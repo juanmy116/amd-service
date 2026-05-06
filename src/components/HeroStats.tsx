@@ -50,7 +50,7 @@ const rowVariants = {
   visible: { opacity: 1, x: 0, transition: { duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] } },
 };
 
-export default function HeroStats() {
+export default function HeroStats({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
 
@@ -59,6 +59,8 @@ export default function HeroStats() {
   const c2 = useCounter(stats[2].numericValue, 1800, inView);
   const counts = [c0, c1, c2];
 
+  const isLight = theme === 'light';
+
   return (
     <motion.div
       ref={ref}
@@ -66,8 +68,8 @@ export default function HeroStats() {
       style={{
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        backgroundColor: 'rgba(11,17,32,0.35)',
-        border: '1px solid rgba(255,255,255,0.1)',
+        backgroundColor: isLight ? 'rgba(255,255,255,0.18)' : 'rgba(11,17,32,0.35)',
+        border: isLight ? '1px solid rgba(255,255,255,0.35)' : '1px solid rgba(255,255,255,0.1)',
       }}
       variants={containerVariants}
       initial="hidden"
@@ -77,15 +79,15 @@ export default function HeroStats() {
         <motion.div
           key={label}
           className="flex items-center gap-5 p-6"
-          style={{ borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.08)' : 'none' }}
+          style={{ borderBottom: i < 2 ? `1px solid ${isLight ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)'}` : 'none' }}
           variants={rowVariants}
         >
-          <Icon className="w-5 h-5 flex-shrink-0" style={{ color: '#BF0D0D' }} />
+          <Icon className="w-5 h-5 flex-shrink-0" style={{ color: isLight ? 'white' : '#BF0D0D' }} />
           <div>
             <div className="text-3xl font-bold text-white" style={{ fontFamily: 'Poppins, sans-serif' }}>
               {formatNumber(counts[i])}{suffix}
             </div>
-            <div className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.65)' }}>{label}</div>
+            <div className="text-sm mt-0.5" style={{ color: isLight ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.65)' }}>{label}</div>
           </div>
         </motion.div>
       ))}
