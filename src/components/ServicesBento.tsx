@@ -1,142 +1,91 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import Link from 'next/link';
 import { motion, useInView, useReducedMotion } from 'framer-motion';
-import { Printer, ShoppingCart, BarChart3, Wrench, Package, Award } from 'lucide-react';
+import { Printer, ShoppingCart, BarChart3, Wrench } from 'lucide-react';
 import { SERVICES } from '@/lib/constants';
 
-type CardConfig = {
-  Icon: React.ElementType;
-  index: number;
-  colSpan: 1 | 2 | 3;
-  featured?: boolean;
-  href: string;
-};
-
-const CARDS: CardConfig[] = [
-  { Icon: Printer,      index: 0, colSpan: 2, featured: true, href: '/services' },
-  { Icon: ShoppingCart, index: 1, colSpan: 1, href: '/services' },
-  { Icon: BarChart3,    index: 2, colSpan: 1, href: '/services' },
-  { Icon: Wrench,       index: 3, colSpan: 1, href: '/services' },
-  { Icon: Package,      index: 4, colSpan: 1, href: '/services' },
-  { Icon: Award,        index: 5, colSpan: 3, href: '/contact' },
+const CARDS = [
+  { Icon: Printer,      index: 0, href: '/services' },
+  { Icon: ShoppingCart, index: 1, href: '/services' },
+  { Icon: BarChart3,    index: 2, href: '/services' },
+  { Icon: Wrench,       index: 3, href: '/services' },
 ];
 
-function BentoCard({ card, animDelay, theme = 'dark' }: { card: CardConfig; animDelay: number; theme?: 'dark' | 'light' }) {
-  const { Icon, index, colSpan, featured, href } = card;
-  const [hovered, setHovered] = useState(false);
-  const [mouse, setMouse] = useState({ x: 50, y: 50 });
-  const ref = useRef<HTMLDivElement>(null);
+function ServiceCard({
+  card,
+  animDelay,
+  theme = 'dark',
+}: {
+  card: typeof CARDS[number];
+  animDelay: number;
+  theme?: 'dark' | 'light';
+}) {
+  const { Icon, index, href } = card;
   const reduced = useReducedMotion();
   const service = SERVICES[index];
   const isLight = theme === 'light';
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    setMouse({
-      x: ((e.clientX - r.left) / r.width) * 100,
-      y: ((e.clientY - r.top) / r.height) * 100,
-    });
-  };
-
-  const colClass =
-    colSpan === 3 ? 'md:col-span-3' : colSpan === 2 ? 'md:col-span-2' : 'md:col-span-1';
-
-  const bgColor = isLight
-    ? (featured ? '#FFFFFF' : '#F9FAFB')
-    : (featured ? '#172033' : '#111827');
-  const borderColor = isLight ? '#E5E7EB' : (featured ? '#BF0D0D' : '#1E2D45');
-  const titleColor = isLight ? '#111827' : '#FFFFFF';
-  const descColor = isLight ? '#6B7280' : '#94A3B8';
-
   return (
     <motion.div
-      ref={ref}
-      className={`relative overflow-hidden border p-6 md:p-8 group cursor-pointer ${colClass}`}
+      className="group relative flex flex-col p-8 border cursor-default transition-colors duration-200"
       style={{
-        backgroundColor: bgColor,
-        borderColor,
-        borderTop: isLight && featured ? '3px solid #BF0D0D' : undefined,
+        backgroundColor: isLight ? '#FFFFFF' : '#111827',
+        borderColor: isLight ? '#E5E7EB' : '#1E2D45',
       }}
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: reduced ? 0 : 0.5, delay: reduced ? 0 : animDelay }}
-      whileHover={reduced ? {} : { scale: 1.015 }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onMouseMove={handleMouseMove}
+      transition={{ duration: reduced ? 0 : 0.4, delay: reduced ? 0 : animDelay }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.backgroundColor = isLight ? '#FAFAFA' : '#172033';
+        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(191,13,13,0.35)';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.backgroundColor = isLight ? '#FFFFFF' : '#111827';
+        (e.currentTarget as HTMLElement).style.borderColor = isLight ? '#E5E7EB' : '#1E2D45';
+      }}
     >
-      {/* Dark theme: featured glow */}
-      {!isLight && featured && (
-        <div className="absolute inset-0 opacity-20 pointer-events-none">
-          <div
-            className="absolute inset-0 blur-3xl"
-            style={{ background: 'radial-gradient(ellipse at 30% 80%, rgba(191,13,13,0.6), transparent 60%)' }}
-          />
-        </div>
-      )}
-
-      {/* Mouse-follow */}
+      {/* Icono */}
       <div
-        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-400 pointer-events-none"
+        className="w-12 h-12 flex items-center justify-center mb-6 border"
         style={{
-          background: `radial-gradient(circle at ${mouse.x}% ${mouse.y}%, ${isLight ? 'rgba(191,13,13,0.05)' : 'rgba(191,13,13,0.08)'}, transparent 55%)`,
+          backgroundColor: isLight ? 'rgba(191,13,13,0.06)' : 'rgba(191,13,13,0.10)',
+          borderColor: isLight ? 'rgba(191,13,13,0.15)' : '#BF0D0D',
         }}
-      />
-
-      {/* Content */}
-      <div className="relative z-10 flex flex-col h-full">
-        <motion.div
-          className="w-11 h-11 flex items-center justify-center mb-5 border transition-colors duration-300"
-          style={{
-            borderColor: isLight ? '#E5E7EB' : '#BF0D0D',
-            background: isLight ? 'rgba(191,13,13,0.06)' : 'rgba(191,13,13,0.10)',
-          }}
-          animate={{ boxShadow: hovered ? '0 0 16px rgba(191,13,13,0.2)' : '0 0 0px rgba(191,13,13,0)' }}
-          transition={{ duration: 0.3 }}
-        >
-          <Icon className="w-5 h-5" style={{ color: '#BF0D0D' }} />
-        </motion.div>
-
-        <h3
-          className={`font-bold mb-3 transition-colors duration-300 ${featured ? 'text-2xl md:text-3xl' : 'text-base md:text-lg'}`}
-          style={{ color: titleColor }}
-        >
-          {service.title_fr}
-        </h3>
-
-        <p className={`leading-relaxed transition-colors duration-300 ${featured ? 'text-base' : 'text-sm'}`}
-          style={{ color: descColor }}>
-          {service.description_fr}
-        </p>
-
-        {/* CTA link */}
-        <motion.div
-          className="mt-auto pt-5"
-          initial={{ opacity: 0, x: -8 }}
-          animate={{ opacity: hovered ? 1 : 0, x: hovered ? 0 : -8 }}
-          transition={{ duration: 0.25 }}
-        >
-          <Link
-            href={href}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold pb-0.5 transition-colors duration-200"
-            style={{ color: '#BF0D0D', borderBottom: '1px solid rgba(191,13,13,0.4)' }}
-          >
-            {index === 5 ? 'Demander un devis' : 'En savoir plus'}
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-        </motion.div>
+      >
+        <Icon className="w-5 h-5" style={{ color: '#BF0D0D' }} />
       </div>
 
-      {/* Hover border */}
-      <div
-        className="absolute inset-0 pointer-events-none transition-colors duration-500"
-        style={{ border: `1px solid ${hovered ? 'rgba(191,13,13,0.3)' : 'transparent'}` }}
-      />
+      {/* Título */}
+      <h3
+        className="text-lg font-bold mb-3"
+        style={{ color: isLight ? '#111827' : '#F1F5F9' }}
+      >
+        {service.title_fr}
+      </h3>
+
+      {/* Descripción */}
+      <p
+        className="text-sm leading-relaxed flex-1"
+        style={{ color: isLight ? '#6B7280' : '#94A3B8' }}
+      >
+        {service.description_fr}
+      </p>
+
+      {/* CTA */}
+      <div className="mt-6 pt-5 border-t" style={{ borderColor: isLight ? '#F3F4F6' : '#1E2D45' }}>
+        <Link
+          href={href}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold transition-opacity duration-150 hover:opacity-70 cursor-pointer"
+          style={{ color: '#BF0D0D' }}
+        >
+          En savoir plus
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      </div>
     </motion.div>
   );
 }
@@ -144,26 +93,13 @@ function BentoCard({ card, animDelay, theme = 'dark' }: { card: CardConfig; anim
 export default function ServicesBento({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
-  const isLight = theme === 'light';
 
   return (
-    <div ref={ref} className="relative">
-      {/* Subtle grid background */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none">
-        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="bento-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke={isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)'} strokeWidth="0.5" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#bento-grid)" />
-        </svg>
-      </div>
-
+    <div ref={ref}>
       {inView && (
-        <div className="relative grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px" style={{ backgroundColor: theme === 'light' ? '#E5E7EB' : '#1E2D45' }}>
           {CARDS.map((card, i) => (
-            <BentoCard key={card.index} card={card} animDelay={i * 0.1} theme={theme} />
+            <ServiceCard key={card.index} card={card} animDelay={i * 0.08} theme={theme} />
           ))}
         </div>
       )}
