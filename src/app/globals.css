@@ -22,12 +22,13 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .service-card {
-  background-color: #BF0D0D;
-  border: 1px solid rgba(255,255,255,0.1);
-  transition: background-color 150ms ease-out;
+  background-color: #111827;
+  border: 1px solid #1E2D45;
+  transition: background-color 150ms ease-out, border-color 150ms ease-out;
 }
 .service-card:hover {
-  background-color: #9A0A0A;
+  background-color: #172033;
+  border-color: rgba(191,13,13,0.4);
 }
 
 .btn-ghost {

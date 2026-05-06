@@ -25,18 +25,24 @@ export default function Footer() {
                 style={{ objectFit: 'contain' }}
               />
             </Link>
-            <p className="text-sm leading-relaxed" style={{ color: '#FFFFFF' }}>
+            <p className="text-sm leading-relaxed" style={{ color: '#94A3B8' }}>
               Location, vente et gestion d&apos;équipements d&apos;impression professionnels à Dakar, Sénégal.
             </p>
           </div>
 
           {/* Nav */}
           <div>
-            <div className="text-xs font-semibold uppercase tracking-widest mb-5" style={{ color: '#FFFFFF' }}>Navigation</div>
+            <div className="text-xs font-semibold uppercase tracking-widest mb-5" style={{ color: '#F1F5F9' }}>Navigation</div>
             <ul className="space-y-3">
               {NAVIGATION.map((item) => (
                 <li key={item.href}>
-                  <Link href={item.href} className="text-sm font-medium transition-colors duration-150 cursor-pointer hover:text-white" style={{ color: '#FFFFFF' }}>
+                  <Link
+                    href={item.href}
+                    className="text-sm font-medium transition-colors duration-150 cursor-pointer"
+                    style={{ color: '#64748B' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#F1F5F9')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#64748B')}
+                  >
                     {item.label}
                   </Link>
                 </li>
@@ -46,11 +52,17 @@ export default function Footer() {
 
           {/* Services */}
           <div>
-            <div className="text-xs font-semibold uppercase tracking-widest mb-5" style={{ color: '#FFFFFF' }}>Services</div>
+            <div className="text-xs font-semibold uppercase tracking-widest mb-5" style={{ color: '#F1F5F9' }}>Services</div>
             <ul className="space-y-3">
               {['Location d\'équipements', 'Vente', 'Maintenance', 'Gestion de parc', 'Impression gérée'].map((item) => (
                 <li key={item}>
-                  <Link href="/services" className="text-sm font-medium transition-colors duration-150 cursor-pointer hover:text-white" style={{ color: '#FFFFFF' }}>
+                  <Link
+                    href="/services"
+                    className="text-sm font-medium transition-colors duration-150 cursor-pointer"
+                    style={{ color: '#64748B' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#F1F5F9')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#64748B')}
+                  >
                     {item}
                   </Link>
                 </li>
@@ -60,21 +72,33 @@ export default function Footer() {
 
           {/* Contact */}
           <div>
-            <div className="text-xs font-semibold uppercase tracking-widest mb-5" style={{ color: '#FFFFFF' }}>Contact</div>
+            <div className="text-xs font-semibold uppercase tracking-widest mb-5" style={{ color: '#F1F5F9' }}>Contact</div>
             <ul className="space-y-4">
               <li className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#BF0D0D' }} />
-                <span className="text-sm font-medium" style={{ color: '#FFFFFF' }}>{FOOTER.address_fr}, Sénégal</span>
+                <span className="text-sm font-medium" style={{ color: '#94A3B8' }}>{FOOTER.address_fr}, Sénégal</span>
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 flex-shrink-0" style={{ color: '#BF0D0D' }} />
-                <a href={`tel:${FOOTER.phone}`} className="text-sm font-medium transition-colors duration-150 cursor-pointer hover:text-white" style={{ color: '#FFFFFF' }}>
+                <a
+                  href={`tel:${FOOTER.phone}`}
+                  className="text-sm font-medium transition-colors duration-150 cursor-pointer"
+                  style={{ color: '#94A3B8' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#F1F5F9')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#94A3B8')}
+                >
                   {FOOTER.phone}
                 </a>
               </li>
               <li className="flex items-center gap-2.5">
                 <Mail className="w-4 h-4 flex-shrink-0" style={{ color: '#BF0D0D' }} />
-                <a href={`mailto:${FOOTER.email}`} className="text-sm font-medium transition-colors duration-150 cursor-pointer hover:text-white" style={{ color: '#FFFFFF' }}>
+                <a
+                  href={`mailto:${FOOTER.email}`}
+                  className="text-sm font-medium transition-colors duration-150 cursor-pointer"
+                  style={{ color: '#94A3B8' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#F1F5F9')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#94A3B8')}
+                >
                   {FOOTER.email}
                 </a>
               </li>
@@ -84,12 +108,19 @@ export default function Footer() {
 
         {/* Bottom */}
         <div className="pt-8 flex flex-col md:flex-row justify-between items-center gap-4" style={{ borderTop: '1px solid #1E2D45' }}>
-          <p className="text-xs" style={{ color: '#FFFFFF' }}>
+          <p className="text-xs" style={{ color: '#475569' }}>
             © {currentYear} AMD Service. Tous droits réservés.
           </p>
           <div className="flex gap-6">
             {['Confidentialité', 'Mentions légales'].map((item) => (
-              <a key={item} href="#" className="text-xs transition-colors duration-150 cursor-pointer hover:text-white" style={{ color: '#FFFFFF' }}>
+              <a
+                key={item}
+                href="#"
+                className="text-xs transition-colors duration-150 cursor-pointer"
+                style={{ color: '#475569' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#94A3B8')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#475569')}
+              >
                 {item}
               </a>
             ))}

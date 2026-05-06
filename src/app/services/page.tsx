@@ -45,14 +45,14 @@ export default function ServicesPage() {
                   key={service.id}
                   className="service-card flex flex-col p-8"
                 >
-                  <Icon className="w-5 h-5 mb-6 text-white" />
+                  <Icon className="w-5 h-5 mb-6" style={{ color: '#BF0D0D' }} />
                   <h3 className="text-lg font-semibold text-white mb-3">{service.title_fr}</h3>
-                  <p className="text-sm leading-relaxed mb-6 text-white">{service.description_fr}</p>
+                  <p className="text-sm leading-relaxed mb-6" style={{ color: '#94A3B8' }}>{service.description_fr}</p>
 
                   <ul className="space-y-2.5 flex-1">
                     {details.map((d) => (
-                      <li key={d} className="flex items-start gap-2.5 text-sm text-white">
-                        <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-white" />
+                      <li key={d} className="flex items-start gap-2.5 text-sm" style={{ color: '#94A3B8' }}>
+                        <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#BF0D0D' }} />
                         {d}
                       </li>
                     ))}

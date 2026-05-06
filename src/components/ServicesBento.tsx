@@ -43,11 +43,14 @@ function BentoCard({ card, animDelay }: { card: CardConfig; animDelay: number })
   const colClass =
     colSpan === 3 ? 'md:col-span-3' : colSpan === 2 ? 'md:col-span-2' : 'md:col-span-1';
 
+  const bgColor = featured ? '#172033' : '#111827';
+  const borderColor = featured ? '#BF0D0D' : '#1E2D45';
+
   return (
     <motion.div
       ref={ref}
       className={`relative overflow-hidden border p-6 md:p-8 group cursor-pointer ${colClass}`}
-      style={{ backgroundColor: '#BF0D0D', borderColor: 'rgba(255,255,255,0.08)' }}
+      style={{ backgroundColor: bgColor, borderColor }}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: reduced ? 0 : 0.5, delay: reduced ? 0 : animDelay }}
@@ -56,46 +59,39 @@ function BentoCard({ card, animDelay }: { card: CardConfig; animDelay: number })
       onMouseLeave={() => setHovered(false)}
       onMouseMove={handleMouseMove}
     >
-      {/* Dark overlay que da el look futurista manteniendo el rojo de base */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.30) 50%, rgba(0,0,0,0.05) 100%)' }}
-      />
-
-      {/* Featured: glow rojo ambiental desde abajo */}
+      {/* Featured: glow rojo ambiental sutil */}
       {featured && (
-        <div className="absolute inset-0 opacity-40 pointer-events-none">
+        <div className="absolute inset-0 opacity-20 pointer-events-none">
           <div
-            className="absolute inset-0 blur-2xl"
-            style={{ background: 'radial-gradient(ellipse at 30% 80%, rgba(255,80,80,0.5), transparent 60%)' }}
+            className="absolute inset-0 blur-3xl"
+            style={{ background: 'radial-gradient(ellipse at 30% 80%, rgba(191,13,13,0.6), transparent 60%)' }}
           />
         </div>
       )}
 
-      {/* Mouse-follow: barrido de luz blanca */}
+      {/* Mouse-follow: barrido de luz roja */}
       <div
         className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-400 pointer-events-none"
-        style={{ background: `radial-gradient(circle at ${mouse.x}% ${mouse.y}%, rgba(255,255,255,0.10), transparent 55%)` }}
+        style={{ background: `radial-gradient(circle at ${mouse.x}% ${mouse.y}%, rgba(191,13,13,0.08), transparent 55%)` }}
       />
 
       {/* Content */}
       <div className="relative z-10 flex flex-col h-full">
         <motion.div
-          className="w-11 h-11 flex items-center justify-center mb-5 border border-white/20 group-hover:border-white/50 transition-colors duration-300"
-          style={{ background: 'rgba(0,0,0,0.30)' }}
-          animate={{ boxShadow: hovered ? '0 0 16px rgba(255,255,255,0.15)' : '0 0 0px rgba(255,255,255,0)' }}
+          className="w-11 h-11 flex items-center justify-center mb-5 border transition-colors duration-300"
+          style={{ borderColor: '#BF0D0D', background: 'rgba(191,13,13,0.10)' }}
+          animate={{ boxShadow: hovered ? '0 0 16px rgba(191,13,13,0.25)' : '0 0 0px rgba(191,13,13,0)' }}
           transition={{ duration: 0.3 }}
         >
-          <Icon className="w-5 h-5 text-white" />
+          <Icon className="w-5 h-5" style={{ color: '#BF0D0D' }} />
         </motion.div>
 
-
-        <h3 className={`font-bold text-white mb-3 group-hover:text-white transition-colors duration-300 ${featured ? 'text-2xl md:text-3xl' : 'text-base md:text-lg'}`}>
+        <h3 className={`font-bold text-white mb-3 transition-colors duration-300 ${featured ? 'text-2xl md:text-3xl' : 'text-base md:text-lg'}`}>
           {service.title_fr}
         </h3>
 
-        <p className={`leading-relaxed group-hover:text-white/90 transition-colors duration-300 ${featured ? 'text-base' : 'text-sm'}`}
-          style={{ color: 'rgba(255,255,255,0.65)' }}>
+        <p className={`leading-relaxed transition-colors duration-300 ${featured ? 'text-base' : 'text-sm'}`}
+          style={{ color: '#94A3B8' }}>
           {service.description_fr}
         </p>
 
@@ -108,7 +104,8 @@ function BentoCard({ card, animDelay }: { card: CardConfig; animDelay: number })
         >
           <Link
             href={href}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/90 hover:text-white border-b border-white/30 pb-0.5 hover:border-white/70 transition-colors duration-200"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold pb-0.5 transition-colors duration-200"
+            style={{ color: '#BF0D0D', borderBottom: '1px solid rgba(191,13,13,0.4)' }}
           >
             {index === 5 ? 'Demander un devis' : 'En savoir plus'}
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,8 +115,11 @@ function BentoCard({ card, animDelay }: { card: CardConfig; animDelay: number })
         </motion.div>
       </div>
 
-      {/* Hover: borde blanco sutil */}
-      <div className="absolute inset-0 border border-white/0 group-hover:border-white/15 transition-colors duration-500 pointer-events-none" />
+      {/* Hover: borde rojo sutil */}
+      <div
+        className="absolute inset-0 pointer-events-none transition-colors duration-500"
+        style={{ border: `1px solid ${hovered ? 'rgba(191,13,13,0.3)' : 'transparent'}` }}
+      />
     </motion.div>
   );
 }
