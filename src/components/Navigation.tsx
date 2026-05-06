@@ -48,8 +48,15 @@ export default function Navigation() {
             })}
           </div>
 
-          {/* CTA */}
-          <div className="hidden md:block">
+          {/* CTA group */}
+          <div className="hidden md:flex items-center gap-3">
+            <Link
+              href="/#plans"
+              className="px-4 py-2 text-sm font-semibold border transition-colors duration-150 cursor-pointer hover:opacity-80"
+              style={{ color: '#BF0D0D', borderColor: '#BF0D0D', backgroundColor: 'transparent' }}
+            >
+              Nos plans
+            </Link>
             <Link
               href="/contact"
               className="inline-flex items-center gap-2 px-5 py-2 text-white text-sm font-semibold transition-opacity duration-150 hover:opacity-80 cursor-pointer"
@@ -91,7 +98,15 @@ export default function Navigation() {
                   </Link>
                 );
               })}
-              <div className="px-4 pt-3">
+              <div className="px-4 pt-3 flex flex-col gap-2">
+                <Link
+                  href="/#plans"
+                  onClick={() => setIsOpen(false)}
+                  className="block w-full text-center px-5 py-2.5 text-sm font-semibold cursor-pointer border"
+                  style={{ color: '#BF0D0D', borderColor: '#BF0D0D', backgroundColor: 'transparent' }}
+                >
+                  Nos plans
+                </Link>
                 <Link
                   href="/contact"
                   onClick={() => setIsOpen(false)}
