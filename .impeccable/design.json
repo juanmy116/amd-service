@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-05T00:00:00Z",
+  "title": "Design System: AMD Service",
+  "extensions": {
+    "colorMeta": {
+      "page-bg":       { "role": "neutral",   "displayName": "Senegal Night",   "canonical": "oklch(8% 0.025 245)",   "tonalRamp": ["#050810","#0B1120","#111827","#172033","#1E2D45","#2D4060","#475569","#64748B"] },
+      "surface":       { "role": "neutral",   "displayName": "Surface Slate",   "canonical": "oklch(12% 0.03 245)",   "tonalRamp": ["#050810","#0B1120","#111827","#172033","#1E2D45","#2D4060","#475569","#64748B"] },
+      "raised":        { "role": "neutral",   "displayName": "Lifted Slate",    "canonical": "oklch(16% 0.04 245)",   "tonalRamp": ["#050810","#0B1120","#111827","#172033","#1E2D45","#2D4060","#475569","#64748B"] },
+      "border":        { "role": "neutral",   "displayName": "Steel Divide",    "canonical": "oklch(22% 0.05 245)",   "tonalRamp": ["#050810","#0B1120","#111827","#172033","#1E2D45","#2D4060","#475569","#64748B"] },
+      "crimson":       { "role": "primary",   "displayName": "AMD Crimson",     "canonical": "oklch(44% 0.27 27)",    "tonalRamp": ["#2C0303","#470505","#6E0707","#9A0A0A","#BF0D0D","#D93030","#E86060","#FDA4A4"] },
+      "crimson-deep":  { "role": "primary",   "displayName": "Deep Crimson",    "canonical": "oklch(38% 0.25 27)",    "tonalRamp": ["#2C0303","#470505","#6E0707","#9A0A0A","#BF0D0D","#D93030","#E86060","#FDA4A4"] },
+      "text-primary":  { "role": "neutral",   "displayName": "Arctic White",    "canonical": "oklch(95% 0.008 245)",  "tonalRamp": ["#1E2D45","#2D4060","#475569","#64748B","#94A3B8","#CBD5E1","#E2E8F0","#F1F5F9"] },
+      "text-secondary":{ "role": "neutral",   "displayName": "Storm Slate",     "canonical": "oklch(68% 0.04 245)",   "tonalRamp": ["#1E2D45","#2D4060","#475569","#64748B","#94A3B8","#CBD5E1","#E2E8F0","#F1F5F9"] },
+      "text-tertiary": { "role": "neutral",   "displayName": "Muted Slate",     "canonical": "oklch(52% 0.04 245)",   "tonalRamp": ["#1E2D45","#2D4060","#475569","#64748B","#94A3B8","#CBD5E1","#E2E8F0","#F1F5F9"] },
+      "text-meta":     { "role": "neutral",   "displayName": "Receded Slate",   "canonical": "oklch(42% 0.04 245)",   "tonalRamp": ["#1E2D45","#2D4060","#475569","#64748B","#94A3B8","#CBD5E1","#E2E8F0","#F1F5F9"] },
+      "error-blush":   { "role": "tertiary",  "displayName": "Error Blush",     "canonical": "oklch(75% 0.16 27)",    "tonalRamp": ["#2C0303","#470505","#6E0707","#9A0A0A","#BF0D0D","#D93030","#E86060","#FDA4A4"] }
+    },
+    "typographyMeta": {
+      "display":   { "displayName": "Display",    "purpose": "H1 único por página. Hero principal." },
+      "headline":  { "displayName": "Headline",   "purpose": "H2 de sección. Un máximo de 3-4 por página." },
+      "title":     { "displayName": "Title",      "purpose": "H3 de tarjeta o componente individual." },
+      "body":      { "displayName": "Body",       "purpose": "Párrafos y descripciones. Máx. 72ch de ancho." },
+      "label":     { "displayName": "Label",      "purpose": "Etiquetas de sección, categorías. Siempre uppercase." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "state-transition", "value": "150ms ease-out", "purpose": "Todos los cambios de estado: hover, focus, active. Nada más lento." }
+    ],
+    "breakpoints": [
+      { "name": "sm",  "value": "640px"  },
+      { "name": "md",  "value": "768px"  },
+      { "name": "lg",  "value": "1024px" },
+      { "name": "xl",  "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "CTA principal. Fondo crimson, sin radio, transición de opacidad en 150ms.",
+      "html": "<button class=\"ds-btn-primary\">Demandez votre audit gratuit <svg class=\"ds-btn-primary__icon\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 8px; background: #BF0D0D; color: #F1F5F9; padding: 12px 24px; font-family: 'Inter', system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; border: none; border-radius: 0; cursor: pointer; transition: background 150ms ease-out; } .ds-btn-primary:hover { background: #9A0A0A; } .ds-btn-primary:focus-visible { outline: 2px solid #BF0D0D; outline-offset: 2px; } .ds-btn-primary__icon { flex-shrink: 0; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "CTA secundario. Sin fondo, borde Steel Divide, transición a texto blanco en hover.",
+      "html": "<button class=\"ds-btn-ghost\">Voir nos services</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: #94A3B8; padding: 12px 24px; font-family: 'Inter', system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; border: 1px solid #1E2D45; border-radius: 0; cursor: pointer; transition: border-color 150ms ease-out, color 150ms ease-out; } .ds-btn-ghost:hover { color: #F1F5F9; border-color: #475569; } .ds-btn-ghost:focus-visible { outline: 2px solid #BF0D0D; outline-offset: 2px; }"
+    },
+    {
+      "name": "Section Label",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Firma visual del sistema. Franja roja + etiqueta en mayúsculas. Precede a cada Headline de sección.",
+      "html": "<div class=\"ds-section-label\"><div class=\"ds-section-label__blade\"></div><span class=\"ds-section-label__text\">Nos solutions</span></div>",
+      "css": ".ds-section-label { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; } .ds-section-label__blade { width: 4px; height: 16px; background: #BF0D0D; flex-shrink: 0; } .ds-section-label__text { font-family: 'Inter', system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #BF0D0D; }"
+    },
+    {
+      "name": "Service Card",
+      "kind": "card",
+      "refersTo": "service-card",
+      "description": "Tarjeta de servicio. Sin radio, borde Steel Divide, hover eleva al tercer plano tonal.",
+      "html": "<div class=\"ds-service-card\"><svg class=\"ds-service-card__icon\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#BF0D0D\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"6 9 6 2 18 2 18 9\"/><path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/><rect width=\"12\" height=\"8\" x=\"6\" y=\"14\"/></svg><h3 class=\"ds-service-card__title\">Location d'équipements</h3><p class=\"ds-service-card__desc\">Accédez à des imprimantes multifonction professionnelles sans investissement initial lourd.</p></div>",
+      "css": ".ds-service-card { background: #111827; border: 1px solid #1E2D45; padding: 32px; cursor: pointer; transition: background 150ms ease-out; } .ds-service-card:hover { background: #172033; } .ds-service-card__icon { margin-bottom: 20px; } .ds-service-card__title { font-family: 'Poppins', system-ui, sans-serif; font-size: 1rem; font-weight: 600; color: #F1F5F9; margin: 0 0 8px 0; } .ds-service-card__desc { font-family: 'Inter', system-ui, sans-serif; font-size: 0.875rem; line-height: 1.5; color: #64748B; margin: 0; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Campo de formulario. Fondo de página, borde Steel Divide, focus en crimson. Sin radio.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Votre nom\" />",
+      "css": ".ds-input { width: 100%; background: #0B1120; color: #F1F5F9; border: 1px solid #1E2D45; border-radius: 0; padding: 12px 16px; font-family: 'Inter', system-ui, sans-serif; font-size: 0.875rem; outline: none; transition: border-color 150ms ease-out; } .ds-input::placeholder { color: #475569; } .ds-input:focus { border-color: #BF0D0D; } .ds-input:disabled { opacity: 0.4; cursor: not-allowed; }"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Navbar sticky. Fondo Senegal Night, borde inferior Steel Divide, activo con subrayado crimson.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav__logo\" href=\"/\"><div class=\"ds-nav__logo-icon\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"white\" stroke-width=\"2\"><polyline points=\"6 9 6 2 18 2 18 9\"/><path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"/><rect width=\"12\" height=\"8\" x=\"6\" y=\"14\"/></svg></div><span class=\"ds-nav__logo-text\">AMD <span class=\"ds-nav__logo-accent\">Service</span></span></a><div class=\"ds-nav__links\"><a class=\"ds-nav__link\" href=\"/\">Accueil</a><a class=\"ds-nav__link ds-nav__link--active\" href=\"/services\">Services</a><a class=\"ds-nav__link\" href=\"/contact\">Contact</a></div></nav>",
+      "css": ".ds-nav { position: sticky; top: 0; z-index: 50; background: #0B1120; border-bottom: 1px solid #1E2D45; display: flex; align-items: center; justify-content: space-between; padding: 0 32px; height: 64px; } .ds-nav__logo { display: flex; align-items: center; gap: 12px; text-decoration: none; } .ds-nav__logo-icon { width: 32px; height: 32px; background: #BF0D0D; display: flex; align-items: center; justify-content: center; flex-shrink: 0; } .ds-nav__logo-text { font-family: 'Poppins', system-ui, sans-serif; font-size: 1.125rem; font-weight: 700; color: #F1F5F9; letter-spacing: -0.01em; } .ds-nav__logo-accent { color: #BF0D0D; } .ds-nav__links { display: flex; gap: 4px; } .ds-nav__link { padding: 8px 16px; font-family: 'Inter', system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; color: #94A3B8; text-decoration: none; border-bottom: 2px solid transparent; transition: color 150ms ease-out, border-color 150ms ease-out; } .ds-nav__link:hover { color: #F1F5F9; } .ds-nav__link--active { color: #BF0D0D; border-bottom-color: #BF0D0D; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Senegal Standard",
+    "overview": "AMD Service lleva más de 10 años siendo el referente técnico de gestión de impresión en Senegal. El sistema de diseño refleja esa autoridad acumulada: no intenta impresionar, simplemente demuestra. La arquitectura visual es oscura, estructurada y precisa — como la sala de máquinas de una empresa que sabe exactamente lo que hace.\n\nLa paleta va de un azul marino profundo hacia capas progresivamente más claras sin recurrir jamás a sombras. La profundidad se construye con color, no con efectos. Los bordes son rectos, las esquinas son cuadradas, los márgenes son generosos.\n\nEste sistema rechaza: el diseño informal o de apariencia barata, las tipografías lúdicas, las plantillas de PYME sin identidad, el SaaS americano con gradientes de neón.",
+    "keyCharacteristics": [
+      "Tema oscuro con capas tonales puras, sin sombras",
+      "Arquitectura cuadrada: cero border-radius en toda la interfaz",
+      "Un solo acento cromático (AMD Crimson) usado con máxima disciplina",
+      "Tipografía bicéfala: Poppins para autoridad, Inter para legibilidad",
+      "Etiquetas de sección con franja roja vertical como firma visual"
+    ],
+    "rules": [
+      { "name": "La Regla del Acento Único",    "body": "El crimson aparece en ≤10% de cualquier pantalla. Su escasez es su fuerza.", "section": "colors" },
+      { "name": "La Regla de las Tres Capas",   "body": "La profundidad se construye únicamente con los tres fondos (#0B1120 → #111827 → #172033). No se añaden capas intermedias.", "section": "colors" },
+      { "name": "La Regla Sin Sombras",         "body": "box-shadow está prohibido en todos los componentes. Si un elemento necesita destacar, se eleva mediante color de fondo, no mediante efecto visual.", "section": "elevation" },
+      { "name": "La Regla del Encabezado Único","body": "Una sola instancia de tipografía Display por página. Más de uno rompe la jerarquía.", "section": "typography" },
+      { "name": "La Regla de la Etiqueta",      "body": "Toda etiqueta de sección lleva: franja roja 4×16px + texto Label en AMD Crimson uppercase. No se simplifica, no se omite.", "section": "typography" }
+    ],
+    "dos": [
+      "Do usar AMD Crimson exclusivamente para CTAs, iconos de acción, estados activos y la franja de sección.",
+      "Do mantener border-radius: 0 en absolutamente todos los elementos.",
+      "Do construir profundidad únicamente con los tres fondos de la escala tonal.",
+      "Do usar la franja roja + etiqueta mayúscula antes de cada encabezado de sección.",
+      "Do mantener el texto de cuerpo en máximo 72 caracteres de ancho.",
+      "Do separar secciones con border: 1px solid #1E2D45.",
+      "Do usar transition-duration: 150ms para todos los cambios de estado."
+    ],
+    "donts": [
+      "Don't usar border-left o border-right mayor de 1px como acento cromático en tarjetas o callouts.",
+      "Don't aplicar box-shadow en ningún componente.",
+      "Don't usar gradientes de ningún tipo.",
+      "Don't redondear esquinas bajo ninguna circunstancia.",
+      "Don't añadir colores fuera de la paleta definida.",
+      "Don't producir un diseño que parezca una plantilla de PYME local, un SaaS americano, o cualquier cosa con tipografías informales.",
+      "Don't usar el rojo como color de fondo de secciones enteras.",
+      "Don't añadir animaciones de entrada, scroll-driven effects ni bounce/elastic."
+    ]
+  }
+}
