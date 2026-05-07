@@ -3,7 +3,6 @@ import HeroVideo from '@/components/HeroVideo';
 import HeroStats from '@/components/HeroStats';
 import HomeStats from '@/components/HomeStats';
 import ServicesBento from '@/components/ServicesBento';
-import BenefitsList from '@/components/BenefitsList';
 import PlanCards from '@/components/PlanCards';
 import ClientLogos from '@/components/ClientLogos';
 import { HERO } from '@/lib/constants';
@@ -46,7 +45,7 @@ export default function Home() {
   return (
     <div style={{ backgroundColor: '#FFFFFF' }}>
 
-      {/* ── Hero ── RED */}
+      {/* 1 ── Hero ── RED */}
       <section className="relative overflow-hidden border-b" style={{ borderColor: '#9A0A0A' }}>
         <HeroVideo />
         <div className="absolute inset-0" style={{ backgroundColor: 'rgba(191,13,13,0.35)', zIndex: 1 }} />
@@ -90,7 +89,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Value bar ── DARK RED */}
+      {/* 2 ── Value bar ── DARK RED */}
       <section className="border-b" style={{ backgroundColor: '#9A0A0A', borderColor: '#8A0909' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="flex flex-wrap justify-center gap-8">
@@ -104,12 +103,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Stats ── WHITE animados */}
-      <section className="border-b" style={{ borderColor: '#E5E7EB' }}>
-        <HomeStats />
-      </section>
-
-      {/* ── Nos solutions ── GREY */}
+      {/* 3 ── Nos solutions ── GREY */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 border-b" style={{ backgroundColor: '#F5F5F5', borderColor: '#E5E7EB' }}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-10">
@@ -128,7 +122,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Plans ── WHITE */}
+      {/* 4 ── Plans ── WHITE */}
       <section id="plans" className="py-16 px-4 sm:px-6 lg:px-8 border-b" style={{ borderColor: '#E5E7EB' }}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-10">
@@ -147,22 +141,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Pourquoi AMD ── GREY */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ backgroundColor: '#F5F5F5', borderColor: '#E5E7EB' }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-14">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
-              <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Pourquoi AMD Service</span>
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold" style={{ color: '#111827' }}>Ce que vous gagnez avec nous</h2>
-          </div>
-          <BenefitsList theme="light" />
-        </div>
-      </section>
+      {/* 5 ── Ils nous font confiance + CTA ── RED */}
+      <ClientLogos />
 
-      {/* ── Support technique ── WHITE */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ borderColor: '#E5E7EB' }}>
+      {/* 6 ── Support technique ── GREY */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ backgroundColor: '#F5F5F5', borderColor: '#E5E7EB' }}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-14">
             <div className="flex items-center gap-2 mb-4">
@@ -176,10 +159,9 @@ export default function Home() {
               Nos techniciens basés à Dakar prennent en charge l&apos;intégralité de vos équipements, de l&apos;installation au suivi quotidien.
             </p>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ backgroundColor: '#E5E7EB' }}>
             {SUPPORT_ITEMS.map(({ Icon, title, desc }) => (
-              <div key={title} className="flex gap-5 p-8" style={{ backgroundColor: '#FFFFFF' }}>
+              <div key={title} className="flex gap-5 p-8" style={{ backgroundColor: '#F5F5F5' }}>
                 <div
                   className="w-10 h-10 flex-shrink-0 flex items-center justify-center border mt-0.5"
                   style={{ borderColor: '#E5E7EB', backgroundColor: 'rgba(191,13,13,0.06)' }}
@@ -196,8 +178,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Ils nous font confiance + CTA ── RED */}
-      <ClientLogos />
+      {/* 7 ── Estadísticas animadas ── WHITE */}
+      <section className="border-b" style={{ borderColor: '#E5E7EB' }}>
+        <HomeStats />
+      </section>
 
     </div>
   );
