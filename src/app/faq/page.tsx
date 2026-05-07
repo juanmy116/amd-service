@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { CTA_MESSAGES } from '@/lib/constants';
+
+// Metadata is defined in a separate server segment; page is client for accordion interactivity.
 import { ChevronDown, ArrowRight } from 'lucide-react';
 
 const FAQ_ITEMS = [

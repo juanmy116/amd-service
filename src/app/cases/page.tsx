@@ -1,5 +1,11 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CTA_MESSAGES } from '@/lib/constants';
+
+export const metadata: Metadata = {
+  title: 'Cas d\'usage — AMD Service',
+  description: 'Découvrez comment des entreprises, administrations et ONG au Sénégal ont réduit leurs coûts d\'impression avec AMD Service.',
+};
 import { Building2, Landmark, Factory, Globe, CheckCircle, ArrowRight } from 'lucide-react';
 
 const CASES = [

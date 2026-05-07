@@ -46,42 +46,36 @@ export const HERO = {
 
 export const BENEFITS = [
   {
-    icon: '💰',
     title_fr: 'Réduction des coûts',
     title_es: 'Reducción de costes',
     description_fr: 'Contrôlez vos dépenses d\'impression avec un modèle de coût par copie transparent.',
     description_es: 'Controla tus gastos de impresión con un modelo de coste por copia transparente.',
   },
   {
-    icon: '🔧',
     title_fr: 'Maintenance incluse',
     title_es: 'Mantenimiento incluido',
     description_fr: 'Toner, pièces et assistance technique : tout est géré par nos experts.',
     description_es: 'Tóner, piezas y asistencia técnica: todo es gestionado por nuestros expertos.',
   },
   {
-    icon: '⚡',
     title_fr: 'Zéro surprise',
     title_es: 'Cero sorpresas',
     description_fr: 'Plus de pannes inattendues ni d\'achats d\'urgence. Continuité garantie.',
     description_es: 'Sin averías inesperadas ni compras urgentes. Continuidad garantizada.',
   },
   {
-    icon: '📊',
     title_fr: 'Visibilité totale',
     title_es: 'Visibilidad total',
     description_fr: 'Analysez votre consommation en temps réel et optimisez votre parque.',
     description_es: 'Analiza tu consumo en tiempo real y optimiza tu parque.',
   },
   {
-    icon: '🤝',
     title_fr: 'Partner de confiance',
     title_es: 'Partner de confianza',
     description_fr: '+10 ans d\'expérience, 1.200+ équipements en location, 2.600+ machines au Sénégal.',
     description_es: '+10 años de experiencia, 1.200+ equipos en alquiler, 2.600+ máquinas en Senegal.',
   },
   {
-    icon: '🌍',
     title_fr: 'Support local',
     title_es: 'Soporte local',
     description_fr: 'Intervention rapide et assistance technique disponible à Dakar.',
@@ -92,7 +86,6 @@ export const BENEFITS = [
 export const SERVICES = [
   {
     id: 'rental',
-    icon: '📠',
     title_fr: 'Location d\'équipements',
     title_es: 'Alquiler de equipos',
     description_fr:
@@ -102,7 +95,6 @@ export const SERVICES = [
   },
   {
     id: 'sales',
-    icon: '🛒',
     title_fr: 'Vente d\'équipements',
     title_es: 'Venta de equipos',
     description_fr: 'Trouvez les équipements professionnels adaptés à vos besoins spécifiques.',
@@ -110,7 +102,6 @@ export const SERVICES = [
   },
   {
     id: 'management',
-    icon: '📋',
     title_fr: 'Gestion de parque',
     title_es: 'Gestión de parque',
     description_fr:
@@ -120,7 +111,6 @@ export const SERVICES = [
   },
   {
     id: 'maintenance',
-    icon: '🔨',
     title_fr: 'Maintenance technique',
     title_es: 'Mantenimiento técnico',
     description_fr: 'Interventions préventives et correctives pour une disponibilité maximale.',
@@ -128,7 +118,6 @@ export const SERVICES = [
   },
   {
     id: 'consumables',
-    icon: '🗂️',
     title_fr: 'Fournitures incluses',
     title_es: 'Suministros incluidos',
     description_fr: 'Toner, pièces détachées et tous les consommables selon votre contrat.',
@@ -136,7 +125,6 @@ export const SERVICES = [
   },
   {
     id: 'managed',
-    icon: '💳',
     title_fr: 'Impression gérée',
     title_es: 'Impresión gestionada',
     description_fr: 'Solution complète avec coût par copie, service et support inclus.',

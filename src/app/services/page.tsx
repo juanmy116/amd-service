@@ -1,5 +1,11 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { SERVICES, CTA_MESSAGES } from '@/lib/constants';
+
+export const metadata: Metadata = {
+  title: 'Nos services — AMD Service',
+  description: 'Location, vente, maintenance et gestion de parcs d\'impression professionnels à Dakar, Sénégal. Solutions tout inclus avec coût par copie transparent.',
+};
 import { Printer, ShoppingCart, BarChart3, Wrench, Package, CreditCard, CheckCircle, ArrowRight } from 'lucide-react';
 
 const SERVICE_ICONS = [Printer, ShoppingCart, BarChart3, Wrench, Package, CreditCard];

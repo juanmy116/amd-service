@@ -1,5 +1,11 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CTA_MESSAGES } from '@/lib/constants';
+
+export const metadata: Metadata = {
+  title: 'Pourquoi AMD Service — AMD Service',
+  description: 'Réduisez vos coûts d\'impression, éliminez les pannes et gagnez en visibilité budgétaire. Découvrez pourquoi des entreprises au Sénégal choisissent AMD Service.',
+};
 import {
   TrendingDown, AlertCircle, Clock, Layers, BarChart3, CheckCircle, ArrowRight,
   Banknote, ShieldCheck, Printer, LayoutDashboard, Headphones, Users

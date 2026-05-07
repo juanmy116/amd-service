@@ -90,8 +90,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 2 ── Value bar ── DARK RED */}
-      <section className="border-b" style={{ backgroundColor: '#9A0A0A', borderColor: '#8A0909' }}>
+      {/* 2 ── Value bar ── DARK */}
+      <section className="border-b" style={{ backgroundColor: '#111827', borderColor: '#1E2D45' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="flex flex-wrap justify-center gap-8">
             {['Zéro investissement initial', 'Maintenance incluse', 'Coût par copie transparent', 'Support local Dakar'].map((item) => (

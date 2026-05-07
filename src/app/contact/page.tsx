@@ -1,5 +1,11 @@
+import type { Metadata } from 'next';
 import ContactForm from '@/components/ContactForm';
 import { FOOTER } from '@/lib/constants';
+
+export const metadata: Metadata = {
+  title: 'Contact — AMD Service',
+  description: 'Contactez AMD Service pour un diagnostic gratuit de votre parc d\'impression. Réponse garantie sous 24h. Basés à Dakar, Sénégal.',
+};
 import { MapPin, Phone, Mail, Clock, CheckCircle } from 'lucide-react';
 
 export default function ContactPage() {

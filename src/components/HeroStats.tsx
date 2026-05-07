@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
-import { Award, Printer, Users } from 'lucide-react';
+import { Award, Printer, Monitor } from 'lucide-react';
 import { SOCIAL_PROOF } from '@/lib/constants';
 
 function useCounter(target: number, duration: number, active: boolean) {
@@ -30,7 +30,7 @@ function useCounter(target: number, duration: number, active: boolean) {
 const stats = [
   { numericValue: 10, suffix: '+', label: SOCIAL_PROOF.description_fr, icon: Award },
   { numericValue: 1200, suffix: '+', label: SOCIAL_PROOF.equipments_label_fr, icon: Printer },
-  { numericValue: 2600, suffix: '+', label: SOCIAL_PROOF.machines_label_fr, icon: Users },
+  { numericValue: 2600, suffix: '+', label: SOCIAL_PROOF.machines_label_fr, icon: Monitor },
 ];
 
 function formatNumber(n: number) {
