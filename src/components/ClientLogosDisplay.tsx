@@ -1,59 +1,77 @@
 'use client';
 
 import Image from 'next/image';
-import { motion, useInView } from 'framer-motion';
-import { useRef } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 
 export default function ClientLogosDisplay({ logos }: { logos: string[] }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: '-60px' });
+  const reduced = useReducedMotion();
 
   if (logos.length === 0) return null;
 
-  return (
-    <section style={{ backgroundColor: '#BF0D0D' }} className="py-20 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
+  const doubled = [...logos, ...logos];
 
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-          <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>
+  return (
+    <section
+      className="py-12 overflow-hidden border-t-4 border-b"
+      style={{ backgroundColor: '#FFFFFF', borderTopColor: '#BF0D0D', borderBottomColor: '#E5E7EB' }}
+    >
+
+      {/* Encabezado */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8 text-center">
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
+          <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>
             Références
           </span>
         </div>
         <h2
-          className="text-3xl md:text-4xl font-bold text-white mb-14"
-          style={{ fontFamily: 'Poppins, sans-serif' }}
+          className="text-3xl md:text-4xl font-bold"
+          style={{ color: '#111827', fontFamily: 'Poppins, sans-serif' }}
         >
           Ils nous font confiance
         </h2>
+      </div>
 
+      {/* Carrusel — ancho completo */}
+      <div className="relative">
+        {/* Fade izquierda */}
         <div
-          ref={ref}
-          className="flex flex-wrap justify-center items-center gap-x-14 gap-y-10"
+          className="absolute left-0 top-0 bottom-0 w-32 z-10 pointer-events-none"
+          style={{ background: 'linear-gradient(to right, #FFFFFF, transparent)' }}
+        />
+        {/* Fade derecha */}
+        <div
+          className="absolute right-0 top-0 bottom-0 w-32 z-10 pointer-events-none"
+          style={{ background: 'linear-gradient(to left, #FFFFFF, transparent)' }}
+        />
+
+        <motion.div
+          className="flex items-center"
+          style={{ width: 'max-content' }}
+          animate={reduced ? {} : { x: ['0%', '-50%'] }}
+          transition={{
+            repeat: Infinity,
+            ease: 'linear',
+            duration: 30,
+          }}
         >
-          {logos.map((src, i) => (
-            <motion.div
-              key={src}
-              initial={{ opacity: 0, y: 12 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.4, delay: i * 0.08 }}
-            >
+          {doubled.map((src, i) => (
+            <div key={i} className="flex-shrink-0 px-12">
               <Image
                 src={src}
-                alt={`Client ${i + 1}`}
-                width={130}
-                height={60}
+                alt={`Client ${(i % logos.length) + 1}`}
+                width={120}
+                height={56}
                 style={{
                   objectFit: 'contain',
-                  filter: 'brightness(0) invert(1)',
                   opacity: 0.85,
                 }}
               />
-            </motion.div>
+            </div>
           ))}
-        </div>
-
+        </motion.div>
       </div>
+
     </section>
   );
 }
