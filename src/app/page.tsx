@@ -3,9 +3,10 @@ import HeroVideo from '@/components/HeroVideo';
 import HeroStats from '@/components/HeroStats';
 import HomeStats from '@/components/HomeStats';
 import ServicesBento from '@/components/ServicesBento';
+import BenefitsList from '@/components/BenefitsList';
 import PlanCards from '@/components/PlanCards';
 import ClientLogos from '@/components/ClientLogos';
-import { HERO } from '@/lib/constants';
+import { HERO, CTA_MESSAGES } from '@/lib/constants';
 import { ArrowRight, Clock, Wrench, BarChart3, Headphones, ShieldCheck, Repeat } from 'lucide-react';
 
 const SUPPORT_ITEMS = [
@@ -181,6 +182,44 @@ export default function Home() {
       {/* 7 ── Estadísticas animadas ── WHITE */}
       <section className="border-b" style={{ borderColor: '#E5E7EB' }}>
         <HomeStats />
+      </section>
+
+      {/* 8 ── Pourquoi AMD ── GREY */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ backgroundColor: '#F5F5F5', borderColor: '#E5E7EB' }}>
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-14">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
+              <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Pourquoi AMD Service</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold" style={{ color: '#111827' }}>Ce que vous gagnez avec nous</h2>
+          </div>
+          <BenefitsList theme="light" />
+        </div>
+      </section>
+
+      {/* 9 ── CTA final ── RED */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-2 mb-6">
+            <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Prochaine étape</span>
+          </div>
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            Prêt à maîtriser vos coûts d&apos;impression ?
+          </h2>
+          <p className="text-lg mb-8" style={{ color: 'rgba(255,255,255,0.85)' }}>
+            Obtenez un diagnostic gratuit de votre parc, sans engagement.
+          </p>
+          <Link
+            href="/contact"
+            className="inline-flex items-center gap-2 px-8 py-4 font-semibold transition-opacity duration-150 hover:opacity-90 cursor-pointer"
+            style={{ backgroundColor: '#FFFFFF', color: '#BF0D0D' }}
+          >
+            {CTA_MESSAGES.audit_fr}
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
       </section>
 
     </div>
