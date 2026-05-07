@@ -9,7 +9,7 @@ export default function ClientLogos() {
     logos = fs.readdirSync(dir)
       .filter((f) => /\.(png|jpg|jpeg|webp|svg)$/i.test(f))
       .sort()
-      .map((f) => `/images/logos-clientes/${f}`);
+      .map((f) => `/images/logos-clientes/${encodeURIComponent(f)}`);
   } catch {
     logos = [];
   }

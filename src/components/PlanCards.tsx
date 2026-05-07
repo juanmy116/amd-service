@@ -11,19 +11,19 @@ const PLANS = [
     id: 'pantum-cm1100',
     model: 'Pantum CM1100',
     type: 'A4 — Couleur & Monochrome',
-    image: '/images/copiers-1.jpg',
+    image: '/images/copiers-1.png',
   },
   {
     id: 'ricoh-mpc2003',
     model: 'Ricoh MP C2003',
     type: 'A4 / A3 — Monochrome & Couleur',
-    image: '/images/copiers-2.jpg',
+    image: '/images/copiers-2.png',
   },
   {
     id: 'ricoh-mpc3003',
     model: 'Ricoh MP C3003',
     type: 'A4 / A3 — Monochrome & Couleur',
-    image: '/images/copiers-3.jpg',
+    image: '/images/copiers-3.png',
   },
 ];
 
