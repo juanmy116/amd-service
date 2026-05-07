@@ -12,8 +12,8 @@ export default function ClientLogosDisplay({ logos }: { logos: string[] }) {
 
   return (
     <section
-      className="py-12 overflow-hidden border-t-4 border-b"
-      style={{ backgroundColor: '#FFFFFF', borderTopColor: '#BF0D0D', borderBottomColor: '#E5E7EB' }}
+      className="py-12 overflow-hidden border-t-4 border-b-4"
+      style={{ backgroundColor: '#FFFFFF', borderTopColor: '#BF0D0D', borderBottomColor: '#BF0D0D' }}
     >
 
       {/* Encabezado */}
@@ -52,7 +52,7 @@ export default function ClientLogosDisplay({ logos }: { logos: string[] }) {
           transition={{
             repeat: Infinity,
             ease: 'linear',
-            duration: 30,
+            duration: 45,
           }}
         >
           {doubled.map((src, i) => (
@@ -60,8 +60,8 @@ export default function ClientLogosDisplay({ logos }: { logos: string[] }) {
               <Image
                 src={src}
                 alt={`Client ${(i % logos.length) + 1}`}
-                width={120}
-                height={56}
+                width={150}
+                height={70}
                 style={{
                   objectFit: 'contain',
                   opacity: 0.85,

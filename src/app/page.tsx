@@ -129,7 +129,7 @@ export default function Home() {
           <div className="mb-10">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
-              <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Nos équipements</span>
+              <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Nos plans de Location</span>
             </div>
             <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: '#111827' }}>
               Choisissez votre plan
@@ -179,8 +179,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 7 ── Estadísticas animadas ── WHITE */}
-      <section className="border-b" style={{ borderColor: '#E5E7EB' }}>
+      {/* 7 ── Estadísticas animadas ── RED */}
+      <section>
         <HomeStats />
       </section>
 

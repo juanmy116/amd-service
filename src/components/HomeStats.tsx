@@ -53,7 +53,7 @@ export default function HomeStats() {
     <motion.div
       ref={ref}
       className="grid grid-cols-1 md:grid-cols-3 gap-px"
-      style={{ backgroundColor: '#E5E7EB' }}
+      style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
       variants={containerVariants}
       initial="hidden"
       animate={inView ? 'visible' : 'hidden'}
@@ -62,16 +62,16 @@ export default function HomeStats() {
         <motion.div
           key={label}
           className="flex flex-col items-center justify-center py-14 px-8 text-center"
-          style={{ backgroundColor: '#FFFFFF' }}
+          style={{ backgroundColor: '#BF0D0D' }}
           variants={itemVariants}
         >
           <div
             className="text-5xl font-bold mb-2"
-            style={{ fontFamily: 'Poppins, sans-serif', color: '#BF0D0D' }}
+            style={{ fontFamily: 'Poppins, sans-serif', color: '#FFFFFF' }}
           >
             {formatNumber(counts[i])}{suffix}
           </div>
-          <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6B7280' }}>
+          <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.75)' }}>
             {label}
           </div>
         </motion.div>

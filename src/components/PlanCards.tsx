@@ -67,15 +67,16 @@ export default function PlanCards() {
           {/* Content */}
           <div className="flex flex-col flex-1 p-8">
             <h3
-              className="text-xl font-bold mb-1"
+              className="text-xl font-bold mb-1 text-center"
               style={{ color: '#111827', fontFamily: 'Poppins, sans-serif' }}
             >
               {plan.model}
             </h3>
-            <p className="text-sm mb-6" style={{ color: '#6B7280' }}>{plan.type}</p>
+            <p className="text-sm mb-6 text-center" style={{ color: '#6B7280' }}>{plan.type}</p>
 
             {/* Price */}
-            <div className="mb-6 pb-6 border-b" style={{ borderColor: '#F3F4F6' }}>
+            <div className="mb-6 pb-6 border-b text-center" style={{ borderColor: '#F3F4F6' }}>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: '#6B7280' }}>Dès</p>
               <span
                 className="text-3xl font-bold"
                 style={{ color: '#BF0D0D', fontFamily: 'Poppins, sans-serif' }}
@@ -86,10 +87,10 @@ export default function PlanCards() {
             </div>
 
             {/* Included */}
-            <ul className="space-y-3 flex-1 mb-8">
+            <ul className="flex-1 mb-8" style={{ backgroundColor: '#BF0D0D' }}>
               {INCLUDED.map((item) => (
-                <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#374151' }}>
-                  <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#BF0D0D' }} />
+                <li key={item} className="flex items-start gap-2.5 text-sm px-5 py-3 border-b" style={{ color: '#FFFFFF', borderColor: 'rgba(255,255,255,0.15)' }}>
+                  <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-white" />
                   {item}
                 </li>
               ))}
