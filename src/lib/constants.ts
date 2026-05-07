@@ -12,14 +12,14 @@ export const SITE = {
 export const BRANDING = {
   primary: '#BF0D0D',
   primaryDeep: '#9A0A0A',
-  pageBg: '#0B1120',
-  surface: '#111827',
-  raised: '#172033',
-  border: '#1E2D45',
-  textPrimary: '#F1F5F9',
-  textSecondary: '#94A3B8',
-  textTertiary: '#64748B',
-  textMeta: '#475569',
+  pageBg: '#FFFFFF',
+  surface: '#F5F5F5',
+  raised: '#EFEFEF',
+  border: '#E5E7EB',
+  textPrimary: '#111827',
+  textSecondary: '#6B7280',
+  textTertiary: '#9CA3AF',
+  textMeta: '#374151',
 };
 
 export const NAVIGATION = [
