@@ -51,13 +51,6 @@ export default function Navigation() {
           {/* CTA group */}
           <div className="hidden md:flex items-center gap-3">
             <Link
-              href="/#plans"
-              className="px-4 py-2 text-sm font-semibold border transition-colors duration-150 cursor-pointer hover:opacity-80"
-              style={{ color: '#BF0D0D', borderColor: '#BF0D0D', backgroundColor: 'transparent' }}
-            >
-              Nos plans
-            </Link>
-            <Link
               href="/contact"
               className="inline-flex items-center gap-2 px-5 py-2 text-white text-sm font-semibold transition-opacity duration-150 hover:opacity-80 cursor-pointer"
               style={{ backgroundColor: '#BF0D0D' }}
@@ -71,7 +64,7 @@ export default function Navigation() {
             onClick={() => setIsOpen(!isOpen)}
             className="md:hidden p-2 transition-colors cursor-pointer"
             style={{ color: '#94A3B8' }}
-            aria-label={isOpen ? 'Fermer' : 'Menu'}
+            aria-label={isOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
           >
             {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -98,15 +91,7 @@ export default function Navigation() {
                   </Link>
                 );
               })}
-              <div className="px-4 pt-3 flex flex-col gap-2">
-                <Link
-                  href="/#plans"
-                  onClick={() => setIsOpen(false)}
-                  className="block w-full text-center px-5 py-2.5 text-sm font-semibold cursor-pointer border"
-                  style={{ color: '#BF0D0D', borderColor: '#BF0D0D', backgroundColor: 'transparent' }}
-                >
-                  Nos plans
-                </Link>
+              <div className="px-4 pt-3">
                 <Link
                   href="/contact"
                   onClick={() => setIsOpen(false)}

@@ -66,7 +66,7 @@ export const BENEFITS = [
   {
     title_fr: 'Visibilité totale',
     title_es: 'Visibilidad total',
-    description_fr: 'Analysez votre consommation en temps réel et optimisez votre parque.',
+    description_fr: 'Analysez votre consommation en temps réel et optimisez votre parc.',
     description_es: 'Analiza tu consumo en tiempo real y optimiza tu parque.',
   },
   {
@@ -89,7 +89,7 @@ export const SERVICES = [
     title_fr: 'Location d\'équipements',
     title_es: 'Alquiler de equipos',
     description_fr:
-      'Accédez à des imprimantes et fotocopieuses multifunction professionnelles sans investissement initial lourd.',
+      'Accédez à des imprimantes et photocopieuses multifonctions professionnelles sans investissement initial lourd.',
     description_es:
       'Accede a impresoras y fotocopiadoras multifunción profesionales sin inversión inicial fuerte.',
   },
@@ -102,7 +102,7 @@ export const SERVICES = [
   },
   {
     id: 'management',
-    title_fr: 'Gestion de parque',
+    title_fr: 'Gestion de parc',
     title_es: 'Gestión de parque',
     description_fr:
       'Suivi, optimisation et contrôle centralisé de tous vos équipements d\'impression.',

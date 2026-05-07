@@ -135,7 +135,7 @@ export default function WhyPage() {
               Un contrat d&apos;impression se décide sur la confiance
             </h2>
             <p className="text-sm leading-relaxed" style={{ color: '#6B7280' }}>
-              Les images doivent soutenir cette impression : des échanges sérieux, des documents examinés, une logique de conseil et de pilotage plutôt qu&apos;un catalogue froid.
+              Choisir un partenaire pour la gestion de votre impression, c&apos;est choisir quelqu&apos;un qui comprend vos contraintes budgétaires, vos délais et votre organisation. Depuis plus de 10 ans, AMD Service construit des relations durables avec ses clients au Sénégal, en plaçant la transparence et la réactivité au cœur de chaque contrat.
             </p>
           </div>
         </div>

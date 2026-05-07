@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import HeroVideo from '@/components/HeroVideo';
 import HeroStats from '@/components/HeroStats';
-import HomeStats from '@/components/HomeStats';
 import ServicesBento from '@/components/ServicesBento';
 import BenefitsList from '@/components/BenefitsList';
 import PlanCards from '@/components/PlanCards';
 import ClientLogos from '@/components/ClientLogos';
+import PhotoFrame from '@/components/PhotoFrame';
 import { HERO, CTA_MESSAGES } from '@/lib/constants';
+import { PHOTO_ASSETS, PHOTO_CREDITS } from '@/lib/visuals';
 import { ArrowRight, Clock, Wrench, BarChart3, Headphones, ShieldCheck, Repeat } from 'lucide-react';
 
 const SUPPORT_ITEMS = [
@@ -49,7 +50,6 @@ export default function Home() {
       {/* 1 ── Hero ── RED */}
       <section className="relative overflow-hidden border-b" style={{ borderColor: '#9A0A0A' }}>
         <HeroVideo />
-        <div className="absolute inset-0" style={{ backgroundColor: 'rgba(191,13,13,0.35)', zIndex: 1 }} />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-36" style={{ zIndex: 2 }}>
           <div className="grid md:grid-cols-3 gap-16 items-center">
 
@@ -104,7 +104,38 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 3 ── Nos solutions ── GREY */}
+      {/* 3 ── Service proof ── WHITE */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8 border-b" style={{ borderColor: '#E5E7EB' }}>
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-px" style={{ backgroundColor: '#E5E7EB' }}>
+          <div className="p-8 md:p-10 lg:col-span-2" style={{ backgroundColor: '#FFFFFF' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
+              <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Sur le terrain</span>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4" style={{ color: '#111827' }}>
+              La confiance commence par un parc lisible
+            </h2>
+            <p className="text-sm leading-relaxed mb-6" style={{ color: '#6B7280' }}>
+              Chaque contrat AMD Service est construit autour d&apos;un seul objectif : que votre parc ne s&apos;arrête jamais. Équipements récents, toner livré avant rupture, technicien disponible à Dakar — tout est inclus dès le premier jour.
+            </p>
+            <Link
+              href="/services"
+              className="inline-flex items-center gap-2 text-sm font-semibold transition-opacity duration-150 hover:opacity-70"
+              style={{ color: '#BF0D0D' }}
+            >
+              Voir l&apos;approche service <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <PhotoFrame
+            src={PHOTO_ASSETS.printerDetail}
+            alt="Imprimante professionnelle installée dans un espace de bureau"
+            credit={PHOTO_CREDITS.printerDetail}
+            className="h-[320px] border-0 lg:col-span-3"
+          />
+        </div>
+      </section>
+
+      {/* 4 ── Nos solutions ── GREY */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 border-b" style={{ backgroundColor: '#F5F5F5', borderColor: '#E5E7EB' }}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-10">
@@ -123,7 +154,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4 ── Plans ── WHITE */}
+      {/* 5 ── Plans ── WHITE */}
       <section id="plans" className="py-16 px-4 sm:px-6 lg:px-8 border-b" style={{ borderColor: '#E5E7EB' }}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-10">
@@ -142,10 +173,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 5 ── Ils nous font confiance + CTA ── RED */}
+      {/* 6 ── Ils nous font confiance + CTA ── RED */}
       <ClientLogos />
 
-      {/* 6 ── Support technique ── GREY */}
+      {/* 7 ── Support technique ── GREY */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ backgroundColor: '#F5F5F5', borderColor: '#E5E7EB' }}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-14">
@@ -179,11 +210,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 7 ── Estadísticas animadas ── RED */}
-      <section>
-        <HomeStats />
-      </section>
-
       {/* 8 ── Pourquoi AMD ── GREY */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ backgroundColor: '#F5F5F5', borderColor: '#E5E7EB' }}>
         <div className="max-w-7xl mx-auto">
@@ -198,7 +224,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 9 ── CTA final ── RED */}
+      {/* 10 ── CTA final ── RED */}
       <section className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 mb-6">

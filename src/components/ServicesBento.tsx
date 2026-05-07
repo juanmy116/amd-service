@@ -16,10 +16,12 @@ const CARDS = [
 function ServiceCard({
   card,
   animDelay,
+  inView,
   theme = 'dark',
 }: {
   card: typeof CARDS[number];
   animDelay: number;
+  inView: boolean;
   theme?: 'dark' | 'light';
 }) {
   const { Icon, index, href } = card;
@@ -35,7 +37,7 @@ function ServiceCard({
         borderColor: isLight ? '#E5E7EB' : '#1E2D45',
       }}
       initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: reduced ? 0 : 0.4, delay: reduced ? 0 : animDelay }}
       onMouseEnter={e => {
         (e.currentTarget as HTMLElement).style.backgroundColor = isLight ? '#FAFAFA' : '#172033';
@@ -94,13 +96,11 @@ export default function ServicesBento({ theme = 'dark' }: { theme?: 'dark' | 'li
 
   return (
     <div ref={ref}>
-      {inView && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px" style={{ backgroundColor: theme === 'light' ? '#E5E7EB' : '#1E2D45' }}>
-          {CARDS.map((card, i) => (
-            <ServiceCard key={card.index} card={card} animDelay={i * 0.08} theme={theme} />
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px" style={{ backgroundColor: theme === 'light' ? '#E5E7EB' : '#1E2D45' }}>
+        {CARDS.map((card, i) => (
+          <ServiceCard key={card.index} card={card} animDelay={i * 0.08} inView={inView} theme={theme} />
+        ))}
+      </div>
     </div>
   );
 }
