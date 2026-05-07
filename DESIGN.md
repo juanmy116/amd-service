@@ -273,7 +273,7 @@ Los bordes de separación son siempre `1px solid #E5E7EB`. En grids de tarjetas 
 
 ### Don't:
 - **Don't** usar `box-shadow` en ningún componente.
-- **Don't** usar gradientes de ningún tipo.
+- **Don't** usar gradientes decorativos. **Excepción documentada:** el marquee de logos clientes usa `linear-gradient` en los bordes izquierdo/derecho como fade funcional para el efecto de carrusel, no como decoración.
 - **Don't** redondear esquinas. Ni `rounded-sm`, ni `rounded-full`.
 - **Don't** poner dos secciones rojas seguidas sin una sección clara entre ellas.
 - **Don't** usar texto oscuro sobre fondo rojo. Solo blanco.

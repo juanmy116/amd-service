@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import Link from 'next/link';
 import { motion, useInView, useReducedMotion } from 'framer-motion';
-import { Printer, ShoppingCart, BarChart3, Wrench } from 'lucide-react';
+import { Printer, ShoppingCart, BarChart3, Wrench, ArrowRight } from 'lucide-react';
 import { SERVICES } from '@/lib/constants';
 
 const CARDS = [
@@ -81,9 +81,7 @@ function ServiceCard({
           style={{ color: '#BF0D0D' }}
         >
           En savoir plus
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
+          <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
     </motion.div>
