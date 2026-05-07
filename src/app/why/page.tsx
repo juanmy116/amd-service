@@ -1,15 +1,17 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import PhotoFrame from '@/components/PhotoFrame';
 import { CTA_MESSAGES } from '@/lib/constants';
+import { PHOTO_ASSETS, PHOTO_CREDITS } from '@/lib/visuals';
+import {
+  TrendingDown, AlertCircle, Clock, Layers, BarChart3, CheckCircle, ArrowRight,
+  Banknote, ShieldCheck, Printer, LayoutDashboard, Headphones, Users
+} from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Pourquoi AMD Service — AMD Service',
   description: 'Réduisez vos coûts d\'impression, éliminez les pannes et gagnez en visibilité budgétaire. Découvrez pourquoi des entreprises au Sénégal choisissent AMD Service.',
 };
-import {
-  TrendingDown, AlertCircle, Clock, Layers, BarChart3, CheckCircle, ArrowRight,
-  Banknote, ShieldCheck, Printer, LayoutDashboard, Headphones, Users
-} from 'lucide-react';
 
 const PROBLEMS = [
   { icon: Banknote, title: 'Coûts imprévisibles', description: 'Achats d\'urgence de toner, réparations non planifiées et dépenses dispersées rendent le budget d\'impression incontrôlable.' },
@@ -44,17 +46,26 @@ export default function WhyPage() {
 
       {/* Hero — RED */}
       <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Pourquoi AMD Service</span>
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-px" style={{ backgroundColor: 'rgba(255,255,255,0.22)' }}>
+          <div className="p-8 md:p-12 lg:col-span-3" style={{ backgroundColor: '#BF0D0D' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
+              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Pourquoi AMD Service</span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+              De la gestion chaotique au contrôle total
+            </h1>
+            <p className="text-lg max-w-3xl" style={{ color: 'rgba(255,255,255,0.85)' }}>
+              Vos équipements d&apos;impression sont censés soutenir votre activité, pas la freiner.
+            </p>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            De la gestion chaotique au contrôle total
-          </h1>
-          <p className="text-lg max-w-3xl" style={{ color: 'rgba(255,255,255,0.85)' }}>
-            Vos équipements d&apos;impression sont censés soutenir votre activité, pas la freiner.
-          </p>
+          <PhotoFrame
+            src={PHOTO_ASSETS.financeReview}
+            alt="Conseillers analysant des documents et un ordinateur pendant une réunion"
+            credit={PHOTO_CREDITS.financeReview}
+            priority
+            className="h-[320px] border-0 lg:col-span-2 lg:h-full"
+          />
         </div>
       </section>
 
@@ -102,6 +113,30 @@ export default function WhyPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Field image — WHITE */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8 border-b" style={{ borderColor: '#E5E7EB' }}>
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-px" style={{ backgroundColor: '#E5E7EB' }}>
+          <PhotoFrame
+            src={PHOTO_ASSETS.boardroomPlanning}
+            alt="Réunion de planification autour de documents et d'un ordinateur portable"
+            credit={PHOTO_CREDITS.boardroomPlanning}
+            className="h-[320px] border-0 lg:col-span-3"
+          />
+          <div className="p-8 md:p-10 lg:col-span-2" style={{ backgroundColor: '#FFFFFF' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
+              <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Décision B2B</span>
+            </div>
+            <h2 className="text-2xl font-bold mb-4" style={{ color: '#111827' }}>
+              Un contrat d&apos;impression se décide sur la confiance
+            </h2>
+            <p className="text-sm leading-relaxed" style={{ color: '#6B7280' }}>
+              Les images doivent soutenir cette impression : des échanges sérieux, des documents examinés, une logique de conseil et de pilotage plutôt qu&apos;un catalogue froid.
+            </p>
           </div>
         </div>
       </section>

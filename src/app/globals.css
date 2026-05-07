@@ -41,6 +41,14 @@ h1, h2, h3, h4, h5, h6 {
   color: #111827;
 }
 
+/* Focus ring for keyboard navigation — links, buttons, accordion */
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid #BF0D0D;
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

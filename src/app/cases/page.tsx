@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import PhotoFrame from '@/components/PhotoFrame';
 import { CTA_MESSAGES } from '@/lib/constants';
+import { PHOTO_ASSETS, PHOTO_CREDITS } from '@/lib/visuals';
+import { Building2, Landmark, Factory, Globe, CheckCircle, ArrowRight } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Cas d\'usage — AMD Service',
   description: 'Découvrez comment des entreprises, administrations et ONG au Sénégal ont réduit leurs coûts d\'impression avec AMD Service.',
 };
-import { Building2, Landmark, Factory, Globe, CheckCircle, ArrowRight } from 'lucide-react';
 
 const CASES = [
   {
@@ -18,6 +20,9 @@ const CASES = [
     solution: 'AMD Service a remplacé l\'ensemble du parc par des équipements récents, mis en place un contrat de coût par copie avec maintenance incluse et un système de suivi centralisé.',
     results: ['Réduction de 35% des coûts', 'Zéro arrêt de production', 'Visibilité totale sur la consommation', 'Équipe IT libérée'],
     metric: '−35%', metricLabel: 'de coûts',
+    image: PHOTO_ASSETS.boardroomPlanning,
+    imageAlt: 'Équipe dirigeante discutant des coûts et de la gestion documentaire',
+    credit: PHOTO_CREDITS.boardroomPlanning,
   },
   {
     id: 'administration',
@@ -28,6 +33,9 @@ const CASES = [
     solution: 'Déploiement d\'un parc unifié avec contrat SLA incluant intervention sous 4h, fourniture de consommables et reporting mensuel pour la direction financière.',
     results: ['Intervention en moins de 4 heures', 'Interlocuteur unique', 'Reporting mensuel', 'Aucune rupture en 12 mois'],
     metric: '<4h', metricLabel: 'd\'intervention',
+    image: PHOTO_ASSETS.printerDetail,
+    imageAlt: 'Équipement multifonction professionnel prêt pour un environnement administratif',
+    credit: PHOTO_CREDITS.printerDetail,
   },
   {
     id: 'pme',
@@ -38,6 +46,9 @@ const CASES = [
     solution: 'Location de 8 multifonctions A3/A4 couleur avec toner inclus et maintenance garantie. Mensualités fixes, aucun apport initial.',
     results: ['Zéro investissement initial', 'Équipements de dernière génération', 'Coût mensuel prévisible', 'Productivité immédiate'],
     metric: '0 FCFA', metricLabel: 'd\'investissement',
+    image: PHOTO_ASSETS.advisoryMeeting,
+    imageAlt: 'Conseil professionnel autour de documents de projet',
+    credit: PHOTO_CREDITS.advisoryMeeting,
   },
   {
     id: 'ngo',
@@ -48,6 +59,9 @@ const CASES = [
     solution: 'Contrat tout inclus avec coût par copie, reporting détaillé par département et facture unique mensuelle alignée avec les exigences des bailleurs.',
     results: ['Reporting par département', 'Facture unique justifiable', 'Conformité bailleurs', 'Réduction de 28%'],
     metric: '−28%', metricLabel: 'économisé',
+    image: PHOTO_ASSETS.financeReview,
+    imageAlt: 'Analyse budgétaire et reporting dans un cadre professionnel',
+    credit: PHOTO_CREDITS.financeReview,
   },
 ];
 
@@ -73,7 +87,7 @@ export default function CasesPage() {
       <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ backgroundColor: '#F5F5F5', borderColor: '#E5E7EB' }}>
         <div className="max-w-7xl mx-auto space-y-px" style={{ backgroundColor: '#E5E7EB' }}>
           {CASES.map((c) => (
-            <div key={c.id} className="grid grid-cols-1 lg:grid-cols-4" style={{ backgroundColor: '#FFFFFF' }}>
+            <div key={c.id} className="grid grid-cols-1 lg:grid-cols-5" style={{ backgroundColor: '#FFFFFF' }}>
 
               {/* Metric */}
               <div className="flex flex-col items-center justify-center p-10 border-b lg:border-b-0 lg:border-r text-center" style={{ borderColor: '#E5E7EB' }}>
@@ -82,6 +96,13 @@ export default function CasesPage() {
                 <div className="text-xs uppercase tracking-widest mb-3" style={{ color: '#9CA3AF' }}>{c.metricLabel}</div>
                 <div className="text-xs font-semibold px-2 py-1 text-white" style={{ backgroundColor: '#BF0D0D' }}>{c.sector}</div>
               </div>
+
+              <PhotoFrame
+                src={c.image}
+                alt={c.imageAlt}
+                credit={c.credit}
+                className="h-64 border-0 lg:h-full"
+              />
 
               {/* Content */}
               <div className="lg:col-span-3 p-10">
@@ -135,7 +156,7 @@ export default function CasesPage() {
             </Link>
             <Link
               href="/services"
-              className="btn-ghost inline-flex items-center gap-2 px-8 py-4 font-semibold border cursor-pointer text-white"
+              className="inline-flex items-center gap-2 px-8 py-4 font-semibold border cursor-pointer text-white transition-opacity duration-150 hover:opacity-80"
               style={{ borderColor: 'rgba(255,255,255,0.4)' }}
             >
               Voir nos services

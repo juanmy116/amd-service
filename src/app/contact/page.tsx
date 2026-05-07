@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import ContactForm from '@/components/ContactForm';
+import PhotoFrame from '@/components/PhotoFrame';
 import { FOOTER } from '@/lib/constants';
+import { PHOTO_ASSETS, PHOTO_CREDITS } from '@/lib/visuals';
+import { MapPin, Phone, Mail, Clock, CheckCircle } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Contact — AMD Service',
   description: 'Contactez AMD Service pour un diagnostic gratuit de votre parc d\'impression. Réponse garantie sous 24h. Basés à Dakar, Sénégal.',
 };
-import { MapPin, Phone, Mail, Clock, CheckCircle } from 'lucide-react';
 
 export default function ContactPage() {
   return (
@@ -42,6 +44,12 @@ export default function ContactPage() {
 
             {/* Sidebar */}
             <div className="space-y-px" style={{ backgroundColor: '#E5E7EB' }}>
+              <PhotoFrame
+                src={PHOTO_ASSETS.financeReview}
+                alt="Échange professionnel autour d'un diagnostic et de documents"
+                credit={PHOTO_CREDITS.financeReview}
+                className="h-64 border-0"
+              />
 
               {/* Contact info */}
               <div className="p-6" style={{ backgroundColor: '#FFFFFF' }}>

@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 
-const inputClass = "w-full px-4 py-3 text-sm border focus:outline-none focus:border-red-700 transition-colors duration-150";
+const inputClass = "w-full px-4 py-3 text-sm border focus:outline-none focus:border-[#BF0D0D] transition-colors duration-150";
 const inputStyle = { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', color: '#111827' };
 
 export default function ContactForm() {
@@ -59,7 +59,7 @@ export default function ContactForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="border p-4 text-sm" style={{ borderColor: '#BF0D0D', color: '#BF0D0D', backgroundColor: 'rgba(191,13,13,0.05)' }}>
+        <div role="alert" className="border p-4 text-sm" style={{ borderColor: '#BF0D0D', color: '#BF0D0D', backgroundColor: 'rgba(191,13,13,0.05)' }}>
           {error}
         </div>
       )}

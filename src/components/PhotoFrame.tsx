@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 type PhotoFrameProps = {
   src: string;
   alt: string;
@@ -18,11 +20,13 @@ export default function PhotoFrame({
       className={`relative overflow-hidden border ${className}`}
       style={{ borderColor: '#E5E7EB', backgroundColor: '#F5F5F5' }}
     >
-      <img
+      <Image
         src={src}
         alt={alt}
-        loading={priority ? 'eager' : 'lazy'}
-        className="h-full w-full object-cover"
+        fill
+        priority={priority}
+        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 40vw"
+        className="object-cover"
       />
       {credit && (
         <figcaption

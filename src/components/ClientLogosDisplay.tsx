@@ -55,20 +55,23 @@ export default function ClientLogosDisplay({ logos }: { logos: string[] }) {
             duration: 45,
           }}
         >
-          {doubled.map((src, i) => (
-            <div key={i} className="flex-shrink-0 px-12">
-              <Image
-                src={src}
-                alt={`Client ${(i % logos.length) + 1}`}
-                width={150}
-                height={70}
-                style={{
-                  objectFit: 'contain',
-                  opacity: 0.85,
-                }}
-              />
-            </div>
-          ))}
+          {doubled.map((src, i) => {
+            const name = src.split('/').pop()?.replace(/\.\w+$/, '').replace(/[-_]/g, ' ') ?? `Logo client ${(i % logos.length) + 1}`;
+            return (
+              <div key={i} className="flex-shrink-0 px-12">
+                <Image
+                  src={src}
+                  alt={name}
+                  width={150}
+                  height={70}
+                  style={{
+                    objectFit: 'contain',
+                    opacity: 0.85,
+                  }}
+                />
+              </div>
+            );
+          })}
         </motion.div>
       </div>
 

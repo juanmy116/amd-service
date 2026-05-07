@@ -53,10 +53,8 @@ export default function BenefitsList({ theme = 'dark' }: { theme?: 'dark' | 'lig
             {/* Texto */}
             <div className="flex-1 min-w-0">
               <h3
-                className="font-semibold mb-1 transition-colors duration-200"
-                style={{ fontSize: '0.9375rem', color: isLight ? '#111827' : '#FFFFFF' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#BF0D0D'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = isLight ? '#111827' : '#FFFFFF'; }}
+                className={`font-semibold mb-1 transition-colors duration-200 group-hover:text-[#BF0D0D] ${isLight ? 'text-[#111827]' : 'text-white'}`}
+                style={{ fontSize: '0.9375rem' }}
               >
                 {benefit.title_fr}
               </h3>
