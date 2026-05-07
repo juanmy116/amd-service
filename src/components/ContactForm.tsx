@@ -65,31 +65,50 @@ export default function ContactForm() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <input type="text" name="name" placeholder="Votre nom" required className={inputClass} style={inputStyle} />
-        <input type="email" name="email" placeholder="Votre email" required className={inputClass} style={inputStyle} />
+        <div>
+          <label htmlFor="name" className="sr-only">Votre nom</label>
+          <input id="name" type="text" name="name" placeholder="Votre nom" required className={inputClass} style={inputStyle} />
+        </div>
+        <div>
+          <label htmlFor="email" className="sr-only">Votre email</label>
+          <input id="email" type="email" name="email" placeholder="Votre email" required className={inputClass} style={inputStyle} />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <input type="text" name="company" placeholder="Votre entreprise" required className={inputClass} style={inputStyle} />
-        <input type="tel" name="phone" placeholder="Votre téléphone" required className={inputClass} style={inputStyle} />
+        <div>
+          <label htmlFor="company" className="sr-only">Votre entreprise</label>
+          <input id="company" type="text" name="company" placeholder="Votre entreprise" required className={inputClass} style={inputStyle} />
+        </div>
+        <div>
+          <label htmlFor="phone" className="sr-only">Votre téléphone</label>
+          <input id="phone" type="tel" name="phone" placeholder="Votre téléphone" required className={inputClass} style={inputStyle} />
+        </div>
       </div>
 
-      <select name="needs" required className={inputClass} style={inputStyle}>
-        <option value="">Sélectionnez votre besoin</option>
-        <option value="rental">Location d&apos;équipements</option>
-        <option value="sales">Achat d&apos;équipements</option>
-        <option value="management">Gestion de parc</option>
-        <option value="maintenance">Maintenance</option>
-        <option value="other">Autre</option>
-      </select>
+      <div>
+        <label htmlFor="needs" className="sr-only">Votre besoin</label>
+        <select id="needs" name="needs" required className={inputClass} style={inputStyle}>
+          <option value="">Sélectionnez votre besoin</option>
+          <option value="rental">Location d&apos;équipements</option>
+          <option value="sales">Achat d&apos;équipements</option>
+          <option value="management">Gestion de parc</option>
+          <option value="maintenance">Maintenance</option>
+          <option value="other">Autre</option>
+        </select>
+      </div>
 
-      <textarea
-        name="message"
-        placeholder="Votre message (optionnel)"
-        rows={4}
-        className={inputClass}
-        style={inputStyle}
-      />
+      <div>
+        <label htmlFor="message" className="sr-only">Votre message</label>
+        <textarea
+          id="message"
+          name="message"
+          placeholder="Votre message (optionnel)"
+          rows={4}
+          className={inputClass}
+          style={inputStyle}
+        />
+      </div>
 
       <button
         type="submit"

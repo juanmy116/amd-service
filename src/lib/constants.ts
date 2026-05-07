@@ -164,6 +164,6 @@ export const FOOTER = {
   contact_es: 'Contacto',
   address_fr: 'Dakar, Sénégal',
   address_es: 'Dakar, Senegal',
-  phone: '+221 (à compléter)',
-  email: 'contact@amd-service.com',
+  phone: '+221 33 824 18 61',
+  email: 'info@amd-service.com',
 };

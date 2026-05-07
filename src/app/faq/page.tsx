@@ -1,11 +1,9 @@
-'use client';
-
-import { useState } from 'react';
 import Link from 'next/link';
+import PhotoFrame from '@/components/PhotoFrame';
+import AccordionItem from '@/components/AccordionItem';
 import { CTA_MESSAGES } from '@/lib/constants';
-
-// Metadata is defined in a separate server segment; page is client for accordion interactivity.
-import { ChevronDown, ArrowRight } from 'lucide-react';
+import { PHOTO_ASSETS, PHOTO_CREDITS } from '@/lib/visuals';
+import { ArrowRight } from 'lucide-react';
 
 const FAQ_ITEMS = [
   {
@@ -49,55 +47,30 @@ const FAQ_ITEMS = [
   },
 ];
 
-function AccordionItem({ q, a }: { q: string; a: string }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="border-b" style={{ borderColor: '#E5E7EB' }}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-0 py-5 text-left transition-colors duration-150 cursor-pointer"
-        aria-expanded={open}
-      >
-        <span className="font-medium pr-8" style={{ color: '#111827' }}>{q}</span>
-        <ChevronDown
-          className="w-4 h-4 flex-shrink-0 transition-transform duration-200"
-          style={{
-            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-            color: open ? '#BF0D0D' : '#9CA3AF',
-          }}
-        />
-      </button>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateRows: open ? '1fr' : '0fr',
-          transition: 'grid-template-rows 200ms ease-out',
-        }}
-      >
-        <div style={{ overflow: 'hidden' }}>
-          <p className="pb-5 text-sm leading-relaxed" style={{ color: '#6B7280' }}>{a}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function FAQPage() {
   return (
     <div style={{ backgroundColor: '#FFFFFF' }}>
 
       {/* Hero — RED */}
       <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>FAQ</span>
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-px" style={{ backgroundColor: 'rgba(255,255,255,0.22)' }}>
+          <div className="p-8 md:p-12 lg:col-span-3" style={{ backgroundColor: '#BF0D0D' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
+              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>FAQ</span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Questions fréquentes</h1>
+            <p className="text-lg max-w-2xl" style={{ color: 'rgba(255,255,255,0.85)' }}>
+              Toutes les réponses sur AMD Service, nos solutions et nos contrats.
+            </p>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Questions fréquentes</h1>
-          <p className="text-lg max-w-2xl" style={{ color: 'rgba(255,255,255,0.85)' }}>
-            Toutes les réponses sur AMD Service, nos solutions et nos contrats.
-          </p>
+          <PhotoFrame
+            src={PHOTO_ASSETS.advisoryMeeting}
+            alt="Conseillers répondant à des questions commerciales autour de documents"
+            credit={PHOTO_CREDITS.advisoryMeeting}
+            priority
+            className="h-[300px] border-0 lg:col-span-2 lg:h-full"
+          />
         </div>
       </section>
 
@@ -119,6 +92,30 @@ export default function FAQPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Visual support — GREY */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8 border-b" style={{ backgroundColor: '#F5F5F5', borderColor: '#E5E7EB' }}>
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-px" style={{ backgroundColor: '#E5E7EB' }}>
+          <PhotoFrame
+            src={PHOTO_ASSETS.printerDetail}
+            alt="Imprimante multifonction professionnelle utilisée pour un parc d'entreprise"
+            credit={PHOTO_CREDITS.printerDetail}
+            className="h-[280px] border-0 lg:col-span-2"
+          />
+          <div className="p-8 md:p-10 lg:col-span-3" style={{ backgroundColor: '#FFFFFF' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
+              <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Avant de démarrer</span>
+            </div>
+            <h2 className="text-2xl font-bold mb-3" style={{ color: '#111827' }}>
+              Les bonnes réponses viennent d&apos;un parc bien observé
+            </h2>
+            <p className="text-sm leading-relaxed" style={{ color: '#6B7280' }}>
+              Volume, usages couleur, disponibilité attendue, maintenance et consommables : le diagnostic clarifie les règles avant toute proposition.
+            </p>
+          </div>
         </div>
       </section>
 
