@@ -47,54 +47,54 @@ const CASES = [
 
 export default function CasesPage() {
   return (
-    <div style={{ backgroundColor: '#0B1120' }}>
+    <div style={{ backgroundColor: '#FFFFFF' }}>
 
-      {/* Hero */}
-      <section className="border-b py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#111827', borderColor: '#1E2D45' }}>
+      {/* Hero — RED */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
-            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Cas d&apos;usage</span>
+            <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Cas d&apos;usage</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Des résultats concrets</h1>
-          <p className="text-lg max-w-3xl" style={{ color: '#94A3B8' }}>
+          <p className="text-lg max-w-3xl" style={{ color: 'rgba(255,255,255,0.85)' }}>
             Comment des entreprises et organisations au Sénégal ont transformé leur gestion de l&apos;impression avec AMD Service.
           </p>
         </div>
       </section>
 
-      {/* Cases */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto space-y-px" style={{ backgroundColor: '#1E2D45' }}>
+      {/* Cases — GREY */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ backgroundColor: '#F5F5F5', borderColor: '#E5E7EB' }}>
+        <div className="max-w-7xl mx-auto space-y-px" style={{ backgroundColor: '#E5E7EB' }}>
           {CASES.map((c) => (
-            <div key={c.id} className="grid grid-cols-1 lg:grid-cols-4" style={{ backgroundColor: '#111827' }}>
+            <div key={c.id} className="grid grid-cols-1 lg:grid-cols-4" style={{ backgroundColor: '#FFFFFF' }}>
 
               {/* Metric */}
-              <div className="flex flex-col items-center justify-center p-10 border-b lg:border-b-0 lg:border-r text-center" style={{ borderColor: '#1E2D45' }}>
+              <div className="flex flex-col items-center justify-center p-10 border-b lg:border-b-0 lg:border-r text-center" style={{ borderColor: '#E5E7EB' }}>
                 <c.Icon className="w-6 h-6 mb-4" style={{ color: '#BF0D0D' }} />
-                <div className="text-4xl font-bold text-white mb-1" style={{ fontFamily: 'Poppins, sans-serif' }}>{c.metric}</div>
-                <div className="text-xs uppercase tracking-widest mb-3" style={{ color: '#64748B' }}>{c.metricLabel}</div>
+                <div className="text-4xl font-bold mb-1" style={{ color: '#111827', fontFamily: 'Poppins, sans-serif' }}>{c.metric}</div>
+                <div className="text-xs uppercase tracking-widest mb-3" style={{ color: '#9CA3AF' }}>{c.metricLabel}</div>
                 <div className="text-xs font-semibold px-2 py-1 text-white" style={{ backgroundColor: '#BF0D0D' }}>{c.sector}</div>
               </div>
 
               {/* Content */}
               <div className="lg:col-span-3 p-10">
-                <h2 className="text-xl font-bold text-white mb-6">{c.title}</h2>
+                <h2 className="text-xl font-bold mb-6" style={{ color: '#111827' }}>{c.title}</h2>
                 <div className="grid md:grid-cols-2 gap-8 mb-8">
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#64748B' }}>Le problème</div>
-                    <p className="text-sm leading-relaxed" style={{ color: '#94A3B8' }}>{c.problem}</p>
+                    <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#9CA3AF' }}>Le problème</div>
+                    <p className="text-sm leading-relaxed" style={{ color: '#6B7280' }}>{c.problem}</p>
                   </div>
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#64748B' }}>La solution</div>
-                    <p className="text-sm leading-relaxed" style={{ color: '#94A3B8' }}>{c.solution}</p>
+                    <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#9CA3AF' }}>La solution</div>
+                    <p className="text-sm leading-relaxed" style={{ color: '#6B7280' }}>{c.solution}</p>
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#64748B' }}>Résultats</div>
+                  <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#9CA3AF' }}>Résultats</div>
                   <div className="grid grid-cols-2 gap-2">
                     {c.results.map((r) => (
-                      <div key={r} className="flex items-start gap-2 text-sm" style={{ color: '#94A3B8' }}>
+                      <div key={r} className="flex items-start gap-2 text-sm" style={{ color: '#374151' }}>
                         <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#BF0D0D' }} />
                         {r}
                       </div>
@@ -102,39 +102,42 @@ export default function CasesPage() {
                   </div>
                 </div>
               </div>
+
             </div>
           ))}
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#111827', borderTop: '1px solid #1E2D45' }}>
+      {/* CTA — RED */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 mb-6">
-            <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
-            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Votre diagnostic</span>
+            <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Votre diagnostic</span>
           </div>
           <h2 className="text-3xl font-bold text-white mb-4">Quelle économie pour votre entreprise ?</h2>
-          <p className="text-lg mb-8" style={{ color: '#94A3B8' }}>
+          <p className="text-lg mb-8" style={{ color: 'rgba(255,255,255,0.85)' }}>
             Chaque situation est unique. Contactez-nous pour un diagnostic personnalisé et gratuit.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <Link
               href="/contact"
-              className="inline-flex items-center gap-2 px-8 py-4 text-white font-semibold transition-opacity duration-150 hover:opacity-80 cursor-pointer"
-              style={{ backgroundColor: '#BF0D0D' }}
+              className="inline-flex items-center gap-2 px-8 py-4 font-semibold transition-opacity duration-150 hover:opacity-90 cursor-pointer"
+              style={{ backgroundColor: '#FFFFFF', color: '#BF0D0D' }}
             >
               {CTA_MESSAGES.audit_fr} <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               href="/services"
-              className="btn-ghost inline-flex items-center gap-2 px-8 py-4 font-semibold border cursor-pointer"
+              className="btn-ghost inline-flex items-center gap-2 px-8 py-4 font-semibold border cursor-pointer text-white"
+              style={{ borderColor: 'rgba(255,255,255,0.4)' }}
             >
               Voir nos services
             </Link>
           </div>
         </div>
       </section>
+
     </div>
   );
 }

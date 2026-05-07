@@ -51,18 +51,18 @@ function AccordionItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="border-b" style={{ borderColor: '#1E2D45' }}>
+    <div className="border-b" style={{ borderColor: '#E5E7EB' }}>
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between px-0 py-5 text-left transition-colors duration-150 cursor-pointer"
         aria-expanded={open}
       >
-        <span className="font-medium text-white pr-8">{q}</span>
+        <span className="font-medium pr-8" style={{ color: '#111827' }}>{q}</span>
         <ChevronDown
           className="w-4 h-4 flex-shrink-0 transition-transform duration-200"
           style={{
             transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-            color: open ? '#BF0D0D' : '#64748B',
+            color: open ? '#BF0D0D' : '#9CA3AF',
           }}
         />
       </button>
@@ -74,7 +74,7 @@ function AccordionItem({ q, a }: { q: string; a: string }) {
         }}
       >
         <div style={{ overflow: 'hidden' }}>
-          <p className="pb-5 text-sm leading-relaxed" style={{ color: '#94A3B8' }}>{a}</p>
+          <p className="pb-5 text-sm leading-relaxed" style={{ color: '#6B7280' }}>{a}</p>
         </div>
       </div>
     </div>
@@ -83,24 +83,24 @@ function AccordionItem({ q, a }: { q: string; a: string }) {
 
 export default function FAQPage() {
   return (
-    <div style={{ backgroundColor: '#0B1120' }}>
+    <div style={{ backgroundColor: '#FFFFFF' }}>
 
-      {/* Hero */}
-      <section className="border-b py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#111827', borderColor: '#1E2D45' }}>
+      {/* Hero — RED */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
-            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>FAQ</span>
+            <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>FAQ</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Questions fréquentes</h1>
-          <p className="text-lg max-w-2xl" style={{ color: '#94A3B8' }}>
+          <p className="text-lg max-w-2xl" style={{ color: 'rgba(255,255,255,0.85)' }}>
             Toutes les réponses sur AMD Service, nos solutions et nos contrats.
           </p>
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
+      {/* FAQ — WHITE */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ borderColor: '#E5E7EB' }}>
         <div className="max-w-3xl mx-auto">
           {FAQ_ITEMS.map((group, gi) => (
             <div key={group.category} className={gi > 0 ? 'mt-14' : ''}>
@@ -120,24 +120,25 @@ export default function FAQPage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 border-t" style={{ backgroundColor: '#111827', borderColor: '#1E2D45' }}>
+      {/* CTA — RED */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-3xl mx-auto">
           <div className="flex items-center gap-2 mb-6">
-            <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
-            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Nous contacter</span>
+            <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Nous contacter</span>
           </div>
           <h2 className="text-2xl font-bold text-white mb-3">Vous ne trouvez pas votre réponse ?</h2>
-          <p className="mb-6" style={{ color: '#94A3B8' }}>Notre équipe répond à toutes vos questions spécifiques.</p>
+          <p className="mb-6" style={{ color: 'rgba(255,255,255,0.85)' }}>Notre équipe répond à toutes vos questions spécifiques.</p>
           <Link
             href="/contact"
-            className="inline-flex items-center gap-2 px-6 py-3 text-white font-semibold transition-opacity duration-150 hover:opacity-80 cursor-pointer"
-            style={{ backgroundColor: '#BF0D0D' }}
+            className="inline-flex items-center gap-2 px-6 py-3 font-semibold transition-opacity duration-150 hover:opacity-90 cursor-pointer"
+            style={{ backgroundColor: '#FFFFFF', color: '#BF0D0D' }}
           >
             {CTA_MESSAGES.contact_fr} <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
+
     </div>
   );
 }

@@ -34,66 +34,65 @@ const COMPARISON = [
 
 export default function WhyPage() {
   return (
-    <div style={{ backgroundColor: '#0B1120' }}>
+    <div style={{ backgroundColor: '#FFFFFF' }}>
 
-      {/* Hero */}
-      <section className="border-b py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#111827', borderColor: '#1E2D45' }}>
+      {/* Hero — RED */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
-            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Pourquoi AMD Service</span>
+            <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Pourquoi AMD Service</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
             De la gestion chaotique au contrôle total
           </h1>
-          <p className="text-lg max-w-3xl" style={{ color: '#94A3B8' }}>
+          <p className="text-lg max-w-3xl" style={{ color: 'rgba(255,255,255,0.85)' }}>
             Vos équipements d&apos;impression sont censés soutenir votre activité, pas la freiner.
           </p>
         </div>
       </section>
 
-      {/* Problems */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ borderColor: '#1E2D45' }}>
+      {/* Problems — GREY */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ backgroundColor: '#F5F5F5', borderColor: '#E5E7EB' }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Le problème</span>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Les problèmes que vous connaissez</h2>
-          <p className="mb-10" style={{ color: '#64748B' }}>La gestion de l&apos;impression en interne génère des coûts cachés et des frustrations quotidiennes.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ backgroundColor: '#1E2D45' }}>
+          <h2 className="text-2xl font-bold mb-2" style={{ color: '#111827' }}>Les problèmes que vous connaissez</h2>
+          <p className="mb-10" style={{ color: '#6B7280' }}>La gestion de l&apos;impression en interne génère des coûts cachés et des frustrations quotidiennes.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ backgroundColor: '#E5E7EB' }}>
             {PROBLEMS.map(({ icon: Icon, title, description }) => (
-              <div key={title} className="p-6" style={{ backgroundColor: '#111827' }}>
+              <div key={title} className="p-6" style={{ backgroundColor: '#FFFFFF' }}>
                 <Icon className="w-5 h-5 mb-4" style={{ color: '#BF0D0D' }} />
-                <h3 className="font-semibold text-white mb-2">{title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: '#64748B' }}>{description}</p>
+                <h3 className="font-semibold mb-2" style={{ color: '#111827' }}>{title}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: '#6B7280' }}>{description}</p>
               </div>
             ))}
-            {/* Filler to complete grid */}
-            <div className="p-6 hidden lg:flex flex-col items-center justify-center gap-3 text-center" style={{ backgroundColor: '#111827' }}>
+            <div className="p-6 hidden lg:flex flex-col items-center justify-center gap-3 text-center" style={{ backgroundColor: '#FFFFFF' }}>
               <div className="w-1 h-8 mx-auto" style={{ backgroundColor: '#BF0D0D' }} />
-              <p className="text-sm font-medium text-white">AMD Service transforme chaque problème en solution.</p>
+              <p className="text-sm font-medium" style={{ color: '#111827' }}>AMD Service transforme chaque problème en solution.</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Solutions */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ borderColor: '#1E2D45' }}>
+      {/* Solutions — WHITE */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ borderColor: '#E5E7EB' }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Notre réponse</span>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Ce que nous apportons</h2>
-          <p className="mb-10" style={{ color: '#64748B' }}>Une solution globale, pensée pour les entreprises au Sénégal.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ backgroundColor: '#1E2D45' }}>
+          <h2 className="text-2xl font-bold mb-2" style={{ color: '#111827' }}>Ce que nous apportons</h2>
+          <p className="mb-10" style={{ color: '#6B7280' }}>Une solution globale, pensée pour les entreprises au Sénégal.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ backgroundColor: '#E5E7EB' }}>
             {SOLUTIONS.map(({ icon: Icon, title, description }) => (
-              <div key={title} className="flex gap-4 p-6" style={{ backgroundColor: '#111827' }}>
+              <div key={title} className="flex gap-4 p-6" style={{ backgroundColor: '#FFFFFF' }}>
                 <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#BF0D0D' }} />
                 <div>
-                  <h3 className="font-semibold text-white mb-1">{title}</h3>
-                  <p className="text-sm leading-relaxed" style={{ color: '#64748B' }}>{description}</p>
+                  <h3 className="font-semibold mb-1" style={{ color: '#111827' }}>{title}</h3>
+                  <p className="text-sm leading-relaxed" style={{ color: '#6B7280' }}>{description}</p>
                 </div>
               </div>
             ))}
@@ -101,16 +100,16 @@ export default function WhyPage() {
         </div>
       </section>
 
-      {/* Comparison */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ borderColor: '#1E2D45' }}>
+      {/* Comparison — GREY */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 border-b" style={{ backgroundColor: '#F5F5F5', borderColor: '#E5E7EB' }}>
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Comparatif</span>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Achat direct vs AMD Service</h2>
-          <p className="mb-10" style={{ color: '#64748B' }}>Comparez objectivement avant de décider.</p>
-          <div className="border overflow-hidden" style={{ borderColor: '#1E2D45' }}>
+          <h2 className="text-2xl font-bold mb-2" style={{ color: '#111827' }}>Achat direct vs AMD Service</h2>
+          <p className="mb-10" style={{ color: '#6B7280' }}>Comparez objectivement avant de décider.</p>
+          <div className="border overflow-hidden" style={{ borderColor: '#E5E7EB' }}>
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ backgroundColor: '#BF0D0D' }}>
@@ -121,9 +120,9 @@ export default function WhyPage() {
               </thead>
               <tbody>
                 {COMPARISON.map((row, i) => (
-                  <tr key={row.criteria} style={{ backgroundColor: i % 2 === 0 ? '#111827' : '#0B1120', borderTop: '1px solid #1E2D45' }}>
-                    <td className="px-6 py-4 font-medium text-white">{row.criteria}</td>
-                    <td className="px-6 py-4 text-center" style={{ color: '#64748B' }}>{row.achat}</td>
+                  <tr key={row.criteria} style={{ backgroundColor: i % 2 === 0 ? '#FFFFFF' : '#F9FAFB', borderTop: '1px solid #E5E7EB' }}>
+                    <td className="px-6 py-4 font-medium" style={{ color: '#111827' }}>{row.criteria}</td>
+                    <td className="px-6 py-4 text-center" style={{ color: '#6B7280' }}>{row.achat}</td>
                     <td className="px-6 py-4 text-center">
                       <span className="inline-flex items-center gap-1.5 font-semibold" style={{ color: '#BF0D0D' }}>
                         <CheckCircle className="w-3.5 h-3.5" />
@@ -138,24 +137,25 @@ export default function WhyPage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#111827' }}>
+      {/* CTA — RED */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 mb-6">
-            <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
-            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Prochaine étape</span>
+            <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Prochaine étape</span>
           </div>
           <h2 className="text-3xl font-bold text-white mb-4">Prêt à reprendre le contrôle ?</h2>
-          <p className="text-lg mb-8" style={{ color: '#94A3B8' }}>Demandez un audit gratuit de votre parc d&apos;impression, sans engagement.</p>
+          <p className="text-lg mb-8" style={{ color: 'rgba(255,255,255,0.85)' }}>Demandez un audit gratuit de votre parc d&apos;impression, sans engagement.</p>
           <Link
             href="/contact"
-            className="inline-flex items-center gap-2 px-8 py-4 text-white font-semibold transition-opacity duration-150 hover:opacity-80 cursor-pointer"
-            style={{ backgroundColor: '#BF0D0D' }}
+            className="inline-flex items-center gap-2 px-8 py-4 font-semibold transition-opacity duration-150 hover:opacity-90 cursor-pointer"
+            style={{ backgroundColor: '#FFFFFF', color: '#BF0D0D' }}
           >
             {CTA_MESSAGES.audit_fr} <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
+
     </div>
   );
 }

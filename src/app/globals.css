@@ -2,17 +2,17 @@
 @import "tailwindcss";
 
 :root {
-  --bg-page:    #0B1120;
-  --bg-surface: #111827;
-  --bg-raised:  #172033;
-  --border:     #1E2D45;
+  --bg-page:    #FFFFFF;
+  --bg-surface: #F5F5F5;
+  --bg-raised:  #EFEFEF;
+  --border:     #E5E7EB;
   --red:        #BF0D0D;
   --red-dark:   #9A0A0A;
 }
 
 body {
-  background-color: #0B1120;
-  color: #F1F5F9;
+  background-color: #FFFFFF;
+  color: #111827;
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -22,23 +22,23 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .service-card {
-  background-color: #111827;
-  border: 1px solid #1E2D45;
+  background-color: #FFFFFF;
+  border: 1px solid #E5E7EB;
   transition: background-color 150ms ease-out, border-color 150ms ease-out;
 }
 .service-card:hover {
-  background-color: #172033;
+  background-color: #FFF5F5;
   border-color: rgba(191,13,13,0.4);
 }
 
 .btn-ghost {
-  border-color: #1E2D45;
-  color: #94A3B8;
+  border-color: #E5E7EB;
+  color: #6B7280;
   transition: border-color 150ms ease-out, color 150ms ease-out;
 }
 .btn-ghost:hover {
-  border-color: #475569;
-  color: #F1F5F9;
+  border-color: #BF0D0D;
+  color: #111827;
 }
 
 @media (prefers-reduced-motion: reduce) {

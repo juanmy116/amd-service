@@ -2,8 +2,8 @@
 
 import { FormEvent, useState } from 'react';
 
-const inputClass = "w-full px-4 py-3 text-sm text-white border focus:outline-none focus:border-red-700 transition-colors duration-150";
-const inputStyle = { backgroundColor: '#0B1120', borderColor: '#1E2D45', color: 'white' };
+const inputClass = "w-full px-4 py-3 text-sm border focus:outline-none focus:border-red-700 transition-colors duration-150";
+const inputStyle = { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', color: '#111827' };
 
 export default function ContactForm() {
   const [loading, setLoading] = useState(false);
@@ -47,9 +47,9 @@ export default function ContactForm() {
       <div className="border p-6" style={{ borderColor: '#BF0D0D', backgroundColor: 'rgba(191,13,13,0.05)' }}>
         <div className="flex items-center gap-2 mb-2">
           <div className="w-1 h-5" style={{ backgroundColor: '#BF0D0D' }} />
-          <h3 className="font-semibold text-white">Message reçu</h3>
+          <h3 className="font-semibold" style={{ color: '#111827' }}>Message reçu</h3>
         </div>
-        <p className="text-sm" style={{ color: '#94A3B8' }}>
+        <p className="text-sm" style={{ color: '#6B7280' }}>
           Nous vous recontacterons dans les 24 heures.
         </p>
       </div>
@@ -59,7 +59,7 @@ export default function ContactForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="border p-4 text-sm" style={{ borderColor: '#BF0D0D', color: '#FDA4A4' }}>
+        <div className="border p-4 text-sm" style={{ borderColor: '#BF0D0D', color: '#BF0D0D', backgroundColor: 'rgba(191,13,13,0.05)' }}>
           {error}
         </div>
       )}
@@ -75,12 +75,12 @@ export default function ContactForm() {
       </div>
 
       <select name="needs" required className={inputClass} style={inputStyle}>
-        <option value="" style={{ backgroundColor: '#0B1120' }}>Sélectionnez votre besoin</option>
-        <option value="rental" style={{ backgroundColor: '#0B1120' }}>Location d&apos;équipements</option>
-        <option value="sales" style={{ backgroundColor: '#0B1120' }}>Achat d&apos;équipements</option>
-        <option value="management" style={{ backgroundColor: '#0B1120' }}>Gestion de parc</option>
-        <option value="maintenance" style={{ backgroundColor: '#0B1120' }}>Maintenance</option>
-        <option value="other" style={{ backgroundColor: '#0B1120' }}>Autre</option>
+        <option value="">Sélectionnez votre besoin</option>
+        <option value="rental">Location d&apos;équipements</option>
+        <option value="sales">Achat d&apos;équipements</option>
+        <option value="management">Gestion de parc</option>
+        <option value="maintenance">Maintenance</option>
+        <option value="other">Autre</option>
       </select>
 
       <textarea
@@ -100,7 +100,7 @@ export default function ContactForm() {
         {loading ? 'Envoi en cours...' : 'Envoyer mon message'}
       </button>
 
-      <p className="text-xs text-center" style={{ color: '#475569' }}>
+      <p className="text-xs text-center" style={{ color: '#9CA3AF' }}>
         Réponse garantie en moins de 24h. Sans engagement.
       </p>
     </form>
