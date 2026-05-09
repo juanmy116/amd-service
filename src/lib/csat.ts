@@ -22,7 +22,7 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
     .single()
 
   if (!incident?.contract_id) return
-  const clientId = (incident.contracts as { client_id: number } | null)?.client_id
+  const clientId = (incident.contracts as unknown as { client_id: number } | null)?.client_id
   if (!clientId) return
 
   // Obtenemos el profile_id del cliente
