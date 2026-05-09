@@ -150,22 +150,22 @@ export default function Home() {
               Nous prenons en charge tout le cycle de vie de vos équipements.
             </p>
           </div>
-          <ServicesBento theme="light" />
+          <ServicesBento theme="brand" />
         </div>
       </section>
 
       {/* 5 ── Plans ── WHITE */}
-      <section id="plans" className="py-16 px-4 sm:px-6 lg:px-8 border-b" style={{ borderColor: '#E5E7EB' }}>
+      <section id="plans" className="py-10 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-7xl mx-auto">
-          <div className="mb-10">
+          <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-1 h-4" style={{ backgroundColor: '#BF0D0D' }} />
-              <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Nos plans de Location</span>
+              <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
+              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Nos plans de Location</span>
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: '#111827' }}>
+            <h2 className="text-2xl md:text-3xl font-bold mb-2 text-white">
               Choisissez votre plan
             </h2>
-            <p className="text-base max-w-2xl" style={{ color: '#6B7280' }}>
+            <p className="text-base max-w-2xl" style={{ color: 'rgba(255,255,255,0.7)' }}>
               Même formule pour les trois équipements — location, maintenance et toner inclus. Aucun frais caché.
             </p>
           </div>

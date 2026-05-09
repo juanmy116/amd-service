@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Web AMD
 
-## Getting Started
+Proyecto web en Next.js para AMD.
 
-First, run the development server:
+## Estructura
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```txt
+web-amd/
+  public/              Assets estaticos servidos por Next
+  src/app/             Paginas y layout de la App Router
+  src/components/      Componentes reutilizables
+  src/lib/             Datos y utilidades compartidas
+  next.config.ts       Configuracion de Next para dev y VPS
+  postcss.config.mjs   Pipeline CSS/Tailwind
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+La carpeta desplegable es esta: `web-amd`. La carpeta superior `Web AMD Codex` solo agrupa documentacion y herramientas; no debe usarse como raiz de `npm`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Desarrollo local
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cd "/Users/juanmiguel/Claude/Web AMD Codex/web-amd"
+npm install
+npm run dev -- -p 3001
+```
 
-## Learn More
+El script `dev` usa Webpack para evitar que Turbopack tome la carpeta padre como raiz en este entorno copiado. Si quieres probar Turbopack:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run dev:turbo -- -p 3001
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Verificacion
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run typecheck
+npm run build
+```
 
-## Deploy on Vercel
+## Despliegue en VPS
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+El proyecto genera salida `standalone`, pensada para servidores propios.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+cd web-amd
+npm ci
+npm run build
+```
+
+Despues del build, sube o conserva en el VPS:
+
+```txt
+.next/standalone/
+.next/static/
+public/
+package.json
+```
+
+Arranque recomendado:
+
+```bash
+cd web-amd
+NODE_ENV=production PORT=3000 node .next/standalone/server.js
+```
+
+En un VPS real conviene gestionarlo con `pm2` o `systemd`, y poner Nginx como reverse proxy hacia el puerto interno.
+
+## Nota sobre imagenes
+
+Hay imagenes locales en `public/images` y algunas imagenes remotas temporales centralizadas en `src/lib/visuals.ts`. Antes de publicar la version definitiva, conviene sustituir las remotas por fotografias propias o descargadas con licencia adecuada dentro de `public/images`.

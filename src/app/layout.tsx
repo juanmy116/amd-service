@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { SITE } from "@/lib/constants";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,15 +16,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="fr" className="h-full scroll-smooth">
       <body className="flex flex-col min-h-screen">
-        <Navigation />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        {children}
       </body>
     </html>
   );
