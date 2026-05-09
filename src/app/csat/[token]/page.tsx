@@ -15,7 +15,7 @@ export default async function CsatPage({
     .eq('token', token)
     .maybeSingle()
 
-  const incidentTitle = (csat?.incidents as { title: string } | null)?.title
+  const incidentTitle = (csat?.incidents as unknown as { title: string } | null)?.title
 
   // Token inválido
   if (!csat) {
