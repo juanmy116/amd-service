@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Plus, QrCode } from 'lucide-react'
 
 export default async function MachinesPage() {
   const supabase = await createClient()
@@ -73,12 +73,22 @@ export default async function MachinesPage() {
                   </span>
                 </td>
                 <td className="px-5 py-4 text-right">
-                  <Link
-                    href={`/admin/machines/${encodeURIComponent(m.numero_serie)}`}
-                    className="text-sm font-medium text-gray-600 hover:text-gray-900 underline underline-offset-2"
-                  >
-                    Modifier
-                  </Link>
+                  <div className="flex items-center justify-end gap-3">
+                    <Link
+                      href={`/admin/machines/${encodeURIComponent(m.numero_serie)}/qr`}
+                      target="_blank"
+                      title="Télécharger QR code"
+                      className="flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-400 transition-colors"
+                    >
+                      <QrCode size={15} />
+                    </Link>
+                    <Link
+                      href={`/admin/machines/${encodeURIComponent(m.numero_serie)}`}
+                      className="text-sm font-medium text-gray-600 hover:text-gray-900 underline underline-offset-2"
+                    >
+                      Modifier
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}
