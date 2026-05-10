@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import QrCanvas from './qr-canvas'
+import PrintButtons from './print-buttons'
 
 export default async function MachineQrPage({
   params,
@@ -40,22 +41,8 @@ export default async function MachineQrPage({
         }
       `}</style>
 
-      {/* Botón imprimir — solo visible en pantalla */}
-      <div className="no-print flex justify-center gap-3 p-6">
-        <button
-          onClick={() => window.print()}
-          className="px-5 py-2.5 rounded-lg text-sm font-medium text-white"
-          style={{ backgroundColor: '#BF0D0D' }}
-        >
-          Imprimer l&apos;étiquette
-        </button>
-        <button
-          onClick={() => window.close()}
-          className="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-600 border border-gray-200"
-        >
-          Fermer
-        </button>
-      </div>
+      {/* Botones imprimir/cerrar — solo visibles en pantalla */}
+      <PrintButtons />
 
       {/* Etiqueta imprimible */}
       <div className="flex justify-center px-6 pb-10">
