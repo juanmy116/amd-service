@@ -12,6 +12,9 @@ export async function updateIncidentAction(
 ): Promise<FormState> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (caller?.role !== 'admin') redirect('/dashboard')
 
   const title = (formData.get('title') as string).trim()
   if (!title) return { error: 'Le titre est obligatoire.' }
@@ -52,6 +55,10 @@ export async function updateIncidentAction(
 export async function deleteIncidentAction(formData: FormData): Promise<void> {
   const id = formData.get('id') as string
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (caller?.role !== 'admin') redirect('/dashboard')
   await supabase.from('incidents').delete().eq('id', id)
   redirect('/admin/incidents')
 }

@@ -10,6 +10,10 @@ export async function createClientAction(
   formData: FormData
 ): Promise<FormState> {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (caller?.role !== 'admin') redirect('/dashboard')
 
   const nom_client = (formData.get('nom_client') as string).trim()
   if (!nom_client) return { error: 'Le nom du client est obligatoire.' }

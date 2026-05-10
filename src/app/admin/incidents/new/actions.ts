@@ -11,6 +11,9 @@ export async function createIncidentAction(
 ): Promise<FormState> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (caller?.role !== 'admin') redirect('/dashboard')
 
   const title       = (formData.get('title')       as string).trim()
   const contract_id = (formData.get('contract_id') as string).trim()

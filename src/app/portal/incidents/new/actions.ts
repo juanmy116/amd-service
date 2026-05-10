@@ -19,13 +19,22 @@ export async function createPortalIncidentAction(
   if (!title)       return { error: 'Le titre est obligatoire.' }
   if (!contract_id) return { error: 'Veuillez sélectionner une machine.' }
 
+  const { data: clientProfile } = await supabase
+    .from('client_profiles')
+    .select('client_id')
+    .eq('profile_id', user.id)
+    .single()
+
+  if (!clientProfile) return { error: 'Profil client introuvable.' }
+
   const { data: contract } = await supabase
     .from('contracts')
-    .select('machine_id')
+    .select('machine_id, client_id')
     .eq('id', contract_id)
     .single()
 
   if (!contract) return { error: 'Contrat introuvable.' }
+  if (contract.client_id !== clientProfile.client_id) return { error: 'Contrat introuvable.' }
 
   const { error } = await supabase.from('incidents').insert({
     contract_id,

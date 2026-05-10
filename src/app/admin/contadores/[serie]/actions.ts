@@ -12,6 +12,8 @@ export async function saveCounterAction(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
+  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (caller?.role !== 'admin') return { error: 'Non autorisé' }
 
   const machine_id           = formData.get('machine_id') as string
   const year                 = parseInt(formData.get('year') as string)
@@ -74,6 +76,8 @@ export async function cancelCounterAction(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
+  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (caller?.role !== 'admin') return { error: 'Non autorisé' }
   if (!reason.trim()) return { error: 'Le motif est obligatoire.' }
 
   const { error } = await supabase

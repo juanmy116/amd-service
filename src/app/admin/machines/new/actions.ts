@@ -10,6 +10,10 @@ export async function createMachineAction(
   formData: FormData
 ): Promise<FormState> {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (caller?.role !== 'admin') redirect('/dashboard')
 
   const numero_serie = (formData.get('numero_serie') as string).trim()
   const marque = (formData.get('marque') as string).trim()

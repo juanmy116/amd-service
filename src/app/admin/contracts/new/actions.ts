@@ -10,6 +10,10 @@ export async function createContractAction(
   formData: FormData
 ): Promise<FormState> {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (caller?.role !== 'admin') redirect('/dashboard')
 
   const numero_contrat = (formData.get('numero_contrat') as string).trim()
   const client_id = Number(formData.get('client_id'))

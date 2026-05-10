@@ -11,6 +11,10 @@ export async function updateContractAction(
   formData: FormData
 ): Promise<FormState> {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (caller?.role !== 'admin') redirect('/dashboard')
 
   const client_id = Number(formData.get('client_id'))
   const machine_id = (formData.get('machine_id') as string).trim()
@@ -37,6 +41,10 @@ export async function updateContractAction(
 export async function deleteContractAction(formData: FormData): Promise<void> {
   const id = formData.get('id') as string
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (caller?.role !== 'admin') redirect('/dashboard')
   await supabase.from('contracts').delete().eq('id', id)
   redirect('/admin/contracts')
 }
