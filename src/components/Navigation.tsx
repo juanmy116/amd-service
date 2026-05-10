@@ -51,6 +51,15 @@ export default function Navigation() {
           {/* CTA group */}
           <div className="hidden md:flex items-center gap-3">
             <Link
+              href="/login"
+              className="px-4 py-2 text-sm font-medium border transition-colors duration-150 cursor-pointer"
+              style={{ color: '#FFFFFF', borderColor: '#1E2D45', backgroundColor: 'transparent' }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = '#BF0D0D')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = '#1E2D45')}
+            >
+              Connexion
+            </Link>
+            <Link
               href="/contact"
               className="inline-flex items-center gap-2 px-5 py-2 text-white text-sm font-semibold transition-opacity duration-150 hover:opacity-80 cursor-pointer"
               style={{ backgroundColor: '#BF0D0D' }}
@@ -91,7 +100,15 @@ export default function Navigation() {
                   </Link>
                 );
               })}
-              <div className="px-4 pt-3">
+              <div className="px-4 pt-3 flex flex-col gap-2">
+                <Link
+                  href="/login"
+                  onClick={() => setIsOpen(false)}
+                  className="block w-full text-center px-5 py-2.5 text-white text-sm font-medium border cursor-pointer"
+                  style={{ borderColor: '#1E2D45' }}
+                >
+                  Connexion
+                </Link>
                 <Link
                   href="/contact"
                   onClick={() => setIsOpen(false)}
