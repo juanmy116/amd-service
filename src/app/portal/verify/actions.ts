@@ -20,13 +20,13 @@ export async function verifyContractAction(
   if (!numero_contrat) return { error: 'Veuillez saisir votre numéro de contrat.' }
 
   // Usamos admin client para bypasear RLS — el usuario aún no tiene client_profiles
-  const { data: contract } = await supabaseAdmin
+  const { data: contract, error: contractError } = await supabaseAdmin
     .from('contracts')
     .select('id, client_id, statut')
     .eq('numero_contrat', numero_contrat)
     .single()
 
-  if (!contract)              return { error: 'Numéro de contrat introuvable. Vérifiez et réessayez.' }
+  if (!contract)              return { error: `Numéro de contrat introuvable. [${contractError?.code}: ${contractError?.message}]` }
   if (contract.statut !== 'actif') return { error: 'Ce contrat n\'est plus actif. Contactez AMD Service.' }
 
   const { error } = await supabase
