@@ -51,7 +51,10 @@ export async function registerClientAction(
   if (password !== confirm) return { error: 'Les mots de passe ne correspondent pas.' }
   if (password.length < 6)  return { error: 'Le mot de passe doit contenir au moins 6 caractères.' }
 
-  const origin = process.env.NEXT_PUBLIC_APP_URL ?? (await headers()).get('origin') ?? 'http://localhost:3000'
+  const h = await headers()
+  const host  = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
+  const proto = h.get('x-forwarded-proto') ?? 'http'
+  const origin = process.env.NEXT_PUBLIC_APP_URL ?? `${proto}://${host}`
 
   const { error } = await supabase.auth.signUp({
     email,
