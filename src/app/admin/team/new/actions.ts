@@ -18,7 +18,7 @@ export async function inviteMemberAction(
   if (!email)     return { error: 'L\'email est obligatoire.' }
   if (!full_name) return { error: 'Le nom complet est obligatoire.' }
 
-  const origin     = (await headers()).get('origin') ?? 'http://localhost:3000'
+  const origin     = process.env.NEXT_PUBLIC_APP_URL ?? (await headers()).get('origin') ?? 'http://localhost:3000'
   const next       = role === 'admin' ? '/admin' : '/tech'
   const redirectTo = `${origin}/auth/callback?next=${next}`
 
