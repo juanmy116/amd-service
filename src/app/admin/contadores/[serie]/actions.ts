@@ -18,9 +18,9 @@ export async function saveCounterAction(
   const month                = parseInt(formData.get('month') as string)
   const counter_bw           = parseInt(formData.get('counter_bw') as string)
   const counter_color        = parseInt(formData.get('counter_color') as string)
-  const notes                = (formData.get('notes') as string).trim() || null
+  const notes                = ((formData.get('notes') as string | null) ?? '').trim() || null
   const is_replacement_start = formData.get('is_replacement_start') === 'on'
-  const previous_machine_id  = (formData.get('previous_machine_id') as string).trim() || null
+  const previous_machine_id  = ((formData.get('previous_machine_id') as string | null) ?? '').trim() || null
 
   if (isNaN(counter_bw) || isNaN(counter_color)) return { error: 'Les compteurs doivent être des nombres valides.' }
   if (counter_bw < 0 || counter_color < 0)       return { error: 'Les compteurs ne peuvent pas être négatifs.' }
