@@ -27,6 +27,24 @@ export async function GET(request: Request) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      if (next === '/dashboard') {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle()
+          if (profile?.role === 'client') {
+            const { data: cp } = await supabase
+              .from('client_profiles')
+              .select('id')
+              .eq('profile_id', user.id)
+              .maybeSingle()
+            return NextResponse.redirect(`${origin}${cp ? '/portal' : '/portal/verify'}`)
+          }
+        }
+      }
       return NextResponse.redirect(`${origin}${next}`)
     }
   }

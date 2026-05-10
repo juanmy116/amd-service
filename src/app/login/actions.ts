@@ -56,7 +56,7 @@ export async function registerClientAction(
   const { error } = await supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo: `${origin}/auth/callback?next=/portal/verify` },
+    options: { emailRedirectTo: `${origin}/auth/callback` },
   })
 
   if (error) {
