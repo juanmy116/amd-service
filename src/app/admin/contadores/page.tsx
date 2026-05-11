@@ -1,161 +1,187 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { BarChart2, AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Building2, ChevronRight, Printer } from 'lucide-react'
+import { MONTHS_FR } from './constants'
 
-const MONTHS_FR = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
-                   'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
+interface Machine {
+  numero_serie: string
+  marque:       string
+  modele:       string
+  clientId:     number | null
+  clientName:   string | null
+}
 
 export default async function ContadoresPage() {
   const supabase = await createClient()
 
-  // Todas las máquinas activas con su contrato y cliente
-  const { data: machines } = await supabase
+  const { data: rawMachines } = await supabase
     .from('machines')
-    .select('numero_serie, marque, modele, contracts(id, numero_contrat, statut, clients(nom_client))')
+    .select('numero_serie, marque, modele, contracts(statut, client_id, clients(id, nom_client))')
     .eq('active', true)
     .order('marque')
 
-  interface ActiveCounter {
-    machine_id:   string
-    year:         number
-    month:        number
-    counter_bw:   number
-    counter_color: number
-  }
-
-  // Todos los relevés activos ordenados del más reciente al más antiguo
   const { data: allActiveCounters } = await supabase
     .from('machine_counters')
-    .select('machine_id, year, month, counter_bw, counter_color')
+    .select('machine_id, year, month')
     .eq('status', 'actif')
     .order('year',  { ascending: false })
     .order('month', { ascending: false })
 
-  // Mapa: machine_id → { latest, delta }
-  const counterMap = new Map<string, { latest: ActiveCounter; delta_bw: number | null; delta_color: number | null }>()
-
+  // Latest relevé per machine
+  const latestMap = new Map<string, { year: number; month: number }>()
   if (allActiveCounters) {
-    const seen = new Map<string, number>()
+    const seen = new Set<string>()
     allActiveCounters.forEach(c => {
-      const count = seen.get(c.machine_id) ?? 0
-      if (count === 0) {
-        counterMap.set(c.machine_id, { latest: c, delta_bw: null, delta_color: null })
-      } else if (count === 1) {
-        const entry = counterMap.get(c.machine_id)!
-        counterMap.set(c.machine_id, {
-          latest:      entry.latest,
-          delta_bw:    entry.latest.counter_bw    - c.counter_bw,
-          delta_color: entry.latest.counter_color - c.counter_color,
-        })
+      if (!seen.has(c.machine_id)) {
+        latestMap.set(c.machine_id, { year: c.year, month: c.month })
+        seen.add(c.machine_id)
       }
-      seen.set(c.machine_id, count + 1)
     })
   }
 
-  const now   = new Date()
-  const cYear = now.getFullYear()
+  const now    = new Date()
+  const cYear  = now.getFullYear()
   const cMonth = now.getMonth() + 1
+
+  // Flatten machines with client info
+  const machines: Machine[] = (rawMachines ?? []).map(m => {
+    const contracts = m.contracts as unknown as {
+      statut: string
+      client_id: number | null
+      clients: { id: number; nom_client: string } | null
+    }[] | null
+    const active = contracts?.find(c => c.statut === 'actif') ?? null
+    return {
+      numero_serie: m.numero_serie,
+      marque:       m.marque,
+      modele:       m.modele,
+      clientId:     active?.client_id ?? null,
+      clientName:   active?.clients?.nom_client ?? null,
+    }
+  })
+
+  // Group by client
+  const clientMap = new Map<number, { name: string; machines: Machine[] }>()
+  const noClient: Machine[] = []
+
+  machines.forEach(m => {
+    if (m.clientId !== null && m.clientName !== null) {
+      if (!clientMap.has(m.clientId)) {
+        clientMap.set(m.clientId, { name: m.clientName, machines: [] })
+      }
+      clientMap.get(m.clientId)!.machines.push(m)
+    } else {
+      noClient.push(m)
+    }
+  })
+
+  const clientGroups = [...clientMap.entries()]
+    .map(([id, { name, machines }]) => ({ id, name, machines }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  const missingCount = (ms: Machine[]) =>
+    ms.filter(m => {
+      const l = latestMap.get(m.numero_serie)
+      return !l || l.year !== cYear || l.month !== cMonth
+    }).length
+
+  const totalMachines = machines.length
+  const totalMissing  = missingCount(machines)
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
-          Compteurs
-        </h1>
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Machine</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Client</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Dernier relevé</th>
-              <th className="text-right px-4 py-3.5 font-medium text-gray-500">N&amp;B total</th>
-              <th className="text-right px-4 py-3.5 font-medium text-gray-500">Δ N&amp;B</th>
-              <th className="text-right px-4 py-3.5 font-medium text-gray-500">Couleur total</th>
-              <th className="text-right px-4 py-3.5 font-medium text-gray-500">Δ Couleur</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {(!machines || machines.length === 0) && (
-              <tr>
-                <td colSpan={8} className="px-5 py-10 text-center text-gray-400">
-                  Aucune machine enregistrée
-                </td>
-              </tr>
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+            Compteurs
+          </h1>
+          <p className="text-sm text-gray-400 mt-0.5">
+            {clientGroups.length} client{clientGroups.length !== 1 ? 's' : ''} · {totalMachines} machine{totalMachines !== 1 ? 's' : ''} actives
+            {totalMissing > 0 && (
+              <span className="ml-2 text-amber-500 font-medium">· {totalMissing} relevé{totalMissing !== 1 ? 's' : ''} manquant{totalMissing !== 1 ? 's' : ''}</span>
             )}
-            {machines?.map(m => {
-              const contracts = m.contracts as unknown as { id: string; numero_contrat: string; statut: string; clients: { nom_client: string } | null }[] | null
-              const activeContract = contracts?.find(c => c.statut === 'actif') ?? null
-              const clientName     = activeContract?.clients?.nom_client ?? null
-              const entry          = counterMap.get(m.numero_serie)
-              const latest         = entry?.latest
-              const missingThisMonth = !latest || (latest.year !== cYear || latest.month !== cMonth)
-
-              return (
-                <tr key={m.numero_serie} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-4">
-                    <p className="font-medium text-gray-900">{m.marque} <span className="text-gray-500">{m.modele}</span></p>
-                    <p className="font-mono text-xs text-gray-400">{m.numero_serie}</p>
-                  </td>
-                  <td className="px-5 py-4 text-gray-600">{clientName ?? <span className="text-gray-300">—</span>}</td>
-                  <td className="px-5 py-4">
-                    {latest ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-700">
-                          {MONTHS_FR[latest.month]} {latest.year}
-                        </span>
-                        {missingThisMonth && (
-                          <span title="Relevé du mois en cours manquant">
-                            <AlertTriangle size={13} className="text-amber-400" />
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400 italic">Aucun relevé</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 text-right font-mono text-xs text-gray-700">
-                    {latest ? latest.counter_bw.toLocaleString('fr-FR') : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-4 text-right font-mono text-xs">
-                    {entry?.delta_bw == null ? (
-                      <span className="text-gray-300">—</span>
-                    ) : (
-                      <span className={entry.delta_bw < 0 ? 'text-red-600 font-semibold' : 'text-gray-700'}>
-                        {entry.delta_bw.toLocaleString('fr-FR')}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 text-right font-mono text-xs text-gray-700">
-                    {latest ? latest.counter_color.toLocaleString('fr-FR') : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-4 text-right font-mono text-xs">
-                    {entry?.delta_color == null ? (
-                      <span className="text-gray-300">—</span>
-                    ) : (
-                      <span className={entry.delta_color < 0 ? 'text-red-600 font-semibold' : 'text-gray-700'}>
-                        {entry.delta_color.toLocaleString('fr-FR')}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 text-right">
-                    <Link
-                      href={`/admin/contadores/${encodeURIComponent(m.numero_serie)}`}
-                      className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900"
-                    >
-                      <BarChart2 size={13} />
-                      Détail
-                    </Link>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+          </p>
+        </div>
       </div>
+
+      {clientGroups.length === 0 && noClient.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 flex items-center justify-center py-20">
+          <p className="text-sm text-gray-400">Aucune machine active enregistrée</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {clientGroups.map(group => {
+            const missing   = missingCount(group.machines)
+            const allGood   = missing === 0
+            return (
+              <Link
+                key={group.id}
+                href={`/admin/contadores/cliente/${group.id}`}
+                className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-5 py-4 hover:border-gray-300 hover:shadow-sm transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#BF0D0D18' }}>
+                    <Building2 size={18} style={{ color: '#BF0D0D' }} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 group-hover:text-gray-700">{group.name}</p>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      <span className="flex items-center gap-1 text-xs text-gray-400">
+                        <Printer size={11} />
+                        {group.machines.length} machine{group.machines.length !== 1 ? 's' : ''}
+                      </span>
+                      <span className="text-xs text-gray-300">·</span>
+                      <span className="text-xs text-gray-400">
+                        Dernier : {(() => {
+                          const lasts = group.machines
+                            .map(m => latestMap.get(m.numero_serie))
+                            .filter((l): l is { year: number; month: number } => l !== undefined)
+                          if (!lasts.length) return 'aucun relevé'
+                          const l = lasts.sort((a, b) => a.year !== b.year ? b.year - a.year : b.month - a.month)[0]
+                          return `${MONTHS_FR[l.month]} ${l.year}`
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  {!allGood ? (
+                    <div className="flex items-center gap-1.5 text-amber-500">
+                      <AlertTriangle size={14} />
+                      <span className="text-xs font-medium">
+                        {missing} en attente
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xs font-medium text-green-600">
+                      ✓ À jour
+                    </span>
+                  )}
+                  <ChevronRight size={16} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
+                </div>
+              </Link>
+            )
+          })}
+
+          {/* Machines sans contrat actif */}
+          {noClient.length > 0 && (
+            <div className="flex items-center justify-between bg-white rounded-xl border border-dashed border-gray-200 px-5 py-4 opacity-70">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+                  <Printer size={18} className="text-gray-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Sans contrat actif</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {noClient.length} machine{noClient.length !== 1 ? 's' : ''} sans client assigné
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

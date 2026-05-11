@@ -18,6 +18,8 @@ export async function saveCounterAction(
   const machine_id           = formData.get('machine_id') as string
   const year                 = parseInt(formData.get('year') as string)
   const month                = parseInt(formData.get('month') as string)
+  const dayRaw               = parseInt(formData.get('day') as string)
+  const day                  = !isNaN(dayRaw) && dayRaw >= 1 && dayRaw <= 31 ? dayRaw : null
   const counter_bw           = parseInt(formData.get('counter_bw') as string)
   const counter_color        = parseInt(formData.get('counter_color') as string)
   const notes                = ((formData.get('notes') as string | null) ?? '').trim() || null
@@ -53,6 +55,7 @@ export async function saveCounterAction(
     client_id:            contract?.client_id ?? null,
     year,
     month,
+    day,
     counter_bw,
     counter_color,
     notes,

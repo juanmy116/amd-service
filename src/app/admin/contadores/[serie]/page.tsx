@@ -3,13 +3,15 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Building2, FileText, RefreshCw } from 'lucide-react'
 import CounterForm from './counter-form'
-import CounterChart, { ChartEntry, MONTHS_FR } from './counter-chart'
+import CounterChart, { ChartEntry } from './counter-chart'
+import { MONTHS_FR } from '../constants'
 import CancelModal from './cancel-modal'
 
 interface Counter {
   id:                   string
   year:                 number
   month:                number
+  day:                  number | null
   counter_bw:           number
   counter_color:        number
   status:               string
@@ -199,7 +201,7 @@ export default async function ContadoresDetailPage({
                             </span>
                           )}
                           <span className={isAnnule ? 'line-through text-gray-400' : 'font-medium text-gray-900'}>
-                            {MONTHS_FR[c.month]} {c.year}
+                            {c.day ? `${c.day} ` : ''}{MONTHS_FR[c.month]} {c.year}
                           </span>
                         </div>
                         {c.notes && <p className="text-xs text-gray-400 mt-0.5">{c.notes}</p>}

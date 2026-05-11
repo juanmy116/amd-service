@@ -3,9 +3,7 @@
 import { useActionState, useState } from 'react'
 import { saveCounterAction, CounterFormState } from './actions'
 import { ChevronDown } from 'lucide-react'
-
-const MONTHS_FR = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-                   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
+import { MONTHS_FR_LONG } from '../constants'
 
 const now = new Date()
 const CURRENT_YEAR  = now.getFullYear()
@@ -33,7 +31,7 @@ export default function CounterForm({ machineId }: Props) {
               className="w-full appearance-none text-sm border border-gray-200 rounded-lg px-3 py-2.5 pr-8 bg-white focus:outline-none focus:ring-2"
               style={{ '--tw-ring-color': '#BF0D0D' } as React.CSSProperties}
             >
-              {MONTHS_FR.slice(1).map((m, i) => (
+              {MONTHS_FR_LONG.slice(1).map((m, i) => (
                 <option key={i + 1} value={i + 1}>{m}</option>
               ))}
             </select>
@@ -53,6 +51,25 @@ export default function CounterForm({ machineId }: Props) {
             </select>
             <ChevronDown size={14} className="absolute right-2.5 top-3 text-gray-400 pointer-events-none" />
           </div>
+        </div>
+      </div>
+
+      {/* Jour du relevé */}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1.5">Jour du relevé</label>
+        <div className="relative">
+          <select
+            name="day"
+            defaultValue=""
+            className="w-full appearance-none text-sm border border-gray-200 rounded-lg px-3 py-2.5 pr-8 bg-white focus:outline-none focus:ring-2"
+            style={{ '--tw-ring-color': '#BF0D0D' } as React.CSSProperties}
+          >
+            <option value="">— Non précisé</option>
+            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+          <ChevronDown size={14} className="absolute right-2.5 top-3 text-gray-400 pointer-events-none" />
         </div>
       </div>
 

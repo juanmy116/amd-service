@@ -5,9 +5,6 @@ import {
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 
-const MONTHS_FR = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
-                   'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
-
 export interface ChartEntry {
   label: string
   bw:    number | null
@@ -41,4 +38,3 @@ export default function CounterChart({ data }: { data: ChartEntry[] }) {
   )
 }
 
-export { MONTHS_FR }
