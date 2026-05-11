@@ -108,10 +108,13 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">NINEA</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                NINEA <span className="text-red-500">*</span>
+              </label>
               <input
                 name="ninea"
                 type="text"
+                required
                 defaultValue={defaultValues?.ninea ?? ''}
                 placeholder="00000000"
                 className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
@@ -122,20 +125,26 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
           {/* Row 2: email + telephone */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Email <span className="text-red-500">*</span>
+              </label>
               <input
                 name="email"
                 type="email"
+                required
                 defaultValue={defaultValues?.email ?? ''}
                 placeholder="contact@societe.sn"
                 className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Téléphone</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Téléphone <span className="text-red-500">*</span>
+              </label>
               <input
                 name="telephone"
                 type="tel"
+                required
                 defaultValue={defaultValues?.telephone ?? ''}
                 placeholder="+221 33 000 00 00"
                 className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
@@ -145,10 +154,13 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
 
           {/* Row 3: adresse */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Adresse</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Adresse <span className="text-red-500">*</span>
+            </label>
             <input
               name="adresse"
               type="text"
+              required
               defaultValue={defaultValues?.adresse ?? ''}
               placeholder="Rue 10, Point E"
               className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
@@ -158,10 +170,13 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
           {/* Row 4: ville + statut */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Ville</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Ville <span className="text-red-500">*</span>
+              </label>
               <input
                 name="ville"
                 type="text"
+                required
                 defaultValue={defaultValues?.ville ?? ''}
                 placeholder="Dakar"
                 className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"

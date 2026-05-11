@@ -156,6 +156,11 @@ export default function ContractForm({
                   </option>
                 ))}
               </select>
+              {!isEdit && machines.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1.5">
+                  Aucune machine disponible (toutes sont déjà assignées à un contrat actif).
+                </p>
+              )}
             </div>
           </div>
 
