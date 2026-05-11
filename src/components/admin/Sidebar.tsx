@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, Printer, FileText,
-  AlertCircle, UserCog, LogOut, BarChart2,
+  AlertCircle, UserCog, LogOut, BarChart2, Wrench,
 } from 'lucide-react'
 import { signOut } from '@/app/login/actions'
 
@@ -14,8 +14,9 @@ const NAV = [
   { href: '/admin/machines',   label: 'Machines',        icon: Printer },
   { href: '/admin/contadores', label: 'Compteurs',       icon: BarChart2 },
   { href: '/admin/contracts',  label: 'Contrats',        icon: FileText },
-  { href: '/admin/incidents',  label: 'Incidents SAV',   icon: AlertCircle },
-  { href: '/admin/team',       label: 'Équipe',          icon: UserCog },
+  { href: '/admin/incidents',    label: 'Incidents SAV',  icon: AlertCircle },
+  { href: '/admin/maintenance',  label: 'Maintenance',    icon: Wrench },
+  { href: '/admin/team',         label: 'Équipe',         icon: UserCog },
 ]
 
 export default function Sidebar({ fullName }: { fullName: string | null }) {

@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Printer, MapPin, Building2 } from 'lucide-react'
+import { ArrowLeft, Printer, MapPin, Building2, Wrench, AlertTriangle } from 'lucide-react'
 
 const STATUS_STYLE: Record<string, string> = {
   nouveau: 'bg-blue-50 text-blue-700', assigné: 'bg-purple-50 text-purple-700',
@@ -44,6 +44,29 @@ export default async function MachineScanPage({
     .not('status', 'in', '("fermé")')
     .order('created_at', { ascending: false })
     .limit(5)
+
+  // Mantenimiento pendiente para esta máquina
+  let pendingVisit: { id: string; scheduled_date: string; status: string } | null = null
+  if (contract) {
+    const { data: plan } = await supabase
+      .from('maintenance_plans')
+      .select('id')
+      .eq('contract_id', contract.id)
+      .eq('active', true)
+      .maybeSingle()
+
+    if (plan) {
+      const { data: visit } = await supabase
+        .from('maintenance_visits')
+        .select('id, scheduled_date, status')
+        .eq('plan_id', plan.id)
+        .in('status', ['planifié', 'en_retard'])
+        .order('scheduled_date')
+        .limit(1)
+        .maybeSingle()
+      pendingVisit = visit ?? null
+    }
+  }
 
   return (
     <div className="p-4 space-y-5">
@@ -96,6 +119,39 @@ export default async function MachineScanPage({
           </div>
         )}
       </div>
+
+      {/* Maintenance en attente */}
+      {pendingVisit && (
+        <div>
+          <p className="text-sm font-semibold text-gray-900 mb-3">Maintenance préventive</p>
+          <Link
+            href={`/tech/scan/${encodeURIComponent(serie)}/maintenance/${pendingVisit.id}`}
+            className="flex items-center justify-between bg-white rounded-2xl border-2 p-4"
+            style={{ borderColor: pendingVisit.status === 'en_retard' ? '#EF4444' : '#3B82F6' }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                style={{ backgroundColor: pendingVisit.status === 'en_retard' ? '#FEF2F2' : '#EFF6FF' }}
+              >
+                {pendingVisit.status === 'en_retard'
+                  ? <AlertTriangle size={16} className="text-red-500" />
+                  : <Wrench size={16} className="text-blue-500" />
+                }
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {pendingVisit.status === 'en_retard' ? 'Maintenance en retard' : 'Maintenance planifiée'}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Prévue le {new Date(pendingVisit.scheduled_date + 'T00:00:00').toLocaleDateString('fr-FR')}
+                </p>
+              </div>
+            </div>
+            <span className="text-sm text-gray-400">→</span>
+          </Link>
+        </div>
+      )}
 
       {/* Incidents actifs */}
       <div>
