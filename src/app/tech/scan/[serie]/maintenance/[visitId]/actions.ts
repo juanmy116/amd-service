@@ -57,6 +57,12 @@ export async function closeMaintenance(
     .single()
 
   if (!visit) return { error: 'Visite introuvable.' }
+
+  // Verificar que la visita pertenece a la máquina escaneada.
+  // Impide cerrar visitas de otras máquinas conociendo solo el visitId.
+  const machineSerie = (visit.maintenance_plans as any)?.contracts?.machines?.numero_serie
+  if (machineSerie !== serie) return { error: 'Visite introuvable.' }
+
   if (visit.status === 'fait') return { error: 'Cette visite est déjà clôturée.' }
 
   const notes = ((formData.get('notes') as string) ?? '').trim() || null
