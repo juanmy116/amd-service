@@ -72,14 +72,10 @@ export default function PlanCards() {
           key={plan.id}
           className={`relative flex flex-col overflow-hidden${plan.recommended ? ' md:scale-105 md:z-10' : ''}`}
           style={{
-            backdropFilter: 'blur(14px)',
-            WebkitBackdropFilter: 'blur(14px)',
-            backgroundColor: plan.recommended
-              ? 'rgba(255,255,255,0.18)'
-              : 'rgba(255,255,255,0.10)',
+            backgroundColor: '#FFFFFF',
             border: plan.recommended
-              ? '1px solid rgba(255,255,255,0.35)'
-              : '1px solid rgba(255,255,255,0.15)',
+              ? '1px solid rgba(191,13,13,0.25)'
+              : '1px solid #E5E7EB',
             borderRadius: '10px',
           }}
           initial={{ opacity: 0, y: 20 }}
@@ -90,7 +86,7 @@ export default function PlanCards() {
           {plan.recommended && (
             <div
               className="absolute top-0 left-1/2 -translate-x-1/2 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-white"
-              style={{ backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: '0 0 6px 6px' }}
+              style={{ backgroundColor: '#BF0D0D', borderRadius: '0 0 6px 6px' }}
             >
               Recommandé
             </div>
@@ -98,10 +94,10 @@ export default function PlanCards() {
 
           {/* Image */}
           <div
-            className="relative h-36 border-b"
+            className="relative h-52 border-b"
             style={{
-              backgroundColor: 'rgba(255,255,255,0.06)',
-              borderColor: 'rgba(255,255,255,0.1)',
+              backgroundColor: '#F9FAFB',
+              borderColor: '#E5E7EB',
               borderRadius: '10px 10px 0 0',
               paddingTop: plan.recommended ? '28px' : '0',
             }}
@@ -118,40 +114,40 @@ export default function PlanCards() {
           <div className="flex flex-col flex-1 p-5">
             <div className="mb-3 text-center">
               <span
-                className="inline-block text-xs font-semibold uppercase tracking-widest px-2 py-1 text-white"
-                style={{ backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: '4px' }}
+                className="inline-block text-xs font-semibold uppercase tracking-widest px-2 py-1"
+                style={{ backgroundColor: 'rgba(191,13,13,0.08)', color: '#BF0D0D', borderRadius: '4px' }}
               >
                 {plan.target}
               </span>
             </div>
             <h3
-              className="text-xl font-bold mb-1 text-center text-white"
-              style={{ fontFamily: 'Poppins, sans-serif' }}
+              className="text-lg font-bold mb-1 text-center"
+              style={{ color: '#111827', fontFamily: 'Poppins, sans-serif' }}
             >
               {plan.model}
             </h3>
-            <p className="text-sm mb-4 text-center" style={{ color: 'rgba(255,255,255,0.65)' }}>
+            <p className="text-xs mb-4 text-center" style={{ color: '#6B7280' }}>
               {plan.type}
             </p>
 
             {/* Price */}
             <div
               className="mb-4 pb-4 border-b text-center"
-              style={{ borderColor: 'rgba(255,255,255,0.12)' }}
+              style={{ borderColor: '#E5E7EB' }}
             >
               {plan.price === 'Sur devis' ? (
-                <span className="text-3xl font-bold text-white" style={{ fontFamily: 'Poppins, sans-serif' }}>
+                <span className="text-3xl font-bold" style={{ color: '#111827', fontFamily: 'Poppins, sans-serif' }}>
                   Sur devis
                 </span>
               ) : (
                 <>
-                  <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                  <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: '#9CA3AF' }}>
                     Dès
                   </p>
-                  <span className="text-3xl font-bold text-white" style={{ fontFamily: 'Poppins, sans-serif' }}>
+                  <span className="text-3xl font-bold" style={{ color: '#111827', fontFamily: 'Poppins, sans-serif' }}>
                     {plan.price}
                   </span>
-                  <span className="text-sm font-medium ml-2" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                  <span className="text-xs font-medium ml-2" style={{ color: '#9CA3AF' }}>
                     /mois
                   </span>
                 </>
@@ -159,29 +155,29 @@ export default function PlanCards() {
             </div>
 
             {/* Features */}
-            <ul className="flex-1 mb-5 overflow-hidden" style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
+            <ul className="flex-1 mb-5 overflow-hidden" style={{ backgroundColor: '#F9FAFB', borderRadius: '6px' }}>
               {plan.features.map((item) => (
                 <li
                   key={item}
-                  className="flex items-start gap-2.5 text-sm px-4 py-2 border-b"
-                  style={{ color: '#FFFFFF', borderColor: 'rgba(255,255,255,0.1)' }}
+                  className="flex items-start gap-2.5 text-xs px-4 py-2 border-b"
+                  style={{ color: '#374151', borderColor: '#E5E7EB' }}
                 >
-                  <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-white" />
+                  <CheckCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#BF0D0D' }} />
                   {item}
                 </li>
               ))}
             </ul>
 
-            {/* CTA con ripple */}
+            {/* CTA */}
             <RippleButton
               href="/contact"
               className="w-full px-6 py-3 text-sm font-semibold"
               style={{
-                backgroundColor: 'rgba(255,255,255,0.95)',
-                color: '#BF0D0D',
+                backgroundColor: '#BF0D0D',
+                color: '#FFFFFF',
                 borderRadius: '6px',
               }}
-              rippleColor="rgba(191,13,13,0.2)"
+              rippleColor="rgba(255,255,255,0.25)"
             >
               Je suis intéressé
             </RippleButton>

@@ -24,6 +24,7 @@ export const BRANDING = {
 
 export const NAVIGATION = [
   { href: '/', label: 'Accueil', label_es: 'Inicio' },
+  { href: '/location', label: 'Location', label_es: 'Alquiler' },
   { href: '/services', label: 'Services', label_es: 'Servicios' },
   { href: '/why', label: 'Pourquoi AMD', label_es: 'Por qué AMD' },
   { href: '/cases', label: 'Cas d\'usage', label_es: 'Casos de uso' },

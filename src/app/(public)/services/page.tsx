@@ -15,9 +15,9 @@ import {
 } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Nos services — AMD Service',
+  title: 'Services techniques — Vente, Maintenance & Gestion de parc — AMD Service',
   description:
-    'Location, vente, maintenance et gestion de parcs d\'impression professionnels à Dakar, Sénégal. Solutions tout inclus avec coût par copie transparent.',
+    'Vente d\'équipements, maintenance préventive et corrective, gestion de parc et fourniture de consommables à Dakar, Sénégal. AMD Service, +10 ans d\'expertise.',
 };
 
 const SERVICE_ICONS = [Printer, ShoppingCart, BarChart3, Wrench, Package, CreditCard];
@@ -40,19 +40,14 @@ const STATS = [
 
 const SERVICE_GROUPS = [
   {
-    label: 'Accéder aux équipements',
-    title: 'Louer ou acheter sans complexité',
-    serviceIds: ['rental', 'sales'],
+    label: 'Acheter vos équipements',
+    title: 'Acquérir sans complexité',
+    serviceIds: ['sales'],
   },
   {
     label: 'Exploiter au quotidien',
     title: 'Gérer, maintenir et approvisionner',
     serviceIds: ['management', 'maintenance', 'consumables'],
-  },
-  {
-    label: 'Piloter les coûts',
-    title: 'Passer à une impression gérée',
-    serviceIds: ['managed'],
   },
 ];
 
@@ -108,10 +103,10 @@ export default function ServicesPage() {
               </span>
             </div>
             <h1 className="mb-5 max-w-3xl text-4xl font-bold leading-tight text-white md:text-5xl">
-              Une chaîne complète pour maîtriser votre parc d&apos;impression
+              Services techniques pour votre parc d&apos;impression
             </h1>
             <p className="max-w-2xl text-lg leading-relaxed" style={{ color: 'rgba(255,255,255,0.85)' }}>
-              AMD Service assemble les équipements, le support technique, les consommables et le pilotage des coûts dans un service unique, clair et mesurable.
+              Vente d&apos;équipements, maintenance préventive et corrective, gestion de parc et fourniture de consommables — tout l&apos;appui technique dont votre entreprise a besoin.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link
@@ -175,6 +170,30 @@ export default function ServicesPage() {
               </p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Banner — Location */}
+      <section className="border-b px-4 py-8 sm:px-6 lg:px-8" style={{ backgroundColor: '#FFF5F5', borderColor: '#FECACA' }}>
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-8 flex-shrink-0" style={{ backgroundColor: '#BF0D0D' }} />
+            <div>
+              <p className="font-semibold text-sm" style={{ color: '#111827' }}>
+                Vous cherchez à louer une imprimante ou un photocopieur ?
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: '#6B7280' }}>
+                Découvrez nos offres de location avec coût par copie, maintenance et toner inclus.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/location"
+            className="flex-shrink-0 inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-80 cursor-pointer"
+            style={{ backgroundColor: '#BF0D0D' }}
+          >
+            Voir les offres de location <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </section>
 
