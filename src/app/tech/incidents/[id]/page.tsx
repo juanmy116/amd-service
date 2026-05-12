@@ -13,12 +13,23 @@ export default async function TechIncidentPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+  if (!profile || !['admin', 'technician'].includes(profile.role)) redirect('/login')
+
   const [{ data: incident }, { data: parts }] = await Promise.all([
     supabase.from('incidents').select('*').eq('id', id).single(),
     supabase.from('incident_parts').select('part_id').eq('incident_id', id),
   ])
 
   if (!incident) notFound()
+
+  // Los técnicos solo pueden ver sus incidentes asignados.
+  // Error opaco: notFound en lugar de 403 para no revelar que el incidente existe.
+  if (profile.role === 'technician' && incident.assigned_to !== user.id) notFound()
 
   const { data: contract } = await supabase
     .from('contracts')
