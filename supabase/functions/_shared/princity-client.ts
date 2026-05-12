@@ -22,9 +22,9 @@ export class PrincityClient {
   private baseUrl: string
   private apiKey: string
 
-  constructor(subdomain: string, apiKey: string) {
-    if (!subdomain || !apiKey) throw new Error('PRINCITY_MISSING_CONFIG')
-    this.baseUrl = `https://${subdomain}.princity.cloud/api`
+  constructor(baseUrl: string, apiKey: string) {
+    if (!baseUrl || !apiKey) throw new Error('PRINCITY_MISSING_CONFIG')
+    this.baseUrl = baseUrl.replace(/\/$/, '')
     this.apiKey  = apiKey
   }
 
@@ -62,7 +62,7 @@ export class PrincityClient {
 }
 
 export function getPrincityClient(): PrincityClient {
-  const subdomain = Deno.env.get('PRINCITY_SUBDOMAIN') ?? ''
-  const apiKey    = Deno.env.get('PRINCITY_API_KEY') ?? ''
-  return new PrincityClient(subdomain, apiKey)
+  const baseUrl = Deno.env.get('PRINCITY_BASE_URL') ?? ''
+  const apiKey  = Deno.env.get('PRINCITY_API_KEY') ?? ''
+  return new PrincityClient(baseUrl, apiKey)
 }
