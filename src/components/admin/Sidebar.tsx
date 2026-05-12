@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, Printer, FileText,
   AlertCircle, UserCog, LogOut, BarChart2, Wrench, CalendarDays,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Plug,
 } from 'lucide-react'
 import { signOut } from '@/app/login/actions'
 
@@ -20,6 +20,7 @@ const NAV = [
   { href: '/admin/maintenance', label: 'Maintenance',     icon: Wrench },
   { href: '/admin/calendrier',  label: 'Calendrier',      icon: CalendarDays },
   { href: '/admin/team',        label: 'Équipe',          icon: UserCog },
+  { href: '/admin/princity',    label: 'Princity API',    icon: Plug },
 ]
 
 export default function Sidebar({ fullName }: { fullName: string | null }) {
