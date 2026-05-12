@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Printer, MapPin, Building2, Wrench, AlertTriangle } from 'lucide-react'
 
@@ -20,13 +20,23 @@ export default async function MachineScanPage({
   const numero_serie = decodeURIComponent(serie)
   const supabase = await createClient()
 
+  // Check explícito de auth y rol — no depender únicamente del middleware o RLS
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+  if (!profile || !['admin', 'technician'].includes(profile.role)) redirect('/login')
+
   const { data: machine } = await supabase
     .from('machines')
     .select('*')
     .eq('numero_serie', numero_serie)
     .single()
 
-  if (!machine) notFound()
+  if (!machine || !machine.active) notFound()
 
   const { data: contract } = await supabase
     .from('contracts')
