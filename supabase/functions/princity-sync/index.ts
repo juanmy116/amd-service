@@ -11,33 +11,29 @@ async function runInitialImport(
   // 1. Borrar datos en orden FK
   await db.rpc('wipe_data_tables')
 
-  // 2. Importar empresas → clients
+  // 2. Importar empresas → clients (solo campos confirmados en docs)
   const companies = await princity.fetchAll('/v3/companies', {
     cursorParams: { filters: [{ key: 'Company.active', type: 'EQ', value: 'true' }] },
-    fieldIds: ['Company.id', 'Company.name', 'Company.address', 'Company.city', 'Company.postalCode'],
+    fieldIds: ['Company.id', 'Company.name'],
   })
 
   let clientsCreated = 0
   for (const c of companies) {
     const { error } = await db.from('clients').insert({
       nom_client:          String(c['Company.name'] ?? ''),
-      adresse:             String(c['Company.address'] ?? '') || null,
-      ville:               String(c['Company.city'] ?? '') || null,
       princity_company_id: String(c['Company.id'] ?? ''),
       active:              true,
     })
     if (!error) clientsCreated++
   }
 
-  // 3. Importar dispositivos → machines
+  // 3. Importar dispositivos → machines (campos confirmados en docs)
   const devices = await princity.fetchAll('/v3/devices', {
-    cursorParams: {
-      filters: [{ key: 'Device.status', type: 'EQ', value: 'ACTIVE' }],
-    },
+    cursorParams: {},
     fieldIds: [
       'Device.id', 'Device.serialNumber',
       'Device.model.manufacturerName', 'Device.model.name',
-      'Device.model.color', 'Device.ip', 'Device.sysLocation',
+      'Device.company.name', 'Device.counter.color',
     ],
   })
 
@@ -46,12 +42,13 @@ async function runInitialImport(
     const serie = String(d['Device.serialNumber'] ?? '').trim()
     if (!serie) continue
 
+    const isColor = Number(d['Device.counter.color'] ?? 0) > 0
+
     const { error } = await db.from('machines').insert({
       numero_serie:       serie,
       marque:             String(d['Device.model.manufacturerName'] ?? '') || 'Ricoh',
       modele:             String(d['Device.model.name'] ?? ''),
-      type:               d['Device.model.color'] ? 'color' : 'noir_blanc',
-      localisation:       String(d['Device.sysLocation'] ?? '') || null,
+      type:               isColor ? 'color' : 'noir_blanc',
       princity_device_id: String(d['Device.id'] ?? ''),
       princity_pending:   true,
       active:             true,
@@ -68,10 +65,10 @@ async function runNormalSync(
 ) {
   let created = 0
 
-  // Sincronizar empresas
+  // Sincronizar empresas (solo campos confirmados en docs)
   const companies = await princity.fetchAll('/v3/companies', {
     cursorParams: { filters: [{ key: 'Company.active', type: 'EQ', value: 'true' }] },
-    fieldIds: ['Company.id', 'Company.name', 'Company.city'],
+    fieldIds: ['Company.id', 'Company.name'],
   })
 
   for (const c of companies) {
@@ -82,7 +79,6 @@ async function runNormalSync(
     if (!existing) {
       await db.from('clients').insert({
         nom_client:          String(c['Company.name'] ?? ''),
-        ville:               String(c['Company.city'] ?? '') || null,
         princity_company_id: companyId,
         active:              true,
       })
@@ -93,19 +89,21 @@ async function runNormalSync(
     }
   }
 
-  // Sincronizar dispositivos
+  // Sincronizar dispositivos (campos confirmados en docs)
   const devices = await princity.fetchAll('/v3/devices', {
-    cursorParams: { filters: [{ key: 'Device.status', type: 'EQ', value: 'ACTIVE' }] },
+    cursorParams: {},
     fieldIds: [
       'Device.id', 'Device.serialNumber',
       'Device.model.manufacturerName', 'Device.model.name',
-      'Device.model.color', 'Device.company.name',
+      'Device.company.name', 'Device.counter.color',
     ],
   })
 
   for (const d of devices) {
     const serie = String(d['Device.serialNumber'] ?? '').trim()
     if (!serie) continue
+
+    const isColor = Number(d['Device.counter.color'] ?? 0) > 0
 
     const { data: existing } = await db.from('machines')
       .select('numero_serie, princity_device_id').eq('numero_serie', serie).maybeSingle()
@@ -115,7 +113,7 @@ async function runNormalSync(
         numero_serie:       serie,
         marque:             String(d['Device.model.manufacturerName'] ?? '') || 'Ricoh',
         modele:             String(d['Device.model.name'] ?? ''),
-        type:               d['Device.model.color'] ? 'color' : 'noir_blanc',
+        type:               isColor ? 'color' : 'noir_blanc',
         princity_device_id: String(d['Device.id'] ?? ''),
         princity_pending:   true,
         active:             true,
