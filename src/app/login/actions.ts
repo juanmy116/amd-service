@@ -17,7 +17,7 @@ export async function signInWithEmail(
     password: formData.get('password') as string,
   })
 
-  if (error) return { error: error.message }
+  if (error) return { error: 'Email ou mot de passe incorrect.' }
 
   redirect('/dashboard')
 }
@@ -49,7 +49,7 @@ export async function registerClientAction(
   const confirm  = (formData.get('confirm')  as string)
 
   if (password !== confirm) return { error: 'Les mots de passe ne correspondent pas.' }
-  if (password.length < 6)  return { error: 'Le mot de passe doit contenir au moins 6 caractères.' }
+  if (password.length < 8)  return { error: 'Le mot de passe doit contenir au moins 8 caractères.' }
 
   const h = await headers()
   const host  = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
@@ -64,10 +64,11 @@ export async function registerClientAction(
 
   if (error) {
     if (error.message.includes('already registered')) return { error: 'Cet email est déjà utilisé.' }
-    return { error: error.message }
+    console.error('[registerClient]', error)
+    return { error: 'Une erreur est survenue. Veuillez réessayer.' }
   }
 
-  redirect('/portal')
+  redirect('/login?message=confirm-email')
 }
 
 export async function signOut(): Promise<void> {

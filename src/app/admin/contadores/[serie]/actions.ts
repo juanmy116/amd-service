@@ -64,7 +64,10 @@ export async function saveCounterAction(
     recorded_by:          user.id,
   })
 
-  if (error) return { error: error.message }
+  if (error) {
+    console.error('[saveCounter]', error)
+    return { error: 'Une erreur est survenue. Veuillez réessayer.' }
+  }
 
   revalidatePath(`/admin/contadores/${encodeURIComponent(machine_id)}`)
   revalidatePath('/admin/contadores')
@@ -94,7 +97,10 @@ export async function cancelCounterAction(
     .eq('id', counterId)
     .eq('status', 'actif')
 
-  if (error) return { error: error.message }
+  if (error) {
+    console.error('[cancelCounter]', error)
+    return { error: 'Une erreur est survenue. Veuillez réessayer.' }
+  }
 
   revalidatePath(`/admin/contadores/${encodeURIComponent(machineId)}`)
   revalidatePath('/admin/contadores')

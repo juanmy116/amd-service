@@ -33,7 +33,10 @@ export async function updateContractAction(
     statut:              formData.get('statut') as string,
   }).eq('id', id)
 
-  if (error) return { error: error.message }
+  if (error) {
+    console.error('[updateContract]', error)
+    return { error: 'Une erreur est survenue. Veuillez réessayer.' }
+  }
 
   redirect('/admin/contracts')
 }

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/admin/Sidebar'
+import AdminAgendaPanel from '@/components/admin/AgendaPanel'
+import AgendaPanelWrapper from '@/components/admin/AgendaPanelWrapper'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -22,6 +24,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>
+      <AgendaPanelWrapper>
+        <AdminAgendaPanel />
+      </AgendaPanelWrapper>
     </div>
   )
 }

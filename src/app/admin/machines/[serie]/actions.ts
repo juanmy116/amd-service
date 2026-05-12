@@ -30,7 +30,10 @@ export async function updateMachineAction(
     active: formData.get('active') === 'on',
   }).eq('numero_serie', serie)
 
-  if (error) return { error: error.message }
+  if (error) {
+    console.error('[updateMachine]', error)
+    return { error: 'Une erreur est survenue. Veuillez réessayer.' }
+  }
 
   redirect('/admin/machines')
 }

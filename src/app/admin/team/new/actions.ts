@@ -33,7 +33,7 @@ export async function inviteMemberAction(
   const proto = h.get('x-forwarded-proto') ?? 'http'
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? `${proto}://${host}`
   const next       = role === 'admin' ? '/admin' : '/tech'
-  const redirectTo = `${origin}/auth/callback?next=${next}`
+  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`
 
   const supabaseAdmin = createAdminClient()
 

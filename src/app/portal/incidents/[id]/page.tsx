@@ -28,10 +28,26 @@ export default async function PortalIncidentDetailPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Obtener client_id del usuario autenticado
+  const { data: clientProfile } = await supabase
+    .from('client_profiles')
+    .select('client_id')
+    .eq('profile_id', user.id)
+    .single()
+  if (!clientProfile) redirect('/portal/verify')
+
+  // Obtener IDs de contratos del cliente (ownership check)
+  const { data: clientContracts } = await supabase
+    .from('contracts')
+    .select('id')
+    .eq('client_id', clientProfile.client_id)
+  const contractIds = (clientContracts ?? []).map(c => c.id)
+
   const { data: incident } = await supabase
     .from('incidents')
     .select('*')
     .eq('id', id)
+    .in('contract_id', contractIds.length > 0 ? contractIds : [''])
     .single()
 
   if (!incident) notFound()

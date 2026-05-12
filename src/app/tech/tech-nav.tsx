@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, QrCode, AlertCircle } from 'lucide-react'
+import { LayoutDashboard, QrCode, AlertCircle, CalendarDays } from 'lucide-react'
 
 const NAV = [
-  { href: '/tech',           label: 'Accueil',    icon: LayoutDashboard, exact: true },
-  { href: '/tech/incidents', label: 'Incidents',  icon: AlertCircle },
-  { href: '/tech/scan',      label: 'Scanner QR', icon: QrCode },
+  { href: '/tech',           label: 'Accueil',  icon: LayoutDashboard,  exact: true },
+  { href: '/tech/incidents', label: 'Incidents', icon: AlertCircle },
+  { href: '/tech/scan',      label: 'Scanner',   icon: QrCode },
+  { href: '/tech/planning',  label: 'Planning',  icon: CalendarDays },
 ]
 
 export default function TechNav() {
@@ -15,7 +16,7 @@ export default function TechNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white border-t border-gray-200 z-10">
-      <div className="grid grid-cols-3 h-16">
+      <div className="grid grid-cols-4 h-16">
         {NAV.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href)
           return (

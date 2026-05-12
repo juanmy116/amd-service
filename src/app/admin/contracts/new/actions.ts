@@ -41,7 +41,8 @@ export async function createContractAction(
 
   if (error) {
     if (error.code === '23505') return { error: 'Ce numéro de contrat existe déjà.' }
-    return { error: error.message }
+    console.error('[createContract]', error)
+    return { error: 'Une erreur est survenue. Veuillez réessayer.' }
   }
 
   redirect('/admin/contracts')

@@ -32,7 +32,10 @@ export async function updateMemberAction(
     .update({ full_name, phone, role })
     .eq('id', id)
 
-  if (error) return { error: error.message }
+  if (error) {
+    console.error('[updateMember]', error)
+    return { error: 'Une erreur est survenue. Veuillez réessayer.' }
+  }
 
   redirect('/admin/team')
 }

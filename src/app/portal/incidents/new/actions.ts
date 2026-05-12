@@ -47,7 +47,10 @@ export async function createPortalIncidentAction(
     status:      'nouveau',
   })
 
-  if (error) return { error: error.message }
+  if (error) {
+    console.error('[createPortalIncident]', error)
+    return { error: 'Une erreur est survenue. Veuillez réessayer.' }
+  }
 
   redirect('/portal/incidents')
 }

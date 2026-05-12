@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, AlertCircle, Printer, LogOut } from 'lucide-react'
+import { LayoutDashboard, AlertCircle, Printer, LogOut, CalendarDays } from 'lucide-react'
 import { signOut } from '@/app/login/actions'
 
 const NAV = [
-  { href: '/tech',           label: 'Tableau de bord',      icon: LayoutDashboard, exact: true },
-  { href: '/tech/incidents', label: 'Mes interventions',    icon: AlertCircle },
-  { href: '/tech/machines',  label: 'Machines',             icon: Printer },
+  { href: '/tech',           label: 'Tableau de bord',   icon: LayoutDashboard, exact: true },
+  { href: '/tech/incidents', label: 'Mes interventions', icon: AlertCircle },
+  { href: '/tech/machines',  label: 'Machines',          icon: Printer },
+  { href: '/tech/planning',  label: 'Planning',          icon: CalendarDays },
 ]
 
 export default function TechDesktopSidebar({ fullName }: { fullName: string | null }) {

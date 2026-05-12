@@ -6,11 +6,22 @@ export default async function TechMachinesPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Machines linked to incidents assigned to this tech (via RLS)
-  const { data: machines } = await supabase
-    .from('machines')
-    .select('numero_serie, marque, modele, type, localisation, active')
-    .order('marque')
+  // Solo máquinas con incidencias asignadas a este técnico
+  const { data: assignedIncidents } = await supabase
+    .from('incidents')
+    .select('machine_id')
+    .eq('assigned_to', user.id)
+    .not('status', 'in', '("fermé")')
+
+  const machineIds = [...new Set((assignedIncidents ?? []).map(i => i.machine_id))]
+
+  const { data: machines } = machineIds.length > 0
+    ? await supabase
+        .from('machines')
+        .select('numero_serie, marque, modele, type, localisation, active')
+        .in('numero_serie', machineIds)
+        .order('marque')
+    : { data: [] }
 
   return (
     <div className="p-4 lg:p-8">

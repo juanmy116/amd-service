@@ -37,7 +37,10 @@ export async function updateIncidentAction(
   if (new_status === 'fermé'  && old_status !== 'fermé')  updates.closed_at   = new Date().toISOString()
 
   const { error } = await supabase.from('incidents').update(updates).eq('id', id)
-  if (error) return { error: error.message }
+  if (error) {
+    console.error('[updateIncident]', error)
+    return { error: 'Une erreur est survenue. Veuillez réessayer.' }
+  }
 
   if (user && new_status !== old_status) {
     await supabase.from('incident_history').insert({

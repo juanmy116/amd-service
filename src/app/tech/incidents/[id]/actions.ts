@@ -24,6 +24,15 @@ export async function submitInterventionAction(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Verificar que el incidente esté asignado a este técnico
+  const { data: incident } = await supabase
+    .from('incidents')
+    .select('assigned_to, status')
+    .eq('id', id)
+    .single()
+  if (!incident) return { error: 'Incident introuvable.' }
+  if (incident.assigned_to !== user.id) return { error: 'Non autorisé.' }
+
   const new_status        = formData.get('status')           as string
   const old_status        = formData.get('old_status')       as string
   const rapport           = (formData.get('rapport') as string).trim() || null
@@ -37,7 +46,10 @@ export async function submitInterventionAction(
   if (new_status === 'fermé'  && old_status !== 'fermé')  updates.closed_at   = new Date().toISOString()
 
   const { error } = await supabase.from('incidents').update(updates).eq('id', id)
-  if (error) return { error: error.message }
+  if (error) {
+    console.error('[submitIntervention]', error)
+    return { error: 'Une erreur est survenue. Veuillez réessayer.' }
+  }
 
   // Historial
   if (new_status !== old_status) {
