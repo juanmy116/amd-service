@@ -103,6 +103,40 @@ El middleware de Next.js (`src/middleware.ts`) redirige según el rol del usuari
 
 ---
 
+## Flujo de trabajo con Git y GitHub
+
+**Regla:** Nunca trabajar directamente en `main`. Siempre usar ramas.
+
+```bash
+# 1. Antes de empezar cualquier tarea
+git checkout main && git pull
+
+# 2. Crear rama (usar prefijos: feat/, fix/, docs/, refactor/)
+git checkout -b feat/nombre-descriptivo
+
+# 3. Commits frecuentes mientras trabajas
+git add <archivos>
+git commit -m "feat: descripción del cambio"
+
+# 4. Subir y abrir PR
+git push origin feat/nombre-descriptivo
+gh pr create --title "Título" --body "Qué hace y por qué"
+
+# 5. Revisar con Claude antes de mergear
+# /code-review <número-PR>
+
+# 6. Mergear cuando esté aprobado
+gh pr merge <número> --merge --delete-branch
+```
+
+**Nomenclatura de ramas:**
+- `feat/` — nueva funcionalidad
+- `fix/` — corrección de bug
+- `docs/` — solo documentación
+- `refactor/` — cambios sin nueva funcionalidad
+
+---
+
 ## Decisiones de diseño importantes
 
 - **Variables de entorno siempre**, nunca hardcodear URLs ni claves

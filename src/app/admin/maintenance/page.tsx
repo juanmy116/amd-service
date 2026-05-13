@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Plus, CheckCircle2, Clock, AlertTriangle, Wrench } from 'lucide-react'
+import { Plus, Clock, AlertTriangle, Wrench } from 'lucide-react'
 
 const FREQ_LABEL: Record<string, string> = {
   mensuel:      'Mensuel',

@@ -1,10 +1,25 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, useInView, useReducedMotion } from 'framer-motion';
 import { Award, Printer, Monitor } from 'lucide-react';
 import { SOCIAL_PROOF } from '@/lib/constants';
-import { useCounter } from '@/lib/hooks';
+
+function useCounter(target: number, duration: number, active: boolean) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    let start = 0;
+    const step = target / (duration / 16);
+    const timer = setInterval(() => {
+      start += step;
+      if (start >= target) { setCount(target); clearInterval(timer); }
+      else { setCount(Math.floor(start)); }
+    }, 16);
+    return () => clearInterval(timer);
+  }, [active, target, duration]);
+  return count;
+}
 
 const stats = [
   { numericValue: 10,   suffix: '+', label: SOCIAL_PROOF.description_fr,       icon: Award   },

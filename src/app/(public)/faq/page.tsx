@@ -1,4 +1,10 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'FAQ — AMD Service',
+  description: 'Toutes les réponses sur AMD Service : location d\'équipements, maintenance, coût par copie, contrats et délais d\'intervention à Dakar, Sénégal.',
+};
 import PhotoFrame from '@/components/PhotoFrame';
 import AccordionItem from '@/components/AccordionItem';
 import { CTA_MESSAGES } from '@/lib/constants';
