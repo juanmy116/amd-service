@@ -51,10 +51,39 @@ export class PrincityClient {
       })
 
       if (res.status === 401) throw new Error('PRINCITY_AUTH_FAILED')
-      if (!res.ok) throw new Error(`PRINCITY_HTTP_${res.status}`)
+      if (!res.ok) {
+        const body = await res.text().catch(() => '')
+        throw new Error(`PRINCITY_HTTP_${res.status}: ${body.slice(0, 300)}`)
+      }
 
       const data = await res.json() as { entries?: PrincityEntry[]; numberOfAll?: number }
       return data.entries ?? []
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  async getV1<T = unknown>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 10_000)
+
+    const qs = new URLSearchParams(params).toString()
+    const url = qs ? `${this.baseUrl}${endpoint}?${qs}` : `${this.baseUrl}${endpoint}`
+
+    try {
+      const res = await fetch(url, {
+        method:  'GET',
+        headers: { 'App-auth-key': this.apiKey },
+        signal:  controller.signal,
+      })
+
+      if (res.status === 401) throw new Error('PRINCITY_AUTH_FAILED')
+      if (!res.ok) {
+        const body = await res.text().catch(() => '')
+        throw new Error(`PRINCITY_HTTP_${res.status}: ${body.slice(0, 300)}`)
+      }
+
+      return await res.json() as T
     } finally {
       clearTimeout(timer)
     }

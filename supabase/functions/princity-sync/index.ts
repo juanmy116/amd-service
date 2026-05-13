@@ -4,59 +4,118 @@ import { notifyAdmin }                            from '../_shared/notify.ts'
 
 const FUNCTION_NAME = 'princity-sync'
 
+interface V1Contract {
+  prefix:           string
+  location:         { name: string; street?: string; city?: string; postalCode?: string; phone?: string | null; email?: string | null; active?: boolean }
+  timezone?:        string
+  taxNumber?:       string | null
+  settlementMethod?: string
+}
+
+interface V1Device {
+  id:           string
+  serial?:      string
+  mac?:         string
+  hostname?:    string
+  sysName?:     string
+  sysLocation?: string
+  hrDeviceDescr?: string
+  deviceModel?: { name?: string; manufacturer?: string; color?: boolean }
+  deviceStatus?: string
+}
+
+async function fetchAllDevices(princity: ReturnType<typeof getPrincityClient>, contracts: V1Contract[]) {
+  // Paralelizar en lotes de 10 para no saturar
+  const batchSize = 10
+  const allDevices: Array<V1Device & { contractPrefix: string; companyName: string }> = []
+
+  for (let i = 0; i < contracts.length; i += batchSize) {
+    const batch = contracts.slice(i, i + batchSize)
+    const results = await Promise.all(
+      batch.map(c =>
+        princity.getV1<V1Device[]>('/v1/devices', { contract: c.prefix })
+          .then(devices => devices.map(d => ({ ...d, contractPrefix: c.prefix, companyName: c.location.name })))
+          .catch(err => {
+            console.error(`[princity-sync] devices fetch error for contract ${c.prefix}:`, err.message)
+            return []
+          })
+      )
+    )
+    for (const list of results) allDevices.push(...list)
+  }
+
+  return allDevices
+}
+
 async function runInitialImport(
   db: ReturnType<typeof getAdminClient>,
   princity: ReturnType<typeof getPrincityClient>
 ) {
-  // 1. Borrar datos en orden FK
-  await db.rpc('wipe_data_tables')
+  // 1. Borrar datos existentes en orden FK
+  const { error: wipeErr } = await db.rpc('wipe_data_tables')
+  if (wipeErr) throw new Error(`WIPE_FAILED: ${wipeErr.message}`)
 
-  // 2. Importar empresas → clients (solo campos confirmados en docs)
-  const companies = await princity.fetchAll('/v3/companies', {
-    cursorParams: { filters: [{ key: 'Company.active', type: 'EQ', value: 'true' }] },
-    fieldIds: ['Company.id', 'Company.name'],
-  })
+  // 2. Obtener contratos (= clientes en Princity)
+  const contracts = await princity.getV1<V1Contract[]>('/v1/contracts')
 
+  // 3. Insertar clientes
   let clientsCreated = 0
-  for (const c of companies) {
+  let clientsFailed  = 0
+  for (const c of contracts) {
     const { error } = await db.from('clients').insert({
-      nom_client:          String(c['Company.name'] ?? ''),
-      princity_company_id: String(c['Company.id'] ?? ''),
-      active:              true,
+      nom_client:          c.location.name,
+      princity_company_id: c.prefix,
+      princity_prefix:     c.prefix,
+      adresse:             c.location.street ?? null,
+      ville:               c.location.city ?? null,
+      telephone:           c.location.phone ?? null,
+      email:               c.location.email ?? null,
+      ninea:               c.taxNumber ?? null,
+      active:              c.location.active ?? true,
     })
-    if (!error) clientsCreated++
+    if (error) {
+      console.error(`[princity-sync] client insert error (${c.prefix} ${c.location.name}):`, error.message)
+      clientsFailed++
+    } else {
+      clientsCreated++
+    }
   }
 
-  // 3. Importar dispositivos → machines (campos confirmados en docs)
-  const devices = await princity.fetchAll('/v3/devices', {
-    cursorParams: {},
-    fieldIds: [
-      'Device.id', 'Device.serialNumber',
-      'Device.model.manufacturerName', 'Device.model.name',
-      'Device.company.name', 'Device.counter.color',
-    ],
-  })
+  // 4. Obtener todos los equipos (paralelo en lotes)
+  const devices = await fetchAllDevices(princity, contracts)
 
+  // 5. Insertar equipos
   let machinesCreated = 0
+  let machinesFailed  = 0
   for (const d of devices) {
-    const serie = String(d['Device.serialNumber'] ?? '').trim()
+    const serie = String(d.serial ?? '').trim()
     if (!serie) continue
 
-    const isColor = Number(d['Device.counter.color'] ?? 0) > 0
+    const isColor = d.deviceModel?.color === true
 
     const { error } = await db.from('machines').insert({
       numero_serie:       serie,
-      marque:             String(d['Device.model.manufacturerName'] ?? '') || 'Ricoh',
-      modele:             String(d['Device.model.name'] ?? ''),
+      marque:             d.deviceModel?.manufacturer ?? 'Ricoh',
+      modele:             d.deviceModel?.name ?? '',
       type:               isColor ? 'color' : 'noir_blanc',
-      princity_device_id: String(d['Device.id'] ?? ''),
+      princity_device_id: d.id,
       princity_pending:   true,
-      active:             true,
+      active:             d.deviceStatus === 'ACTIVE',
     })
-    if (!error) machinesCreated++
+    if (error) {
+      console.error(`[princity-sync] machine insert error (${d.id} ${serie}):`, error.message)
+      machinesFailed++
+    } else {
+      machinesCreated++
+    }
   }
 
-  return { clientsCreated, machinesCreated, companiesTotal: companies.length, devicesTotal: devices.length }
+  return {
+    clientsCreated,
+    machinesCreated,
+    companiesTotal: contracts.length,
+    devicesTotal:   devices.length,
+  }
 }
 
 async function runNormalSync(
@@ -65,45 +124,40 @@ async function runNormalSync(
 ) {
   let created = 0
 
-  // Sincronizar empresas (solo campos confirmados en docs)
-  const companies = await princity.fetchAll('/v3/companies', {
-    cursorParams: { filters: [{ key: 'Company.active', type: 'EQ', value: 'true' }] },
-    fieldIds: ['Company.id', 'Company.name'],
-  })
+  // 1. Contratos
+  const contracts = await princity.getV1<V1Contract[]>('/v1/contracts')
 
-  for (const c of companies) {
-    const companyId = String(c['Company.id'] ?? '')
+  for (const c of contracts) {
     const { data: existing } = await db.from('clients')
-      .select('id').eq('princity_company_id', companyId).maybeSingle()
+      .select('id').eq('princity_company_id', c.prefix).maybeSingle()
 
     if (!existing) {
       await db.from('clients').insert({
-        nom_client:          String(c['Company.name'] ?? ''),
-        princity_company_id: companyId,
-        active:              true,
+        nom_client:          c.location.name,
+        princity_company_id: c.prefix,
+        princity_prefix:     c.prefix,
+        adresse:             c.location.street ?? null,
+        ville:               c.location.city ?? null,
+        telephone:           c.location.phone ?? null,
+        email:               c.location.email ?? null,
+        ninea:               c.taxNumber ?? null,
+        active:              c.location.active ?? true,
       })
       await notifyAdmin(
-        `🆕 NOUVEAU CLIENT PRINCITY\nEntreprise: ${c['Company.name']}\nID Princity: ${companyId}\n→ À lier manuellement: /admin/clients`
+        `🆕 NOUVEAU CLIENT PRINCITY\nEntreprise: ${c.location.name}\nID Princity: ${c.prefix}\n→ À lier manuellement: /admin/clients`
       )
       created++
     }
   }
 
-  // Sincronizar dispositivos (campos confirmados en docs)
-  const devices = await princity.fetchAll('/v3/devices', {
-    cursorParams: {},
-    fieldIds: [
-      'Device.id', 'Device.serialNumber',
-      'Device.model.manufacturerName', 'Device.model.name',
-      'Device.company.name', 'Device.counter.color',
-    ],
-  })
+  // 2. Equipos
+  const devices = await fetchAllDevices(princity, contracts)
 
   for (const d of devices) {
-    const serie = String(d['Device.serialNumber'] ?? '').trim()
+    const serie = String(d.serial ?? '').trim()
     if (!serie) continue
 
-    const isColor = Number(d['Device.counter.color'] ?? 0) > 0
+    const isColor = d.deviceModel?.color === true
 
     const { data: existing } = await db.from('machines')
       .select('numero_serie, princity_device_id').eq('numero_serie', serie).maybeSingle()
@@ -111,19 +165,19 @@ async function runNormalSync(
     if (!existing) {
       await db.from('machines').insert({
         numero_serie:       serie,
-        marque:             String(d['Device.model.manufacturerName'] ?? '') || 'Ricoh',
-        modele:             String(d['Device.model.name'] ?? ''),
+        marque:             d.deviceModel?.manufacturer ?? 'Ricoh',
+        modele:             d.deviceModel?.name ?? '',
         type:               isColor ? 'color' : 'noir_blanc',
-        princity_device_id: String(d['Device.id'] ?? ''),
+        princity_device_id: d.id,
         princity_pending:   true,
-        active:             true,
+        active:             d.deviceStatus === 'ACTIVE',
       })
       await notifyAdmin(
-        `🆕 NOUVEL ÉQUIPEMENT PRINCITY\nSérie: ${serie}\nModèle: ${d['Device.model.name']}\nEntreprise: ${d['Device.company.name']}\n→ Créer contrat: /admin/contracts`
+        `🆕 NOUVEL ÉQUIPEMENT PRINCITY\nSérie: ${serie}\nModèle: ${d.deviceModel?.name ?? '—'}\nEntreprise: ${d.companyName}\n→ Créer contrat: /admin/contracts`
       )
       created++
     } else if (!existing.princity_device_id) {
-      await db.from('machines').update({ princity_device_id: String(d['Device.id'] ?? '') })
+      await db.from('machines').update({ princity_device_id: d.id })
         .eq('numero_serie', serie)
     }
   }
@@ -156,7 +210,7 @@ Deno.serve(async (req: Request) => {
     await updateHealth(db, FUNCTION_NAME, true)
     await writeLog(db, {
       functionName:     FUNCTION_NAME,
-      endpointCalled:   '/v3/companies + /v3/devices',
+      endpointCalled:   '/v1/contracts + /v1/devices',
       status:           'success',
       recordsProcessed: (result.companiesTotal ?? 0) + (result.devicesTotal ?? 0),
       recordsCreated:   result.created ?? (result.clientsCreated ?? 0) + (result.machinesCreated ?? 0),
@@ -172,7 +226,7 @@ Deno.serve(async (req: Request) => {
     await updateHealth(db, FUNCTION_NAME, false, msg).catch(() => {})
     await writeLog(db, {
       functionName:     FUNCTION_NAME,
-      endpointCalled:   '/v3/companies + /v3/devices',
+      endpointCalled:   '/v1/contracts + /v1/devices',
       status:           'error',
       recordsProcessed: 0,
       recordsCreated:   0,
