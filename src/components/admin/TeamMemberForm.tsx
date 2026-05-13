@@ -142,11 +142,24 @@ export default function TeamMemberForm({
             </select>
           </div>
 
-          {/* Info invite (create only) */}
+          {/* Mot de passe temporaire (create only) */}
           {!isEdit && (
-            <p className="text-xs text-gray-400 leading-relaxed">
-              Un email d&apos;invitation sera envoyé. La personne devra cliquer sur le lien pour définir son mot de passe.
-            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Mot de passe temporaire <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="password"
+                type="password"
+                required
+                minLength={8}
+                placeholder="8 caractères minimum"
+                className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-400 mt-1.5">
+                Communiquez ce mot de passe au technicien directement. Il pourra le modifier depuis son profil.
+              </p>
+            </div>
           )}
         </div>
 
@@ -164,7 +177,7 @@ export default function TeamMemberForm({
             style={{ backgroundColor: '#BF0D0D' }}
           >
             {pending && <Loader2 size={15} className="animate-spin" />}
-            {isEdit ? 'Enregistrer' : 'Envoyer l\'invitation'}
+            {isEdit ? 'Enregistrer' : 'Créer le compte'}
           </button>
         </div>
       </form>

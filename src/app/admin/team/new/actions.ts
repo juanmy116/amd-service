@@ -2,7 +2,6 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -23,23 +22,24 @@ export async function inviteMemberAction(
   const full_name = (formData.get('full_name') as string).trim()
   const phone     = (formData.get('phone')     as string).trim() || null
   const role      = formData.get('role') as string
+  const password  = formData.get('password') as string
 
-  if (!email)                    return { error: 'L\'email est obligatoire.' }
-  if (!full_name)                return { error: 'Le nom complet est obligatoire.' }
-  if (!VALID_ROLES.has(role))    return { error: 'Rôle invalide.' }
-
-  const h = await headers()
-  const host  = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
-  const proto = h.get('x-forwarded-proto') ?? 'http'
-  const origin = process.env.NEXT_PUBLIC_APP_URL ?? `${proto}://${host}`
-  const next       = role === 'admin' ? '/admin' : '/tech'
-  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`
+  if (!email)                         return { error: 'L\'email est obligatoire.' }
+  if (!full_name)                     return { error: 'Le nom complet est obligatoire.' }
+  if (!VALID_ROLES.has(role))         return { error: 'Rôle invalide.' }
+  if (!password || password.length < 8) return { error: 'Le mot de passe doit contenir au moins 8 caractères.' }
 
   const supabaseAdmin = createAdminClient()
 
-  const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, { redirectTo })
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  })
+
   if (error) {
-    if (error.message.includes('already been registered')) return { error: 'Cet email est déjà utilisé.' }
+    if (error.message.includes('already been registered') || error.message.includes('already exists'))
+      return { error: 'Cet email est déjà utilisé.' }
     return { error: error.message }
   }
 
