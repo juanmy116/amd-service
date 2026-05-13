@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-13 (sesión 5 — Integración Princity API)
+> Última actualización: 2026-05-13 (sesión 6 — Rediseño PWA Técnico)
 
 ---
 
@@ -53,6 +53,24 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 - Auto-programación de la siguiente visita de mantenimiento al cerrar la actual
 - Notificación Matrix de cierre enviada al room `#maintenance`
 - Layout responsive: bottom nav en móvil ↔ sidebar en desktop
+
+**Home page (`/tech`):**
+- Stats bento 2×2: En cours · Urgents (fondo rojo si >0) · Résolus ce mois · Total assignés
+- Widget "Prochaine intervention": incident activo ordenado por prioridad (urgente→haute→normale→basse), muestra cliente + título + badge prioridad
+- FAB "Scanner une machine" fijo en layout, persistente en todas las páginas del PWA móvil (encima de la nav, `bottom-16 z-40`)
+- Lista de interventions activas: tarjetas en móvil, tabla en desktop (incluye nombre cliente)
+
+**Incidents page (`/tech/incidents`):**
+- Chips de filtro client-side: Tous · Urgents · Aujourd'hui (componente `TechIncidentList`)
+- Tarjetas con borde izquierdo de 4px coloreado por prioridad: urgente=`#BF0D0D` · haute=`#F97316` · normale=`#3B82F6` · basse=`#9CA3AF`
+- Muestra cliente (`clients!client_id(nom_client)`) en cada tarjeta
+
+**Navegación móvil (4 ítems):** Accueil · Incidents · Machines · Planning  
+_(Scanner eliminado del nav; accesible vía FAB persistente)_
+
+**Componentes (`src/components/tech/`):**
+- `TechIncidentList.tsx` — Client Component: chips de filtro + tarjetas; exporta tipo `TechIncident`
+- `AgendaPanel.tsx`, `MaintenanceVisitForm.tsx` — existentes
 
 ### 4. Módulo Contadores (`/admin/contadores`) ✅
 - Vista principal agrupa máquinas por cliente con indicador ⚠ de relevés pendientes
@@ -117,6 +135,16 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 - Gráfico incidencias por mes (últimos 6 meses) — BarChart
 - Tabla de performance por técnico: total, resueltos, en curso, tasa de resolución
 - Distribución de estados de incidencias (barras CSS)
+- Tabla "Incidents récents": 8 últimos incidents abiertos con cliente, técnico, estado y fecha
+- Botón "Nouveau Ticket" en la cabecera → `/admin/incidents/new`
+
+**Componentes (`src/components/admin/`):**
+- `DashboardKpiStrip.tsx` — franja de 5 KPI cards (clientes, máquinas, contratos, incidents, CSAT)
+- `DashboardCopiesBanner.tsx` — banner rojo AMD con copias del mes (oculto si 0)
+- `DashboardRecentIncidents.tsx` — Server Component con fetch propio; tabla de incidents abiertos
+- `DashboardTechTable.tsx` — tabla de performance del equipo técnico; exporta tipo `TechPerf`
+- `DashboardStatusDist.tsx` — barras CSS de distribución de estados
+- `DashboardCharts.tsx` — `CsatTrendChart` + `IncidentsTrendChart` (Recharts, Client Components)
 
 ### 8. Servidor Matrix ✅
 - Synapse autoalojado en VPS Hostinger (`matrix.test-sav.site`)
@@ -817,6 +845,15 @@ Piezas reemplazadas en una visita de mantenimiento.
 - [x] `qr_verified = true` como prueba implícita de presencia física
 - [x] Room Matrix `#maintenance` separado del room SAV
 - [x] Flujo de creación desacoplado: cliente → máquina → contrato → plan mantenimiento
+
+### Fase 2.8 — Rediseño PWA Técnico ✅ COMPLETADO (sesión 6, 2026-05-13)
+- [x] Home: stats bento 2×2 (En cours, Urgents, Résolus ce mois, Total assignés)
+- [x] Widget "Prochaine intervention": incident activo más urgente con join a clients
+- [x] FAB Scanner persistente en layout (bottom-16, lg:hidden) — elimina botón inline
+- [x] Nav móvil: Scanner → Machines (4 ítems: Accueil, Incidents, Machines, Planning)
+- [x] `TechIncidentList` Client Component: chips de filtro + tarjetas con borde de prioridad
+- [x] Join `clients!client_id(nom_client)` en queries de home e incidents
+- [x] Desktop table actualizada: columna Cliente añadida
 
 ### Fase 2.7 — Integración Princity API ✅ COMPLETADO (sesión 5, 2026-05-13)
 - [x] Migración a API REST Princity (v1 + v3), retirada del antiguo `princity-agent` IMAP

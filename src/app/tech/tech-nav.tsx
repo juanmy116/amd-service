@@ -2,13 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, QrCode, AlertCircle, CalendarDays } from 'lucide-react'
+import { LayoutDashboard, AlertCircle, Printer, CalendarDays } from 'lucide-react'
 
 const NAV = [
-  { href: '/tech',           label: 'Accueil',  icon: LayoutDashboard,  exact: true },
-  { href: '/tech/incidents', label: 'Incidents', icon: AlertCircle },
-  { href: '/tech/scan',      label: 'Scanner',   icon: QrCode },
-  { href: '/tech/planning',  label: 'Planning',  icon: CalendarDays },
+  { href: '/tech',           label: 'Accueil',   icon: LayoutDashboard, exact: true },
+  { href: '/tech/incidents', label: 'Incidents',  icon: AlertCircle },
+  { href: '/tech/machines',  label: 'Machines',   icon: Printer },
+  { href: '/tech/planning',  label: 'Planning',   icon: CalendarDays },
 ]
 
 export default function TechNav() {

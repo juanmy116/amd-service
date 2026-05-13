@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { QrCode } from 'lucide-react'
 import TechNav from './tech-nav'
 import TechDesktopSidebar from './tech-desktop-sidebar'
 import TechAgendaPanel from '@/components/tech/AgendaPanel'
@@ -19,27 +21,27 @@ export default async function TechLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-      {/* Desktop sidebar — oculto en móvil */}
       <div className="hidden lg:block">
         <TechDesktopSidebar fullName={profile?.full_name ?? null} />
       </div>
-
-      {/* Contenido principal */}
       <main className="lg:ml-64 xl:mr-72">
-        {/* Móvil: columna centrada estrecha + padding bottom para la nav */}
-        {/* Desktop: ancho completo */}
         <div className="max-w-lg mx-auto lg:max-w-none pb-20 lg:pb-0">
           {children}
         </div>
       </main>
-
-      {/* Panel derecho agenda — solo desktop xl+ */}
       <div className="hidden xl:block">
         <TechAgendaPanel />
       </div>
-
-      {/* Mobile bottom nav — oculto en desktop */}
+      <div className="lg:hidden fixed bottom-16 left-0 right-0 flex justify-center px-4 z-40 pointer-events-none">
+        <Link
+          href="/tech/scan"
+          className="pointer-events-auto flex items-center gap-2 px-6 py-3.5 rounded-full shadow-lg text-white text-sm font-semibold"
+          style={{ backgroundColor: '#BF0D0D' }}
+        >
+          <QrCode size={20} />
+          Scanner une machine
+        </Link>
+      </div>
       <div className="lg:hidden">
         <TechNav />
       </div>
