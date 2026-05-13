@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-13 (sesión 6 — Rediseño PWA Técnico)
+> Última actualización: 2026-05-13 (sesión 7 — Creación directa de cuentas técnico)
 
 ---
 
@@ -35,7 +35,7 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 - Generación de QR por máquina (etiqueta imprimible con logo, datos y código QR)
 - Módulo de contadores de copias agrupado por cliente
 - Gestión de usuarios internos (técnicos y admins)
-- Invitación de equipo por email con redirección automática por rol
+- Creación directa de cuentas: admin introduce email + contraseña temporal → cuenta activa al instante (`createUser` con `email_confirm: true`), sin flujo de invitación por email
 
 ### 2. Portal Cliente (`/portal`) ✅
 - Login con email/contraseña (Google OAuth pendiente de activar)
