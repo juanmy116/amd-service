@@ -23,6 +23,7 @@ export async function updateIncidentAction(
   if (!category)   return { error: 'Catégorie invalide.' }
   if (!priority)   return { error: 'Priorité invalide.' }
   if (!new_status) return { error: 'Statut invalide.' }
+  if (!old_status) return { error: 'Statut actuel invalide.' }
 
   const comment     = (formData.get('comment')   as string)?.trim() || null
   const assigned_to = (formData.get('assigned_to') as string).trim() || null

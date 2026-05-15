@@ -37,6 +37,7 @@ export async function submitInterventionAction(
   const new_status = parseEnum(formData.get('status'),     INCIDENT_STATUSES)
   const old_status = parseEnum(formData.get('old_status'), INCIDENT_STATUSES)
   if (!new_status) return { error: 'Statut invalide.' }
+  if (!old_status) return { error: 'Statut actuel invalide.' }
 
   const rapport           = (formData.get('rapport') as string).trim() || null
   const autres_pieces     = (formData.get('autres_pieces') as string).trim() || null
