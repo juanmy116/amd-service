@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -10,11 +10,7 @@ export async function updateMachineAction(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (caller?.role !== 'admin') redirect('/dashboard')
+  const { supabase } = await requireAdmin()
 
   const marque = (formData.get('marque') as string).trim()
   const modele = (formData.get('modele') as string).trim()
@@ -40,11 +36,7 @@ export async function updateMachineAction(
 
 export async function deleteMachineAction(formData: FormData): Promise<void> {
   const serie = formData.get('serie') as string
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (caller?.role !== 'admin') redirect('/dashboard')
+  const { supabase } = await requireAdmin()
   await supabase.from('machines').delete().eq('numero_serie', serie)
   redirect('/admin/machines')
 }

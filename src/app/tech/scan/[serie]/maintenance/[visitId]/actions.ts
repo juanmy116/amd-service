@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { requireTechnician } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -29,15 +29,7 @@ export async function closeMaintenance(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, full_name')
-    .eq('id', user.id)
-    .single()
-  if (!profile || !['admin', 'technician'].includes(profile.role)) redirect('/login')
+  const { user, profile, supabase } = await requireTechnician()
 
   // Cargar visita con plan y contrato
   const { data: visit } = await supabase
