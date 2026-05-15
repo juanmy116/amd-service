@@ -1,6 +1,7 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth'
+import { CONTRACT_STATUSES, parseEnum } from '@/lib/enums'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -23,7 +24,8 @@ export async function createContractAction(
 
   const date_renouvellement = (formData.get('date_renouvellement') as string).trim() || null
   const lieu_installation   = (formData.get('lieu_installation')   as string).trim() || null
-  const statut              = formData.get('statut') as string
+  const statut              = parseEnum(formData.get('statut'), CONTRACT_STATUSES)
+  if (!statut) return { error: 'Statut invalide.' }
 
   const { error } = await supabase.from('contracts').insert({
     numero_contrat,

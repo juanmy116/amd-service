@@ -1,6 +1,7 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth'
+import { MAINTENANCE_FREQUENCIES, parseEnum } from '@/lib/enums'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -12,13 +13,14 @@ export async function createMaintenancePlanAction(
   const { supabase } = await requireAdmin()
 
   const contract_id    = (formData.get('contract_id')   as string ?? '').trim()
-  const frequency      = (formData.get('frequency')     as string ?? '').trim()
   const first_visit    = (formData.get('first_visit')   as string ?? '').trim()
   const notes          = (formData.get('notes')         as string ?? '').trim() || null
 
   if (!contract_id) return { error: 'Veuillez sélectionner un contrat.' }
-  if (!frequency)   return { error: 'La fréquence est obligatoire.' }
   if (!first_visit) return { error: 'La date de la première visite est obligatoire.' }
+
+  const frequency = parseEnum(formData.get('frequency'), MAINTENANCE_FREQUENCIES)
+  if (!frequency) return { error: 'Fréquence invalide.' }
 
   // Insertar plan
   const { data: plan, error: planErr } = await supabase

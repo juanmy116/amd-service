@@ -1,12 +1,11 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth'
+import { STAFF_ROLES, parseEnum } from '@/lib/enums'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
-
-const VALID_ROLES = new Set(['admin', 'technician'])
 
 export async function updateMemberAction(
   id: string,
@@ -17,9 +16,9 @@ export async function updateMemberAction(
 
   const full_name = (formData.get('full_name') as string).trim() || null
   const phone     = (formData.get('phone')     as string).trim() || null
-  const role      = formData.get('role') as string
 
-  if (!VALID_ROLES.has(role)) return { error: 'Rôle invalide.' }
+  const role = parseEnum(formData.get('role'), STAFF_ROLES)
+  if (!role) return { error: 'Rôle invalide.' }
 
   const supabaseAdmin = createAdminClient()
 

@@ -1,6 +1,7 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth'
+import { INCIDENT_CATEGORIES, INCIDENT_PRIORITIES, parseEnum } from '@/lib/enums'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -25,6 +26,11 @@ export async function createIncidentAction(
 
   if (!contract) return { error: 'Contrat introuvable.' }
 
+  const category = parseEnum(formData.get('category'), INCIDENT_CATEGORIES)
+  const priority = parseEnum(formData.get('priority'), INCIDENT_PRIORITIES)
+  if (!category) return { error: 'Catégorie invalide.' }
+  if (!priority) return { error: 'Priorité invalide.' }
+
   const assigned_to = (formData.get('assigned_to') as string).trim() || null
   const status      = assigned_to ? 'assigné' : 'nouveau'
 
@@ -37,8 +43,8 @@ export async function createIncidentAction(
       assigned_to,
       title,
       description: (formData.get('description') as string).trim() || null,
-      category:    formData.get('category') as string,
-      priority:    formData.get('priority')  as string,
+      category,
+      priority,
       status,
     })
     .select('id')
