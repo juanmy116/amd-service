@@ -1,6 +1,7 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth'
+import { MACHINE_TYPES, parseEnum } from '@/lib/enums'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -23,11 +24,14 @@ export async function createMachineAction(
   if (!marque)       return { error: 'La marque est obligatoire.' }
   if (!modele)       return { error: 'Le modèle est obligatoire.' }
 
+  const type = parseEnum(formData.get('type'), MACHINE_TYPES)
+  if (!type) return { error: 'Type de machine invalide.' }
+
   const { error } = await supabase.from('machines').insert({
     numero_serie,
     marque,
     modele,
-    type:        formData.get('type') as 'color' | 'noir_blanc',
+    type,
     localisation: str(formData, 'localisation') || null,
     active:      formData.get('active') === 'on',
   })

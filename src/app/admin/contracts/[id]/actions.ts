@@ -1,6 +1,7 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth'
+import { CONTRACT_STATUSES, parseEnum } from '@/lib/enums'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -20,13 +21,16 @@ export async function updateContractAction(
   if (!machine_id) return { error: 'Veuillez sélectionner une machine.' }
   if (!date_debut) return { error: 'La date de début est obligatoire.' }
 
+  const statut = parseEnum(formData.get('statut'), CONTRACT_STATUSES)
+  if (!statut) return { error: 'Statut invalide.' }
+
   const { error } = await supabase.from('contracts').update({
     client_id,
     machine_id,
     date_debut,
     date_renouvellement: (formData.get('date_renouvellement') as string).trim() || null,
     lieu_installation:   (formData.get('lieu_installation')   as string).trim() || null,
-    statut:              formData.get('statut') as string,
+    statut,
   }).eq('id', id)
 
   if (error) {

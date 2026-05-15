@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { INCIDENT_CATEGORIES, INCIDENT_PRIORITIES, parseEnum } from '@/lib/enums'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -18,6 +19,11 @@ export async function createPortalIncidentAction(
 
   if (!title)       return { error: 'Le titre est obligatoire.' }
   if (!contract_id) return { error: 'Veuillez sélectionner une machine.' }
+
+  const category = parseEnum(formData.get('category'), INCIDENT_CATEGORIES)
+  const priority = parseEnum(formData.get('priority'), INCIDENT_PRIORITIES)
+  if (!category) return { error: 'Catégorie invalide.' }
+  if (!priority) return { error: 'Priorité invalide.' }
 
   const { data: clientProfile } = await supabase
     .from('client_profiles')
@@ -42,8 +48,8 @@ export async function createPortalIncidentAction(
     opened_by:   user.id,
     title,
     description: (formData.get('description') as string).trim() || null,
-    category:    formData.get('category') as string,
-    priority:    formData.get('priority')  as string,
+    category,
+    priority,
     status:      'nouveau',
   })
 

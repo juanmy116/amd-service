@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
 import { redirect } from 'next/navigation'
 import { sendCsatForIncident } from '@/lib/csat'
 
@@ -33,8 +34,10 @@ export async function submitInterventionAction(
   if (!incident) return { error: 'Incident introuvable.' }
   if (incident.assigned_to !== user.id) return { error: 'Non autorisé.' }
 
-  const new_status        = formData.get('status')           as string
-  const old_status        = formData.get('old_status')       as string
+  const new_status = parseEnum(formData.get('status'),     INCIDENT_STATUSES)
+  const old_status = parseEnum(formData.get('old_status'), INCIDENT_STATUSES)
+  if (!new_status) return { error: 'Statut invalide.' }
+
   const rapport           = (formData.get('rapport') as string).trim() || null
   const autres_pieces     = (formData.get('autres_pieces') as string).trim() || null
   const comment           = (formData.get('comment') as string)?.trim() || null

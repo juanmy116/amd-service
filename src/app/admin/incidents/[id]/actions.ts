@@ -1,6 +1,7 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth'
+import { INCIDENT_CATEGORIES, INCIDENT_PRIORITIES, INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -15,16 +16,22 @@ export async function updateIncidentAction(
   const title = (formData.get('title') as string).trim()
   if (!title) return { error: 'Le titre est obligatoire.' }
 
-  const old_status  = formData.get('old_status') as string
-  const new_status  = formData.get('status')     as string
+  const category   = parseEnum(formData.get('category'), INCIDENT_CATEGORIES)
+  const priority   = parseEnum(formData.get('priority'), INCIDENT_PRIORITIES)
+  const new_status = parseEnum(formData.get('status'),   INCIDENT_STATUSES)
+  const old_status = parseEnum(formData.get('old_status'), INCIDENT_STATUSES)
+  if (!category)   return { error: 'Catégorie invalide.' }
+  if (!priority)   return { error: 'Priorité invalide.' }
+  if (!new_status) return { error: 'Statut invalide.' }
+
   const comment     = (formData.get('comment')   as string)?.trim() || null
   const assigned_to = (formData.get('assigned_to') as string).trim() || null
 
   const updates: Record<string, unknown> = {
     title,
     description:  (formData.get('description') as string).trim() || null,
-    category:     formData.get('category'),
-    priority:     formData.get('priority'),
+    category,
+    priority,
     status:       new_status,
     assigned_to,
   }
