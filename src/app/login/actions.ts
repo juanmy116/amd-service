@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 
 type AuthState = { error: string } | null
 
@@ -10,10 +11,15 @@ export async function signInWithEmail(
   _prev: AuthState,
   formData: FormData
 ): Promise<AuthState> {
+  const email = (formData.get('email') as string ?? '').trim().toLowerCase()
+  const ip = await getClientIp()
+  const ok = await checkRateLimit('login', `${ip}:${email}`)
+  if (!ok) return { error: 'Trop de tentatives. Réessayez dans quelques minutes.' }
+
   const supabase = await createClient()
 
   const { error } = await supabase.auth.signInWithPassword({
-    email: formData.get('email') as string,
+    email,
     password: formData.get('password') as string,
   })
 
@@ -42,6 +48,10 @@ export async function registerClientAction(
   _prev: AuthState,
   formData: FormData
 ): Promise<AuthState> {
+  const ip = await getClientIp()
+  const ok = await checkRateLimit('signup', ip)
+  if (!ok) return { error: 'Trop de tentatives. Réessayez plus tard.' }
+
   const supabase = await createClient()
 
   const email    = (formData.get('email')    as string).trim()

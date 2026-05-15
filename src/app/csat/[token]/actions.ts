@@ -1,12 +1,17 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 
 export async function submitCsatAction(
   token: string,
   _prev: { error?: string; success?: boolean } | null,
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
+  const ip = await getClientIp()
+  const ok = await checkRateLimit('csat', `${ip}:${token}`)
+  if (!ok) return { error: 'Trop de tentatives. Réessayez plus tard.' }
+
   const rating = Number(formData.get('rating'))
   const comment = (formData.get('comment') as string)?.trim() || null
 

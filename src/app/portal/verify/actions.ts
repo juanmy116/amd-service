@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 
 type FormState = { error: string } | null
 
@@ -15,6 +16,10 @@ export async function verifyContractAction(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const ip = await getClientIp()
+  const ok = await checkRateLimit('verify', `${ip}:${user.id}`)
+  if (!ok) return { error: 'Trop de tentatives. Réessayez plus tard.' }
 
   // Si ya está vinculado a un cliente, no permitir re-linking
   const { data: existing } = await supabaseAdmin

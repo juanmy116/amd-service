@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 const VALID_NEEDS = new Set(['rental', 'sales', 'management', 'maintenance', 'other'])
 
@@ -10,6 +11,12 @@ export async function POST(req: NextRequest) {
     if (!origin.includes(host)) {
       return NextResponse.json({ success: false, message: 'Requête non autorisée.' }, { status: 403 })
     }
+  }
+
+  const ip = getClientIpFromHeaders(req.headers)
+  const ok = await checkRateLimit('contact', ip)
+  if (!ok) {
+    return NextResponse.json({ success: false, message: 'Trop de demandes. Réessayez plus tard.' }, { status: 429 })
   }
 
   let body: Record<string, unknown>
@@ -35,7 +42,6 @@ export async function POST(req: NextRequest) {
 
   // TODO: Supabase — store lead
   // TODO: Mailjet — send confirmation email
-  // TODO: Add per-IP rate limiting before connecting email integration
 
   return NextResponse.json({ success: true, message: 'Message reçu' }, { status: 200 })
 }
