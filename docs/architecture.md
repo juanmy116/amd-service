@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-15 (sesión 10 — Rate limiting con Upstash Redis)
+> Última actualización: 2026-05-15 (sesión 11 — Migraciones SQL versionadas en repo)
 
 ---
 
@@ -744,6 +744,7 @@ Piezas reemplazadas en una visita de mantenimiento.
 | #7 | MEDIO | Patrón de auth check duplicado en 14 Server Actions | `src/lib/auth.ts` (nuevo) | Helpers `requireAdmin()` / `requireTechnician()`. Perfil ausente → `/login`; rol incorrecto → `/dashboard`. −87 líneas netas. PR #1 |
 | #9 | MEDIO | Enums sin validar en Server Actions (`category`, `priority`, `status`, `statut`, `type`, `role`, `frequency`) — un form manipulado podía enviar valores arbitrarios | `src/lib/enums.ts` (nuevo) + 11 actions | Constantes centralizadas + helper `parseEnum()` genérico. Cada action valida el valor contra la lista permitida y devuelve error claro si no encaja. PR #2 |
 | #8 | MEDIO/BAJO | Rate limiting ausente en login, registro, verify contrato, CSAT, contact API | `src/lib/rate-limit.ts` (nuevo) + 5 endpoints | Upstash Redis sliding window. Identificadores diferenciados por endpoint (IP+email en login, IP+token en CSAT, etc.). Mensajes opacos al cliente para no facilitar enumeración. PR #3 |
+| #6 | MEDIO | Schema de BD y políticas RLS no versionadas en repo (vivían solo en Supabase remoto) | `supabase/migrations/` (28 archivos, antes vacío) | Volcado de las 28 migraciones registradas en Supabase a archivos SQL en el repo. Cubre schema completo + 41 políticas RLS + funciones SECURITY DEFINER + crons. Permite recrear la BD entera desde cero. PR #4 |
 
 **⏳ Pendientes (por orden de prioridad):**
 
@@ -753,11 +754,7 @@ Piezas reemplazadas en una visita de mantenimiento.
 | #2 | ALTO | Scan page: role check explícito + `machine.active` validado | `tech/scan/[serie]/page.tsx` | ✅ Commit `efe506e` |
 | #4 | MEDIO/ALTO | Incident detail técnico: role check + `assigned_to` guard con `notFound()` opaco | `tech/incidents/[id]/page.tsx` | ✅ Commit `6438b5c` |
 
-**⏳ Pendientes (próxima sesión):**
-
-| # | Severidad | Descripción | Archivo |
-|---|---|---|---|
-| #6 | MEDIO | Políticas RLS no versionadas en repo | solo en Supabase remoto |
+**⏳ Pendientes:** ninguno de la auditoría Codex.
 
 ---
 
