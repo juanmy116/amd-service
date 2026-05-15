@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-15 (sesión 9 — Helpers de auth + validación de enums)
+> Última actualización: 2026-05-15 (sesión 10 — Rate limiting con Upstash Redis)
 
 ---
 
@@ -721,6 +721,7 @@ Piezas reemplazadas en una visita de mantenimiento.
 - **Recursión infinita resuelta** mediante 6 funciones `SECURITY DEFINER`: `auth_tech_incident_ids`, `auth_tech_incident_contract_ids`, `auth_tech_incident_machine_ids`, `auth_tech_assigned_client_ids`, `auth_client_contract_ids`, `auth_client_machine_ids`
 - **`service_role`** solo en servidor (Edge Functions, Server Actions) — nunca expuesto al cliente
 - **`machine_counters`** accesible únicamente por admins — datos de facturación
+- **Rate limiting** con Upstash Redis (sliding window) en endpoints públicos: login (5/15m por IP+email), signup (3/h por IP), verify contrato (10/h por IP+user), CSAT (5/h por IP+token), contact API (3/h por IP). Helper centralizado en `src/lib/rate-limit.ts`. Fail-open con `console.error` si faltan credenciales en producción
 
 ### Auditoría de seguridad — Princity (2026-05-13, sesión 5)
 
@@ -742,6 +743,7 @@ Piezas reemplazadas en una visita de mantenimiento.
 | #1 | CRÍTICO | Portal verify: cualquier usuario vinculable a cualquier contrato conociendo solo el nº | `portal/verify/actions.ts` | Validación email cliente vs. email auth + re-linking bloqueado + error opaco |
 | #7 | MEDIO | Patrón de auth check duplicado en 14 Server Actions | `src/lib/auth.ts` (nuevo) | Helpers `requireAdmin()` / `requireTechnician()`. Perfil ausente → `/login`; rol incorrecto → `/dashboard`. −87 líneas netas. PR #1 |
 | #9 | MEDIO | Enums sin validar en Server Actions (`category`, `priority`, `status`, `statut`, `type`, `role`, `frequency`) — un form manipulado podía enviar valores arbitrarios | `src/lib/enums.ts` (nuevo) + 11 actions | Constantes centralizadas + helper `parseEnum()` genérico. Cada action valida el valor contra la lista permitida y devuelve error claro si no encaja. PR #2 |
+| #8 | MEDIO/BAJO | Rate limiting ausente en login, registro, verify contrato, CSAT, contact API | `src/lib/rate-limit.ts` (nuevo) + 5 endpoints | Upstash Redis sliding window. Identificadores diferenciados por endpoint (IP+email en login, IP+token en CSAT, etc.). Mensajes opacos al cliente para no facilitar enumeración. PR #3 |
 
 **⏳ Pendientes (por orden de prioridad):**
 
@@ -755,7 +757,6 @@ Piezas reemplazadas en una visita de mantenimiento.
 
 | # | Severidad | Descripción | Archivo |
 |---|---|---|---|
-| #8 | MEDIO/BAJO | Rate limiting ausente en login, registro, verify contrato, CSAT, contact API | múltiples |
 | #6 | MEDIO | Políticas RLS no versionadas en repo | solo en Supabase remoto |
 
 ---
@@ -773,6 +774,8 @@ Piezas reemplazadas en una visita de mantenimiento.
 | `MATRIX_HOMESERVER_URL` | `https://matrix.test-sav.site` |
 | `MATRIX_ACCESS_TOKEN` | Token del bot Matrix (`princity-bot`) |
 | `MATRIX_MAINTENANCE_ROOM_ID` | ID del room `#maintenance` en Matrix |
+| `UPSTASH_REDIS_REST_URL` | URL REST de la base Upstash Redis para rate limiting |
+| `UPSTASH_REDIS_REST_TOKEN` | Token REST de la base Upstash Redis para rate limiting |
 
 ## Secrets Supabase Edge Functions
 
@@ -801,6 +804,7 @@ Piezas reemplazadas en una visita de mantenimiento.
 - `formData.get('campo')` devuelve `null` si vacío → usar `?? ''` antes de `.trim()`
 - Auth check en Server Actions: `await requireAdmin()` o `await requireTechnician()` desde `@/lib/auth` — devuelven `{ user, profile, supabase }`
 - Validación de enums en Server Actions: `parseEnum(formData.get('x'), ENUM_CONST)` desde `@/lib/enums` — devuelve el valor tipado o `null`
+- Rate limiting en endpoints públicos: `checkRateLimit('login', identifier)` desde `@/lib/rate-limit` antes de cualquier procesamiento. IP del cliente: `getClientIp()` en Server Actions, `getClientIpFromHeaders(req.headers)` en route handlers
 
 ---
 
