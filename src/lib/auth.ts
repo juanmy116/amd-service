@@ -21,7 +21,8 @@ async function requireRole(allowed: readonly Role[]): Promise<AuthContext> {
     .eq('id', user.id)
     .single()
 
-  if (!profile || !allowed.includes(profile.role as Role)) redirect('/dashboard')
+  if (!profile) redirect('/login')
+  if (!allowed.includes(profile.role as Role)) redirect('/dashboard')
 
   return {
     user,
