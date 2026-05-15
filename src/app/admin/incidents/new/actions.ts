@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -9,11 +9,7 @@ export async function createIncidentAction(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (caller?.role !== 'admin') redirect('/dashboard')
+  const { user, supabase } = await requireAdmin()
 
   const title       = (formData.get('title')       as string).trim()
   const contract_id = (formData.get('contract_id') as string).trim()
@@ -37,7 +33,7 @@ export async function createIncidentAction(
     .insert({
       contract_id,
       machine_id:  contract.machine_id,
-      opened_by:   user?.id ?? null,
+      opened_by:   user.id,
       assigned_to,
       title,
       description: (formData.get('description') as string).trim() || null,
@@ -50,7 +46,7 @@ export async function createIncidentAction(
 
   if (error) return { error: error.message }
 
-  if (incident && user) {
+  if (incident) {
     await supabase.from('incident_history').insert({
       incident_id: incident.id,
       changed_by:  user.id,

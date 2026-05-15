@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -10,11 +10,7 @@ export async function updateIncidentAction(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (caller?.role !== 'admin') redirect('/dashboard')
+  const { user, supabase } = await requireAdmin()
 
   const title = (formData.get('title') as string).trim()
   if (!title) return { error: 'Le titre est obligatoire.' }
@@ -42,7 +38,7 @@ export async function updateIncidentAction(
     return { error: 'Une erreur est survenue. Veuillez réessayer.' }
   }
 
-  if (user && new_status !== old_status) {
+  if (new_status !== old_status) {
     await supabase.from('incident_history').insert({
       incident_id: id,
       changed_by:  user.id,
@@ -57,11 +53,7 @@ export async function updateIncidentAction(
 
 export async function deleteIncidentAction(formData: FormData): Promise<void> {
   const id = formData.get('id') as string
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (caller?.role !== 'admin') redirect('/dashboard')
+  const { supabase } = await requireAdmin()
   await supabase.from('incidents').delete().eq('id', id)
   redirect('/admin/incidents')
 }

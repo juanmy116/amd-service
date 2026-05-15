@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 
 export type CounterFormState = { error?: string; success?: boolean } | null
@@ -9,11 +9,7 @@ export async function saveCounterAction(
   _prev: CounterFormState,
   formData: FormData
 ): Promise<CounterFormState> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
-  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (caller?.role !== 'admin') return { error: 'Non autorisé' }
+  const { user, supabase } = await requireAdmin()
 
   const machine_id           = formData.get('machine_id') as string
   const year                 = parseInt(formData.get('year') as string)
@@ -79,11 +75,7 @@ export async function cancelCounterAction(
   machineId: string,
   reason: string
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Non authentifié' }
-  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (caller?.role !== 'admin') return { error: 'Non autorisé' }
+  const { user, supabase } = await requireAdmin()
   if (!reason.trim()) return { error: 'Le motif est obligatoire.' }
 
   const { error } = await supabase

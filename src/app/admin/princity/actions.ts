@@ -1,19 +1,12 @@
 'use server'
 
-import { createClient }      from '@/lib/supabase/server'
+import { requireAdmin }      from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { redirect }          from 'next/navigation'
 
 type State = { status: 'idle' | 'success' | 'error'; message?: string } | null
 
 export async function triggerInitialImportAction(_prev: State, _fd: FormData): Promise<State> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') redirect('/dashboard')
+  await requireAdmin()
 
   const admin = createAdminClient()
   const { error } = await admin.functions.invoke('princity-sync', {

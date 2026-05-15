@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-13 (sesión 7 — Creación directa de cuentas técnico)
+> Última actualización: 2026-05-15 (sesión 9 — Helpers de auth `requireAdmin`/`requireTechnician`)
 
 ---
 
@@ -740,6 +740,7 @@ Piezas reemplazadas en una visita de mantenimiento.
 | #5 | CRÍTICO | Next.js 15→16 (SSRF, path traversal, DoS) | `package.json` | Actualización `16.2.4→16.2.6` + `overrides: postcss>=8.5.14` |
 | #10 | ALTO | Cabeceras de seguridad incompletas; `camera=()` bloqueaba scanner QR | `next.config.ts` | CSP + HSTS + `camera=(self)` global |
 | #1 | CRÍTICO | Portal verify: cualquier usuario vinculable a cualquier contrato conociendo solo el nº | `portal/verify/actions.ts` | Validación email cliente vs. email auth + re-linking bloqueado + error opaco |
+| #7 | MEDIO | Patrón de auth check duplicado en 14 Server Actions | `src/lib/auth.ts` (nuevo) | Helpers `requireAdmin()` / `requireTechnician()`. Perfil ausente → `/login`; rol incorrecto → `/dashboard`. −87 líneas netas. PR #1 |
 
 **⏳ Pendientes (por orden de prioridad):**
 
@@ -753,7 +754,6 @@ Piezas reemplazadas en una visita de mantenimiento.
 
 | # | Severidad | Descripción | Archivo |
 |---|---|---|---|
-| #7 | MEDIO | Helpers `requireAdmin()` / `requireTechnician()` — consolidar patrón repetido | `src/lib/auth.ts` (nuevo) |
 | #9 | MEDIO | Enum sin validación en Server Actions (category, priority, status, statut) | múltiples |
 | #8 | MEDIO/BAJO | Rate limiting ausente en login, registro, verify contrato, CSAT, contact API | múltiples |
 | #6 | MEDIO | Políticas RLS no versionadas en repo | solo en Supabase remoto |
@@ -799,7 +799,7 @@ Piezas reemplazadas en una visita de mantenimiento.
 - NO pasar Client Components como `React.ReactNode` props a otros Client Components
 - Recharts solo en Client Components (`'use client'`)
 - `formData.get('campo')` devuelve `null` si vacío → usar `?? ''` antes de `.trim()`
-- Auth check en todos los Server Actions de admin: `getUser()` + role check en `profiles`
+- Auth check en Server Actions: `await requireAdmin()` o `await requireTechnician()` desde `@/lib/auth` — devuelven `{ user, profile, supabase }`
 
 ---
 

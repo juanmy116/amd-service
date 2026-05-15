@@ -1,7 +1,7 @@
 'use server'
 
+import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -13,11 +13,7 @@ export async function updateMemberAction(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (caller?.role !== 'admin') redirect('/dashboard')
+  await requireAdmin()
 
   const full_name = (formData.get('full_name') as string).trim() || null
   const phone     = (formData.get('phone')     as string).trim() || null
@@ -41,11 +37,7 @@ export async function updateMemberAction(
 }
 
 export async function deleteMemberAction(formData: FormData): Promise<void> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (caller?.role !== 'admin') redirect('/dashboard')
+  await requireAdmin()
 
   const id = formData.get('id') as string
   const supabaseAdmin = createAdminClient()

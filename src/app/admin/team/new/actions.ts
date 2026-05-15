@@ -1,7 +1,7 @@
 'use server'
 
+import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -12,11 +12,7 @@ export async function inviteMemberAction(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: caller } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (caller?.role !== 'admin') redirect('/dashboard')
+  await requireAdmin()
 
   const email     = (formData.get('email')     as string).trim()
   const full_name = (formData.get('full_name') as string).trim()
