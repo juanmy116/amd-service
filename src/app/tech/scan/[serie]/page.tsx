@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Printer, MapPin, Building2, Wrench, AlertTriangle } from 'lucide-react'
@@ -37,6 +38,33 @@ export default async function MachineScanPage({
     .single()
 
   if (!machine || !machine.active) notFound()
+
+  // Auto-transición primer escaneo: assigné → en_cours para incidentes asignados a este técnico en esta máquina.
+  // Se ejecuta después del guard machine.active para no mutar incidentes en máquinas dadas de baja.
+  // createAdminClient() bypassa RLS — server-only, nunca llamar desde un Client Component.
+  const admin = createAdminClient()
+  const { data: toTransition } = await admin
+    .from('incidents')
+    .select('id')
+    .eq('machine_id', numero_serie)
+    .eq('assigned_to', user.id)
+    .eq('status', 'assigné')
+
+  if (toTransition && toTransition.length > 0) {
+    await admin
+      .from('incidents')
+      .update({ status: 'en_cours' })
+      .in('id', toTransition.map((i) => i.id))
+    await admin.from('incident_history').insert(
+      toTransition.map((i) => ({
+        incident_id: i.id,
+        changed_by: user.id,
+        old_status: 'assigné',
+        new_status: 'en_cours',
+        comment: 'Mise en cours automatique — scan QR',
+      }))
+    )
+  }
 
   const { data: contract } = await supabase
     .from('contracts')
@@ -176,11 +204,16 @@ export default async function MachineScanPage({
               <Link
                 key={inc.id}
                 href={`/tech/incidents/${inc.id}`}
-                className="flex items-center justify-between bg-white rounded-2xl border border-gray-200 p-4"
+                className={`flex items-center justify-between bg-white rounded-2xl border p-4 ${inc.status === 'en_cours' ? 'border-amber-300' : 'border-gray-200'}`}
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900 truncate">{inc.title}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{new Date(inc.created_at).toLocaleDateString('fr-FR')}</p>
+                  {inc.status === 'en_cours' && (
+                    <p className="text-xs font-medium mt-1" style={{ color: '#BF0D0D' }}>
+                      Faire l&apos;intervention →
+                    </p>
+                  )}
                 </div>
                 <span className={`shrink-0 ml-3 inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_STYLE[inc.status] ?? 'bg-gray-100 text-gray-500'}`}>
                   {STATUS_LABEL[inc.status] ?? inc.status}
