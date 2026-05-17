@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-15 (sesión 11 — Migraciones SQL versionadas en repo)
+> Última actualización: 2026-05-17 (sesión 12 — Flujo QR automático + fix privilege escalation RPCs)
 
 ---
 
@@ -757,6 +757,12 @@ Piezas reemplazadas en una visita de mantenimiento.
 
 **⏳ Pendientes:** ninguno de la auditoría Codex.
 
+### Auditoría de seguridad — Privilege escalation RPCs (2026-05-17, sesión 12)
+
+| # | Severidad | Descripción | Fix |
+|---|---|---|---|
+| R1 | ALTO | `create_client_with_contract` y `create_machine_with_contract` eran SECURITY DEFINER con `GRANT EXECUTE TO authenticated` sin guard interno. Cualquier usuario logueado (cliente, técnico) podía invocarlas vía `/rest/v1/rpc/` y crear clientes/máquinas/contratos saltándose RLS. | 1) `REVOKE FROM PUBLIC, anon, authenticated` 2) `GRANT TO service_role` 3) Guard whitelist `IF auth.role() <> 'service_role' THEN RAISE EXCEPTION`. Migración `20260517000000_fix_rpc_privilege_escalation.sql`. PR #5 |
+
 ---
 
 ## Variables de Entorno (Vercel)
@@ -869,6 +875,12 @@ Piezas reemplazadas en una visita de mantenimiento.
 - [x] Importación inicial validada: 65 clientes + 90 máquinas
 - [x] pg_cron jobs vía pg_net invocando las 4 funciones
 - [x] Hardening: REVOKE EXECUTE de `wipe_data_tables` a anon/authenticated; UNIQUE en columnas Princity
+
+### Fase 2.9 — Flujo QR Automático de Incidencias ✅ COMPLETADO (sesión 12, 2026-05-17)
+- [x] 1er escaneo QR del técnico → `assigné → en_cours` automático (Server Component, `createAdminClient()`, ejecuta después del guard `machine.active`)
+- [x] `résolu → fermé` automático tras envío de email CSAT (`src/lib/csat.ts`: guard `.eq('status','résolu')` + comprobación de filas actualizadas antes de insertar en `incident_history`)
+- [x] Tarjetas de incidentes `en_cours` en ficha QR: borde ámbar + CTA "Faire l'intervention →"
+- [x] Admin puede seguir cerrando manualmente desde kanban (para casos sin portal cliente)
 
 ### Fase 3 — Sitio Web & SEO (en curso)
 - [x] Página `/location` — core del negocio, SEO-optimizada para Dakar
