@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Printer, MapPin, Building2, Wrench, AlertTriangle, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Printer, MapPin, Building2, Wrench, AlertTriangle } from 'lucide-react'
 
 const STATUS_STYLE: Record<string, string> = {
   nouveau: 'bg-blue-50 text-blue-700', assigné: 'bg-purple-50 text-purple-700',
@@ -31,7 +31,17 @@ export default async function MachineScanPage({
     .single()
   if (!profile || !['admin', 'technician'].includes(profile.role)) redirect('/login')
 
-  // Auto-transición primer escaneo: assigné → en_cours para incidentes asignados a este técnico en esta máquina
+  const { data: machine } = await supabase
+    .from('machines')
+    .select('*')
+    .eq('numero_serie', numero_serie)
+    .single()
+
+  if (!machine || !machine.active) notFound()
+
+  // Auto-transición primer escaneo: assigné → en_cours para incidentes asignados a este técnico en esta máquina.
+  // Se ejecuta después del guard machine.active para no mutar incidentes en máquinas dadas de baja.
+  // createAdminClient() bypassa RLS — server-only, nunca llamar desde un Client Component.
   const admin = createAdminClient()
   const { data: toTransition } = await admin
     .from('incidents')
@@ -55,14 +65,6 @@ export default async function MachineScanPage({
       }))
     )
   }
-
-  const { data: machine } = await supabase
-    .from('machines')
-    .select('*')
-    .eq('numero_serie', numero_serie)
-    .single()
-
-  if (!machine || !machine.active) notFound()
 
   const { data: contract } = await supabase
     .from('contracts')

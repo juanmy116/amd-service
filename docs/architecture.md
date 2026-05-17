@@ -47,6 +47,7 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 ### 3. App de Campo — PWA Técnico (`/tech`) ✅
 - Login para técnicos
 - Escaneo de QR → ficha de la máquina con incidencias activas + mantenimiento pendiente
+- **Auto-transición 1er escaneo:** al cargar `/tech/scan/[serie]`, los incidentes `assigné` asignados al técnico pasan automáticamente a `en_cours` (usando `createAdminClient()` server-only). Registrado en `incident_history` con `comment: 'Mise en cours automatique — scan QR'`. Solo ejecuta si la máquina está activa (`machine.active`).
 - Vista de intervenciones asignadas
 - Formulario de intervención: informe + checkboxes de piezas + campo libre + estado
 - Formulario de cierre de mantenimiento preventivo: piezas reemplazadas + notas; accesible solo desde el QR de la máquina (`qr_verified = true` garantizado)
@@ -255,12 +256,12 @@ pg_cron `princity-alerts-hourly` (cada hora)
   → Si alert_type = 'panne' y machine+contract conocidos → incidents (status: nouveau)
   → Notificación Matrix al equipo SAV (#amd-alerts) — 🔴 panne / 🟡 toner_bas
   → Admin asigna técnico → incidents (status: assigné)
-  → Técnico en campo escanea QR → /tech/scan/[serie] → ve incidencias activas
-  → Técnico actualiza estado → en_cours
+  → Técnico escanea QR → /tech/scan/[serie] → auto-transición assigné → en_cours (automático)
   → Técnico completa formulario + piezas → résolu
-  → Admin cierra → fermé
-  → Resend envía CSAT al cliente
+  → sendCsatForIncident: Resend envía CSAT + auto-transición résolu → fermé (automático)
 ```
+
+> **Flujo QR automático (sesión 12):** el 1er escaneo QR del técnico dispara `assigné → en_cours` sin acción manual. Al resolver (`résolu`), `src/lib/csat.ts` envía el email CSAT y cierra automáticamente a `fermé` (guard `.eq('status','résolu')` + comprobación de filas actualizadas antes de insertar en `incident_history`). El admin puede seguir cerrando manualmente desde el kanban en casos donde no hay portal cliente.
 
 ### Creada por el cliente (portal)
 ```
