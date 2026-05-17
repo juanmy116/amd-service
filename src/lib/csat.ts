@@ -60,4 +60,19 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
     to: user.email,
     data: { title: incident.title, csat_url: csatUrl },
   })
+
+  // Cierre automático tras envío del CSAT — guard .eq('status','résolu') previene dobles cierres
+  await admin
+    .from('incidents')
+    .update({ status: 'fermé', closed_at: new Date().toISOString() })
+    .eq('id', incidentId)
+    .eq('status', 'résolu')
+
+  await admin.from('incident_history').insert({
+    incident_id: incidentId,
+    changed_by: null,
+    old_status: 'résolu',
+    new_status: 'fermé',
+    comment: 'Fermé automatiquement — email CSAT envoyé',
+  })
 }
