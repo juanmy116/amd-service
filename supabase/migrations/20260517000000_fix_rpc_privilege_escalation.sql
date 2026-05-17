@@ -3,20 +3,11 @@
 -- allowing any logged-in user (client, technician) to call them directly and bypass RLS.
 --
 -- Two layers of defense:
---   1. REVOKE EXECUTE from authenticated — only service_role (used by Server Actions) may call them.
---   2. Internal is_admin() guard — the function refuses if an authenticated non-admin somehow calls it.
-
-REVOKE EXECUTE ON FUNCTION create_client_with_contract(
-  text, text, text, text, text, text, boolean,
-  text, text, date, date, text
-) FROM authenticated;
-
-REVOKE EXECUTE ON FUNCTION create_machine_with_contract(
-  text, text, text, text, boolean,
-  text, bigint, date, text, date, text
-) FROM authenticated;
-
--- Redefine with internal guard (keeps SECURITY DEFINER + SET search_path).
+--   1. Internal whitelist guard — only 'service_role' callers are allowed.
+--   2. REVOKE from authenticated, anon and PUBLIC — no non-service_role role can invoke them.
+--
+-- Order: CREATE OR REPLACE first, then REVOKE/GRANT — avoids failure on a clean schema
+-- where the functions do not yet exist.
 
 CREATE OR REPLACE FUNCTION create_client_with_contract(
   p_nom_client          text,
@@ -39,8 +30,8 @@ AS $$
 DECLARE
   v_client_id bigint;
 BEGIN
-  IF auth.role() = 'authenticated' AND NOT is_admin() THEN
-    RAISE EXCEPTION 'Permission denied: admin role required';
+  IF auth.role() <> 'service_role' THEN
+    RAISE EXCEPTION 'Permission denied';
   END IF;
 
   INSERT INTO clients (nom_client, ninea, email, telephone, adresse, ville, active)
@@ -72,8 +63,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  IF auth.role() = 'authenticated' AND NOT is_admin() THEN
-    RAISE EXCEPTION 'Permission denied: admin role required';
+  IF auth.role() <> 'service_role' THEN
+    RAISE EXCEPTION 'Permission denied';
   END IF;
 
   INSERT INTO machines (numero_serie, marque, modele, type, localisation, active)
@@ -85,3 +76,25 @@ BEGIN
   RETURN json_build_object('machine_id', p_numero_serie);
 END;
 $$;
+
+-- Revoke from all non-service_role roles (REVOKE after CREATE OR REPLACE for idempotency).
+REVOKE EXECUTE ON FUNCTION create_client_with_contract(
+  text, text, text, text, text, text, boolean,
+  text, text, date, date, text
+) FROM PUBLIC, anon, authenticated;
+
+REVOKE EXECUTE ON FUNCTION create_machine_with_contract(
+  text, text, text, text, boolean,
+  text, bigint, date, text, date, text
+) FROM PUBLIC, anon, authenticated;
+
+-- Explicit grant to service_role (matches pattern used in wipe_data_tables migration).
+GRANT EXECUTE ON FUNCTION create_client_with_contract(
+  text, text, text, text, text, text, boolean,
+  text, text, date, date, text
+) TO service_role;
+
+GRANT EXECUTE ON FUNCTION create_machine_with_contract(
+  text, text, text, text, boolean,
+  text, bigint, date, text, date, text
+) TO service_role;
