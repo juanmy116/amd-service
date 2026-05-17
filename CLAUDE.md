@@ -41,7 +41,8 @@ Crear archivo `.env.local` en la raíz del proyecto `web-amd` con:
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://myyejbviunyvywfukysj.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key del proyecto AMD en Supabase>
-SUPABASE_SERVICE_ROLE_KEY=<service role key — NUNCA exponer al cliente>
+SUPABASE_SECRET_KEY=<sb_secret_... — nueva generación, usada por createAdminClient>
+SUPABASE_SERVICE_ROLE_KEY=<JWT legacy — solo para Bearer a Edge Functions desde email.ts>
 ```
 
 > Las claves se encuentran en el panel de Supabase → proyecto AMD → Settings → API.
