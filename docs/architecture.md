@@ -771,7 +771,8 @@ Piezas reemplazadas en una visita de mantenimiento.
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anon para el cliente |
-| `SUPABASE_SERVICE_ROLE_KEY` | Clave service_role para Server Actions |
+| `SUPABASE_SECRET_KEY` | Nueva generación (`sb_secret_*`) — usada por `createAdminClient()` para acceso a BD. Bypassa RLS. |
+| `SUPABASE_SERVICE_ROLE_KEY` | JWT legacy — solo para Bearer a Edge Functions desde `email.ts` (verify_jwt requiere JWT). Pendiente de migrar cuando se redespliegen las Edge Functions con `--no-verify-jwt`. |
 | `RESEND_API_KEY` | API key de Resend |
 | `RESEND_FROM` | `AMD Service <noreply@amd-service.com>` |
 | `NEXT_PUBLIC_APP_URL` | `https://amd-service.vercel.app` |
