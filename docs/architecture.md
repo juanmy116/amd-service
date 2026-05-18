@@ -773,14 +773,14 @@ Piezas reemplazadas en una visita de mantenimiento.
 | `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anon para el cliente |
 | `SUPABASE_SECRET_KEY` | Nueva generación (`sb_secret_*`) — usada por `createAdminClient()` para acceso a BD (bypassa RLS) **y** como Bearer hacia la Edge Function `send-email`. |
-| `RESEND_API_KEY` | API key de Resend |
-| `RESEND_FROM` | `AMD Service <noreply@amd-service.com>` |
 | `NEXT_PUBLIC_APP_URL` | `https://amd-service.vercel.app` |
-| `MATRIX_HOMESERVER_URL` | `https://matrix.test-sav.site` |
+| `MATRIX_HOMESERVER_URL` | `https://matrix.test-sav.site` (usado por server actions de mantenimiento) |
 | `MATRIX_ACCESS_TOKEN` | Token del bot Matrix (`princity-bot`) |
 | `MATRIX_MAINTENANCE_ROOM_ID` | ID del room `#maintenance` en Matrix |
 | `UPSTASH_REDIS_REST_URL` | URL REST de la base Upstash Redis para rate limiting |
 | `UPSTASH_REDIS_REST_TOKEN` | Token REST de la base Upstash Redis para rate limiting |
+
+> Resend (`RESEND_API_KEY`, `RESEND_FROM`) vive como secret de Supabase Edge Functions, no en Vercel — la app Next.js delega el envío de emails a la Edge Function `send-email`. La `SUPABASE_SERVICE_ROLE_KEY` legacy ha sido eliminada del entorno (PR #8).
 
 ## Secrets Supabase Edge Functions
 
