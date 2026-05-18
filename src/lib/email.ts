@@ -12,7 +12,7 @@ export async function sendEmail({ template, to, data }: SendEmailOptions) {
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      Authorization: `Bearer ${process.env.SUPABASE_SECRET_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ template, to, data }),

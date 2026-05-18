@@ -108,7 +108,8 @@ _(Scanner eliminado del nav; accesible vía FAB persistente)_
 
 **Helpers compartidos (`supabase/functions/_shared/`):**
 - `princity-client.ts` — clase `PrincityClient` con `fetchAll()` (POST v3 lectura) y `getV1()` (GET v1). **Sin método POST a v1**: imposible escribir en Princity con el código actual.
-- `db.ts` — `getAdminClient()`, `updateHealth()`, `writeLog()`
+- `db.ts` — `getAdminClient()` (parsea `SUPABASE_SECRET_KEYS.default`), `updateHealth()`, `writeLog()`
+- `secret-key.ts` — `getSecretKey()`, `getAllSecretKeys()`, `isValidSecretKey()` para parsear el JSON `SUPABASE_SECRET_KEYS` auto-inyectado por la plataforma
 - `notify.ts` — `notifyMatrix(room, msg)`, `notifyAdmin()`, `notifyAlerts()`, `notifyEmail()` (Resend)
 
 **Identificadores Princity en BD:**
@@ -771,8 +772,7 @@ Piezas reemplazadas en una visita de mantenimiento.
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anon para el cliente |
-| `SUPABASE_SECRET_KEY` | Nueva generación (`sb_secret_*`) — usada por `createAdminClient()` para acceso a BD. Bypassa RLS. |
-| `SUPABASE_SERVICE_ROLE_KEY` | JWT legacy — solo para Bearer a Edge Functions desde `email.ts` (verify_jwt requiere JWT). Pendiente de migrar cuando se redespliegen las Edge Functions con `--no-verify-jwt`. |
+| `SUPABASE_SECRET_KEY` | Nueva generación (`sb_secret_*`) — usada por `createAdminClient()` para acceso a BD (bypassa RLS) **y** como Bearer hacia la Edge Function `send-email`. |
 | `RESEND_API_KEY` | API key de Resend |
 | `RESEND_FROM` | `AMD Service <noreply@amd-service.com>` |
 | `NEXT_PUBLIC_APP_URL` | `https://amd-service.vercel.app` |
@@ -821,7 +821,7 @@ Piezas reemplazadas en una visita de mantenimiento.
 - [x] Back-office AMD (clientes, máquinas, contratos, incidents kanban, equipo)
 - [x] Portal cliente (registro, verificación contrato, dashboard, incidencias)
 - [x] PWA técnico (dashboard, intervenciones, scanner QR, machines)
-- [x] Edge Function `send-email` con Resend (5 plantillas)
+- [x] Edge Function `send-email` con Resend (5 plantillas) — `verify_jwt: false` + validación interna del Bearer contra `SUPABASE_SECRET_KEYS`
 - [x] Sistema CSAT (email + token + página pública)
 - [x] ~~Agente Princity (IMAP → BD → Matrix)~~ — **sustituido en sesión 5 por integración API directa** (ver Fase 2.7)
 - [x] Servidor Matrix (Synapse en VPS, bot integrado)

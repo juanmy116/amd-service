@@ -1,8 +1,9 @@
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getSecretKey } from './secret-key.ts'
 
 export function getAdminClient(): SupabaseClient {
   const url    = Deno.env.get('SUPABASE_URL') ?? ''
-  const secret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  const secret = getSecretKey()
   return createClient(url, secret, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
