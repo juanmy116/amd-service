@@ -120,7 +120,9 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
 
   const rows = statusFilter
     ? allRows.filter((r) => {
-        if (statusFilter === 'fait') return r.nextVisit === null && r.lastDone !== null
+        // "fait" = el plan tiene al menos una visita realizada (independiente de pendientes).
+        // "planifié" / "en_retard" = estado de la próxima visita pendiente.
+        if (statusFilter === 'fait') return r.lastDone !== null
         return r.nextVisit?.status === statusFilter
       })
     : allRows

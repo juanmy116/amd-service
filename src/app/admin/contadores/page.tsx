@@ -163,7 +163,9 @@ export default async function ContadoresPage({ searchParams }: { searchParams: S
         ]}
       />
 
-      {clientGroups.length === 0 && noClient.length === 0 ? (
+      {/* Con búsqueda activa la tarjeta "Sans contrat actif" se oculta, así que
+          no debe contar como contenido visible para evaluar el empty-state. */}
+      {clientGroups.length === 0 && (q !== null || noClient.length === 0) ? (
         <div className="bg-white rounded-xl border border-gray-200 flex items-center justify-center py-20">
           <p className="text-sm text-gray-400">
             {hasFilters ? 'Aucun client ne correspond aux filtres' : 'Aucune machine active enregistrée'}
