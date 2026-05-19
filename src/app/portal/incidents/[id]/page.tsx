@@ -75,6 +75,9 @@ export default async function PortalIncidentDetailPage({
           <ArrowLeft size={16} className="text-gray-600" />
         </Link>
         <div className="flex-1 min-w-0">
+          <p className="font-mono text-[11px] font-semibold tracking-wide" style={{ color: '#BF0D0D' }}>
+            {incident.numero_incident}
+          </p>
           <h1 className="text-xl font-semibold text-gray-900 truncate" style={{ fontFamily: 'Poppins, sans-serif' }}>
             {incident.title}
           </h1>

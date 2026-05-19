@@ -31,6 +31,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export type TechIncident = {
   id: string
+  numero_incident: string
   title: string
   status: string
   priority: string
@@ -102,6 +103,9 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
                 style={{ backgroundColor: PRIORITY_COLOR[inc.priority] ?? '#9CA3AF' }}
               />
               <div className="min-w-0 flex-1">
+                <p className="font-mono text-[10px] font-semibold tracking-wide mb-0.5" style={{ color: '#BF0D0D' }}>
+                  {inc.numero_incident}
+                </p>
                 <p className="text-sm font-semibold text-gray-900 truncate">
                   {inc.clients?.nom_client ?? inc.title}
                 </p>

@@ -45,7 +45,7 @@ export default async function PortalIncidentsPage() {
 
   const { data: incidents } = await supabase
     .from('incidents')
-    .select('id, title, status, priority, category, created_at, machine_id')
+    .select('id, numero_incident, title, status, priority, category, created_at, machine_id')
     .in('contract_id', ids)
     .order('created_at', { ascending: false })
 
@@ -69,6 +69,7 @@ export default async function PortalIncidentsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
+              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Nº</th>
               <th className="text-left px-5 py-3.5 font-medium text-gray-500">Titre</th>
               <th className="text-left px-5 py-3.5 font-medium text-gray-500">Machine</th>
               <th className="text-left px-5 py-3.5 font-medium text-gray-500">Priorité</th>
@@ -80,11 +81,14 @@ export default async function PortalIncidentsPage() {
           <tbody className="divide-y divide-gray-100">
             {(!incidents || incidents.length === 0) && (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-gray-400">Aucun incident signalé</td>
+                <td colSpan={7} className="px-5 py-10 text-center text-gray-400">Aucun incident signalé</td>
               </tr>
             )}
             {incidents?.map((inc) => (
               <tr key={inc.id} className="hover:bg-gray-50">
+                <td className="px-5 py-4 font-mono text-xs font-semibold" style={{ color: '#BF0D0D' }}>
+                  {inc.numero_incident}
+                </td>
                 <td className="px-5 py-4 font-medium text-gray-900">{inc.title}</td>
                 <td className="px-5 py-4 font-mono text-xs text-gray-400">{inc.machine_id}</td>
                 <td className="px-5 py-4">

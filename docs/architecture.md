@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-17 (sesión 12 — Flujo QR automático + fix privilege escalation RPCs)
+> Última actualización: 2026-05-19 (sesión 14 — Búsqueda + filtros admin · numero_incident SAV-YYYY-NNNN)
 
 ---
 
@@ -11,7 +11,7 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 
 **Producción:** `https://amd-service.vercel.app`
 **Repositorio:** `https://github.com/juanmy116/amd-service` (privado)
-**Versión actual:** `v1.4`
+**Versión actual:** `v1.5`
 
 ---
 
@@ -483,6 +483,7 @@ Núcleo del sistema SAV.
 | Campo | Tipo | Notas |
 |---|---|---|
 | `id` | UUID PK | |
+| `numero_incident` | text UNIQUE NOT NULL | Identificador humano `SAV-YYYY-NNNN`, asignado por trigger BEFORE INSERT |
 | `contract_id` | UUID | FK → contracts |
 | `machine_id` | text | FK → machines.numero_serie |
 | `opened_by` | UUID | FK → profiles, nullable |
@@ -498,6 +499,26 @@ Núcleo del sistema SAV.
 | `updated_at` | timestamptz | trigger automático |
 | `resolved_at` | timestamptz | nullable |
 | `closed_at` | timestamptz | nullable |
+
+> **`numero_incident` (SAV-YYYY-NNNN):** contador secuencial por año, reseteado el 1 de enero. Generado por `public.next_incident_number()` (upsert atómico sobre `incident_counters`). Asignado por el trigger `trg_set_incident_numero` BEFORE INSERT. Visible en Kanban, vista lista admin, detalle admin, PWA técnico (lista + detalle) y portal cliente (lista + detalle).
+
+---
+
+### Tabla: `incident_counters`
+Contador secuencial por año para `numero_incident`.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `year` | int PK | año natural (ej. 2026) |
+| `last_number` | int NOT NULL | último número emitido para ese año |
+
+RLS activado, sin políticas. Solo accesible vía `service_role` o vía la función SECURITY DEFINER `next_incident_number()`.
+
+**Función `next_incident_number()`** SECURITY DEFINER, REVOKE a anon/authenticated. Upsert atómico sobre `incident_counters` → devuelve `SAV-{year}-{lpad 4}`.
+
+**Función `set_incident_numero()`** SECURITY DEFINER. Trigger handler que rellena `NEW.numero_incident` si llega NULL.
+
+**Trigger `trg_set_incident_numero`**: BEFORE INSERT ON `incidents` → ejecuta `set_incident_numero()`.
 
 ---
 
@@ -716,6 +737,47 @@ Piezas reemplazadas en una visita de mantenimiento.
 
 ---
 
+## Búsqueda y Filtros del Back-Office (sesión 14, 2026-05-19)
+
+Patrón compartido aplicado a 6 páginas admin para búsqueda + filtros vía `searchParams` en URL, con defensa contra SQL/PostgREST injection.
+
+**Helper compartido `src/lib/search.ts`:**
+- `sanitizeSearchQuery(input)` — strip de control chars + `"` + `\` + `;`, colapso de espacios, longitud 2–80
+- `escapeIlike(input)` — escape de wildcards `%` y `_`
+- `buildIlikePattern(query)` — `%escapado%`
+- `buildSafeOr(columns, query)` — envuelve el patrón en `"…"` para que comas/paréntesis del usuario no rompan el DSL de `.or()`
+- `parseBooleanParam`, `parsePositiveIntParam`, `firstParam` — validación de filtros tipados
+- Enum whitelisting reutilizando `parseEnum` de `src/lib/enums.ts`
+
+**Componentes:**
+- `src/components/admin/SearchFilters.tsx` — input search (debounce 300 ms, `maxLength=80`) + selects de filtro, sincroniza con URL vía `router.replace` + `startTransition`
+- `src/components/admin/ViewToggle.tsx` — toggle Kanban ↔ Liste (`?view=list|kanban`, default kanban)
+- `src/components/admin/IncidentsListView.tsx` — vista lista alternativa al Kanban en `/admin/incidents`
+
+**Páginas con búsqueda + filtros:**
+
+| Página | Search columns | Filtros | Cross-table |
+|---|---|---|---|
+| `/admin/clients` | `nom_client`, `ninea`, `ville` | `active` | — |
+| `/admin/machines` | `numero_serie`, `marque`, `modele` | `type`, `active` | — |
+| `/admin/contracts` | `numero_contrat` + nom_client | `statut` | Pre-lookup `clients.id` → `client_id.in.(...)` |
+| `/admin/incidents` | `numero_incident`, `title`, `machine_id` | `client`, `status`, `priority` + toggle vista | Pre-lookup `contracts.id` por client_id → `contract_id.in.(...)` |
+| `/admin/maintenance` | nom_client + `numero_contrat` | `frequency`, status visita (JS) | Pre-lookup clients + contracts |
+| `/admin/contadores` | nom_client (JS) | `month`, `year` | Filtro JS sobre datos cargados |
+
+**Defensas activas en todas las páginas:**
+- Patrón ILIKE escapado y envuelto en `"…"` (PostgREST-safe)
+- Whitelist de columnas (constantes hardcoded, nunca input del usuario)
+- Enum/booleano/int validados antes del `.eq()`
+- `.limit()` siempre presente (200–300)
+- RLS aplicada (uso `createClient()`, no `createAdminClient()`)
+- Cuando un cross-table lookup devuelve 0 IDs, se fuerza el filtro a un UUID imposible para no fugar resultados
+- React escapa por defecto, sin `dangerouslySetInnerHTML`
+
+**Nombres clicables:** en todas las tablas de listado, los nombres relevantes (cliente, máquina, contrato, incidente) son enlaces al detalle con estilo negro/gris por defecto y rojo `#BF0D0D` + subrayado al hover.
+
+---
+
 ## Seguridad
 
 - **RLS activado** en todas las tablas
@@ -882,6 +944,16 @@ Piezas reemplazadas en una visita de mantenimiento.
 - [x] `résolu → fermé` automático tras envío de email CSAT (`src/lib/csat.ts`: guard `.eq('status','résolu')` + comprobación de filas actualizadas antes de insertar en `incident_history`)
 - [x] Tarjetas de incidentes `en_cours` en ficha QR: borde ámbar + CTA "Faire l'intervention →"
 - [x] Admin puede seguir cerrando manualmente desde kanban (para casos sin portal cliente)
+
+### Fase 2.8 — Búsqueda + filtros admin & numero_incident ✅ COMPLETADO (sesión 14, 2026-05-19)
+- [x] Migración `20260519092101_add_numero_incident.sql` — columna `numero_incident` NOT NULL UNIQUE + tabla `incident_counters` + funciones + trigger + backfill
+- [x] Helper `src/lib/search.ts` (sanitización ILIKE + escape PostgREST + validaciones tipadas)
+- [x] Componente `SearchFilters` reutilizable (debounce + sync URL searchParams)
+- [x] Componente `ViewToggle` Kanban ↔ Liste para `/admin/incidents`
+- [x] Componente `IncidentsListView` con columnas: Nº, Titre, Client, Machine, Statut, Priorité, Technicien, Date
+- [x] Búsqueda + filtros aplicados a 6 páginas admin: clients, machines, contracts, incidents, maintenance, contadores
+- [x] Nombres clicables en todas las tablas (cliente, máquina, contrato, incidente) → detalle, hover rojo `#BF0D0D`
+- [x] `numero_incident` SAV-YYYY-NNNN visible en Kanban admin, lista admin, detalle admin, PWA técnico (lista + detalle), portal cliente (lista + detalle)
 
 ### Fase 3 — Sitio Web & SEO (en curso)
 - [x] Página `/location` — core del negocio, SEO-optimizada para Dakar
