@@ -1,10 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Plus, Clock, AlertTriangle, Wrench } from 'lucide-react'
+import SearchFilters from '@/components/admin/SearchFilters'
+import {
+  sanitizeSearchQuery,
+  buildIlikePattern,
+  firstParam,
+} from '@/lib/search'
+import { parseEnum, MAINTENANCE_FREQUENCIES } from '@/lib/enums'
+
+const VISIT_STATUSES = ['planifié', 'en_retard', 'fait'] as const
+type VisitStatus = typeof VISIT_STATUSES[number]
+const RESULT_LIMIT = 300
+const CLIENT_LOOKUP_LIMIT = 100
 
 const FREQ_LABEL: Record<string, string> = {
-  mensuel:      'Mensuel',
-  trimestriel:  'Trimestriel',
+  mensuel:     'Mensuel',
+  trimestriel: 'Trimestriel',
 }
 
 const STATUS_CFG = {
@@ -13,10 +25,54 @@ const STATUS_CFG = {
   en_retard: { label: 'En retard',  class: 'bg-red-50 text-red-700'    },
 }
 
-export default async function MaintenancePage() {
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
+
+export default async function MaintenancePage({ searchParams }: { searchParams: SearchParams }) {
+  const sp = await searchParams
+  const q = sanitizeSearchQuery(firstParam(sp.q))
+  const frequencyFilter = parseEnum(firstParam(sp.frequency), MAINTENANCE_FREQUENCIES)
+  const statusRaw = firstParam(sp.status)
+  const statusFilter: VisitStatus | null =
+    statusRaw && (VISIT_STATUSES as readonly string[]).includes(statusRaw)
+      ? (statusRaw as VisitStatus)
+      : null
+
   const supabase = await createClient()
 
-  const { data: plans } = await supabase
+  // 1. Si hay búsqueda: resolver contratos que matchean (nº contrato o nombre cliente).
+  let contractIdFilter: string[] | null = null
+  if (q) {
+    const pattern = buildIlikePattern(q)
+    const [{ data: matchedClients }, { data: matchedContracts }] = await Promise.all([
+      supabase
+        .from('clients')
+        .select('id')
+        .ilike('nom_client', pattern)
+        .limit(CLIENT_LOOKUP_LIMIT),
+      supabase
+        .from('contracts')
+        .select('id')
+        .ilike('numero_contrat', pattern)
+        .limit(RESULT_LIMIT),
+    ])
+    const clientIds = (matchedClients ?? []).map((c) => c.id).filter((id): id is number => typeof id === 'number')
+    const contractIdsFromNumero = (matchedContracts ?? []).map((c) => c.id).filter((id): id is string => typeof id === 'string')
+
+    let contractIdsFromClients: string[] = []
+    if (clientIds.length > 0) {
+      const { data } = await supabase
+        .from('contracts')
+        .select('id')
+        .in('client_id', clientIds)
+        .limit(RESULT_LIMIT)
+      contractIdsFromClients = (data ?? []).map((c) => c.id).filter((id): id is string => typeof id === 'string')
+    }
+
+    contractIdFilter = Array.from(new Set([...contractIdsFromNumero, ...contractIdsFromClients]))
+  }
+
+  // 2. Query principal.
+  let plansQuery = supabase
     .from('maintenance_plans')
     .select(`
       id, frequency, active, notes,
@@ -30,8 +86,21 @@ export default async function MaintenancePage() {
       )
     `)
     .order('created_at', { ascending: false })
+    .limit(RESULT_LIMIT)
 
-  const rows = (plans ?? []).map(p => {
+  if (frequencyFilter) plansQuery = plansQuery.eq('frequency', frequencyFilter)
+  if (contractIdFilter !== null) {
+    if (contractIdFilter.length === 0) {
+      plansQuery = plansQuery.eq('contract_id', '00000000-0000-0000-0000-000000000000')
+    } else {
+      plansQuery = plansQuery.in('contract_id', contractIdFilter)
+    }
+  }
+
+  const { data: plans } = await plansQuery
+
+  // 3. Construir rows y aplicar filtro de status de la próxima visita (cliente).
+  const allRows = (plans ?? []).map((p) => {
     const contract = p.contracts as unknown as {
       id: string; numero_contrat: string
       clients:  { nom_client: string }
@@ -41,21 +110,30 @@ export default async function MaintenancePage() {
       id: string; scheduled_date: string; status: string; done_at: string | null
     }[]
     const nextVisit = visits
-      .filter(v => v.status === 'planifié')
+      .filter((v) => v.status !== 'fait')
       .sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date))[0] ?? null
     const lastDone = visits
-      .filter(v => v.status === 'fait')
+      .filter((v) => v.status === 'fait')
       .sort((a, b) => b.scheduled_date.localeCompare(a.scheduled_date))[0] ?? null
     return { plan: p, contract, visits, nextVisit, lastDone }
   })
 
-  const totalPlans    = rows.length
-  const overdue       = rows.filter(r => r.visits.some(v => v.status === 'en_retard')).length
-  const dueThisWeek   = rows.filter(r => {
-    if (!r.nextVisit) return false
+  const rows = statusFilter
+    ? allRows.filter((r) => {
+        if (statusFilter === 'fait') return r.nextVisit === null && r.lastDone !== null
+        return r.nextVisit?.status === statusFilter
+      })
+    : allRows
+
+  const totalPlans  = rows.length
+  const overdue     = rows.filter((r) => r.nextVisit?.status === 'en_retard').length
+  const dueThisWeek = rows.filter((r) => {
+    if (!r.nextVisit || r.nextVisit.status !== 'planifié') return false
     const diff = (new Date(r.nextVisit.scheduled_date).getTime() - Date.now()) / 86400000
     return diff >= 0 && diff <= 7
   }).length
+
+  const hasFilters = q !== null || frequencyFilter !== null || statusFilter !== null
 
   return (
     <div className="p-8 space-y-6">
@@ -67,7 +145,8 @@ export default async function MaintenancePage() {
             Maintenance préventive
           </h1>
           <p className="text-sm text-gray-400 mt-0.5">
-            {totalPlans} plan{totalPlans !== 1 ? 's' : ''} actif{totalPlans !== 1 ? 's' : ''}
+            {totalPlans} plan{totalPlans !== 1 ? 's' : ''}
+            {hasFilters ? ' trouvé' + (totalPlans !== 1 ? 's' : '') : ' actif' + (totalPlans !== 1 ? 's' : '')}
             {overdue > 0 && <span className="ml-2 text-red-500 font-medium">· {overdue} en retard</span>}
             {dueThisWeek > 0 && <span className="ml-2 text-amber-500 font-medium">· {dueThisWeek} cette semaine</span>}
           </p>
@@ -82,12 +161,35 @@ export default async function MaintenancePage() {
         </Link>
       </div>
 
+      <SearchFilters
+        placeholder="Rechercher par client ou nº contrat…"
+        filters={[
+          {
+            param: 'frequency',
+            label: 'Toutes les fréquences',
+            options: [
+              { value: 'mensuel',     label: 'Mensuel'     },
+              { value: 'trimestriel', label: 'Trimestriel' },
+            ],
+          },
+          {
+            param: 'status',
+            label: 'Tous les statuts',
+            options: [
+              { value: 'planifié',  label: 'Planifié'  },
+              { value: 'en_retard', label: 'En retard' },
+              { value: 'fait',      label: 'Fait'      },
+            ],
+          },
+        ]}
+      />
+
       {/* KPI strip */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Plans actifs',      value: totalPlans,  icon: Wrench,         color: 'text-gray-700' },
-          { label: 'En retard',         value: overdue,     icon: AlertTriangle,  color: 'text-red-600'  },
-          { label: 'À faire cette sem.', value: dueThisWeek, icon: Clock,         color: 'text-amber-600'},
+          { label: 'Plans',              value: totalPlans,  icon: Wrench,         color: 'text-gray-700'  },
+          { label: 'En retard',          value: overdue,     icon: AlertTriangle,  color: 'text-red-600'   },
+          { label: 'À faire cette sem.', value: dueThisWeek, icon: Clock,          color: 'text-amber-600' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
             <Icon size={18} className={`${color} shrink-0`} />
@@ -102,7 +204,9 @@ export default async function MaintenancePage() {
       {/* Lista */}
       {rows.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 flex items-center justify-center py-20">
-          <p className="text-sm text-gray-400">Aucun plan de maintenance enregistré</p>
+          <p className="text-sm text-gray-400">
+            {hasFilters ? 'Aucun plan ne correspond aux filtres' : 'Aucun plan de maintenance enregistré'}
+          </p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -120,26 +224,31 @@ export default async function MaintenancePage() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {rows.map(({ plan, contract, nextVisit, lastDone }) => {
-                const overdue = nextVisit?.status === 'en_retard'
-                const statusKey = nextVisit?.status ?? 'planifié'
+                const href = `/admin/maintenance/${plan.id}`
+                const overdueRow = nextVisit?.status === 'en_retard'
+                const statusKey = nextVisit?.status ?? (lastDone ? 'fait' : 'planifié')
                 const cfg = STATUS_CFG[statusKey as keyof typeof STATUS_CFG] ?? STATUS_CFG.planifié
                 return (
                   <tr key={plan.id} className="hover:bg-gray-50">
                     <td className="px-5 py-3.5">
-                      <p className="font-medium text-gray-900">{contract.clients.nom_client}</p>
+                      <Link href={href} className="font-medium text-gray-900 hover:text-[#BF0D0D] hover:underline transition-colors">
+                        {contract.clients.nom_client}
+                      </Link>
                       <p className="text-xs text-gray-400 font-mono mt-0.5">
                         {contract.machines.marque} {contract.machines.modele}
                       </p>
                     </td>
-                    <td className="px-4 py-3.5 font-mono text-xs text-gray-500">
-                      {contract.numero_contrat}
+                    <td className="px-4 py-3.5 font-mono text-xs">
+                      <Link href={href} className="text-gray-500 hover:text-[#BF0D0D] hover:underline transition-colors">
+                        {contract.numero_contrat}
+                      </Link>
                     </td>
                     <td className="px-4 py-3.5 text-gray-700">
                       {FREQ_LABEL[plan.frequency]}
                     </td>
                     <td className="px-4 py-3.5">
                       {nextVisit ? (
-                        <span className={overdue ? 'text-red-600 font-semibold' : 'text-gray-700'}>
+                        <span className={overdueRow ? 'text-red-600 font-semibold' : 'text-gray-700'}>
                           {new Date(nextVisit.scheduled_date).toLocaleDateString('fr-FR')}
                         </span>
                       ) : (
@@ -153,15 +262,13 @@ export default async function MaintenancePage() {
                       }
                     </td>
                     <td className="px-4 py-3.5">
-                      {nextVisit && (
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${cfg.class}`}>
-                          {cfg.label}
-                        </span>
-                      )}
+                      <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${cfg.class}`}>
+                        {cfg.label}
+                      </span>
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <Link
-                        href={`/admin/maintenance/${plan.id}`}
+                        href={href}
                         className="text-xs font-medium text-gray-500 hover:text-gray-900"
                       >
                         Détail →

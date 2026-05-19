@@ -1,6 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
+import SearchFilters from '@/components/admin/SearchFilters'
+import {
+  sanitizeSearchQuery,
+  buildIlikePattern,
+  firstParam,
+} from '@/lib/search'
+import { parseEnum, CONTRACT_STATUSES } from '@/lib/enums'
+
+const RESULT_LIMIT = 200
+const CLIENT_LOOKUP_LIMIT = 100
 
 const STATUT_STYLE = {
   actif:    'bg-green-50 text-green-700',
@@ -19,13 +29,45 @@ function formatDate(d: string | null) {
   return new Date(d).toLocaleDateString('fr-FR')
 }
 
-export default async function ContractsPage() {
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
+
+export default async function ContractsPage({ searchParams }: { searchParams: SearchParams }) {
+  const sp = await searchParams
+  const q = sanitizeSearchQuery(firstParam(sp.q))
+  const statutFilter = parseEnum(firstParam(sp.statut), CONTRACT_STATUSES)
+
   const supabase = await createClient()
 
-  const { data: contracts } = await supabase
+  let clientIds: number[] = []
+  if (q) {
+    const { data: matchedClients } = await supabase
+      .from('clients')
+      .select('id')
+      .ilike('nom_client', buildIlikePattern(q))
+      .limit(CLIENT_LOOKUP_LIMIT)
+    clientIds = (matchedClients ?? [])
+      .map((c) => c.id)
+      .filter((id): id is number => typeof id === 'number')
+  }
+
+  let query = supabase
     .from('contracts')
-    .select('id, numero_contrat, date_debut, date_renouvellement, lieu_installation, statut, clients(nom_client), machines(marque, modele)')
+    .select('id, numero_contrat, date_debut, date_renouvellement, lieu_installation, statut, client_id, clients(nom_client), machines(marque, modele)')
     .order('created_at', { ascending: false })
+    .limit(RESULT_LIMIT)
+
+  if (q) {
+    const pattern = buildIlikePattern(q)
+    const conditions = [`numero_contrat.ilike."${pattern}"`]
+    if (clientIds.length > 0) {
+      conditions.push(`client_id.in.(${clientIds.join(',')})`)
+    }
+    query = query.or(conditions.join(','))
+  }
+  if (statutFilter) query = query.eq('statut', statutFilter)
+
+  const { data: contracts } = await query
+  const hasFilters = q !== null || statutFilter !== null
 
   return (
     <div className="p-8">
@@ -42,6 +84,21 @@ export default async function ContractsPage() {
           Nouveau contrat
         </Link>
       </div>
+
+      <SearchFilters
+        placeholder="Rechercher par nº contrat ou nom du client…"
+        filters={[
+          {
+            param: 'statut',
+            label: 'Tous les statuts',
+            options: [
+              { value: 'actif',    label: 'Actif' },
+              { value: 'suspendu', label: 'Suspendu' },
+              { value: 'terminé',  label: 'Terminé' },
+            ],
+          },
+        ]}
+      />
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
@@ -60,7 +117,7 @@ export default async function ContractsPage() {
             {(!contracts || contracts.length === 0) && (
               <tr>
                 <td colSpan={7} className="px-5 py-10 text-center text-gray-400">
-                  Aucun contrat enregistré
+                  {hasFilters ? 'Aucun contrat ne correspond aux filtres' : 'Aucun contrat enregistré'}
                 </td>
               </tr>
             )}
@@ -68,11 +125,22 @@ export default async function ContractsPage() {
               const statut = c.statut as keyof typeof STATUT_STYLE
               const client  = c.clients  as unknown as { nom_client: string } | null
               const machine = c.machines as unknown as { marque: string; modele: string } | null
+              const href = `/admin/contracts/${c.id}`
               return (
                 <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-4 font-mono text-xs text-gray-600">{c.numero_contrat}</td>
-                  <td className="px-5 py-4 font-medium text-gray-900">
-                    {client?.nom_client ?? '—'}
+                  <td className="px-5 py-4 font-mono text-xs">
+                    <Link href={href} className="text-gray-600 hover:text-[#BF0D0D] hover:underline transition-colors">
+                      {c.numero_contrat}
+                    </Link>
+                  </td>
+                  <td className="px-5 py-4 font-medium">
+                    {client ? (
+                      <Link href={href} className="text-gray-900 hover:text-[#BF0D0D] hover:underline transition-colors">
+                        {client.nom_client}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                   <td className="px-5 py-4 text-gray-600">
                     {machine ? `${machine.marque} ${machine.modele}` : '—'}
@@ -86,7 +154,7 @@ export default async function ContractsPage() {
                   </td>
                   <td className="px-5 py-4 text-right">
                     <Link
-                      href={`/admin/contracts/${c.id}`}
+                      href={href}
                       className="text-sm font-medium text-gray-600 hover:text-gray-900 underline underline-offset-2"
                     >
                       Modifier
