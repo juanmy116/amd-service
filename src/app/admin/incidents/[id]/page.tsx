@@ -72,7 +72,7 @@ export default async function EditIncidentPage({
         action={boundUpdateAction}
         defaultValues={incident}
         technicians={technicians ?? []}
-        title={incident.title}
+        title={`${incident.numero_incident} · ${incident.title}`}
         isEdit
         incidentId={incident.id}
         deleteAction={deleteIncidentAction}

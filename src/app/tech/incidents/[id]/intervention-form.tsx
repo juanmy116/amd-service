@@ -30,7 +30,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 type Props = {
   incident: {
-    id: string; title: string; description: string | null; status: string;
+    id: string; numero_incident: string; title: string; description: string | null; status: string;
     priority: string; category: string; rapport_intervention: string | null; autres_pieces: string | null;
   }
   boundAction: (prev: FormState, data: FormData) => Promise<FormState>
@@ -55,6 +55,9 @@ export default function InterventionForm({
           <ArrowLeft size={16} className="text-gray-600" />
         </Link>
         <div className="min-w-0">
+          <p className="font-mono text-[10px] font-semibold tracking-wide" style={{ color: '#BF0D0D' }}>
+            {incident.numero_incident}
+          </p>
           <h1 className="text-base font-semibold text-gray-900 truncate" style={{ fontFamily: 'Poppins, sans-serif' }}>
             {incident.title}
           </h1>

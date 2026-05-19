@@ -19,6 +19,7 @@ import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions
 
 export type KanbanIncident = {
   id: string
+  numero_incident: string
   title: string
   machine_id: string
   category: string
@@ -79,6 +80,9 @@ function IncidentCard({
         isOverlay       ? 'shadow-2xl rotate-1 cursor-grabbing' : 'cursor-grab hover:shadow-sm hover:border-gray-300 transition-all',
       ].join(' ')}
     >
+      <p className="font-mono text-[11px] font-semibold text-[#BF0D0D] mb-1.5 tracking-wide">
+        {incident.numero_incident}
+      </p>
       <p className="text-sm font-medium text-gray-900 leading-snug mb-2 line-clamp-2">
         {incident.title}
       </p>

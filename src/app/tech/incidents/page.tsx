@@ -10,7 +10,7 @@ export default async function TechIncidentsPage() {
 
   const { data } = await supabase
     .from('incidents')
-    .select('id, title, status, priority, created_at, clients!client_id(nom_client)')
+    .select('id, numero_incident, title, status, priority, created_at, clients!client_id(nom_client)')
     .eq('assigned_to', user.id)
     .order('created_at', { ascending: false })
 
