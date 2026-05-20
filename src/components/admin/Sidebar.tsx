@@ -45,7 +45,7 @@ export default function Sidebar({ fullName }: { fullName: string | null }) {
 
   return (
     <aside
-      className={`${collapsed ? 'w-16' : 'w-64'} h-screen flex flex-col bg-chrome shrink-0 overflow-x-hidden transition-all duration-200`}
+      className={`${collapsed ? 'w-16' : 'w-64'} h-screen flex flex-col bg-chrome shrink-0 overflow-hidden transition-all duration-200`}
     >
       {/* Marca + botón colapsar */}
       <div className={`flex items-center h-16 border-b border-chrome-line shrink-0 ${collapsed ? 'justify-center px-2' : 'px-4 justify-between'}`}>
