@@ -9,7 +9,7 @@ const VARIANTS = {
 export type ButtonVariant = keyof typeof VARIANTS
 
 export function buttonClasses(variant: ButtonVariant = 'primary'): string {
-  return `inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity ${VARIANTS[variant]}`
+  return `inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${VARIANTS[variant]}`
 }
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
