@@ -25,12 +25,12 @@ La Fase 0 produce tokens y componentes aislados; su validación es de compilaci�
 
 ## Preparación
 
-- [ ] **Crear la rama de trabajo desde `main` actualizado**
+- [ ] **Confirmar que estás en la rama de trabajo**
+
+La rama `feat/redesign-phase-0` ya existe y contiene el spec y este plan. La implementación de la Fase 0 se hace sobre ella, para que spec, plan y código viajen juntos en el PR final.
 
 ```bash
-git checkout main
-git pull --ff-only
-git checkout -b feat/redesign-phase-0
+git branch --show-current   # debe imprimir: feat/redesign-phase-0
 ```
 
 ---
