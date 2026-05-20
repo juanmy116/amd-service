@@ -75,7 +75,7 @@ export default function Sidebar({ fullName }: { fullName: string | null }) {
       </div>
 
       {/* Navegación */}
-      <nav className={`flex-1 py-3 overflow-y-auto scrollbar-chrome ${collapsed ? 'px-2' : 'px-3'}`}>
+      <nav className={`flex-1 min-h-0 py-3 overflow-y-auto scrollbar-chrome ${collapsed ? 'px-2' : 'px-3'}`}>
         {collapsed && (
           <button
             onClick={() => setCollapsed(false)}
