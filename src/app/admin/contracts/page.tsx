@@ -5,12 +5,14 @@ import SearchFilters from '@/components/admin/SearchFilters'
 import {
   sanitizeSearchQuery,
   buildIlikePattern,
+  buildSafeOr,
   firstParam,
 } from '@/lib/search'
 import { parseEnum, CONTRACT_STATUSES } from '@/lib/enums'
 
 const RESULT_LIMIT = 200
-const CLIENT_LOOKUP_LIMIT = 100
+// Límite holgado para el lookup intermedio de clientes que alimenta el filtro.
+const LOOKUP_LIMIT = 1000
 
 const STATUT_STYLE = {
   actif:    'bg-green-50 text-green-700',
@@ -44,7 +46,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
       .from('clients')
       .select('id')
       .ilike('nom_client', buildIlikePattern(q))
-      .limit(CLIENT_LOOKUP_LIMIT)
+      .limit(LOOKUP_LIMIT)
     clientIds = (matchedClients ?? [])
       .map((c) => c.id)
       .filter((id): id is number => typeof id === 'number')
@@ -57,8 +59,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
     .limit(RESULT_LIMIT)
 
   if (q) {
-    const pattern = buildIlikePattern(q)
-    const conditions = [`numero_contrat.ilike."${pattern}"`]
+    const conditions = [buildSafeOr(['numero_contrat'], q)]
     if (clientIds.length > 0) {
       conditions.push(`client_id.in.(${clientIds.join(',')})`)
     }

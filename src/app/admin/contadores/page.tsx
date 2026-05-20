@@ -132,6 +132,8 @@ export default async function ContadoresPage({ searchParams }: { searchParams: S
   const missingCount = (ms: Machine[]) =>
     ms.filter((m) => !presence.has(`${m.numero_serie}|${cYear}|${cMonth}`)).length
 
+  // clientGroups ya está filtrado por la búsqueda: cuando hay un cliente buscado,
+  // estos totales del cabecero reflejan solo el subset visible. Es intencional.
   const totalMachines = clientGroups.reduce((acc, g) => acc + g.machines.length, 0)
   const totalMissing  = clientGroups.reduce((acc, g) => acc + missingCount(g.machines), 0)
   const hasFilters    = q !== null || monthFilter !== null || yearFilter !== null

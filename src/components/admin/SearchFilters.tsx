@@ -33,6 +33,12 @@ export default function SearchFilters({ placeholder = 'Rechercher…', filters =
     setValue(searchParams.get(QUERY_PARAM) ?? '')
   }, [searchParams])
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
+
   function pushWith(updates: Record<string, string | null>) {
     const next = new URLSearchParams(searchParams.toString())
     for (const [key, val] of Object.entries(updates)) {
