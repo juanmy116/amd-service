@@ -5,6 +5,7 @@ export const CONTRACT_STATUSES   = ['actif', 'suspendu', 'terminé'] as const
 export const MACHINE_TYPES       = ['color', 'noir_blanc'] as const
 export const STAFF_ROLES         = ['admin', 'technician'] as const
 export const MAINTENANCE_FREQUENCIES = ['mensuel', 'trimestriel'] as const
+export const VISIT_STATUSES          = ['planifié', 'en_retard', 'fait'] as const
 
 export type IncidentCategory     = typeof INCIDENT_CATEGORIES[number]
 export type IncidentPriority     = typeof INCIDENT_PRIORITIES[number]
@@ -13,6 +14,7 @@ export type ContractStatus       = typeof CONTRACT_STATUSES[number]
 export type MachineType          = typeof MACHINE_TYPES[number]
 export type StaffRole            = typeof STAFF_ROLES[number]
 export type MaintenanceFrequency = typeof MAINTENANCE_FREQUENCIES[number]
+export type VisitStatus          = typeof VISIT_STATUSES[number]
 
 export function parseEnum<T extends string>(
   value: FormDataEntryValue | null | undefined,

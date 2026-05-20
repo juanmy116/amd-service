@@ -7,12 +7,12 @@ import {
   buildIlikePattern,
   firstParam,
 } from '@/lib/search'
-import { parseEnum, MAINTENANCE_FREQUENCIES } from '@/lib/enums'
+import { parseEnum, MAINTENANCE_FREQUENCIES, VISIT_STATUSES } from '@/lib/enums'
 
-const VISIT_STATUSES = ['planifié', 'en_retard', 'fait'] as const
-type VisitStatus = typeof VISIT_STATUSES[number]
 const RESULT_LIMIT = 300
-const CLIENT_LOOKUP_LIMIT = 100
+// Límite holgado para lookups intermedios que alimentan filtros: si truncaran,
+// el filtro de búsqueda devolvería resultados incompletos sin avisar.
+const LOOKUP_LIMIT = 1000
 
 const FREQ_LABEL: Record<string, string> = {
   mensuel:     'Mensuel',
@@ -31,11 +31,7 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
   const sp = await searchParams
   const q = sanitizeSearchQuery(firstParam(sp.q))
   const frequencyFilter = parseEnum(firstParam(sp.frequency), MAINTENANCE_FREQUENCIES)
-  const statusRaw = firstParam(sp.status)
-  const statusFilter: VisitStatus | null =
-    statusRaw && (VISIT_STATUSES as readonly string[]).includes(statusRaw)
-      ? (statusRaw as VisitStatus)
-      : null
+  const statusFilter = parseEnum(firstParam(sp.status), VISIT_STATUSES)
 
   const supabase = await createClient()
 
@@ -48,12 +44,12 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
         .from('clients')
         .select('id')
         .ilike('nom_client', pattern)
-        .limit(CLIENT_LOOKUP_LIMIT),
+        .limit(LOOKUP_LIMIT),
       supabase
         .from('contracts')
         .select('id')
         .ilike('numero_contrat', pattern)
-        .limit(RESULT_LIMIT),
+        .limit(LOOKUP_LIMIT),
     ])
     const clientIds = (matchedClients ?? []).map((c) => c.id).filter((id): id is number => typeof id === 'number')
     const contractIdsFromNumero = (matchedContracts ?? []).map((c) => c.id).filter((id): id is string => typeof id === 'string')
@@ -64,7 +60,7 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
         .from('contracts')
         .select('id')
         .in('client_id', clientIds)
-        .limit(RESULT_LIMIT)
+        .limit(LOOKUP_LIMIT)
       contractIdsFromClients = (data ?? []).map((c) => c.id).filter((id): id is string => typeof id === 'string')
     }
 
@@ -90,14 +86,14 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
 
   if (frequencyFilter) plansQuery = plansQuery.eq('frequency', frequencyFilter)
   if (contractIdFilter !== null) {
-    if (contractIdFilter.length === 0) {
-      plansQuery = plansQuery.eq('contract_id', '00000000-0000-0000-0000-000000000000')
-    } else {
-      plansQuery = plansQuery.in('contract_id', contractIdFilter)
-    }
+    // .in() con array vacío genera 0 resultados (búsqueda sin contratos coincidentes).
+    plansQuery = plansQuery.in('contract_id', contractIdFilter)
   }
 
   const { data: plans } = await plansQuery
+  // El statusFilter se aplica client-side después del límite, así que el aviso
+  // de truncación solo es fiable y no engañoso cuando no hay filtro de status.
+  const plansTruncated = !statusFilter && (plans?.length ?? 0) >= RESULT_LIMIT
 
   // 3. Construir rows y aplicar filtro de status de la próxima visita (cliente).
   const allRows = (plans ?? []).map((p) => {
@@ -185,6 +181,12 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
           },
         ]}
       />
+
+      {plansTruncated && (
+        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          Affichage limité aux {RESULT_LIMIT} premiers plans. Affinez votre recherche pour voir le reste.
+        </p>
+      )}
 
       {/* KPI strip */}
       <div className="grid grid-cols-3 gap-4">

@@ -50,15 +50,13 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
   if (statusFilter) query = query.eq('status', statusFilter)
   if (priorityFilter) query = query.eq('priority', priorityFilter)
   if (clientId) {
+    // .in() con array vacío genera 0 resultados (cliente sin contratos).
     const ids = (contractIdsRes.data ?? []).map((c) => c.id)
-    if (ids.length === 0) {
-      query = query.eq('contract_id', '00000000-0000-0000-0000-000000000000')
-    } else {
-      query = query.in('contract_id', ids)
-    }
+    query = query.in('contract_id', ids)
   }
 
   const { data: incidents } = await query
+  const truncated = (incidents?.length ?? 0) >= RESULT_LIMIT
 
   // Transformación a filas planas para los dos renderizados.
   type Row = NonNullable<typeof incidents>[number] & {
@@ -155,6 +153,12 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
           },
         ]}
       />
+
+      {truncated && (
+        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+          Affichage limité aux {RESULT_LIMIT} premiers incidents. Affinez votre recherche pour voir le reste.
+        </p>
+      )}
 
       {view === 'list' ? (
         <IncidentsListView incidents={listIncidents} />
