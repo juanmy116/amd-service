@@ -91,7 +91,9 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
   }
 
   const { data: plans } = await plansQuery
-  const plansTruncated = (plans?.length ?? 0) >= RESULT_LIMIT
+  // El statusFilter se aplica client-side después del límite, así que el aviso
+  // de truncación solo es fiable y no engañoso cuando no hay filtro de status.
+  const plansTruncated = !statusFilter && (plans?.length ?? 0) >= RESULT_LIMIT
 
   // 3. Construir rows y aplicar filtro de status de la próxima visita (cliente).
   const allRows = (plans ?? []).map((p) => {
