@@ -1,6 +1,49 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
 @import "tailwindcss";
 
+@theme {
+  /* Chrome — navegación oscura */
+  --color-chrome: #1A1A1E;
+  --color-chrome-line: rgba(255, 255, 255, 0.07);
+  --color-chrome-fg: #9A9AA2;
+  --color-chrome-fg-strong: #FFFFFF;
+  --color-chrome-hover: rgba(255, 255, 255, 0.06);
+
+  /* Superficies — contenido claro */
+  --color-page: #F6F6F7;
+  --color-card: #FFFFFF;
+  --color-line: #EAEAEC;
+  --color-line-subtle: #F1F1F2;
+
+  /* Texto */
+  --color-ink: #18181B;
+  --color-ink-soft: #71717A;
+  --color-ink-muted: #A1A1AA;
+
+  /* Acento de marca */
+  --color-accent: #BF0D0D;
+  --color-accent-dark: #7E0808;
+  --color-accent-soft: #FEF2F2;
+
+  /* Estados */
+  --color-success: #16A34A;
+  --color-success-soft: #ECFDF3;
+  --color-warning: #D97706;
+  --color-warning-soft: #FEF3C7;
+  --color-neutral-soft: #F4F4F5;
+
+  /* Radios */
+  --radius-card: 13px;
+
+  /* Sombras */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-raised: 0 4px 12px rgba(191, 13, 13, 0.28);
+
+  /* Tipografía */
+  --font-display: Poppins, system-ui, sans-serif;
+  --font-sans: Inter, system-ui, sans-serif;
+}
+
 :root {
   --bg-page:    #FFFFFF;
   --bg-surface: #F5F5F5;

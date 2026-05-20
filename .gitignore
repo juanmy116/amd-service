@@ -43,3 +43,6 @@ next-env.d.ts
 
 # supabase CLI local cache
 supabase/.temp/
+
+# brainstorming visual companion (mockups, no van al repo)
+.superpowers/
