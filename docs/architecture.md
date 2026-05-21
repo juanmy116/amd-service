@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-21 (sesión 16 — Dashboard Atelier + rediseño UI bloques 1a/1b/1c)
+> Última actualización: 2026-05-21 (sesión 17 — pasarela QR cliente + eliminación Matrix)
 
 ---
 
@@ -123,7 +123,15 @@ _(Scanner eliminado del nav; accesible vía FAB persistente)_
 
 **Bug crítico resuelto en `wipe_data_tables`:** PostgREST bloquea `DELETE` sin `WHERE` clause cuando se llama vía `db.rpc()` desde Edge Functions. La función original usaba `DELETE FROM tabla` y fallaba silenciosamente. Migración `wipe_data_tables_use_truncate` (2026-05-13): se cambió a `TRUNCATE TABLE ... RESTART IDENTITY CASCADE`. Además se revocó `EXECUTE` a `anon` y `authenticated` por seguridad (advisor lo detectó como crítico).
 
-### 6. Sistema CSAT ✅
+### 6. Pasarela QR (`/m/[serie]`) ✅
+Punto de entrada universal para los QR físicos de máquinas. Server Component que detecta el rol del usuario y redirige:
+- **Técnico / admin** → `/tech/scan/[serie]`
+- **Cliente** → `/portal/incidents/new?machine=[serie]` (máquina preseleccionada si pertenece al contrato)
+- **Sin sesión** → `/login?redirectTo=/m/[serie]`
+
+El QR imprimible (`/admin/machines/[serie]/qr`) apunta a esta ruta desde PR #18. Los QR anteriores apuntaban directamente a `/tech/scan/` y siguen funcionando para técnicos.
+
+### 7. Sistema CSAT ✅
 - Al resolver un ticket, se envía email al cliente vía Resend
 - Email contiene enlace único con token de 7 días
 - El cliente valora de 1 a 5 + comentario opcional
@@ -987,3 +995,12 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - [x] Ruta `/atelier` — kiosko de taller: Kanban + mantenimientos lun–vie + KPIs, auto-refresco (PR #16)
 - [x] Fix: FKs hacia `profiles` a `ON DELETE SET NULL` — permite borrar técnicos (PR #17)
 - [ ] Operativo: crear las cuentas reales de los técnicos AMD en `/admin/team/new`
+
+### Pasarela QR cliente ✅ COMPLETADO (sesión 17, 2026-05-21) — PR #18 (`6c7865b`)
+- [x] Nueva ruta `/m/[serie]` — pasarela universal para QR de máquinas:
+  - Técnico / admin → `/tech/scan/[serie]` (flujo existente intacto)
+  - Cliente → `/portal/incidents/new?machine=[serie]`
+  - Sin sesión → `/login?redirectTo=/m/[serie]`
+- [x] QR de etiqueta imprimible actualizado: apunta a `/m/[serie]` en vez de `/tech/scan/[serie]`
+- [x] Formulario `/portal/incidents/new` acepta `?machine=`: preselecciona automáticamente la máquina del cliente (banner verde) o avisa si la máquina no pertenece a su contrato (banner naranja)
+- ⚠️ Los QR ya impresos en papel apuntan al flujo antiguo (`/tech/scan/`); funcionan para técnicos pero no usan la pasarela. Regenerar etiquetas para activar el flujo cliente.
