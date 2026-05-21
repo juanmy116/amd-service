@@ -29,7 +29,7 @@ export default async function MachineQrPage({
     .maybeSingle()
 
   const client = contract?.clients as unknown as { id: number; nom_client: string } | null
-  const qrUrl = `${process.env.NEXT_PUBLIC_APP_URL}/tech/scan/${encodeURIComponent(numero_serie)}`
+  const qrUrl = `${process.env.NEXT_PUBLIC_APP_URL}/m/${encodeURIComponent(numero_serie)}`
 
   return (
     <>
