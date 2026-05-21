@@ -63,6 +63,7 @@ export default async function AtelierPage() {
       .from('profiles')
       .select('id, full_name')
       .eq('role', 'technician')
+      .neq('is_dispatcher', true)
       .order('full_name'),
   ])
 
