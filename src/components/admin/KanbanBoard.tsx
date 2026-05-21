@@ -15,6 +15,8 @@ import {
   useDraggable,
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
+import { Badge } from '@/components/ui/Badge'
+import type { BadgeVariant } from '@/components/ui/Badge'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
 
 export type KanbanIncident = {
@@ -35,14 +37,11 @@ const COLUMNS = [
   { id: 'fermé',    label: 'Fermé',    dot: 'bg-gray-400' },
 ] as const
 
-const PRIORITY_STYLE: Record<string, string> = {
-  basse:   'bg-gray-100 text-gray-500',
-  normale: 'bg-blue-50 text-blue-600',
-  haute:   'bg-orange-50 text-orange-700',
-  urgente: 'bg-red-50 text-red-700',
-}
-const PRIORITY_LABEL: Record<string, string> = {
-  basse: 'Basse', normale: 'Normale', haute: 'Haute', urgente: 'Urgente',
+const PRIORITY: Record<string, { label: string; variant: BadgeVariant }> = {
+  basse:   { label: 'Basse',   variant: 'neutral' },
+  normale: { label: 'Normale', variant: 'info'    },
+  haute:   { label: 'Haute',   variant: 'warning' },
+  urgente: { label: 'Urgente', variant: 'danger'  },
 }
 const CATEGORY_LABEL: Record<string, string> = {
   panne: 'Panne', maintenance: 'Maintenance', consommable: 'Consommable', autre: 'Autre',
@@ -67,6 +66,7 @@ function IncidentCard({
 
   const isDraggingThis = draggingId === incident.id && !isOverlay
   const style = !isOverlay && transform ? { transform: CSS.Translate.toString(transform) } : undefined
+  const priority = PRIORITY[incident.priority]
 
   return (
     <div
@@ -75,31 +75,31 @@ function IncidentCard({
       {...(isOverlay ? {} : attributes)}
       {...(isOverlay ? {} : listeners)}
       className={[
-        'bg-white rounded-lg border border-gray-200 p-3.5 select-none',
+        'bg-card rounded-card border border-line p-3.5 select-none',
         isDraggingThis  ? 'opacity-30' : '',
-        isOverlay       ? 'shadow-2xl rotate-1 cursor-grabbing' : 'cursor-grab hover:shadow-sm hover:border-gray-300 transition-all',
+        isOverlay       ? 'shadow-raised rotate-1 cursor-grabbing' : 'cursor-grab hover:shadow-card transition-all',
       ].join(' ')}
     >
-      <p className="font-mono text-[11px] font-semibold text-[#BF0D0D] mb-1.5 tracking-wide">
+      <p className="font-mono text-[11px] font-semibold text-accent mb-1.5 tracking-wide">
         {incident.numero_incident}
       </p>
-      <p className="text-sm font-medium text-gray-900 leading-snug mb-2 line-clamp-2">
+      <p className="text-sm font-medium text-ink leading-snug mb-2 line-clamp-2">
         {incident.title}
       </p>
-      <p className="font-mono text-xs text-gray-400 mb-3">{incident.machine_id}</p>
+      <p className="font-mono text-xs text-ink-muted mb-3">{incident.machine_id}</p>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className={`shrink-0 inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${PRIORITY_STYLE[incident.priority] ?? 'bg-gray-100 text-gray-500'}`}>
-            {PRIORITY_LABEL[incident.priority] ?? incident.priority}
-          </span>
-          <span className="text-xs text-gray-400 truncate">
+          {priority
+            ? <Badge variant={priority.variant}>{priority.label}</Badge>
+            : <span className="text-xs text-ink-muted">{incident.priority}</span>}
+          <span className="text-xs text-ink-muted truncate">
             {CATEGORY_LABEL[incident.category] ?? incident.category}
           </span>
         </div>
         {!isOverlay && (
           <Link
             href={`/admin/incidents/${incident.id}`}
-            className="shrink-0 text-xs text-gray-300 hover:text-gray-600 transition-colors"
+            className="shrink-0 text-xs text-ink-muted hover:text-ink-soft transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
             →
@@ -129,9 +129,9 @@ function KanbanColumn({
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${column.dot}`} />
-          <span className="text-sm font-semibold text-gray-700">{column.label}</span>
+          <span className="text-sm font-semibold text-ink">{column.label}</span>
         </div>
-        <span className="text-xs font-medium text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
+        <span className="text-xs font-medium text-ink-soft bg-neutral-soft rounded-full px-2 py-0.5">
           {incidents.length}
         </span>
       </div>
@@ -140,15 +140,15 @@ function KanbanColumn({
       <div
         ref={setNodeRef}
         className={[
-          'flex-1 min-h-[520px] rounded-xl p-2.5 space-y-2 border-2 border-dashed transition-colors duration-150',
-          isOver ? 'border-gray-400 bg-gray-100' : 'border-transparent bg-gray-50',
+          'flex-1 min-h-[520px] rounded-card p-2.5 space-y-2 border-2 border-dashed transition-colors duration-150',
+          isOver ? 'border-line bg-neutral-soft' : 'border-transparent bg-page',
         ].join(' ')}
       >
         {incidents.map((inc) => (
           <IncidentCard key={inc.id} incident={inc} draggingId={draggingId} />
         ))}
         {incidents.length === 0 && !isOver && (
-          <div className="flex items-center justify-center h-20 text-xs text-gray-300">
+          <div className="flex items-center justify-center h-20 text-xs text-ink-muted">
             Aucun incident
           </div>
         )}
