@@ -9,6 +9,8 @@ import DashboardRecentIncidents from '@/components/admin/DashboardRecentIncident
 import DashboardTechTable from '@/components/admin/DashboardTechTable'
 import type { TechPerf } from '@/components/admin/DashboardTechTable'
 import DashboardStatusDist from '@/components/admin/DashboardStatusDist'
+import { Card } from '@/components/ui/Card'
+import { buttonClasses } from '@/components/ui/Button'
 
 const MONTHS_FR = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
 
@@ -143,16 +145,12 @@ export default async function Dashboard() {
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <h1 className="font-display text-2xl font-semibold text-ink">
             Tableau de bord
           </h1>
-          <p className="text-sm text-gray-400 mt-0.5">Vue direction — {data.today}</p>
+          <p className="text-sm text-ink-muted mt-0.5">Vue direction — {data.today}</p>
         </div>
-        <Link
-          href="/admin/incidents/new"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
-          style={{ backgroundColor: '#BF0D0D' }}
-        >
+        <Link href="/admin/incidents/new" className={buttonClasses('primary')}>
           <Plus size={16} />
           Nouveau Ticket
         </Link>
@@ -172,41 +170,55 @@ export default async function Dashboard() {
 
       {/* Charts */}
       <div className="grid grid-cols-5 gap-5">
-        <div className="col-span-3 bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-sm font-semibold text-gray-900">Évolution CSAT</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Note moyenne de satisfaction sur 6 mois</p>
+        <div className="col-span-3">
+          <Card>
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-line-subtle">
+              <div>
+                <h3 className="font-display text-sm font-semibold text-ink">Évolution CSAT</h3>
+                <p className="text-xs text-ink-muted mt-0.5">
+                  Note moyenne de satisfaction sur 6 mois
+                </p>
+              </div>
+              {data.csatCount > 0 && (
+                <span className="text-xs text-ink-muted bg-neutral-soft border border-line rounded-full px-2.5 py-1">
+                  {data.csatCount} réponses
+                </span>
+              )}
             </div>
-            {data.csatCount > 0 && (
-              <span className="text-xs text-gray-400 bg-gray-50 border border-gray-100 rounded-full px-2.5 py-1">
-                {data.csatCount} réponses
-              </span>
-            )}
-          </div>
-          <CsatTrendChart data={data.csatTrend} />
-          {data.avgCsat > 0 && (
-            <p className="text-xs text-gray-400 mt-3">
-              Ligne verte = objectif 4/5
-            </p>
-          )}
+            <div className="p-5">
+              <CsatTrendChart data={data.csatTrend} />
+              {data.avgCsat > 0 && (
+                <p className="text-xs text-ink-muted mt-3">Ligne verte = objectif 4/5</p>
+              )}
+            </div>
+          </Card>
         </div>
 
-        <div className="col-span-2 bg-white rounded-xl border border-gray-200 p-6">
-          <div className="mb-5">
-            <h2 className="text-sm font-semibold text-gray-900">Nouvelles interventions</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Incidents créés par mois (6 mois)</p>
-          </div>
-          <IncidentsTrendChart data={data.incidentsTrend} />
+        <div className="col-span-2">
+          <Card>
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-line-subtle">
+              <div>
+                <h3 className="font-display text-sm font-semibold text-ink">
+                  Nouvelles interventions
+                </h3>
+                <p className="text-xs text-ink-muted mt-0.5">
+                  Incidents créés par mois (6 mois)
+                </p>
+              </div>
+            </div>
+            <div className="p-5">
+              <IncidentsTrendChart data={data.incidentsTrend} />
+            </div>
+          </Card>
         </div>
       </div>
 
       {/* Performance */}
       <div className="grid grid-cols-5 gap-5">
         <DashboardTechTable techPerf={data.techPerf} />
-
         <DashboardStatusDist statusDist={data.statusDist} statusTotal={data.statusTotal} />
       </div>
+
     </div>
   )
 }
