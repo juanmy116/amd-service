@@ -19,7 +19,7 @@ La app SAV está **completa y en producción** (`https://amd-service.vercel.app`
 - Sitio web público AMD + página `/location` (SEO Dakar)
 - Back-office admin (`/admin`): clientes, máquinas, contratos, incidencias (Kanban), compteurs, maintenance, calendrier, équipe, Princity
 - Portal cliente (`/portal`) y PWA técnico (`/tech`) con escáner QR
-- Auth por rol, RLS, rate limiting, integraciones (Resend/CSAT, Princity API, Matrix)
+- Auth por rol, RLS, rate limiting, integraciones (Resend/CSAT, Princity API)
 - Búsqueda + filtros admin · `numero_incident` (SAV-YYYY-NNNN)
 - **Dashboard Atelier** (`/atelier`): kiosko de taller para TV 32" — cuenta «Atelier» (rol técnico + flag `is_dispatcher`) que asigna incidencias y mantenimientos a los técnicos
 
@@ -143,5 +143,4 @@ gh pr merge <número> --merge --delete-branch
 - **`send-email` Edge Function** encapsula el proveedor de email (Mailjet ahora, intercambiable después)
 - **`service_role`** solo en servidor (Edge Functions, Server Actions) — nunca en el cliente
 - **QR por máquina** codifica la URL `/tech/maquina/[numero_serie]`
-- **Matrix/Synapse** para mensajería interna de técnicos y admins (se despliega en Docker en el VPS)
 - **RLS** bloqueado hasta que se añadan políticas módulo a módulo

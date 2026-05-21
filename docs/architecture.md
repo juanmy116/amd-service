@@ -52,7 +52,6 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 - Formulario de intervención: informe + checkboxes de piezas + campo libre + estado
 - Formulario de cierre de mantenimiento preventivo: piezas reemplazadas + notas; accesible solo desde el QR de la máquina (`qr_verified = true` garantizado)
 - Auto-programación de la siguiente visita de mantenimiento al cerrar la actual
-- Notificación Matrix de cierre enviada al room `#maintenance`
 - Layout responsive: bottom nav en móvil ↔ sidebar en desktop
 
 **Home page (`/tech`):**
@@ -101,16 +100,16 @@ _(Scanner eliminado del nav; accesible vía FAB persistente)_
 
 | Edge Function | Frecuencia | Endpoints Princity | Función |
 |---|---|---|---|
-| `princity-alerts` | cada hora (`0 * * * *`) | `POST /v3/alerts` con `Alert.deactivationDate IS_NULL` | Detecta pannes y toner-bas; crea incidencias para pannes con máquina+contrato conocidos; notifica Matrix `#amd-alerts` |
+| `princity-alerts` | cada hora (`0 * * * *`) | `POST /v3/alerts` con `Alert.deactivationDate IS_NULL` | Detecta pannes y toner-bas; crea incidencias para pannes con máquina+contrato conocidos |
 | `princity-sync` | diario 06:00 UTC (`0 6 * * *`) | `GET /v1/contracts` + `GET /v1/devices?contract=X` (paralelizado en lotes de 10) | Detecta nuevos clientes y equipos; modo `normal` solo INSERT-si-no-existe; modo `initial` ejecuta `wipe_data_tables` + reimport completo |
 | `princity-counters` | 2× al día: 02:00 + 07:00 UTC (`0 2 * * *` y `0 7 * * *`) | `POST /v3/billingCounters` con filtro `BillingCounter.deviceId EQ <id>` | Importa último contador del mes por máquina; aprende el `billing_day` por contrato. Doble ejecución para cubrir variaciones horarias de Princity (idempotente por `(machine_id, year, month, status='actif')`) |
-| `princity-watchdog` | cada 2h (`30 */2 * * *`) | — (consulta `princity_health`) | Alerta Matrix + email si alguna función no se ejecuta en su umbral (alerts: 2h, sync: 2d, counters: 35d) |
+| `princity-watchdog` | cada 2h (`30 */2 * * *`) | — (consulta `princity_health`) | Alerta por email si alguna función no se ejecuta en su umbral (alerts: 2h, sync: 2d, counters: 35d) |
 
 **Helpers compartidos (`supabase/functions/_shared/`):**
 - `princity-client.ts` — clase `PrincityClient` con `fetchAll()` (POST v3 lectura) y `getV1()` (GET v1). **Sin método POST a v1**: imposible escribir en Princity con el código actual.
 - `db.ts` — `getAdminClient()` (parsea `SUPABASE_SECRET_KEYS.default`), `updateHealth()`, `writeLog()`
 - `secret-key.ts` — `getSecretKey()`, `getAllSecretKeys()`, `isValidSecretKey()` para parsear el JSON `SUPABASE_SECRET_KEYS` auto-inyectado por la plataforma
-- `notify.ts` — `notifyMatrix(room, msg)`, `notifyAdmin()`, `notifyAlerts()`, `notifyEmail()` (Resend)
+- `notify.ts` — `notifyEmail()` (Resend): envío de alertas del watchdog al admin
 
 **Identificadores Princity en BD:**
 - `clients.princity_company_id` (text, UNIQUE) — guarda el `prefix` del contrato Princity (ej. `"63"`)
@@ -148,15 +147,7 @@ _(Scanner eliminado del nav; accesible vía FAB persistente)_
 - `DashboardStatusDist.tsx` — barras CSS de distribución de estados
 - `DashboardCharts.tsx` — `CsatTrendChart` + `IncidentsTrendChart` (Recharts, Client Components)
 
-### 8. Servidor Matrix ✅
-- Synapse autoalojado en VPS Hostinger (`matrix.test-sav.site`)
-- Bot `princity-bot` con 3 salas activas:
-  - `#amd-alerts:test-sav.site` — alertas SAV (pannes/toner) desde `princity-alerts`
-  - `#maintenance:test-sav.site` (`!cRNbjhiPvuwhJESDyd:test-sav.site`) — equipo de técnicos para mantenimiento preventivo
-  - `#Admin:test-sav.site` (`MATRIX_ADMIN_ROOM_ID`) — notificaciones de gestión: nuevos clientes/equipos Princity, fin de importación inicial, alertas del watchdog
-- Acceso por el equipo AMD vía cliente Element
-
-### 9. Sitio Web Público (`/`) ✅
+### 8. Sitio Web Público (`/`) ✅
 
 Sitio de marketing B2B en francés con 6 páginas + layout compartido (Navigation + Footer).
 
@@ -193,8 +184,7 @@ Sitio de marketing B2B en francés con 6 páginas + layout compartido (Navigatio
 - Back-office: lista con KPIs (total, en retard, esta semana), formulario nuevo plan, detalle con historial
 - Edge Function `maintenance-cron` con pg_cron diario a las 8h UTC:
   - Marca visitas atrasadas como `en_retard`
-  - Envía alerta Matrix al room `#maintenance` para visitas de los próximos 3 días (una sola vez por visita)
-- Cierre de visita vía QR: técnico escanea la máquina → ve mantenimiento pendiente → formulario con checklist de piezas + notas → `qr_verified = true` + notificación Matrix de confirmación
+- Cierre de visita vía QR: técnico escanea la máquina → ve mantenimiento pendiente → formulario con checklist de piezas + notas → `qr_verified = true`
 - Piezas reemplazadas guardadas en `maintenance_parts` (catálogo `parts` + campo libre)
 
 ### 11. Dashboard Atelier (`/atelier`) ✅
@@ -215,7 +205,6 @@ Sitio de marketing B2B en francés con 6 páginas + layout compartido (Navigatio
 | Frontend | Next.js 16 App Router + TypeScript + Tailwind CSS v4 |
 | App técnico | PWA mobile-first (Next.js, mismo repo) |
 | Emails transaccionales | Resend (`noreply@amd-service.com`, dominio verificado) |
-| Mensajería interna | Matrix/Synapse autoalojado + cliente Element |
 | Integración Princity | 4 Edge Functions (`princity-alerts` cada hora, `princity-sync` diario, `princity-counters` diario, `princity-watchdog` cada 2h) sobre API REST Princity v1+v3 |
 | Mantenimiento preventivo | Edge Function `maintenance-cron`, cron diario 8h UTC vía pg_cron + pg_net |
 | QR por máquina | Librería `qrcode`, generado en back-office, página imprimible |
@@ -223,7 +212,6 @@ Sitio de marketing B2B en francés con 6 páginas + layout compartido (Navigatio
 | Kanban | `@dnd-kit/core` + `@dnd-kit/utilities` |
 | Scanner QR | `@zxing/browser` (PWA técnico) |
 | Hosting frontend | Vercel (Next.js) |
-| Hosting Matrix | VPS Hostinger + Docker + Traefik |
 
 ---
 
@@ -261,7 +249,6 @@ pg_cron `princity-alerts-hourly` (cada hora)
   → Para cada alerta: lookup machine por princity_device_id, lookup contrato activo
   → Insert en princity_alerts con idempotencia (code + device_id_raw + received_at)
   → Si alert_type = 'panne' y machine+contract conocidos → incidents (status: nouveau)
-  → Notificación Matrix al equipo SAV (#amd-alerts) — 🔴 panne / 🟡 toner_bas
   → Admin asigna técnico → incidents (status: assigné)
   → Técnico escanea QR → /tech/scan/[serie] → auto-transición assigné → en_cours (automático)
   → Técnico completa formulario + piezas → résolu
@@ -290,12 +277,8 @@ Admin crea plan en /admin/maintenance/new
 
 Edge Function maintenance-cron (diario 8h UTC, via pg_cron + pg_net):
   → Visitas con scheduled_date < hoy y status='planifié' → status='en_retard'
-  → Visitas con scheduled_date en los próximos 3 días y matrix_notified=false:
-      → Envía mensaje Matrix al room #maintenance
-      → "🔧 MAINTENANCE PLANIFIÉE — [fecha] / Cliente / Máquina / Contrato / Frec. / Notas / Qui prend en charge ?"
-      → matrix_notified = true
 
-Técnico recibe notificación Element → va a la instalación
+Técnico va a la instalación
   → Escanea QR de la máquina → /tech/scan/[serie]
   → Ve card "Maintenance planifiée" (azul) o "Maintenance en retard" (roja)
   → Pulsa la card → /tech/scan/[serie]/maintenance/[visitId]
@@ -304,7 +287,6 @@ Técnico recibe notificación Element → va a la instalación
     → visit: status='fait', done_at=now(), done_by=user.id, qr_verified=true
     → Inserta filas en maintenance_parts para cada pieza marcada
     → Crea siguiente maintenance_visit (scheduled_date = scheduled_date actual + 30/90 días)
-    → Envía Matrix: "✅ MAINTENANCE EFFECTUÉE / Cliente / Máquina / Técnico / Próxima visita: [fecha]"
     → Redirige a /tech/scan/[serie]
 ```
 
@@ -390,7 +372,7 @@ Filtro: `BillingCounter.deviceId EQ <princity_device_id>`. Orden: `BillingCounte
 
 ### Clasificación de `alert_type`
 - `severity = "error"` y `description` NO contiene "toner" → `panne` (crea incidencia)
-- `description` contiene "toner" o "niveau bas" → `toner_bas` (solo notifica Matrix)
+- `description` contiene "toner" o "niveau bas" → `toner_bas` (solo se registra en BD)
 - resto → `autre`
 
 ---
@@ -655,7 +637,7 @@ Estado de salud de cada función Princity. 3 filas predefinidas (alerts, sync, c
 - `princity-sync` → 2 días
 - `princity-counters` → 35 días
 
-Si `last_success_at` supera el umbral y `alert_sent = false`, envía Matrix + email a `info@amd-service.com` y pone `alert_sent = true`. Cuando la función vuelve a tener éxito, `alert_sent` se resetea.
+Si `last_success_at` supera el umbral y `alert_sent = false`, envía email a `info@amd-service.com` y pone `alert_sent = true`. Cuando la función vuelve a tener éxito, `alert_sent` se resetea.
 
 ---
 
@@ -729,7 +711,7 @@ Una fila por visita programada o realizada.
 | `status` | text | planifié / en_retard / fait |
 | `qr_verified` | boolean | true si se cerró vía escaneo QR |
 | `notes` | text | notas del técnico al cerrar, nullable |
-| `matrix_notified` | boolean | true si ya se envió alerta previa Matrix |
+| `matrix_notified` | boolean | legacy — ya no se usa (Matrix retirado del proyecto) |
 | `created_at` | timestamptz | default: now() |
 
 ---
@@ -865,9 +847,6 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anon para el cliente |
 | `SUPABASE_SECRET_KEY` | Nueva generación (`sb_secret_*`) — usada por `createAdminClient()` para acceso a BD (bypassa RLS) **y** como Bearer hacia la Edge Function `send-email`. |
 | `NEXT_PUBLIC_APP_URL` | `https://amd-service.vercel.app` |
-| `MATRIX_HOMESERVER_URL` | `https://matrix.test-sav.site` (usado por server actions de mantenimiento) |
-| `MATRIX_ACCESS_TOKEN` | Token del bot Matrix (`princity-bot`) |
-| `MATRIX_MAINTENANCE_ROOM_ID` | ID del room `#maintenance` en Matrix |
 | `UPSTASH_REDIS_REST_URL` | URL REST de la base Upstash Redis para rate limiting |
 | `UPSTASH_REDIS_REST_TOKEN` | Token REST de la base Upstash Redis para rate limiting |
 
@@ -880,11 +859,6 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 | `PRINCITY_BASE_URL` | `https://amdservice.its-printer.com/api` |
 | `PRINCITY_API_KEY` | Header `App-auth-key` de la API Princity (solo lectura, ver auditoría) |
 | `RESEND_API_KEY` | API key Resend para emails del watchdog |
-| `MATRIX_HOMESERVER_URL` | `https://matrix.test-sav.site` |
-| `MATRIX_ACCESS_TOKEN` | Token del bot `princity-bot` |
-| `MATRIX_ROOM_ID` | `!PHCHbjijoJZsTYfRoK:test-sav.site` (sala SAV/alertas) |
-| `MATRIX_MAINTENANCE_ROOM_ID` | `!cRNbjhiPvuwhJESDyd:test-sav.site` (sala mantenimiento) |
-| `MATRIX_ADMIN_ROOM_ID` | sala `#Admin` para notificaciones de gestión (nuevos clientes/equipos, watchdog) |
 
 > Los antiguos secrets `IMAP_HOST`, `IMAP_USER`, `IMAP_PASSWORD` quedaron obsoletos tras retirar `princity-agent`. Pueden borrarse del dashboard de Supabase.
 
@@ -914,8 +888,7 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - [x] PWA técnico (dashboard, intervenciones, scanner QR, machines)
 - [x] Edge Function `send-email` con Resend (5 plantillas) — `verify_jwt: false` + validación interna del Bearer contra `SUPABASE_SECRET_KEYS`
 - [x] Sistema CSAT (email + token + página pública)
-- [x] ~~Agente Princity (IMAP → BD → Matrix)~~ — **sustituido en sesión 5 por integración API directa** (ver Fase 2.7)
-- [x] Servidor Matrix (Synapse en VPS, bot integrado)
+- [x] ~~Agente Princity (IMAP)~~ — **sustituido en sesión 5 por integración API directa** (ver Fase 2.7)
 - [x] QR por máquina (etiqueta imprimible)
 
 ### Fase 2 — Contadores ✅ COMPLETADO
@@ -937,14 +910,12 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 
 ### Fase 2.6 — Mantenimiento Preventivo ✅ COMPLETADO
 - [x] Tablas `maintenance_plans`, `maintenance_visits`, `maintenance_parts` con RLS
-- [x] Edge Function `maintenance-cron` (pg_cron diario 8h UTC): marca `en_retard` + alertas Matrix previas
+- [x] Edge Function `maintenance-cron` (pg_cron diario 8h UTC): marca `en_retard`
 - [x] Back-office: lista con KPIs, formulario nuevo plan, detalle con historial de visitas
 - [x] PWA técnico: card de mantenimiento pendiente en ficha de máquina (QR scan)
 - [x] Formulario de cierre vía QR: checklist 12 piezas + campo libre + notas
 - [x] Auto-programación de la siguiente visita al cerrar la actual
-- [x] Notificación Matrix de confirmación de cierre
 - [x] `qr_verified = true` como prueba implícita de presencia física
-- [x] Room Matrix `#maintenance` separado del room SAV
 - [x] Flujo de creación desacoplado: cliente → máquina → contrato → plan mantenimiento
 
 ### Fase 2.8 — Rediseño PWA Técnico ✅ COMPLETADO (sesión 6, 2026-05-13)
@@ -1000,7 +971,6 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - [ ] Parser Excel de Princity → inserción automática en contadores
 - [ ] Exportación de contadores a PDF/Excel para facturación
 - [ ] Agente IA para asignación automática de técnicos
-- [ ] Cuentas de técnicos: invitar los 4 técnicos al room Matrix `#maintenance`
 
 ### Fase 4 — Rediseño UI «Híbrido» (en curso, sesiones 15–16)
 - [x] Fase 0 — sistema de diseño: tokens `@theme` + 6 componentes UI compartidos (PR #12)
