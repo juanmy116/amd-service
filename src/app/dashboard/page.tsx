@@ -9,10 +9,11 @@ export default async function Dashboard() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_dispatcher')
     .eq('id', user.id)
     .single()
 
+  if (profile?.is_dispatcher) redirect('/atelier')
   if (profile?.role === 'admin') redirect('/admin')
   if (profile?.role === 'technician') redirect('/tech')
   if (profile?.role === 'client') redirect('/portal')
