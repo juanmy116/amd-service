@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-21 (sesión 16 — Rediseño UI «Híbrido»: Fase 0 + bloques 1a/1b/1c de /admin)
+> Última actualización: 2026-05-21 (sesión 16 — Dashboard Atelier + rediseño UI bloques 1a/1b/1c)
 
 ---
 
@@ -11,7 +11,7 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 
 **Producción:** `https://amd-service.vercel.app`
 **Repositorio:** `https://github.com/juanmy116/amd-service` (privado)
-**Versión actual:** `v1.5`
+**Versión actual:** `v1.6`
 
 ---
 
@@ -196,6 +196,12 @@ Sitio de marketing B2B en francés con 6 páginas + layout compartido (Navigatio
   - Envía alerta Matrix al room `#maintenance` para visitas de los próximos 3 días (una sola vez por visita)
 - Cierre de visita vía QR: técnico escanea la máquina → ve mantenimiento pendiente → formulario con checklist de piezas + notas → `qr_verified = true` + notificación Matrix de confirmación
 - Piezas reemplazadas guardadas en `maintenance_parts` (catálogo `parts` + campo libre)
+
+### 11. Dashboard Atelier (`/atelier`) ✅
+- Kiosko de taller a pantalla completa para una TV de 32" conectada a una Raspberry Pi 3 — tema oscuro «centro de mando», auto-refresco cada 30 s
+- Muestra todas las incidencias en Kanban (drag & drop = cambia estado) + mini-tablero de mantenimientos lun–vie + 4 tarjetas KPI
+- Cuenta especial «Atelier»: rol `technician` + flag `profiles.is_dispatcher` → un *dispatcher* puede asignar incidencias y visitas de mantenimiento a los técnicos sin ser admin
+- Las Server Actions de despacho validan `admin OR is_dispatcher` y escriben vía `createAdminClient()`; el middleware protege `/atelier` y `/dashboard` redirige ahí a los dispatchers
 
 ---
 
@@ -408,7 +414,10 @@ Extiende `auth.users`. Se crea automáticamente vía trigger al registrar un usu
 | `role` | enum | client / technician / admin |
 | `full_name` | text | nullable |
 | `phone` | text | nullable |
+| `is_dispatcher` | boolean | default: false — true solo en la cuenta «Atelier» (acceso a `/atelier` + permiso de despacho) |
 | `created_at` | timestamptz | default: now() |
+
+> **FKs hacia `profiles` — `ON DELETE SET NULL`:** las 6 referencias desde `incidents` (`opened_by`, `assigned_to`), `incident_history` (`changed_by`), `incident_photos` (`uploaded_by`) y `maintenance_visits` (`done_by`, `assigned_to`) usan `ON DELETE SET NULL`. Al borrar un perfil, esos registros se conservan y solo pierden el enlace — permite eliminar técnicos sin perder el historial.
 
 ---
 
@@ -715,7 +724,8 @@ Una fila por visita programada o realizada.
 | `plan_id` | UUID | FK → maintenance_plans |
 | `scheduled_date` | date | fecha planificada de la visita |
 | `done_at` | timestamptz | fecha/hora real de cierre, nullable |
-| `done_by` | UUID | FK → profiles (técnico), nullable |
+| `done_by` | UUID | FK → profiles (técnico que la realizó), nullable |
+| `assigned_to` | UUID | FK → profiles (técnico planificado), nullable — asignable desde el Dashboard Atelier |
 | `status` | text | planifié / en_retard / fait |
 | `qr_verified` | boolean | true si se cerró vía escaneo QR |
 | `notes` | text | notas del técnico al cerrar, nullable |
@@ -1001,3 +1011,9 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - [ ] `/admin` bloque 1e — secundarias (calendrier, team, princity, detalle compteurs, QR)
 - [ ] Fase 2 — `/portal` + `/login` + `/csat`
 - [ ] Fase 3 — `/tech` (PWA técnico)
+
+### Dashboard Atelier ✅ COMPLETADO (sesión 16, 2026-05-21)
+- [x] Migración `is_dispatcher` (profiles) + `assigned_to` (maintenance_visits) — PR #16
+- [x] Ruta `/atelier` — kiosko de taller: Kanban + mantenimientos lun–vie + KPIs, auto-refresco (PR #16)
+- [x] Fix: FKs hacia `profiles` a `ON DELETE SET NULL` — permite borrar técnicos (PR #17)
+- [ ] Operativo: crear las cuentas reales de los técnicos AMD en `/admin/team/new`
