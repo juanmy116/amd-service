@@ -29,11 +29,11 @@ export default function ViewToggle({ defaultView = 'kanban' }: { defaultView?: V
   }
 
   const base = 'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors'
-  const active = 'bg-white text-gray-900 shadow-sm'
-  const idle = 'text-gray-500 hover:text-gray-800'
+  const active = 'bg-card text-ink shadow-card'
+  const idle = 'text-ink-soft hover:text-ink'
 
   return (
-    <div className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-100 p-0.5">
+    <div className="inline-flex items-center rounded-lg border border-line bg-neutral-soft p-0.5">
       <button
         type="button"
         onClick={() => setView('kanban')}
