@@ -40,6 +40,7 @@ export async function deleteMemberAction(formData: FormData): Promise<void> {
 
   const id = formData.get('id') as string
   const supabaseAdmin = createAdminClient()
-  await supabaseAdmin.auth.admin.deleteUser(id)
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(id)
+  if (error) console.error('[deleteMember]', error)
   redirect('/admin/team')
 }
