@@ -194,7 +194,7 @@ export default function AtelierKanban({
 
   return (
     <>
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <DndContext id="atelier-kanban" sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="flex gap-3 h-full">
           {COLUMNS.map((col) => (
             <KanbanColumn

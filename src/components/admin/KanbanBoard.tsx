@@ -205,7 +205,7 @@ export default function KanbanBoard({ incidents: initialIncidents }: { incidents
   )
 
   return (
-    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+    <DndContext id="admin-kanban" sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <div className="flex gap-4 overflow-x-auto pb-4">
         {COLUMNS.map((col) => (
           <KanbanColumn
