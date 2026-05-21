@@ -85,6 +85,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
     category: r.category,
     priority: r.priority,
     status: r.status,
+    technicianName: r.technicianName,
   }))
 
   const listIncidents: IncidentRow[] = rows.map((r) => ({

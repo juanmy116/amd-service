@@ -27,6 +27,7 @@ export type KanbanIncident = {
   category: string
   priority: string
   status: string
+  technicianName: string | null
 }
 
 const COLUMNS = [
@@ -86,7 +87,12 @@ function IncidentCard({
       <p className="text-sm font-medium text-ink leading-snug mb-2 line-clamp-2">
         {incident.title}
       </p>
-      <p className="font-mono text-xs text-ink-muted mb-3">{incident.machine_id}</p>
+      <p className="font-mono text-xs text-ink-muted mb-2">{incident.machine_id}</p>
+      <p className="text-xs mb-3">
+        {incident.technicianName
+          ? <span className="text-ink-soft">{incident.technicianName}</span>
+          : <span className="text-ink-muted">Non assigné</span>}
+      </p>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           {priority
