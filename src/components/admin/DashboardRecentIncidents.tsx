@@ -1,10 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { Card } from '@/components/ui/Card'
+import { PanelHeader } from '@/components/ui/PanelHeader'
+import { Badge } from '@/components/ui/Badge'
+import type { BadgeVariant } from '@/components/ui/Badge'
 
-const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  nouveau:  { label: 'Nouveau',  className: 'bg-blue-50 text-blue-700' },
-  assigné:  { label: 'Assigné',  className: 'bg-purple-50 text-purple-700' },
-  en_cours: { label: 'En cours', className: 'bg-amber-50 text-amber-700' },
+const STATUS_BADGE: Record<string, { label: string; variant: BadgeVariant }> = {
+  nouveau:  { label: 'Nouveau',  variant: 'info' },
+  assigné:  { label: 'Assigné',  variant: 'warning' },
+  en_cours: { label: 'En cours', variant: 'neutral' },
 }
 
 type RecentIncident = {
@@ -33,27 +37,35 @@ export default async function DashboardRecentIncidents() {
   const incidents = (data ?? []) as unknown as RecentIncident[]
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-        <h2 className="text-sm font-semibold text-gray-900">Incidents récents</h2>
-        <Link href="/admin/incidents" className="text-xs text-gray-400 hover:text-gray-700 transition-colors">
-          Voir tout →
-        </Link>
-      </div>
+    <Card className="overflow-hidden">
+      <PanelHeader
+        title="Incidents récents"
+        action={{ label: 'Voir tout →', href: '/admin/incidents' }}
+      />
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-gray-50/60 border-b border-gray-50">
-            <th className="text-left text-[11px] font-medium text-gray-400 px-6 py-3">Titre</th>
-            <th className="text-left text-[11px] font-medium text-gray-400 px-4 py-3">Client</th>
-            <th className="text-left text-[11px] font-medium text-gray-400 px-4 py-3">Statut</th>
-            <th className="text-left text-[11px] font-medium text-gray-400 px-4 py-3">Technicien</th>
-            <th className="text-right text-[11px] font-medium text-gray-400 px-6 py-3">Date</th>
+          <tr className="bg-neutral-soft border-b border-line-subtle">
+            <th className="text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+              Titre
+            </th>
+            <th className="text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+              Client
+            </th>
+            <th className="text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+              Statut
+            </th>
+            <th className="text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+              Technicien
+            </th>
+            <th className="text-right text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+              Date
+            </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-50">
+        <tbody className="divide-y divide-line-subtle">
           {incidents.length === 0 ? (
             <tr>
-              <td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-400">
+              <td colSpan={5} className="px-4 py-10 text-center text-sm text-ink-muted">
                 Aucun incident ouvert
               </td>
             </tr>
@@ -61,28 +73,33 @@ export default async function DashboardRecentIncidents() {
             incidents.map(inc => {
               const badge = STATUS_BADGE[inc.status]
               return (
-                <tr key={inc.id} className="hover:bg-gray-50/60 transition-colors">
-                  <td className="px-6 py-3.5">
+                <tr key={inc.id} className="hover:bg-neutral-soft transition-colors">
+                  <td className="px-4 py-3">
                     <Link
                       href={`/admin/incidents/${inc.id}`}
-                      className="font-medium text-gray-900 hover:text-[#BF0D0D] transition-colors truncate block max-w-[220px]"
+                      className="font-medium text-ink hover:text-accent transition-colors truncate block max-w-[220px]"
                     >
                       {inc.title}
                     </Link>
                   </td>
-                  <td className="px-4 py-3.5 text-gray-600">{inc.clients?.nom_client ?? '—'}</td>
-                  <td className="px-4 py-3.5">
+                  <td className="px-4 py-3 text-ink-soft">{inc.clients?.nom_client ?? '—'}</td>
+                  <td className="px-4 py-3">
                     {badge ? (
-                      <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold ${badge.className}`}>
+                      <Badge variant={badge.variant}>
                         {badge.label}
-                      </span>
+                      </Badge>
                     ) : (
-                      <span className="text-xs text-gray-400">{inc.status}</span>
+                      <span className="text-xs text-ink-muted">{inc.status}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3.5 text-gray-600">{inc.profiles?.full_name ?? 'Non assigné'}</td>
-                  <td className="px-6 py-3.5 text-right text-xs text-gray-400 whitespace-nowrap">
-                    {new Date(inc.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                  <td className="px-4 py-3 text-ink-soft">
+                    {inc.profiles?.full_name ?? 'Non assigné'}
+                  </td>
+                  <td className="px-4 py-3 text-right text-xs text-ink-muted whitespace-nowrap">
+                    {new Date(inc.created_at).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'short',
+                    })}
                   </td>
                 </tr>
               )
@@ -90,6 +107,6 @@ export default async function DashboardRecentIncidents() {
           )}
         </tbody>
       </table>
-    </div>
+    </Card>
   )
 }
