@@ -38,3 +38,32 @@ export function requireAdmin() {
 export function requireTechnician() {
   return requireRole(['admin', 'technician'])
 }
+
+export type DispatcherContext = {
+  user: User
+  profile: { role: Role; full_name: string | null; isDispatcher: boolean }
+  supabase: Awaited<ReturnType<typeof createClient>>
+}
+
+export async function requireDispatcher(): Promise<DispatcherContext> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, full_name, is_dispatcher')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile) redirect('/login')
+
+  const isDispatcher = profile.is_dispatcher === true
+  if (profile.role !== 'admin' && !isDispatcher) redirect('/dashboard')
+
+  return {
+    user,
+    profile: { role: profile.role as Role, full_name: profile.full_name, isDispatcher },
+    supabase,
+  }
+}
