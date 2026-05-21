@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { AlertTriangle, Building2, ChevronRight, Printer } from 'lucide-react'
 import { MONTHS_FR, MONTHS_FR_LONG } from './constants'
 import SearchFilters from '@/components/admin/SearchFilters'
+import { Card } from '@/components/ui/Card'
 import { sanitizeSearchQuery, firstParam } from '@/lib/search'
 
 interface Machine {
@@ -142,14 +143,14 @@ export default async function ContadoresPage({ searchParams }: { searchParams: S
     <div className="p-8">
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <h1 className="font-display text-2xl font-semibold text-ink">
             Compteurs
           </h1>
-          <p className="text-sm text-gray-400 mt-0.5">
+          <p className="text-sm text-ink-muted mt-0.5">
             {clientGroups.length} client{clientGroups.length !== 1 ? 's' : ''} · {totalMachines} machine{totalMachines !== 1 ? 's' : ''}
-            {isCustomPeriod && <span className="ml-2 text-gray-500">· période : {periodLabel}</span>}
+            {isCustomPeriod && <span className="ml-2 text-ink-soft">· période : {periodLabel}</span>}
             {totalMissing > 0 && (
-              <span className="ml-2 text-amber-500 font-medium">
+              <span className="ml-2 text-warning font-medium">
                 · {totalMissing} relevé{totalMissing !== 1 ? 's' : ''} manquant{totalMissing !== 1 ? 's' : ''}
               </span>
             )}
@@ -168,82 +169,80 @@ export default async function ContadoresPage({ searchParams }: { searchParams: S
       {/* Con búsqueda activa la tarjeta "Sans contrat actif" se oculta, así que
           no debe contar como contenido visible para evaluar el empty-state. */}
       {clientGroups.length === 0 && (q !== null || noClient.length === 0) ? (
-        <div className="bg-white rounded-xl border border-gray-200 flex items-center justify-center py-20">
-          <p className="text-sm text-gray-400">
+        <Card className="flex items-center justify-center py-20">
+          <p className="text-sm text-ink-muted">
             {hasFilters ? 'Aucun client ne correspond aux filtres' : 'Aucune machine active enregistrée'}
           </p>
-        </div>
+        </Card>
       ) : (
         <div className="space-y-3">
           {clientGroups.map((group) => {
             const missing = missingCount(group.machines)
             const allGood = missing === 0
             return (
-              <Link
-                key={group.id}
-                href={`/admin/contadores/cliente/${group.id}`}
-                className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-5 py-4 hover:border-gray-300 hover:shadow-sm transition-all group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#BF0D0D18' }}>
-                    <Building2 size={18} style={{ color: '#BF0D0D' }} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900 group-hover:text-[#BF0D0D] transition-colors">{group.name}</p>
-                    <div className="flex items-center gap-3 mt-0.5">
-                      <span className="flex items-center gap-1 text-xs text-gray-400">
-                        <Printer size={11} />
-                        {group.machines.length} machine{group.machines.length !== 1 ? 's' : ''}
-                      </span>
-                      <span className="text-xs text-gray-300">·</span>
-                      <span className="text-xs text-gray-400">
-                        Dernier : {(() => {
-                          const lasts = group.machines
-                            .map((m) => latestMap.get(m.numero_serie))
-                            .filter((l): l is { year: number; month: number } => l !== undefined)
-                          if (!lasts.length) return 'aucun relevé'
-                          const l = lasts.sort((a, b) => a.year !== b.year ? b.year - a.year : b.month - a.month)[0]
-                          return `${MONTHS_FR[l.month]} ${l.year}`
-                        })()}
-                      </span>
+              <Link key={group.id} href={`/admin/contadores/cliente/${group.id}`} className="block group">
+                <Card className="flex items-center justify-between px-5 py-4 hover:shadow-raised transition-shadow">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-accent-soft flex items-center justify-center shrink-0">
+                      <Building2 size={18} className="text-accent" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-ink group-hover:text-accent transition-colors">{group.name}</p>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <span className="flex items-center gap-1 text-xs text-ink-muted">
+                          <Printer size={11} />
+                          {group.machines.length} machine{group.machines.length !== 1 ? 's' : ''}
+                        </span>
+                        <span className="text-xs text-line">·</span>
+                        <span className="text-xs text-ink-muted">
+                          Dernier : {(() => {
+                            const lasts = group.machines
+                              .map((m) => latestMap.get(m.numero_serie))
+                              .filter((l): l is { year: number; month: number } => l !== undefined)
+                            if (!lasts.length) return 'aucun relevé'
+                            const l = lasts.sort((a, b) => a.year !== b.year ? b.year - a.year : b.month - a.month)[0]
+                            return `${MONTHS_FR[l.month]} ${l.year}`
+                          })()}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-4">
-                  {!allGood ? (
-                    <div className="flex items-center gap-1.5 text-amber-500">
-                      <AlertTriangle size={14} />
-                      <span className="text-xs font-medium">
-                        {missing} {isCustomPeriod ? `manque(s) en ${MONTHS_FR[cMonth]}` : 'en attente'}
+                  <div className="flex items-center gap-4">
+                    {!allGood ? (
+                      <div className="flex items-center gap-1.5 text-warning">
+                        <AlertTriangle size={14} />
+                        <span className="text-xs font-medium">
+                          {missing} {isCustomPeriod ? `manque(s) en ${MONTHS_FR[cMonth]}` : 'en attente'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-medium text-success">
+                        ✓ À jour{isCustomPeriod ? ` (${MONTHS_FR[cMonth]} ${cYear})` : ''}
                       </span>
-                    </div>
-                  ) : (
-                    <span className="text-xs font-medium text-green-600">
-                      ✓ À jour{isCustomPeriod ? ` (${MONTHS_FR[cMonth]} ${cYear})` : ''}
-                    </span>
-                  )}
-                  <ChevronRight size={16} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
-                </div>
+                    )}
+                    <ChevronRight size={16} className="text-ink-muted group-hover:text-ink-soft transition-colors" />
+                  </div>
+                </Card>
               </Link>
             )
           })}
 
           {/* Machines sans contrat actif — solo cuando no hay búsqueda activa */}
           {!q && noClient.length > 0 && (
-            <div className="flex items-center justify-between bg-white rounded-xl border border-dashed border-gray-200 px-5 py-4 opacity-70">
+            <Card className="flex items-center justify-between px-5 py-4 opacity-70 border-dashed">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
-                  <Printer size={18} className="text-gray-400" />
+                <div className="w-10 h-10 rounded-xl bg-neutral-soft flex items-center justify-center shrink-0">
+                  <Printer size={18} className="text-ink-muted" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Sans contrat actif</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-sm font-medium text-ink-soft">Sans contrat actif</p>
+                  <p className="text-xs text-ink-muted mt-0.5">
                     {noClient.length} machine{noClient.length !== 1 ? 's' : ''} sans client assigné
                   </p>
                 </div>
               </div>
-            </div>
+            </Card>
           )}
         </div>
       )}

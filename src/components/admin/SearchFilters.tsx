@@ -73,14 +73,14 @@ export default function SearchFilters({ placeholder = 'Rechercher…', filters =
   return (
     <div className="flex flex-wrap items-center gap-2 mb-5">
       <div className="relative flex-1 min-w-[220px] max-w-md">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
         <input
           type="search"
           value={value}
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder={placeholder}
           maxLength={80}
-          className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300"
+          className="w-full pl-9 pr-3 py-2 text-sm text-ink border border-line rounded-lg bg-card focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
         />
       </div>
 
@@ -91,7 +91,7 @@ export default function SearchFilters({ placeholder = 'Rechercher…', filters =
             key={filter.param}
             value={current}
             onChange={(e) => pushWith({ [filter.param]: e.target.value || null })}
-            className="text-sm border border-gray-200 rounded-lg bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300"
+            className="text-sm text-ink border border-line rounded-lg bg-card px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
           >
             <option value="">{filter.label}</option>
             {filter.options.map((opt) => (
@@ -105,7 +105,7 @@ export default function SearchFilters({ placeholder = 'Rechercher…', filters =
         <button
           type="button"
           onClick={clearAll}
-          className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900 px-2 py-1.5"
+          className="inline-flex items-center gap-1 text-xs font-medium text-ink-soft hover:text-ink px-2 py-1.5"
         >
           <X size={13} />
           Effacer

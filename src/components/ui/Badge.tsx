@@ -6,6 +6,7 @@ const VARIANTS = {
   success: 'bg-success-soft text-success',
   warning: 'bg-warning-soft text-warning',
   info:    'bg-info-soft text-info',
+  violet:  'bg-violet-soft text-violet',
   neutral: 'bg-neutral-soft text-ink-soft',
 } as const
 

@@ -2,6 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Plus, Clock, AlertTriangle, Wrench } from 'lucide-react'
 import SearchFilters from '@/components/admin/SearchFilters'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import type { BadgeVariant } from '@/components/ui/Badge'
+import { buttonClasses } from '@/components/ui/Button'
 import {
   sanitizeSearchQuery,
   buildIlikePattern,
@@ -13,16 +17,17 @@ const RESULT_LIMIT = 300
 // Límite holgado para lookups intermedios que alimentan filtros: si truncaran,
 // el filtro de búsqueda devolvería resultados incompletos sin avisar.
 const LOOKUP_LIMIT = 1000
+const TH = 'text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-5 py-2.5'
 
 const FREQ_LABEL: Record<string, string> = {
   mensuel:     'Mensuel',
   trimestriel: 'Trimestriel',
 }
 
-const STATUS_CFG = {
-  fait:      { label: 'Fait',       class: 'bg-green-50 text-green-700' },
-  planifié:  { label: 'Planifié',   class: 'bg-blue-50 text-blue-700'  },
-  en_retard: { label: 'En retard',  class: 'bg-red-50 text-red-700'    },
+const STATUS = {
+  fait:      { label: 'Fait',      variant: 'success' as BadgeVariant },
+  planifié:  { label: 'Planifié',  variant: 'info'    as BadgeVariant },
+  en_retard: { label: 'En retard', variant: 'danger'  as BadgeVariant },
 }
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
@@ -139,21 +144,17 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <h1 className="font-display text-2xl font-semibold text-ink">
             Maintenance préventive
           </h1>
-          <p className="text-sm text-gray-400 mt-0.5">
+          <p className="text-sm text-ink-muted mt-0.5">
             {totalPlans} plan{totalPlans !== 1 ? 's' : ''}
             {hasFilters ? ' trouvé' + (totalPlans !== 1 ? 's' : '') : ' actif' + (totalPlans !== 1 ? 's' : '')}
-            {overdue > 0 && <span className="ml-2 text-red-500 font-medium">· {overdue} en retard</span>}
-            {dueThisWeek > 0 && <span className="ml-2 text-amber-500 font-medium">· {dueThisWeek} cette semaine</span>}
+            {overdue > 0 && <span className="ml-2 text-accent font-medium">· {overdue} en retard</span>}
+            {dueThisWeek > 0 && <span className="ml-2 text-warning font-medium">· {dueThisWeek} cette semaine</span>}
           </p>
         </div>
-        <Link
-          href="/admin/maintenance/new"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white"
-          style={{ backgroundColor: '#BF0D0D' }}
-        >
+        <Link href="/admin/maintenance/new" className={buttonClasses('primary')}>
           <Plus size={16} />
           Nouveau plan
         </Link>
@@ -183,7 +184,7 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
       />
 
       {plansTruncated && (
-        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+        <p className="text-xs text-warning bg-warning-soft border border-warning/30 rounded-lg px-3 py-2">
           Affichage limité aux {RESULT_LIMIT} premiers plans. Affinez votre recherche pour voir le reste.
         </p>
       )}
@@ -191,89 +192,87 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
       {/* KPI strip */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Plans',              value: totalPlans,  icon: Wrench,         color: 'text-gray-700'  },
-          { label: 'En retard',          value: overdue,     icon: AlertTriangle,  color: 'text-red-600'   },
-          { label: 'À faire cette sem.', value: dueThisWeek, icon: Clock,          color: 'text-amber-600' },
+          { label: 'Plans',              value: totalPlans,  icon: Wrench,         color: 'text-ink'     },
+          { label: 'En retard',          value: overdue,     icon: AlertTriangle,  color: 'text-accent'  },
+          { label: 'À faire cette sem.', value: dueThisWeek, icon: Clock,          color: 'text-warning' },
         ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+          <Card key={label} className="p-4 flex items-center gap-3">
             <Icon size={18} className={`${color} shrink-0`} />
             <div>
-              <p className="text-xs text-gray-400">{label}</p>
+              <p className="text-xs text-ink-muted">{label}</p>
               <p className={`text-xl font-semibold ${color}`}>{value}</p>
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 
       {/* Lista */}
       {rows.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 flex items-center justify-center py-20">
-          <p className="text-sm text-gray-400">
+        <Card className="flex items-center justify-center py-20">
+          <p className="text-sm text-ink-muted">
             {hasFilters ? 'Aucun plan ne correspond aux filtres' : 'Aucun plan de maintenance enregistré'}
           </p>
-        </div>
+        </Card>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <Card className="overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-5 py-3 text-xs font-medium text-gray-500">Client / Machine</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Contrat</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Fréquence</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Prochaine visite</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Dernière faite</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Statut</th>
-                <th />
+              <tr className="bg-neutral-soft border-b border-line-subtle">
+                <th className={TH}>Client / Machine</th>
+                <th className={TH}>Contrat</th>
+                <th className={TH}>Fréquence</th>
+                <th className={TH}>Prochaine visite</th>
+                <th className={TH}>Dernière faite</th>
+                <th className={TH}>Statut</th>
+                <th className="px-5 py-2.5" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-line-subtle">
               {rows.map(({ plan, contract, nextVisit, lastDone }) => {
                 const href = `/admin/maintenance/${plan.id}`
                 const overdueRow = nextVisit?.status === 'en_retard'
                 const statusKey = nextVisit?.status ?? (lastDone ? 'fait' : 'planifié')
-                const cfg = STATUS_CFG[statusKey as keyof typeof STATUS_CFG] ?? STATUS_CFG.planifié
+                const status = STATUS[statusKey as keyof typeof STATUS] ?? STATUS.planifié
                 return (
-                  <tr key={plan.id} className="hover:bg-gray-50">
+                  <tr key={plan.id} className="hover:bg-neutral-soft transition-colors">
                     <td className="px-5 py-3.5">
-                      <Link href={href} className="font-medium text-gray-900 hover:text-[#BF0D0D] hover:underline transition-colors">
+                      <Link href={href} className="font-medium text-ink hover:text-accent transition-colors">
                         {contract.clients.nom_client}
                       </Link>
-                      <p className="text-xs text-gray-400 font-mono mt-0.5">
+                      <p className="text-xs text-ink-muted font-mono mt-0.5">
                         {contract.machines.marque} {contract.machines.modele}
                       </p>
                     </td>
-                    <td className="px-4 py-3.5 font-mono text-xs">
-                      <Link href={href} className="text-gray-500 hover:text-[#BF0D0D] hover:underline transition-colors">
+                    <td className="px-5 py-3.5 font-mono text-xs">
+                      <Link href={href} className="text-ink-soft hover:text-accent transition-colors">
                         {contract.numero_contrat}
                       </Link>
                     </td>
-                    <td className="px-4 py-3.5 text-gray-700">
+                    <td className="px-5 py-3.5 text-ink-soft">
                       {FREQ_LABEL[plan.frequency]}
                     </td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-5 py-3.5">
                       {nextVisit ? (
-                        <span className={overdueRow ? 'text-red-600 font-semibold' : 'text-gray-700'}>
+                        <span className={overdueRow ? 'text-accent font-semibold' : 'text-ink-soft'}>
                           {new Date(nextVisit.scheduled_date).toLocaleDateString('fr-FR')}
                         </span>
                       ) : (
-                        <span className="text-gray-300">—</span>
+                        <span className="text-line">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5 text-gray-500">
+                    <td className="px-5 py-3.5 text-ink-muted">
                       {lastDone
                         ? new Date(lastDone.scheduled_date).toLocaleDateString('fr-FR')
-                        : <span className="text-gray-300">—</span>
+                        : <span className="text-line">—</span>
                       }
                     </td>
-                    <td className="px-4 py-3.5">
-                      <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${cfg.class}`}>
-                        {cfg.label}
-                      </span>
+                    <td className="px-5 py-3.5">
+                      <Badge variant={status.variant}>{status.label}</Badge>
                     </td>
-                    <td className="px-4 py-3.5 text-right">
+                    <td className="px-5 py-3.5 text-right">
                       <Link
                         href={href}
-                        className="text-xs font-medium text-gray-500 hover:text-gray-900"
+                        className="text-xs font-medium text-ink-soft hover:text-ink"
                       >
                         Détail →
                       </Link>
@@ -283,7 +282,7 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
               })}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
     </div>
   )
