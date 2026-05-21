@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react'
 import Link from 'next/link'
-import { Loader2, ArrowLeft } from 'lucide-react'
+import { Loader2, ArrowLeft, QrCode, AlertTriangle } from 'lucide-react'
 
 type FormState = { error: string } | null
 type ContractOption = { id: string; label: string }
@@ -10,6 +10,8 @@ type ContractOption = { id: string; label: string }
 type Props = {
   action: (prev: FormState, data: FormData) => Promise<FormState>
   contracts: ContractOption[]
+  preselectedContractId?: string | null
+  machineNotFound?: boolean
 }
 
 const CATEGORY_OPTIONS = [
@@ -25,7 +27,7 @@ const PRIORITY_OPTIONS = [
   { value: 'urgente', label: 'Urgente — machine totalement hors service' },
 ]
 
-export default function NewIncidentForm({ action, contracts }: Props) {
+export default function NewIncidentForm({ action, contracts, preselectedContractId, machineNotFound }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
 
   return (
@@ -38,6 +40,22 @@ export default function NewIncidentForm({ action, contracts }: Props) {
           Signaler un problème
         </h1>
       </div>
+
+      {/* Banner QR — máquina escaneada no pertenece al cliente */}
+      {machineNotFound && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800 mb-5">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <span>La machine scannée ne fait pas partie de votre contrat. Sélectionnez une machine ci-dessous.</span>
+        </div>
+      )}
+
+      {/* Banner QR — máquina preseleccionada correctamente */}
+      {preselectedContractId && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-800 mb-5">
+          <QrCode size={16} className="shrink-0" />
+          <span>Machine identifiée par QR code et pré-sélectionnée.</span>
+        </div>
+      )}
 
       <form action={formAction}>
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
@@ -59,7 +77,7 @@ export default function NewIncidentForm({ action, contracts }: Props) {
               <select
                 name="contract_id"
                 required
-                defaultValue=""
+                defaultValue={preselectedContractId ?? ''}
                 className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white"
               >
                 <option value="" disabled>Sélectionner une machine...</option>
