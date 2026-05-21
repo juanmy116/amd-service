@@ -2,6 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import SearchFilters from '@/components/admin/SearchFilters'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import type { BadgeVariant } from '@/components/ui/Badge'
+import { buttonClasses } from '@/components/ui/Button'
 import {
   sanitizeSearchQuery,
   buildIlikePattern,
@@ -13,18 +17,13 @@ import { parseEnum, CONTRACT_STATUSES } from '@/lib/enums'
 const RESULT_LIMIT = 200
 // Límite holgado para el lookup intermedio de clientes que alimenta el filtro.
 const LOOKUP_LIMIT = 1000
+const TH = 'text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-5 py-2.5'
 
-const STATUT_STYLE = {
-  actif:    'bg-green-50 text-green-700',
-  suspendu: 'bg-amber-50 text-amber-700',
-  terminé:  'bg-gray-100 text-gray-500',
-} as const
-
-const STATUT_LABEL = {
-  actif:    'Actif',
-  suspendu: 'Suspendu',
-  terminé:  'Terminé',
-} as const
+const STATUT: Record<string, { label: string; variant: BadgeVariant }> = {
+  actif:    { label: 'Actif',    variant: 'success' },
+  suspendu: { label: 'Suspendu', variant: 'warning' },
+  terminé:  { label: 'Terminé',  variant: 'neutral' },
+}
 
 function formatDate(d: string | null) {
   if (!d) return '—'
@@ -73,14 +72,8 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
-          Contrats
-        </h1>
-        <Link
-          href="/admin/contracts/new"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
-          style={{ backgroundColor: '#BF0D0D' }}
-        >
+        <h1 className="font-display text-2xl font-semibold text-ink">Contrats</h1>
+        <Link href="/admin/contracts/new" className={buttonClasses('primary')}>
           <Plus size={16} />
           Nouveau contrat
         </Link>
@@ -101,62 +94,62 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
         ]}
       />
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <Card className="overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Nº Contrat</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Client</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Machine</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Début</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Renouvellement</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Statut</th>
-              <th />
+            <tr className="bg-neutral-soft border-b border-line-subtle">
+              <th className={TH}>Nº Contrat</th>
+              <th className={TH}>Client</th>
+              <th className={TH}>Machine</th>
+              <th className={TH}>Début</th>
+              <th className={TH}>Renouvellement</th>
+              <th className={TH}>Statut</th>
+              <th className="px-5 py-2.5" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-line-subtle">
             {(!contracts || contracts.length === 0) && (
               <tr>
-                <td colSpan={7} className="px-5 py-10 text-center text-gray-400">
+                <td colSpan={7} className="px-5 py-10 text-center text-ink-muted">
                   {hasFilters ? 'Aucun contrat ne correspond aux filtres' : 'Aucun contrat enregistré'}
                 </td>
               </tr>
             )}
             {contracts?.map((c) => {
-              const statut = c.statut as keyof typeof STATUT_STYLE
               const client  = c.clients  as unknown as { nom_client: string } | null
               const machine = c.machines as unknown as { marque: string; modele: string } | null
+              const statut = STATUT[c.statut]
               const href = `/admin/contracts/${c.id}`
               return (
-                <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={c.id} className="hover:bg-neutral-soft transition-colors">
                   <td className="px-5 py-4 font-mono text-xs">
-                    <Link href={href} className="text-gray-600 hover:text-[#BF0D0D] hover:underline transition-colors">
+                    <Link href={href} className="text-ink-soft hover:text-accent transition-colors">
                       {c.numero_contrat}
                     </Link>
                   </td>
                   <td className="px-5 py-4 font-medium">
                     {client ? (
-                      <Link href={href} className="text-gray-900 hover:text-[#BF0D0D] hover:underline transition-colors">
+                      <Link href={href} className="text-ink hover:text-accent transition-colors">
                         {client.nom_client}
                       </Link>
                     ) : (
-                      <span className="text-gray-400">—</span>
+                      <span className="text-ink-muted">—</span>
                     )}
                   </td>
-                  <td className="px-5 py-4 text-gray-600">
+                  <td className="px-5 py-4 text-ink-soft">
                     {machine ? `${machine.marque} ${machine.modele}` : '—'}
                   </td>
-                  <td className="px-5 py-4 text-gray-600">{formatDate(c.date_debut)}</td>
-                  <td className="px-5 py-4 text-gray-600">{formatDate(c.date_renouvellement)}</td>
+                  <td className="px-5 py-4 text-ink-soft">{formatDate(c.date_debut)}</td>
+                  <td className="px-5 py-4 text-ink-soft">{formatDate(c.date_renouvellement)}</td>
                   <td className="px-5 py-4">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUT_STYLE[statut] ?? 'bg-gray-100 text-gray-500'}`}>
-                      {STATUT_LABEL[statut] ?? statut}
-                    </span>
+                    {statut
+                      ? <Badge variant={statut.variant}>{statut.label}</Badge>
+                      : <span className="text-xs text-ink-muted">{c.statut}</span>}
                   </td>
                   <td className="px-5 py-4 text-right">
                     <Link
                       href={href}
-                      className="text-sm font-medium text-gray-600 hover:text-gray-900 underline underline-offset-2"
+                      className="text-sm font-medium text-ink-soft hover:text-ink"
                     >
                       Modifier
                     </Link>
@@ -166,7 +159,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
             })}
           </tbody>
         </table>
-      </div>
+      </Card>
     </div>
   )
 }
