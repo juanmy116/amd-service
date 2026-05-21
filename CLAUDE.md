@@ -13,7 +13,7 @@ Aplicación web para la gestión de incidencias (SAV) de AMD Service, empresa de
 
 ## Estado actual del desarrollo
 
-La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). 15 PRs mergeados.
+La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). 17 PRs mergeados.
 
 ### ✅ Completado
 - Sitio web público AMD + página `/location` (SEO Dakar)
@@ -21,6 +21,7 @@ La app SAV está **completa y en producción** (`https://amd-service.vercel.app`
 - Portal cliente (`/portal`) y PWA técnico (`/tech`) con escáner QR
 - Auth por rol, RLS, rate limiting, integraciones (Resend/CSAT, Princity API, Matrix)
 - Búsqueda + filtros admin · `numero_incident` (SAV-YYYY-NNNN)
+- **Dashboard Atelier** (`/atelier`): kiosko de taller para TV 32" — cuenta «Atelier» (rol técnico + flag `is_dispatcher`) que asigna incidencias y mantenimientos a los técnicos
 
 ### 🔄 En curso — Rediseño UI "Híbrido"
 Refresco visual de la app interna (presentación pura, sin cambios de lógica ni rutas).
