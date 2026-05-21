@@ -13,27 +13,26 @@ Aplicación web para la gestión de incidencias (SAV) de AMD Service, empresa de
 
 ## Estado actual del desarrollo
 
+La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). 15 PRs mergeados.
+
 ### ✅ Completado
-- Schema de base de datos en Supabase (12 tablas, RLS activado)
-- Arquitectura y decisiones técnicas documentadas
-- Sitio web público AMD (páginas: home, services, cases, faq, contact, why)
+- Sitio web público AMD + página `/location` (SEO Dakar)
+- Back-office admin (`/admin`): clientes, máquinas, contratos, incidencias (Kanban), compteurs, maintenance, calendrier, équipe, Princity
+- Portal cliente (`/portal`) y PWA técnico (`/tech`) con escáner QR
+- Auth por rol, RLS, rate limiting, integraciones (Resend/CSAT, Princity API, Matrix)
+- Búsqueda + filtros admin · `numero_incident` (SAV-YYYY-NNNN)
 
-### 🔄 En curso — Fase 1: SAV
-- [ ] Paso 1: Instalar Supabase + configurar cliente (browser + server)
-- [ ] Paso 2: Auth (email/password + Google OAuth, redirección por rol)
-- [ ] Paso 3: Back-office AMD (clientes, máquinas, contratos, incidencias)
-- [ ] Paso 4: Portal cliente
-- [ ] Paso 5: PWA técnico + escáner QR
-- [ ] Paso 6: Integraciones (Mailjet CSAT, agente Princity, Matrix)
-
-### ⏳ Pendiente — Fase 2 y 3
-Ver roadmap completo en `../docs/architecture.md`
+### 🔄 En curso — Rediseño UI "Híbrido"
+Refresco visual de la app interna (presentación pura, sin cambios de lógica ni rutas).
+- Fase 0 (sistema de diseño) ✅ · `/admin` bloques 1a (chrome) ✅, 1b (Dashboard) ✅, 1c (Listados) ✅
+- Pendiente: `/admin` 1d (detalles/formularios), 1e (secundarias) · `/portal` · `/tech`
+- Specs y planes en `docs/superpowers/`. Detalle en `docs/architecture.md`.
 
 ---
 
 ## Entorno de desarrollo
 
-**Estamos en LOCAL.** Al terminar, la app se desplegará en un VPS (Hostinger) con Docker + Traefik.
+**Producción:** la app está desplegada en **Vercel** (`https://amd-service.vercel.app`), con Supabase cloud para BD y Edge Functions. El desarrollo se hace en local con `npm run dev`.
 
 ### Variables de entorno
 Crear archivo `.env.local` en la raíz del proyecto `web-amd` con:
@@ -47,9 +46,9 @@ SUPABASE_SECRET_KEY=<sb_secret_... — usada por createAdminClient y como Bearer
 > Las claves se encuentran en el panel de Supabase → proyecto AMD → Settings → API.
 > El archivo `.env.local` nunca se sube a git (está en .gitignore por defecto en Next.js).
 
-### Para el VPS (producción)
-Las mismas variables van en `docker-compose.yml` como variables de entorno del contenedor.
-Google OAuth necesitará la URL de producción añadida en el panel de Google Cloud Console.
+### Para producción (Vercel)
+Las mismas variables se configuran en Vercel → Settings → Environment Variables (entorno *Production*).
+Google OAuth necesita la URL de producción añadida en el panel de Google Cloud Console.
 
 ---
 

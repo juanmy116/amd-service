@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-19 (sesión 14 — Búsqueda + filtros admin · numero_incident SAV-YYYY-NNNN)
+> Última actualización: 2026-05-21 (sesión 16 — Rediseño UI «Híbrido»: Fase 0 + bloques 1a/1b/1c de /admin)
 
 ---
 
@@ -778,6 +778,25 @@ Patrón compartido aplicado a 6 páginas admin para búsqueda + filtros vía `se
 
 ---
 
+## Sistema de Diseño (Rediseño UI «Híbrido»)
+
+Rediseño visual de la app interna iniciado en sesión 15 — **presentación pura**, sin cambios de lógica, Server Actions ni rutas. Estilo "Híbrido": navegación oscura + contenido claro. Multi-fase; ver specs/planes en `docs/superpowers/`.
+
+**Tokens de diseño** — bloque `@theme` de Tailwind v4 en `src/app/globals.css`:
+- Chrome (navegación oscura): `chrome`, `chrome-line`, `chrome-fg`, `chrome-fg-strong`, `chrome-hover`
+- Superficies: `page`, `card`, `line`, `line-subtle`
+- Texto: `ink`, `ink-soft`, `ink-muted`
+- Acento de marca: `accent` (`#BF0D0D`), `accent-dark`, `accent-soft`
+- Estados: `success`/`success-soft`, `warning`/`warning-soft`, `info`/`info-soft`, `violet`/`violet-soft`, `neutral-soft`
+- Radios/sombras/tipografía: `radius-card`, `shadow-card`, `shadow-raised`, `font-display` (Poppins), `font-sans` (Inter)
+
+**Componentes UI compartidos** — `src/components/ui/` (sin barrel, imports directos):
+`Card`, `PanelHeader`, `Badge` (variantes solid/danger/success/warning/info/violet/neutral), `Button` (+ `buttonClasses`), `Avatar`, `KpiCard`.
+
+**Progreso:** Fase 0 (sistema de diseño) ✅ · `/admin` bloques 1a (chrome) ✅, 1b (Dashboard) ✅, 1c (Listados) ✅. Pendiente: `/admin` 1d (detalles/formularios) y 1e (secundarias), luego `/portal` y `/tech`.
+
+---
+
 ## Seguridad
 
 - **RLS activado** en todas las tablas
@@ -972,3 +991,13 @@ Patrón compartido aplicado a 6 páginas admin para búsqueda + filtros vía `se
 - [ ] Exportación de contadores a PDF/Excel para facturación
 - [ ] Agente IA para asignación automática de técnicos
 - [ ] Cuentas de técnicos: invitar los 4 técnicos al room Matrix `#maintenance`
+
+### Fase 4 — Rediseño UI «Híbrido» (en curso, sesiones 15–16)
+- [x] Fase 0 — sistema de diseño: tokens `@theme` + 6 componentes UI compartidos (PR #12)
+- [x] `/admin` bloque 1a — chrome: layout + sidebar oscura + loading skeleton (PR #13)
+- [x] `/admin` bloque 1b — Dashboard: KPIs, paneles y gráficas (PR #14)
+- [x] `/admin` bloque 1c — Listados: 6 páginas + SearchFilters/ViewToggle/IncidentsListView + Kanban (PR #15)
+- [ ] `/admin` bloque 1d — detalles (`[id]`) y formularios (`*Form`, `new`)
+- [ ] `/admin` bloque 1e — secundarias (calendrier, team, princity, detalle compteurs, QR)
+- [ ] Fase 2 — `/portal` + `/login` + `/csat`
+- [ ] Fase 3 — `/tech` (PWA técnico)
