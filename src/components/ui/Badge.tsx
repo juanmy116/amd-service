@@ -5,6 +5,7 @@ const VARIANTS = {
   danger:  'bg-accent-soft text-accent',
   success: 'bg-success-soft text-success',
   warning: 'bg-warning-soft text-warning',
+  info:    'bg-info-soft text-info',
   neutral: 'bg-neutral-soft text-ink-soft',
 } as const
 

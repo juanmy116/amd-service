@@ -5,8 +5,8 @@ import { PanelHeader } from '@/components/ui/PanelHeader'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
 
-const STATUS_BADGE: Record<string, { label: string; variant: BadgeVariant; className?: string }> = {
-  nouveau:  { label: 'Nouveau',  variant: 'neutral', className: 'bg-blue-50 text-blue-700' },
+const STATUS_BADGE: Record<string, { label: string; variant: BadgeVariant }> = {
+  nouveau:  { label: 'Nouveau',  variant: 'info' },
   assigné:  { label: 'Assigné',  variant: 'warning' },
   en_cours: { label: 'En cours', variant: 'neutral' },
 }
@@ -85,7 +85,7 @@ export default async function DashboardRecentIncidents() {
                   <td className="px-4 py-3 text-ink-soft">{inc.clients?.nom_client ?? '—'}</td>
                   <td className="px-4 py-3">
                     {badge ? (
-                      <Badge variant={badge.variant} className={badge.className ?? ''}>
+                      <Badge variant={badge.variant}>
                         {badge.label}
                       </Badge>
                     ) : (
