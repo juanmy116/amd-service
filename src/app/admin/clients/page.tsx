@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Users, Plus, CheckCircle, XCircle } from 'lucide-react'
+import { Users, Plus } from 'lucide-react'
 import SearchFilters from '@/components/admin/SearchFilters'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import { buttonClasses } from '@/components/ui/Button'
 import {
   sanitizeSearchQuery,
   buildSafeOr,
@@ -11,6 +14,7 @@ import {
 
 const SEARCH_COLUMNS = ['nom_client', 'ninea', 'ville'] as const
 const RESULT_LIMIT = 200
+const TH = 'text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-6 py-2.5'
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 
@@ -40,19 +44,13 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
-            Clients
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="font-display text-2xl font-semibold text-ink">Clients</h1>
+          <p className="text-sm text-ink-muted mt-1">
             {count} client{count !== 1 ? 's' : ''}
             {hasFilters ? ' trouvé' + (count !== 1 ? 's' : '') : ' enregistré' + (count !== 1 ? 's' : '')}
           </p>
         </div>
-        <Link
-          href="/admin/clients/new"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
-          style={{ backgroundColor: '#BF0D0D' }}
-        >
+        <Link href="/admin/clients/new" className={buttonClasses('primary')}>
           <Plus size={16} />
           Nouveau client
         </Link>
@@ -73,21 +71,17 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
       />
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200">
+      <Card className="overflow-hidden">
         {!clients || clients.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <Users size={36} className="text-gray-300 mb-3" />
-            <p className="text-sm font-medium text-gray-500">
+            <Users size={36} className="text-ink-muted mb-3" />
+            <p className="text-sm font-medium text-ink-soft">
               {hasFilters ? 'Aucun client ne correspond aux filtres' : 'Aucun client enregistré'}
             </p>
             {!hasFilters && (
               <>
-                <p className="text-xs text-gray-400 mt-1 mb-5">Commencez par ajouter votre premier client</p>
-                <Link
-                  href="/admin/clients/new"
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
-                  style={{ backgroundColor: '#BF0D0D' }}
-                >
+                <p className="text-xs text-ink-muted mt-1 mb-5">Commencez par ajouter votre premier client</p>
+                <Link href="/admin/clients/new" className={buttonClasses('primary')}>
                   <Plus size={15} />
                   Ajouter un client
                 </Link>
@@ -97,45 +91,36 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Nom du client</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">NINEA</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Ville</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3">Statut</th>
-                <th className="text-left text-xs font-medium text-gray-400 px-6 py-3"></th>
+              <tr className="bg-neutral-soft border-b border-line-subtle">
+                <th className={TH}>Nom du client</th>
+                <th className={TH}>NINEA</th>
+                <th className={TH}>Ville</th>
+                <th className={TH}>Statut</th>
+                <th className="px-6 py-2.5" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-line-subtle">
               {clients.map((client) => (
-                <tr key={client.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={client.id} className="hover:bg-neutral-soft transition-colors">
                   <td className="px-6 py-4 text-sm font-medium">
                     <Link
                       href={`/admin/clients/${client.id}`}
-                      className="text-gray-900 hover:text-[#BF0D0D] hover:underline transition-colors"
+                      className="text-ink hover:text-accent transition-colors"
                     >
                       {client.nom_client}
                     </Link>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 font-mono">{client.ninea ?? '—'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{client.ville ?? '—'}</td>
+                  <td className="px-6 py-4 text-sm text-ink-muted font-mono">{client.ninea ?? '—'}</td>
+                  <td className="px-6 py-4 text-sm text-ink-soft">{client.ville ?? '—'}</td>
                   <td className="px-6 py-4">
-                    {client.active ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 px-2.5 py-0.5 rounded-full">
-                        <CheckCircle size={11} />
-                        Actif
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full">
-                        <XCircle size={11} />
-                        Inactif
-                      </span>
-                    )}
+                    <Badge variant={client.active ? 'success' : 'neutral'}>
+                      {client.active ? 'Actif' : 'Inactif'}
+                    </Badge>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <Link
                       href={`/admin/clients/${client.id}`}
-                      className="text-sm font-medium hover:underline"
-                      style={{ color: '#BF0D0D' }}
+                      className="text-sm font-medium text-accent hover:underline"
                     >
                       Modifier
                     </Link>
@@ -145,7 +130,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
             </tbody>
           </table>
         )}
-      </div>
+      </Card>
     </div>
   )
 }
