@@ -2,6 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Plus, QrCode } from 'lucide-react'
 import SearchFilters from '@/components/admin/SearchFilters'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import { buttonClasses } from '@/components/ui/Button'
 import {
   sanitizeSearchQuery,
   buildSafeOr,
@@ -12,6 +15,7 @@ import { parseEnum, MACHINE_TYPES } from '@/lib/enums'
 
 const SEARCH_COLUMNS = ['numero_serie', 'marque', 'modele'] as const
 const RESULT_LIMIT = 200
+const TH = 'text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-5 py-2.5'
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 
@@ -39,14 +43,8 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
-          Machines
-        </h1>
-        <Link
-          href="/admin/machines/new"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
-          style={{ backgroundColor: '#BF0D0D' }}
-        >
+        <h1 className="font-display text-2xl font-semibold text-ink">Machines</h1>
+        <Link href="/admin/machines/new" className={buttonClasses('primary')}>
           <Plus size={16} />
           Nouvelle machine
         </Link>
@@ -74,22 +72,22 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
         ]}
       />
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <Card className="overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Nº Série</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Marque / Modèle</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Type</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Localisation</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Statut</th>
-              <th />
+            <tr className="bg-neutral-soft border-b border-line-subtle">
+              <th className={TH}>Nº Série</th>
+              <th className={TH}>Marque / Modèle</th>
+              <th className={TH}>Type</th>
+              <th className={TH}>Localisation</th>
+              <th className={TH}>Statut</th>
+              <th className="px-5 py-2.5" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-line-subtle">
             {(!machines || machines.length === 0) && (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-gray-400">
+                <td colSpan={6} className="px-5 py-10 text-center text-ink-muted">
                   {hasFilters ? 'Aucune machine ne correspond aux filtres' : 'Aucune machine enregistrée'}
                 </td>
               </tr>
@@ -97,36 +95,29 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
             {machines?.map((m) => {
               const href = `/admin/machines/${encodeURIComponent(m.numero_serie)}`
               return (
-                <tr key={m.numero_serie} className="hover:bg-gray-50 transition-colors">
+                <tr key={m.numero_serie} className="hover:bg-neutral-soft transition-colors">
                   <td className="px-5 py-4 font-mono text-xs">
-                    <Link href={href} className="text-gray-600 hover:text-[#BF0D0D] hover:underline transition-colors">
+                    <Link href={href} className="text-ink-soft hover:text-accent transition-colors">
                       {m.numero_serie}
                     </Link>
                   </td>
                   <td className="px-5 py-4">
-                    <Link href={href} className="group inline-flex items-center hover:underline">
-                      <span className="font-medium text-gray-900 group-hover:text-[#BF0D0D] transition-colors">{m.marque}</span>
-                      <span className="text-gray-300 mx-1.5">·</span>
-                      <span className="text-gray-600 group-hover:text-[#BF0D0D] transition-colors">{m.modele}</span>
+                    <Link href={href} className="group inline-flex items-center">
+                      <span className="font-medium text-ink group-hover:text-accent transition-colors">{m.marque}</span>
+                      <span className="text-line mx-1.5">·</span>
+                      <span className="text-ink-soft group-hover:text-accent transition-colors">{m.modele}</span>
                     </Link>
                   </td>
                   <td className="px-5 py-4">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                      m.type === 'color'
-                        ? 'bg-purple-50 text-purple-700'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}>
+                    <Badge variant={m.type === 'color' ? 'violet' : 'neutral'}>
                       {m.type === 'color' ? 'Couleur' : 'N&B'}
-                    </span>
+                    </Badge>
                   </td>
-                  <td className="px-5 py-4 text-gray-600">{m.localisation || '—'}</td>
+                  <td className="px-5 py-4 text-ink-soft">{m.localisation || '—'}</td>
                   <td className="px-5 py-4">
-                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                      m.active ? 'text-green-700' : 'text-gray-400'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${m.active ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    <Badge variant={m.active ? 'success' : 'neutral'}>
                       {m.active ? 'Active' : 'Inactive'}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="px-5 py-4 text-right">
                     <div className="flex items-center justify-end gap-3">
@@ -134,13 +125,13 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
                         href={`${href}/qr`}
                         target="_blank"
                         title="Télécharger QR code"
-                        className="flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-400 transition-colors"
+                        className="flex items-center justify-center w-8 h-8 rounded-lg border border-line text-ink-soft hover:text-ink hover:border-ink-muted transition-colors"
                       >
                         <QrCode size={15} />
                       </Link>
                       <Link
                         href={href}
-                        className="text-sm font-medium text-gray-600 hover:text-gray-900 underline underline-offset-2"
+                        className="text-sm font-medium text-ink-soft hover:text-ink"
                       >
                         Modifier
                       </Link>
@@ -151,7 +142,7 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
             })}
           </tbody>
         </table>
-      </div>
+      </Card>
     </div>
   )
 }
