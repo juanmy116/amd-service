@@ -18,28 +18,28 @@ export default async function PortalLayout({ children }: { children: React.React
   if (profile?.role !== 'client') redirect('/dashboard')
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-page">
       {/* Top nav */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <header className="bg-chrome border-b border-chrome-line sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
 
           {/* Logo */}
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#BF0D0D' }}>
-              <span className="text-white font-bold text-xs" style={{ fontFamily: 'Poppins, sans-serif' }}>A</span>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-accent">
+              <span className="text-white font-bold text-xs font-display">A</span>
             </div>
-            <span className="text-sm font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+            <span className="text-sm font-semibold text-chrome-fg-strong font-display">
               AMD Service
             </span>
           </div>
 
           {/* Nav links */}
           <nav className="flex items-center gap-1">
-            <Link href="/portal" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors">
+            <Link href="/portal" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-chrome-fg hover:bg-chrome-hover transition-colors">
               <LayoutDashboard size={15} />
               Tableau de bord
             </Link>
-            <Link href="/portal/incidents" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors">
+            <Link href="/portal/incidents" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-chrome-fg hover:bg-chrome-hover transition-colors">
               <AlertCircle size={15} />
               Mes incidents
             </Link>
@@ -49,14 +49,13 @@ export default async function PortalLayout({ children }: { children: React.React
           <div className="flex items-center gap-2">
             <Link
               href="/portal/incidents/new"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#BF0D0D' }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-accent transition-opacity hover:opacity-90"
             >
               <Printer size={14} />
               Signaler un problème
             </Link>
             <form action={signOut}>
-              <button type="submit" className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+              <button type="submit" className="flex items-center justify-center w-8 h-8 rounded-lg text-chrome-fg hover:bg-chrome-hover transition-colors">
                 <LogOut size={15} />
               </button>
             </form>
