@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-21 (sesión 17 — pasarela QR cliente + eliminación Matrix)
+> Última actualización: 2026-05-22 (sesión 18 — formulario público QR + 3 fixes de seguridad)
 
 ---
 
@@ -11,7 +11,7 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 
 **Producción:** `https://amd-service.vercel.app`
 **Repositorio:** `https://github.com/juanmy116/amd-service` (privado)
-**Versión actual:** `v1.6`
+**Versión actual:** `v1.7`
 
 ---
 
@@ -127,9 +127,27 @@ _(Scanner eliminado del nav; accesible vía FAB persistente)_
 Punto de entrada universal para los QR físicos de máquinas. Server Component que detecta el rol del usuario y redirige:
 - **Técnico / admin** → `/tech/scan/[serie]`
 - **Cliente** → `/portal/incidents/new?machine=[serie]` (máquina preseleccionada si pertenece al contrato)
-- **Sin sesión** → `/login?redirectTo=/m/[serie]`
+- **Sin sesión** → `/signaler/[serie]` (formulario público — PR #19)
 
 El QR imprimible (`/admin/machines/[serie]/qr`) apunta a esta ruta desde PR #18. Los QR anteriores apuntaban directamente a `/tech/scan/` y siguen funcionando para técnicos.
+
+### 6b. Formulario Público de Incidentes (`/signaler/[serie]`) ✅ — PR #19 (2026-05-22)
+Ruta pública **sin autenticación** para que cualquier persona abra un incidente escaneando el QR de una máquina.
+
+**Flujo:**
+1. Usuario escanea el QR → `/m/[serie]` → sin sesión → `/signaler/[serie]`
+2. Server Component carga la máquina vía `createAdminClient()` → `notFound()` si no existe
+3. Formulario (Client Component): banner máquina + Nom * + Téléphone * + Email (optionnel) + Description * (máx. 500 chars con contador)
+4. Server Action `submitPublicIncident`:
+   - Sanitización: strip HTML, control chars, allowlist teléfono `[0-9 +\-().]`, límite server-side en todos los campos
+   - Rate limit: `${ip}:${serie}` — 2/hora y 5/día (Upstash Redis, limiters `public_incident_hourly` / `public_incident_daily`)
+   - Si superado → estado `rateLimited` con mensaje "Il y a déjà un incident en attente…"
+   - Lookup `machines` (verifica existencia) + lookup `contracts` activo (obtiene `contract_id` si existe)
+   - INSERT en `incidents` con `opened_by=null`, `source='public'`, campos de contacto
+   - Email de notificación a `savamdservice@gmail.com` (template `raw` via Resend, contenido HTML escapado)
+5. Estado de éxito: mensaje de agradecimiento + número de referencia `SAV-YYYY-NNNN`
+
+**Seguridad:** datos del reporter anónimo (`contact_name/phone/email`) son visibles solo en el detalle de admin. El portal del cliente los excluye con filtro `.or('source.is.null,source.neq.public')` en listado y detalle. La página tech detail usa query condicional para evitar crash con `contract_id=null`.
 
 ### 7. Sistema CSAT ✅
 - Al resolver un ticket, se envía email al cliente vía Resend
@@ -270,6 +288,18 @@ pg_cron `princity-alerts-hourly` (cada hora)
 Cliente logueado → selecciona máquina → abre incidencia
   → incidents (status: nouveau)
   → (mismo flujo desde asignación)
+```
+
+### Creada vía QR público (sin autenticación) — PR #19
+```
+Cualquier persona escanea el QR de la máquina
+  → /m/[serie] → sin sesión → /signaler/[serie]
+  → Rellena formulario (nombre, teléfono, email opcional, descripción 500 chars)
+  → submitPublicIncident: sanitiza + rate limit (2/h · 5/día por IP:serie)
+  → Si rate limit superado → mensaje "Il y a déjà un incident en attente…"
+  → INSERT incidents (source='public', opened_by=null, contract_id según contrato activo)
+  → Email notificación a savamdservice@gmail.com
+  → Muestra número de referencia SAV-YYYY-NNNN
 ```
 
 ---
@@ -483,9 +513,9 @@ Núcleo del sistema SAV.
 |---|---|---|
 | `id` | UUID PK | |
 | `numero_incident` | text UNIQUE NOT NULL | Identificador humano `SAV-YYYY-NNNN`, asignado por trigger BEFORE INSERT |
-| `contract_id` | UUID | FK → contracts |
+| `contract_id` | UUID | FK → contracts, **nullable** (null en incidentes públicos sin contrato activo) |
 | `machine_id` | text | FK → machines.numero_serie |
-| `opened_by` | UUID | FK → profiles, nullable |
+| `opened_by` | UUID | FK → profiles, nullable (null en incidentes públicos) |
 | `assigned_to` | UUID | FK → profiles (técnico), nullable |
 | `title` | text | |
 | `description` | text | nullable |
@@ -494,12 +524,18 @@ Núcleo del sistema SAV.
 | `status` | enum | nouveau / assigné / en_cours / résolu / fermé |
 | `rapport_intervention` | text | informe del técnico, nullable |
 | `autres_pieces` | text | piezas libres, nullable |
+| `contact_name` | text | nullable — nombre del reporter (incidentes públicos vía QR) |
+| `contact_phone` | text | nullable — teléfono del reporter |
+| `contact_email` | text | nullable — email del reporter (opcional en el formulario) |
+| `source` | text | nullable — `'public'` para incidentes del formulario QR; null para el resto |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | trigger automático |
 | `resolved_at` | timestamptz | nullable |
 | `closed_at` | timestamptz | nullable |
 
 > **`numero_incident` (SAV-YYYY-NNNN):** contador secuencial por año, reseteado el 1 de enero. Generado por `public.next_incident_number()` (upsert atómico sobre `incident_counters`). Asignado por el trigger `trg_set_incident_numero` BEFORE INSERT. Visible en Kanban, vista lista admin, detalle admin, PWA técnico (lista + detalle) y portal cliente (lista + detalle).
+
+> **Incidentes públicos (`source='public'`):** creados por `submitPublicIncident` sin autenticación, con `opened_by=null` y `contract_id` nullable. El detalle admin muestra una sección "Contact" con badge "Public". El portal cliente los excluye con `.or('source.is.null,source.neq.public')`. La página tech/incidents/[id] usa query condicional para no crashear con `contract_id=null`.
 
 ---
 
@@ -804,7 +840,7 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - **Recursión infinita resuelta** mediante 6 funciones `SECURITY DEFINER`: `auth_tech_incident_ids`, `auth_tech_incident_contract_ids`, `auth_tech_incident_machine_ids`, `auth_tech_assigned_client_ids`, `auth_client_contract_ids`, `auth_client_machine_ids`
 - **`service_role`** solo en servidor (Edge Functions, Server Actions) — nunca expuesto al cliente
 - **`machine_counters`** accesible únicamente por admins — datos de facturación
-- **Rate limiting** con Upstash Redis (sliding window) en endpoints públicos: login (5/15m por IP+email), signup (3/h por IP), verify contrato (10/h por IP+user), CSAT (5/h por IP+token), contact API (3/h por IP). Helper centralizado en `src/lib/rate-limit.ts`. Fail-open con `console.error` si faltan credenciales en producción
+- **Rate limiting** con Upstash Redis (sliding window) en endpoints públicos: login (5/15m por IP+email), signup (3/h por IP), verify contrato (10/h por IP+user), CSAT (5/h por IP+token), contact API (3/h por IP), **formulario público QR (2/h · 5/24h por `IP:serie`)**. Helper centralizado en `src/lib/rate-limit.ts`. Fail-open con `console.error` si faltan credenciales en producción
 
 ### Auditoría de seguridad — Princity (2026-05-13, sesión 5)
 
@@ -1000,7 +1036,19 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - [x] Nueva ruta `/m/[serie]` — pasarela universal para QR de máquinas:
   - Técnico / admin → `/tech/scan/[serie]` (flujo existente intacto)
   - Cliente → `/portal/incidents/new?machine=[serie]`
-  - Sin sesión → `/login?redirectTo=/m/[serie]`
+  - Sin sesión → `/signaler/[serie]` (actualizado en PR #19)
 - [x] QR de etiqueta imprimible actualizado: apunta a `/m/[serie]` en vez de `/tech/scan/[serie]`
 - [x] Formulario `/portal/incidents/new` acepta `?machine=`: preselecciona automáticamente la máquina del cliente (banner verde) o avisa si la máquina no pertenece a su contrato (banner naranja)
 - ⚠️ Los QR ya impresos en papel apuntan al flujo antiguo (`/tech/scan/`); funcionan para técnicos pero no usan la pasarela. Regenerar etiquetas para activar el flujo cliente.
+
+### Formulario público de incidentes ✅ COMPLETADO (sesión 18, 2026-05-22) — PR #19 (`693c2be`)
+- [x] Nueva ruta `/signaler/[serie]` — formulario público sin auth, estilo AMD (shell idéntica al CSAT)
+- [x] Sanitización defensiva: strip HTML + control chars en todos los campos; allowlist teléfono; límite 500 chars descripción server-side
+- [x] Rate limiting por `IP:serie`: 2 incidentes/hora y 5/día (Upstash Redis, limiters `public_incident_hourly`/`public_incident_daily`)
+- [x] Migración `20260522120000_public_incident_form.sql`: `contract_id` nullable + columnas `contact_name/phone/email/source` en `incidents`
+- [x] Email de notificación a `savamdservice@gmail.com` al recibir incidente público (template `raw` via Resend, HTML escapado)
+- [x] Detalle admin `/admin/incidents/[id]`: sección "Contact" con badge "Public" cuando `contact_name IS NOT NULL`
+- [x] **3 fixes de seguridad** detectados en code review (5 agentes Sonnet) antes del merge:
+  - `tech/incidents/[id]`: crash PGRST116 con `contract_id=null` → query condicional + `.maybeSingle()`
+  - `portal/incidents` (lista + detalle): incidentes públicos excluidos con `.or('source.is.null,source.neq.public')`
+  - Rate limit: identificador `${ip}:${serie}` en vez de solo `serie`
