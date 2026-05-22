@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Wrench, AlertCircle, AlertTriangle } from 'lucide-react'
+import { Badge } from '@/components/ui/Badge'
+import type { BadgeVariant } from '@/components/ui/Badge'
 
 function fmtDate(dateStr: string): { label: string; isOverdue: boolean } {
   const d = new Date(dateStr + 'T00:00:00')
@@ -17,13 +19,11 @@ function fmtDate(dateStr: string): { label: string; isOverdue: boolean } {
   }
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  nouveau:  'bg-blue-50 text-blue-700',
-  assigné:  'bg-purple-50 text-purple-700',
-  en_cours: 'bg-amber-50 text-amber-700',
+const STATUS_BADGE: Record<string, BadgeVariant> = {
+  nuevo: 'info', assigné: 'violet', en_cours: 'warning',
 }
 const STATUS_LABEL: Record<string, string> = {
-  nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours',
+  nuevo: 'Nuevo', assigné: 'Assigné', en_cours: 'En cours',
 }
 
 export default async function TechPlanningPage() {
@@ -71,10 +71,10 @@ export default async function TechPlanningPage() {
     <div className="p-4 space-y-6 pt-5">
 
       <div>
-        <h1 className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+        <h1 className="text-lg font-semibold text-ink font-display">
           Planning
         </h1>
-        <p className="text-xs text-gray-400 mt-0.5">
+        <p className="text-xs text-ink-muted mt-0.5">
           {now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
       </div>
@@ -83,8 +83,8 @@ export default async function TechPlanningPage() {
       {overdueVisits.length > 0 && (
         <section className="space-y-2">
           <div className="flex items-center gap-2">
-            <AlertTriangle size={14} className="text-red-500" />
-            <p className="text-sm font-semibold text-red-600">En retard ({overdueVisits.length})</p>
+            <AlertTriangle size={14} className="text-accent" />
+            <p className="text-sm font-semibold text-accent">En retard ({overdueVisits.length})</p>
           </div>
           {overdueVisits.map(v => {
             const plan     = v.maintenance_plans as any
@@ -96,23 +96,23 @@ export default async function TechPlanningPage() {
               <Link
                 key={v.id}
                 href={serie ? `/tech/scan/${encodeURIComponent(serie)}` : '/tech'}
-                className="flex items-start gap-3 bg-white rounded-2xl border-2 border-red-200 p-4"
+                className="flex items-start gap-3 bg-card rounded-[var(--radius-card)] border-2 border-accent/30 p-4"
               >
-                <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
-                  <Wrench size={16} className="text-red-500" />
+                <div className="w-9 h-9 rounded-xl bg-accent-soft flex items-center justify-center shrink-0">
+                  <Wrench size={16} className="text-accent" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-gray-900 truncate">
+                  <p className="text-sm font-semibold text-ink truncate">
                     {contract?.clients?.nom_client ?? '—'}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className="text-xs text-ink-soft truncate">
                     {machine?.marque} {machine?.modele}
                   </p>
                   {contract?.lieu_installation && (
-                    <p className="text-xs text-gray-400 truncate mt-0.5">{contract.lieu_installation}</p>
+                    <p className="text-xs text-ink-muted truncate mt-0.5">{contract.lieu_installation}</p>
                   )}
                 </div>
-                <span className="shrink-0 text-xs font-semibold text-red-500 whitespace-nowrap">{label}</span>
+                <span className="shrink-0 text-xs font-semibold text-accent whitespace-nowrap">{label}</span>
               </Link>
             )
           })}
@@ -122,18 +122,18 @@ export default async function TechPlanningPage() {
       {/* ── MAINTENANCES PLANIFIÉES ── */}
       <section className="space-y-2">
         <div className="flex items-center gap-2">
-          <Wrench size={14} className="text-gray-400" />
-          <p className="text-sm font-semibold text-gray-700">
+          <Wrench size={14} className="text-ink-muted" />
+          <p className="text-sm font-semibold text-ink-soft">
             Maintenance — 14 prochains jours
             {plannedVisits.length > 0 && (
-              <span className="ml-2 text-xs font-normal text-gray-400">({plannedVisits.length})</span>
+              <span className="ml-2 text-xs font-normal text-ink-muted">({plannedVisits.length})</span>
             )}
           </p>
         </div>
 
         {plannedVisits.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center">
-            <p className="text-sm text-gray-400">Aucune visite planifiée dans 14 jours</p>
+          <div className="bg-card rounded-[var(--radius-card)] border border-line p-6 text-center">
+            <p className="text-sm text-ink-muted">Aucune visite planifiée dans 14 jours</p>
           </div>
         ) : (
           plannedVisits.map(v => {
@@ -146,23 +146,23 @@ export default async function TechPlanningPage() {
               <Link
                 key={v.id}
                 href={serie ? `/tech/scan/${encodeURIComponent(serie)}` : '/tech'}
-                className="flex items-start gap-3 bg-white rounded-2xl border border-gray-200 p-4"
+                className="flex items-start gap-3 bg-card rounded-[var(--radius-card)] border border-line p-4"
               >
-                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-                  <Wrench size={16} className="text-blue-500" />
+                <div className="w-9 h-9 rounded-xl bg-info-soft flex items-center justify-center shrink-0">
+                  <Wrench size={16} className="text-info" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-gray-900 truncate">
+                  <p className="text-sm font-semibold text-ink truncate">
                     {contract?.clients?.nom_client ?? '—'}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className="text-xs text-ink-soft truncate">
                     {machine?.marque} {machine?.modele}
                   </p>
                   {contract?.lieu_installation && (
-                    <p className="text-xs text-gray-400 truncate mt-0.5">{contract.lieu_installation}</p>
+                    <p className="text-xs text-ink-muted truncate mt-0.5">{contract.lieu_installation}</p>
                   )}
                 </div>
-                <span className={`shrink-0 text-xs font-semibold whitespace-nowrap ${isOverdue ? 'text-red-500' : 'text-blue-500'}`}>
+                <span className={`shrink-0 text-xs font-semibold whitespace-nowrap ${isOverdue ? 'text-accent' : 'text-info'}`}>
                   {label}
                 </span>
               </Link>
@@ -174,39 +174,39 @@ export default async function TechPlanningPage() {
       {/* ── MES INTERVENTIONS ── */}
       <section className="space-y-2">
         <div className="flex items-center gap-2">
-          <AlertCircle size={14} className="text-gray-400" />
-          <p className="text-sm font-semibold text-gray-700">
+          <AlertCircle size={14} className="text-ink-muted" />
+          <p className="text-sm font-semibold text-ink-soft">
             Mes interventions
             {(incidents?.length ?? 0) > 0 && (
-              <span className="ml-2 text-xs font-normal text-gray-400">({incidents!.length})</span>
+              <span className="ml-2 text-xs font-normal text-ink-muted">({incidents!.length})</span>
             )}
           </p>
         </div>
 
         {(!incidents || incidents.length === 0) ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center">
-            <p className="text-sm text-gray-400">Aucune intervention assignée</p>
+          <div className="bg-card rounded-[var(--radius-card)] border border-line p-6 text-center">
+            <p className="text-sm text-ink-muted">Aucune intervention assignée</p>
           </div>
         ) : (
           incidents.map(inc => (
             <Link
               key={inc.id}
               href={`/tech/incidents/${inc.id}`}
-              className="flex items-start gap-3 bg-white rounded-2xl border border-gray-200 p-4"
+              className="flex items-start gap-3 bg-card rounded-[var(--radius-card)] border border-line p-4"
             >
-              <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
-                <AlertCircle size={16} className="text-gray-500" />
+              <div className="w-9 h-9 rounded-xl bg-neutral-soft flex items-center justify-center shrink-0">
+                <AlertCircle size={16} className="text-ink-muted" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-gray-900 truncate">{inc.title}</p>
-                <p className="font-mono text-xs text-gray-400 mt-0.5">{inc.machine_id}</p>
-                <p className="text-xs text-gray-400">
+                <p className="text-sm font-semibold text-ink truncate">{inc.title}</p>
+                <p className="font-mono text-xs text-ink-muted mt-0.5">{inc.machine_id}</p>
+                <p className="text-xs text-ink-muted">
                   {new Date(inc.created_at).toLocaleDateString('fr-FR')}
                 </p>
               </div>
-              <span className={`shrink-0 inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[inc.status] ?? 'bg-gray-100 text-gray-500'}`}>
+              <Badge variant={STATUS_BADGE[inc.status] ?? 'neutral'}>
                 {STATUS_LABEL[inc.status] ?? inc.status}
-              </span>
+              </Badge>
             </Link>
           ))
         )}
