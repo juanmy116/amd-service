@@ -2,10 +2,12 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import type { BadgeVariant } from '@/components/ui/Badge'
 
-const STATUS_STYLE: Record<string, string> = {
-  nouveau: 'bg-blue-50 text-blue-700', assigné: 'bg-purple-50 text-purple-700',
-  en_cours: 'bg-amber-50 text-amber-700', résolu: 'bg-green-50 text-green-700', fermé: 'bg-gray-100 text-gray-500',
+const STATUS_BADGE: Record<string, BadgeVariant> = {
+  nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success', fermé: 'neutral',
 }
 const STATUS_LABEL: Record<string, string> = {
   nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu', fermé: 'Fermé',
@@ -28,7 +30,6 @@ export default async function PortalIncidentDetailPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Obtener client_id del usuario autenticado
   const { data: clientProfile } = await supabase
     .from('client_profiles')
     .select('client_id')
@@ -36,7 +37,6 @@ export default async function PortalIncidentDetailPage({
     .single()
   if (!clientProfile) redirect('/portal/verify')
 
-  // Obtener IDs de contratos del cliente (ownership check)
   const { data: clientContracts } = await supabase
     .from('contracts')
     .select('id')
@@ -74,88 +74,90 @@ export default async function PortalIncidentDetailPage({
 
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/portal/incidents" className="flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors">
-          <ArrowLeft size={16} className="text-gray-600" />
+        <Link href="/portal/incidents" className="flex items-center justify-center w-9 h-9 rounded-lg border border-line bg-card hover:bg-neutral-soft transition-colors">
+          <ArrowLeft size={16} className="text-ink-soft" />
         </Link>
         <div className="flex-1 min-w-0">
-          <p className="font-mono text-[11px] font-semibold tracking-wide" style={{ color: '#BF0D0D' }}>
+          <p className="font-mono text-[11px] font-semibold tracking-wide text-accent">
             {incident.numero_incident}
           </p>
-          <h1 className="text-xl font-semibold text-gray-900 truncate" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <h1 className="text-xl font-semibold text-ink font-display truncate">
             {incident.title}
           </h1>
-          <p className="text-sm text-gray-400 mt-0.5">
+          <p className="text-sm text-ink-muted mt-0.5">
             {machine ? `${machine.marque} ${machine.modele}` : incident.machine_id}
             {contract?.numero_contrat && ` · ${contract.numero_contrat}`}
           </p>
         </div>
-        <span className={`shrink-0 inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${STATUS_STYLE[incident.status] ?? 'bg-gray-100 text-gray-500'}`}>
-          {STATUS_LABEL[incident.status] ?? incident.status}
+        <span className="shrink-0">
+          <Badge variant={STATUS_BADGE[incident.status] ?? 'neutral'}>
+            {STATUS_LABEL[incident.status] ?? incident.status}
+          </Badge>
         </span>
       </div>
 
       {/* Details */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <Card className="p-6 space-y-4">
         {incident.description && (
           <div>
-            <p className="text-xs font-medium text-gray-400 mb-1">Description</p>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{incident.description}</p>
+            <p className="text-xs font-medium text-ink-muted mb-1">Description</p>
+            <p className="text-sm text-ink-soft whitespace-pre-wrap">{incident.description}</p>
           </div>
         )}
-        <div className="grid grid-cols-3 gap-4 pt-2 border-t border-gray-100">
+        <div className="grid grid-cols-3 gap-4 pt-2 border-t border-line-subtle">
           <div>
-            <p className="text-xs font-medium text-gray-400 mb-1">Catégorie</p>
-            <p className="text-sm text-gray-700 capitalize">{incident.category}</p>
+            <p className="text-xs font-medium text-ink-muted mb-1">Catégorie</p>
+            <p className="text-sm text-ink-soft capitalize">{incident.category}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-400 mb-1">Priorité</p>
-            <p className="text-sm text-gray-700 capitalize">{incident.priority}</p>
+            <p className="text-xs font-medium text-ink-muted mb-1">Priorité</p>
+            <p className="text-sm text-ink-soft capitalize">{incident.priority}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-400 mb-1">Ouvert le</p>
-            <p className="text-sm text-gray-700">{new Date(incident.created_at).toLocaleDateString('fr-FR')}</p>
+            <p className="text-xs font-medium text-ink-muted mb-1">Ouvert le</p>
+            <p className="text-sm text-ink-soft">{new Date(incident.created_at).toLocaleDateString('fr-FR')}</p>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Rapport technicien */}
       {incident.rapport_intervention && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <p className="text-xs font-medium text-gray-400 mb-2">Rapport d&apos;intervention</p>
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">{incident.rapport_intervention}</p>
-        </div>
+        <Card className="p-6">
+          <p className="text-xs font-medium text-ink-muted mb-2">Rapport d&apos;intervention</p>
+          <p className="text-sm text-ink-soft whitespace-pre-wrap">{incident.rapport_intervention}</p>
+        </Card>
       )}
 
       {/* Historique */}
       {history && history.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <p className="text-sm font-semibold text-gray-700 mb-5">Suivi de l&apos;incident</p>
+        <Card className="p-6">
+          <p className="text-sm font-semibold text-ink mb-5">Suivi de l&apos;incident</p>
           <div className="space-y-4">
             {history.map((h) => (
               <div key={h.id} className="flex gap-3">
                 <div className="flex flex-col items-center pt-1">
                   <div className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[h.new_status] ?? 'bg-gray-400'}`} />
                 </div>
-                <div className="flex-1 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
+                <div className="flex-1 pb-4 border-b border-line-subtle last:border-0 last:pb-0">
                   <div className="flex flex-wrap items-center gap-x-2">
                     {h.old_status ? (
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-ink-muted">
                         {STATUS_LABEL[h.old_status] ?? h.old_status}
                         {' → '}
-                        <span className="font-medium text-gray-800">{STATUS_LABEL[h.new_status] ?? h.new_status}</span>
+                        <span className="font-medium text-ink">{STATUS_LABEL[h.new_status] ?? h.new_status}</span>
                       </span>
                     ) : (
-                      <span className="text-xs font-medium text-gray-800">{STATUS_LABEL[h.new_status] ?? h.new_status}</span>
+                      <span className="text-xs font-medium text-ink">{STATUS_LABEL[h.new_status] ?? h.new_status}</span>
                     )}
-                    <span className="text-xs text-gray-300">·</span>
-                    <span className="text-xs text-gray-400">{formatDateTime(h.created_at)}</span>
+                    <span className="text-xs text-ink-muted">·</span>
+                    <span className="text-xs text-ink-muted">{formatDateTime(h.created_at)}</span>
                   </div>
-                  {h.comment && <p className="mt-1 text-xs text-gray-500 italic">{h.comment}</p>}
+                  {h.comment && <p className="mt-1 text-xs text-ink-muted italic">{h.comment}</p>}
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   )
