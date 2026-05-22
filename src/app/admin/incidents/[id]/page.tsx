@@ -34,12 +34,14 @@ export default async function EditIncidentPage({
 
   if (!incident) notFound()
 
-  // Context: contract → client + machine
-  const { data: contract } = await supabase
-    .from('contracts')
-    .select('numero_contrat, clients(nom_client), machines(marque, modele)')
-    .eq('id', incident.contract_id)
-    .single()
+  // Context: contract → client + machine (contract_id puede ser null en incidentes públicos)
+  const { data: contract } = incident.contract_id
+    ? await supabase
+        .from('contracts')
+        .select('numero_contrat, clients(nom_client), machines(marque, modele)')
+        .eq('id', incident.contract_id)
+        .maybeSingle()
+    : { data: null }
 
   const clientData  = contract?.clients  as unknown as { nom_client: string }      | null
   const machineData = contract?.machines as unknown as { marque: string; modele: string } | null
@@ -78,6 +80,46 @@ export default async function EditIncidentPage({
         deleteAction={deleteIncidentAction}
         contextInfo={contextInfo}
       />
+
+      {/* Contact public (incidente via QR sin autenticación) */}
+      {incident.contact_name && (
+        <div className="px-8 pb-4 max-w-3xl">
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-sm font-semibold text-gray-700">Contact</h2>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                Public
+              </span>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex gap-2">
+                <span className="text-gray-500 w-24 shrink-0">Nom</span>
+                <span className="text-gray-900 font-medium">{incident.contact_name}</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="text-gray-500 w-24 shrink-0">Téléphone</span>
+                <a
+                  href={`tel:${incident.contact_phone}`}
+                  className="text-gray-900 hover:underline"
+                >
+                  {incident.contact_phone}
+                </a>
+              </div>
+              {incident.contact_email && (
+                <div className="flex gap-2">
+                  <span className="text-gray-500 w-24 shrink-0">Email</span>
+                  <a
+                    href={`mailto:${incident.contact_email}`}
+                    className="text-gray-900 hover:underline"
+                  >
+                    {incident.contact_email}
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Rapport d'intervention */}
       {incident.rapport_intervention && (

@@ -18,11 +18,13 @@ function build(limit: number, window: `${number} ${'s' | 'm' | 'h' | 'd'}`, pref
 }
 
 export const rateLimiters = {
-  login:   build(5,  '15 m', 'login'),
-  signup:  build(3,  '1 h',  'signup'),
-  verify:  build(10, '1 h',  'verify'),
-  csat:    build(5,  '1 h',  'csat'),
-  contact: build(3,  '1 h',  'contact'),
+  login:                  build(5,  '15 m', 'login'),
+  signup:                 build(3,  '1 h',  'signup'),
+  verify:                 build(10, '1 h',  'verify'),
+  csat:                   build(5,  '1 h',  'csat'),
+  contact:                build(3,  '1 h',  'contact'),
+  public_incident_hourly: build(2,  '1 h',  'pub_inc_h'),
+  public_incident_daily:  build(5,  '24 h', 'pub_inc_d'),
 }
 
 export type RateLimiterKey = keyof typeof rateLimiters
