@@ -19,13 +19,13 @@ export default function CsatForm({ token }: { token: string }) {
   if (state?.success) {
     return (
       <div className="text-center py-8">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="w-16 h-16 rounded-full bg-success-soft flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">Merci pour votre avis !</h2>
-        <p className="text-sm text-gray-500">Votre retour nous aide à améliorer notre service.</p>
+        <h2 className="text-lg font-semibold text-ink mb-2">Merci pour votre avis !</h2>
+        <p className="text-sm text-ink-muted">Votre retour nous aide à améliorer notre service.</p>
       </div>
     )
   }
@@ -34,13 +34,13 @@ export default function CsatForm({ token }: { token: string }) {
     <form action={action} className="space-y-6">
       {/* Estrellas */}
       <div>
-        <p className="text-sm font-medium text-gray-700 mb-3 text-center">Votre note globale</p>
+        <p className="text-sm font-medium text-ink-soft mb-3 text-center">Votre note globale</p>
         <div className="flex justify-center gap-2">
           {STARS.map((star) => (
             <label key={star} className="cursor-pointer group">
               <input type="radio" name="rating" value={star} className="sr-only peer" required />
               <svg
-                className="w-10 h-10 text-gray-200 peer-checked:text-amber-400 group-hover:text-amber-300 transition-colors"
+                className="w-10 h-10 text-ink-muted peer-checked:text-amber-400 group-hover:text-amber-300 transition-colors"
                 fill="currentColor"
                 viewBox="0 0 24 24"
               >
@@ -54,26 +54,25 @@ export default function CsatForm({ token }: { token: string }) {
 
       {/* Comentario */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          Commentaire <span className="text-gray-400 font-normal">(facultatif)</span>
+        <label className="block text-sm font-medium text-ink-soft mb-1.5">
+          Commentaire <span className="text-ink-muted font-normal">(facultatif)</span>
         </label>
         <textarea
           name="comment"
           rows={3}
           placeholder="Dites-nous ce que nous pouvons améliorer..."
-          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-200 resize-none"
+          className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent resize-none"
         />
       </div>
 
       {state?.error && (
-        <p className="text-sm text-red-600 text-center">{state.error}</p>
+        <p className="text-sm text-accent text-center">{state.error}</p>
       )}
 
       <button
         type="submit"
         disabled={pending}
-        className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-        style={{ backgroundColor: '#BF0D0D' }}
+        className="w-full py-2.5 rounded-lg text-sm font-semibold text-white bg-accent transition-opacity hover:opacity-90 disabled:opacity-50"
       >
         {pending ? 'Envoi...' : 'Envoyer mon avis'}
       </button>
