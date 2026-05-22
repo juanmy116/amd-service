@@ -2,17 +2,15 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Printer, AlertCircle, CheckCircle, Clock } from 'lucide-react'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import type { BadgeVariant } from '@/components/ui/Badge'
 
-const STATUS_STYLE: Record<string, string> = {
-  nouveau:  'bg-blue-50 text-blue-700',
-  assigné:  'bg-purple-50 text-purple-700',
-  en_cours: 'bg-amber-50 text-amber-700',
-  résolu:   'bg-green-50 text-green-700',
-  fermé:    'bg-gray-100 text-gray-500',
+const STATUS_BADGE: Record<string, BadgeVariant> = {
+  nuevo: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success', fermé: 'neutral',
 }
-
 const STATUS_LABEL: Record<string, string> = {
-  nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu', fermé: 'Fermé',
+  nuevo: 'Nuevo', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu', fermé: 'Fermé',
 }
 
 export default async function PortalPage() {
@@ -20,7 +18,6 @@ export default async function PortalPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Check if verified
   const { data: clientProfile } = await supabase
     .from('client_profiles')
     .select('client_id, clients(nom_client)')
@@ -31,7 +28,6 @@ export default async function PortalPage() {
 
   const clientName = (clientProfile.clients as unknown as { nom_client: string } | null)?.nom_client ?? ''
 
-  // Fetch machines + incidents in parallel
   const [{ data: contracts }, { data: incidents }] = await Promise.all([
     supabase
       .from('contracts')
@@ -51,136 +47,136 @@ export default async function PortalPage() {
       .limit(5),
   ])
 
-  const openCount   = incidents?.filter(i => !['résolu', 'fermé'].includes(i.status)).length ?? 0
-  const resolvedCount = incidents?.filter(i => ['résolu', 'fermé'].includes(i.status)).length ?? 0
+  const openCount     = incidents?.filter(i => !['résolu', 'fermé'].includes(i.status)).length ?? 0
+  const resolvedCount = incidents?.filter(i =>  ['résolu', 'fermé'].includes(i.status)).length ?? 0
 
   return (
     <div className="space-y-8">
 
       {/* Welcome */}
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+        <h1 className="text-2xl font-semibold text-ink font-display">
           Bonjour, {clientName}
         </h1>
-        <p className="text-sm text-gray-500 mt-1">Voici l&apos;état de votre parc d&apos;impression.</p>
+        <p className="text-sm text-ink-muted mt-1">Voici l&apos;état de votre parc d&apos;impression.</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <Card className="p-5">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-              <Printer size={16} className="text-blue-600" />
+            <div className="w-8 h-8 rounded-lg bg-info-soft flex items-center justify-center">
+              <Printer size={16} className="text-info" />
             </div>
-            <span className="text-sm text-gray-500">Machines actives</span>
+            <span className="text-sm text-ink-soft">Machines actives</span>
           </div>
-          <p className="text-3xl font-semibold text-gray-900">{contracts?.length ?? 0}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <p className="text-3xl font-semibold text-ink">{contracts?.length ?? 0}</p>
+        </Card>
+        <Card className="p-5">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
-              <Clock size={16} className="text-amber-600" />
+            <div className="w-8 h-8 rounded-lg bg-warning-soft flex items-center justify-center">
+              <Clock size={16} className="text-warning" />
             </div>
-            <span className="text-sm text-gray-500">Incidents ouverts</span>
+            <span className="text-sm text-ink-soft">Incidents ouverts</span>
           </div>
-          <p className="text-3xl font-semibold text-gray-900">{openCount}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <p className="text-3xl font-semibold text-ink">{openCount}</p>
+        </Card>
+        <Card className="p-5">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
-              <CheckCircle size={16} className="text-green-600" />
+            <div className="w-8 h-8 rounded-lg bg-success-soft flex items-center justify-center">
+              <CheckCircle size={16} className="text-success" />
             </div>
-            <span className="text-sm text-gray-500">Résolus</span>
+            <span className="text-sm text-ink-soft">Résolus</span>
           </div>
-          <p className="text-3xl font-semibold text-gray-900">{resolvedCount}</p>
-        </div>
+          <p className="text-3xl font-semibold text-ink">{resolvedCount}</p>
+        </Card>
       </div>
 
       {/* Machines */}
       <div>
-        <h2 className="text-base font-semibold text-gray-900 mb-3">Mes machines</h2>
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <h2 className="text-base font-semibold text-ink mb-3">Mes machines</h2>
+        <Card className="overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left px-5 py-3.5 font-medium text-gray-500">Machine</th>
-                <th className="text-left px-5 py-3.5 font-medium text-gray-500">Type</th>
-                <th className="text-left px-5 py-3.5 font-medium text-gray-500">Localisation</th>
-                <th className="text-left px-5 py-3.5 font-medium text-gray-500">Contrat</th>
+              <tr className="bg-neutral-soft border-b border-line-subtle">
+                <th className="text-left px-5 py-3.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Machine</th>
+                <th className="text-left px-5 py-3.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Type</th>
+                <th className="text-left px-5 py-3.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Localisation</th>
+                <th className="text-left px-5 py-3.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Contrat</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-line-subtle">
               {(!contracts || contracts.length === 0) && (
-                <tr><td colSpan={4} className="px-5 py-8 text-center text-gray-400">Aucune machine active</td></tr>
+                <tr><td colSpan={4} className="px-5 py-8 text-center text-ink-muted">Aucune machine active</td></tr>
               )}
               {contracts?.map((c) => {
                 const m = c.machines as unknown as { marque: string; modele: string; type: string; localisation: string | null } | null
                 return (
-                  <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-5 py-4 font-medium text-gray-900">{m ? `${m.marque} ${m.modele}` : c.machine_id}</td>
+                  <tr key={c.id} className="hover:bg-neutral-soft transition-colors">
+                    <td className="px-5 py-4 font-medium text-ink">{m ? `${m.marque} ${m.modele}` : c.machine_id}</td>
                     <td className="px-5 py-4">
-                      <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${m?.type === 'color' ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                      <Badge variant={m?.type === 'color' ? 'violet' : 'neutral'}>
                         {m?.type === 'color' ? 'Couleur' : 'N&B'}
-                      </span>
+                      </Badge>
                     </td>
-                    <td className="px-5 py-4 text-gray-500">{m?.localisation ?? c.lieu_installation ?? '—'}</td>
-                    <td className="px-5 py-4 font-mono text-xs text-gray-400">{c.numero_contrat}</td>
+                    <td className="px-5 py-4 text-ink-soft">{m?.localisation ?? c.lieu_installation ?? '—'}</td>
+                    <td className="px-5 py-4 font-mono text-xs text-ink-muted">{c.numero_contrat}</td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
-        </div>
+        </Card>
       </div>
 
       {/* Recent incidents */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-gray-900">Incidents récents</h2>
-          <Link href="/portal/incidents" className="text-sm text-gray-500 hover:text-gray-900 underline underline-offset-2">
+          <h2 className="text-base font-semibold text-ink">Incidents récents</h2>
+          <Link href="/portal/incidents" className="text-sm text-ink-soft hover:text-ink underline underline-offset-2">
             Voir tout
           </Link>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <Card className="overflow-hidden">
           {(!incidents || incidents.length === 0) ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <AlertCircle size={32} className="text-gray-200 mb-3" />
-              <p className="text-sm text-gray-400">Aucun incident signalé</p>
-              <Link href="/portal/incidents/new" className="mt-3 text-sm font-medium underline underline-offset-2" style={{ color: '#BF0D0D' }}>
+              <AlertCircle size={32} className="text-ink-muted mb-3" />
+              <p className="text-sm text-ink-muted">Aucun incident signalé</p>
+              <Link href="/portal/incidents/new" className="mt-3 text-sm font-medium text-accent underline underline-offset-2">
                 Signaler un problème
               </Link>
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left px-5 py-3.5 font-medium text-gray-500">Titre</th>
-                  <th className="text-left px-5 py-3.5 font-medium text-gray-500">Statut</th>
-                  <th className="text-left px-5 py-3.5 font-medium text-gray-500">Date</th>
+                <tr className="bg-neutral-soft border-b border-line-subtle">
+                  <th className="text-left px-5 py-3.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Titre</th>
+                  <th className="text-left px-5 py-3.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Statut</th>
+                  <th className="text-left px-5 py-3.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Date</th>
                   <th />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-line-subtle">
                 {incidents.map((inc) => (
-                  <tr key={inc.id} className="hover:bg-gray-50">
-                    <td className="px-5 py-4 font-medium text-gray-900">{inc.title}</td>
+                  <tr key={inc.id} className="hover:bg-neutral-soft transition-colors">
+                    <td className="px-5 py-4 font-medium text-ink">{inc.title}</td>
                     <td className="px-5 py-4">
-                      <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_STYLE[inc.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                      <Badge variant={STATUS_BADGE[inc.status] ?? 'neutral'}>
                         {STATUS_LABEL[inc.status] ?? inc.status}
-                      </span>
+                      </Badge>
                     </td>
-                    <td className="px-5 py-4 text-gray-400 text-xs">
+                    <td className="px-5 py-4 text-ink-muted text-xs">
                       {new Date(inc.created_at).toLocaleDateString('fr-FR')}
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <Link href={`/portal/incidents/${inc.id}`} className="text-xs text-gray-400 hover:text-gray-700 underline underline-offset-2">Voir</Link>
+                      <Link href={`/portal/incidents/${inc.id}`} className="text-xs text-ink-muted hover:text-ink-soft underline underline-offset-2">Voir</Link>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   )
