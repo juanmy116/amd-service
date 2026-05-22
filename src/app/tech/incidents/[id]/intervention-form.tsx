@@ -3,6 +3,9 @@
 import { useActionState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, MapPin, Building2, FileText } from 'lucide-react'
+import { Badge } from '@/components/ui/Badge'
+import { Card } from '@/components/ui/Card'
+import type { BadgeVariant } from '@/components/ui/Badge'
 
 type FormState = { error: string } | null
 
@@ -20,12 +23,11 @@ const STATUS_OPTIONS = [
   { value: 'résolu',   label: 'Résolu — problème réglé' },
 ]
 
-const STATUS_BADGE: Record<string, string> = {
-  nouveau: 'bg-blue-50 text-blue-700', assigné: 'bg-purple-50 text-purple-700',
-  en_cours: 'bg-amber-50 text-amber-700', résolu: 'bg-green-50 text-green-700',
+const STATUS_BADGE: Record<string, BadgeVariant> = {
+  nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success',
 }
 const STATUS_LABEL: Record<string, string> = {
-  nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu',
+  nuevo: 'Nuevo', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu',
 }
 
 type Props = {
@@ -51,52 +53,54 @@ export default function InterventionForm({
 
       {/* Header */}
       <div className="flex items-center gap-3 pt-2">
-        <Link href="/tech" className="flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 bg-white shrink-0">
-          <ArrowLeft size={16} className="text-gray-600" />
+        <Link href="/tech" className="flex items-center justify-center w-9 h-9 rounded-xl border border-line bg-card shrink-0">
+          <ArrowLeft size={16} className="text-ink-muted" />
         </Link>
         <div className="min-w-0">
-          <p className="font-mono text-[10px] font-semibold tracking-wide" style={{ color: '#BF0D0D' }}>
+          <p className="font-mono text-[10px] font-semibold tracking-wide text-accent">
             {incident.numero_incident}
           </p>
-          <h1 className="text-base font-semibold text-gray-900 truncate" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <h1 className="text-base font-semibold text-ink truncate font-display">
             {incident.title}
           </h1>
-          <span className={`inline-flex mt-0.5 px-2 py-0.5 rounded text-xs font-medium ${STATUS_BADGE[incident.status] ?? 'bg-gray-100 text-gray-500'}`}>
-            {STATUS_LABEL[incident.status] ?? incident.status}
-          </span>
+          <div className="mt-0.5">
+            <Badge variant={STATUS_BADGE[incident.status] ?? 'neutral'}>
+              {STATUS_LABEL[incident.status] ?? incident.status}
+            </Badge>
+          </div>
         </div>
       </div>
 
       {/* Infos machine */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+      <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#BF0D0D' }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-accent">
             <FileText size={14} className="text-white" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-900">{machineName}</p>
-            {contractNumber && <p className="text-xs text-gray-400 font-mono">{contractNumber}</p>}
+            <p className="text-sm font-semibold text-ink">{machineName}</p>
+            {contractNumber && <p className="text-xs text-ink-muted font-mono">{contractNumber}</p>}
           </div>
         </div>
         {clientName && (
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Building2 size={14} className="text-gray-400 shrink-0" />
+          <div className="flex items-center gap-2 text-sm text-ink-soft">
+            <Building2 size={14} className="text-ink-muted shrink-0" />
             {clientName}
           </div>
         )}
         {machineLocation && (
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <MapPin size={14} className="text-gray-400 shrink-0" />
+          <div className="flex items-center gap-2 text-sm text-ink-soft">
+            <MapPin size={14} className="text-ink-muted shrink-0" />
             {machineLocation}
           </div>
         )}
         {incident.description && (
-          <div className="pt-2 border-t border-gray-100">
-            <p className="text-xs font-medium text-gray-400 mb-1">Description du problème</p>
-            <p className="text-sm text-gray-600">{incident.description}</p>
+          <div className="pt-2 border-t border-line-subtle">
+            <p className="text-xs font-medium text-ink-muted mb-1">Description du problème</p>
+            <p className="text-sm text-ink-soft">{incident.description}</p>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Formulaire intervention */}
       <form action={formAction} className="space-y-5">
@@ -109,11 +113,11 @@ export default function InterventionForm({
         )}
 
         {/* Statut */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <p className="text-sm font-semibold text-gray-700 mb-3">Statut de l&apos;intervention</p>
+        <Card className="p-4">
+          <p className="text-sm font-semibold text-ink-soft mb-3">Statut de l&apos;intervention</p>
           <div className="space-y-2">
             {STATUS_OPTIONS.map((o) => (
-              <label key={o.value} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 cursor-pointer">
+              <label key={o.value} className="flex items-center gap-3 p-3 rounded-xl border border-line cursor-pointer">
                 <input
                   type="radio"
                   name="status"
@@ -121,37 +125,37 @@ export default function InterventionForm({
                   defaultChecked={incident.status === o.value || (incident.status === 'assigné' && o.value === 'en_cours')}
                   className="accent-red-600"
                 />
-                <span className="text-sm text-gray-700">{o.label}</span>
+                <span className="text-sm text-ink-soft">{o.label}</span>
               </label>
             ))}
           </div>
-        </div>
+        </Card>
 
         {/* Rapport */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <p className="text-sm font-semibold text-gray-700 mb-3">Rapport d&apos;intervention</p>
+        <Card className="p-4">
+          <p className="text-sm font-semibold text-ink-soft mb-3">Rapport d&apos;intervention</p>
           <textarea
             name="rapport"
             rows={4}
             defaultValue={incident.rapport_intervention ?? ''}
             placeholder="Décrivez les actions effectuées, l'état de la machine, les pièces changées..."
-            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+            className="w-full px-3 py-2.5 rounded-xl border border-line text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
           />
-        </div>
+        </Card>
 
         {/* Pièces remplacées */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <p className="text-sm font-semibold text-gray-700 mb-3">Pièces remplacées</p>
+        <Card className="p-4">
+          <p className="text-sm font-semibold text-ink-soft mb-3">Pièces remplacées</p>
           <div className="grid grid-cols-2 gap-2">
             {PARTS.map((p) => (
-              <label key={p.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-gray-200 cursor-pointer">
+              <label key={p.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-line cursor-pointer">
                 <input
                   type="checkbox"
                   name={`part_${p.id}`}
                   defaultChecked={checkedParts.has(p.id)}
                   className="w-4 h-4 rounded accent-red-600"
                 />
-                <span className="text-sm text-gray-700">{p.name}</span>
+                <span className="text-sm text-ink-soft">{p.name}</span>
               </label>
             ))}
           </div>
@@ -161,28 +165,27 @@ export default function InterventionForm({
               type="text"
               defaultValue={incident.autres_pieces ?? ''}
               placeholder="Autres pièces (libre)"
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              className="w-full px-3 py-2.5 rounded-xl border border-line text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
           </div>
-        </div>
+        </Card>
 
         {/* Commentaire */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <p className="text-sm font-semibold text-gray-700 mb-1">Commentaire</p>
-          <p className="text-xs text-gray-400 mb-3">Ajouté à l&apos;historique si le statut change</p>
+        <Card className="p-4">
+          <p className="text-sm font-semibold text-ink-soft mb-1">Commentaire</p>
+          <p className="text-xs text-ink-muted mb-3">Ajouté à l&apos;historique si le statut change</p>
           <input
             name="comment"
             type="text"
             placeholder="Ex : Pièce commandée, retour prévu demain"
-            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            className="w-full px-3 py-2.5 rounded-xl border border-line text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           />
-        </div>
+        </Card>
 
         <button
           type="submit"
           disabled={pending}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-semibold text-white disabled:opacity-60 transition-opacity"
-          style={{ backgroundColor: '#BF0D0D' }}
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-semibold text-white bg-accent disabled:opacity-60 transition-opacity"
         >
           {pending && <Loader2 size={16} className="animate-spin" />}
           Enregistrer l&apos;intervention
