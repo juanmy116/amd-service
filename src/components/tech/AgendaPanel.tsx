@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Wrench, AlertCircle, AlertTriangle } from 'lucide-react'
+import { Badge } from '@/components/ui/Badge'
+import type { BadgeVariant } from '@/components/ui/Badge'
 
 function fmtDate(dateStr: string): { label: string; isOverdue: boolean } {
   const d = new Date(dateStr + 'T00:00:00')
@@ -13,10 +15,8 @@ function fmtDate(dateStr: string): { label: string; isOverdue: boolean } {
   return { label: d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }), isOverdue: false }
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  nouveau:  'bg-blue-50 text-blue-700',
-  assigné:  'bg-purple-50 text-purple-700',
-  en_cours: 'bg-amber-50 text-amber-700',
+const STATUS_BADGE: Record<string, BadgeVariant> = {
+  nouveau: 'info', assigné: 'violet', en_cours: 'warning',
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -62,14 +62,14 @@ export default async function TechAgendaPanel() {
   )
 
   return (
-    <aside className="fixed top-0 right-0 h-screen w-72 bg-white border-l border-gray-200 overflow-y-auto z-10">
+    <aside className="fixed top-0 right-0 h-screen w-72 bg-card border-l border-line overflow-y-auto z-10">
 
       {/* Header */}
-      <div className="px-4 py-5 border-b border-gray-100 sticky top-0 bg-white z-10">
-        <h2 className="text-sm font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+      <div className="px-4 py-5 border-b border-line-subtle sticky top-0 bg-card z-10">
+        <h2 className="text-sm font-semibold text-ink font-display">
           Mon planning
         </h2>
-        <p className="text-xs text-gray-400 mt-0.5">
+        <p className="text-xs text-ink-muted mt-0.5">
           {now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
       </div>
@@ -79,12 +79,12 @@ export default async function TechAgendaPanel() {
         {/* ── MAINTENANCE ── */}
         <section>
           <div className="flex items-center gap-1.5 mb-2">
-            <Wrench size={13} className="text-gray-400" />
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Maintenance</span>
+            <Wrench size={13} className="text-ink-muted" />
+            <span className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Maintenance</span>
           </div>
 
           {visits.length === 0 ? (
-            <p className="text-xs text-gray-300 py-1">Aucune visite cette semaine</p>
+            <p className="text-xs text-ink-muted py-1">Aucune visite cette semaine</p>
           ) : (
             <div className="space-y-0.5">
               {visits.map(v => {
@@ -97,18 +97,18 @@ export default async function TechAgendaPanel() {
                   <Link
                     key={v.id}
                     href={serie ? `/tech/scan/${encodeURIComponent(serie)}` : '/tech'}
-                    className="flex items-start gap-2.5 px-2.5 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="flex items-start gap-2.5 px-2.5 py-2 rounded-lg hover:bg-neutral-soft transition-colors"
                   >
-                    <div className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${isOverdue ? 'bg-red-500' : 'bg-blue-400'}`} />
+                    <div className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${isOverdue ? 'bg-accent' : 'bg-info'}`} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-gray-800 truncate leading-tight">
+                      <p className="text-xs font-medium text-ink-soft truncate leading-tight">
                         {contract?.clients?.nom_client ?? '—'}
                       </p>
-                      <p className="text-[11px] text-gray-400 truncate">
-                        {machine?.marque} {machine?.modele}
+                      <p className="text-[11px] text-ink-muted truncate">
+                        {machine?.marque} {machine?.modelo}
                       </p>
                     </div>
-                    <span className={`shrink-0 text-[11px] font-medium whitespace-nowrap ${isOverdue ? 'text-red-500' : 'text-gray-400'}`}>
+                    <span className={`shrink-0 text-[11px] font-medium whitespace-nowrap ${isOverdue ? 'text-accent' : 'text-ink-muted'}`}>
                       {label}
                     </span>
                   </Link>
@@ -118,40 +118,40 @@ export default async function TechAgendaPanel() {
           )}
         </section>
 
-        <div className="border-t border-gray-100" />
+        <div className="border-t border-line-subtle" />
 
         {/* ── MES INTERVENTIONS ── */}
         <section>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5">
-              <AlertCircle size={13} className="text-gray-400" />
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Mes interventions</span>
+              <AlertCircle size={13} className="text-ink-muted" />
+              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Mes interventions</span>
             </div>
             {(incidents?.length ?? 0) > 0 && (
-              <Link href="/tech/incidents" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              <Link href="/tech/incidents" className="text-xs text-ink-muted hover:text-ink-soft transition-colors">
                 Voir tout →
               </Link>
             )}
           </div>
 
           {(!incidents || incidents.length === 0) ? (
-            <p className="text-xs text-gray-300 py-1">Aucune intervention assignée</p>
+            <p className="text-xs text-ink-muted py-1">Aucune intervention assignée</p>
           ) : (
             <div className="space-y-0.5">
               {incidents.map(inc => (
                 <Link
                   key={inc.id}
                   href={`/tech/incidents/${inc.id}`}
-                  className="flex items-start gap-2.5 px-2.5 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-start gap-2.5 px-2.5 py-2 rounded-lg hover:bg-neutral-soft transition-colors"
                 >
-                  <AlertTriangle size={12} className="mt-0.5 shrink-0 text-gray-300" />
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0 text-ink-muted/40" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-gray-800 truncate leading-tight">{inc.title}</p>
-                    <p className="font-mono text-[10px] text-gray-400">{inc.machine_id}</p>
+                    <p className="text-xs font-medium text-ink-soft truncate leading-tight">{inc.title}</p>
+                    <p className="font-mono text-[10px] text-ink-muted">{inc.machine_id}</p>
                   </div>
-                  <span className={`shrink-0 inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_BADGE[inc.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                  <Badge variant={STATUS_BADGE[inc.status] ?? 'neutral'}>
                     {STATUS_LABEL[inc.status] ?? inc.status}
-                  </span>
+                  </Badge>
                 </Link>
               ))}
             </div>
