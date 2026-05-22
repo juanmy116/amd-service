@@ -16,21 +16,21 @@ export default function TechDesktopSidebar({ fullName }: { fullName: string | nu
   const pathname = usePathname()
 
   return (
-    <aside className="fixed top-0 left-0 h-screen w-64 flex flex-col bg-white border-r border-gray-200 z-10">
+    <aside className="fixed top-0 left-0 h-screen w-64 flex flex-col bg-chrome border-r border-chrome-line z-10">
 
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 h-16 border-b border-gray-200">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: '#BF0D0D' }}>
-          <span className="text-white font-bold text-sm" style={{ fontFamily: 'Poppins, sans-serif' }}>A</span>
+      <div className="flex items-center gap-3 px-5 h-16 border-b border-chrome-line">
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-accent">
+          <span className="text-white font-bold text-sm font-display">A</span>
         </div>
         <div>
-          <p className="text-sm font-semibold text-gray-900 leading-none" style={{ fontFamily: 'Poppins, sans-serif' }}>AMD Service</p>
-          <p className="text-xs text-gray-400 mt-0.5">Espace technicien</p>
+          <p className="text-sm font-semibold text-chrome-fg-strong leading-none font-display">AMD Service</p>
+          <p className="text-xs text-chrome-fg mt-0.5">Espace technicien</p>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto scrollbar-chrome">
         {NAV.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href)
           return (
@@ -38,9 +38,10 @@ export default function TechDesktopSidebar({ fullName }: { fullName: string | nu
               key={href}
               href={href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                active ? 'text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                active
+                  ? 'bg-accent/15 text-accent'
+                  : 'text-chrome-fg hover:bg-chrome-hover hover:text-chrome-fg-strong'
               }`}
-              style={active ? { backgroundColor: '#BF0D0D' } : {}}
             >
               <Icon size={18} />
               {label}
@@ -50,12 +51,15 @@ export default function TechDesktopSidebar({ fullName }: { fullName: string | nu
       </nav>
 
       {/* User + logout */}
-      <div className="px-3 py-4 border-t border-gray-200">
+      <div className="px-3 py-4 border-t border-chrome-line">
         {fullName && (
-          <p className="px-3 text-xs text-gray-400 mb-2 truncate">{fullName}</p>
+          <p className="px-3 text-xs text-chrome-fg mb-2 truncate">{fullName}</p>
         )}
         <form action={signOut}>
-          <button type="submit" className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+          <button
+            type="submit"
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-chrome-fg hover:bg-chrome-hover hover:text-chrome-fg-strong transition-colors"
+          >
             <LogOut size={18} />
             Déconnexion
           </button>
