@@ -23,10 +23,11 @@ La app SAV está **completa y en producción** (`https://amd-service.vercel.app`
 - Búsqueda + filtros admin · `numero_incident` (SAV-YYYY-NNNN)
 - **Dashboard Atelier** (`/atelier`): kiosko de taller para TV 32" — cuenta «Atelier» (rol técnico + flag `is_dispatcher`) que asigna incidencias y mantenimientos a los técnicos
 
-### 🔄 En curso — Rediseño UI "Híbrido"
+### ✅ Rediseño UI "Híbrido" — completado
 Refresco visual de la app interna (presentación pura, sin cambios de lógica ni rutas).
 - Fase 0 (sistema de diseño) ✅ · `/admin` bloques 1a (chrome) ✅, 1b (Dashboard) ✅, 1c (Listados) ✅, 1d (Detalles/formularios) ✅, 1e (Secundarias) ✅
-- Pendiente: `/portal` · `/tech`
+- Fase 2 `/portal` + `/login` + `/csat` ✅ · Fase 3 `/tech` ✅
+- Las 3 superficies internas migradas; solo la web pública (`/`) conserva el estilo antiguo (a propósito).
 - Specs y planes en `docs/superpowers/`. Detalle en `docs/architecture.md`.
 
 ---

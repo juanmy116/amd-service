@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-22 (sesión 20 — rediseño bloque 1e: 6 páginas secundarias /admin — `/admin` completamente migrado)
+> Última actualización: 2026-05-22 (sesión 22 — rediseño Fase 3: PWA técnico `/tech` migrada — rediseño UI «Híbrido» completo en las 3 superficies)
 
 ---
 
@@ -829,9 +829,15 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 **Componentes UI compartidos** — `src/components/ui/` (sin barrel, imports directos):
 `Card`, `PanelHeader`, `Badge` (variantes solid/danger/success/warning/info/violet/neutral), `Button` (+ `buttonClasses`), `Avatar`, `KpiCard`.
 
-**Progreso:** Fase 0 (sistema de diseño) ✅ · `/admin` completamente migrado — bloques 1a (chrome) ✅, 1b (Dashboard) ✅, 1c (Listados) ✅, 1d (detalles/formularios) ✅, 1e (secundarias: calendrier, team, princity, contadores/detalle, QR) ✅. Pendiente: Fase 2 `/portal` + `/login` + `/csat` · Fase 3 `/tech`.
+**Progreso:** ✅ **COMPLETO** — las 3 superficies de la app interna migradas. Solo la web pública (`/`) conserva el estilo antiguo, a propósito.
+- Fase 0 (sistema de diseño) ✅
+- `/admin` completamente migrado — bloques 1a (chrome) ✅, 1b (Dashboard) ✅, 1c (Listados) ✅, 1d (detalles/formularios) ✅, 1e (secundarias: calendrier, team, princity, contadores/detalle, QR) ✅
+- Fase 2 `/portal` + `/login` + `/csat` ✅ (merge `1850c09`)
+- Fase 3 `/tech` ✅ (merge `33d7746`)
 
 **Notas de implementación bloque 1e:** `VISIT_COLOR`/`INCIDENT_COLOR` en calendrier son hex values para FullCalendar (librería externa) — no se migran a tokens Tailwind. `fontFamily: 'Helvetica, Arial, sans-serif'` y `@media print` en la etiqueta QR son tipografía de impresión — se mantienen intactos. `ROLE_STYLE` eliminado en team/page → sustituido por `ROLE_VARIANT` + `Badge` component.
+
+**Notas de implementación Fase 3 (`/tech`):** `tech-nav.tsx` y `tech-desktop-sidebar.tsx` usan tokens chrome (navegación oscura); `AgendaPanel.tsx` es superficie de contenido (`bg-card`, no chrome) pese a ser un panel lateral. `PRIORITY_COLOR` en `TechIncidentList.tsx` conserva hex values (incluye naranja `#F97316` sin token equivalente) para la franja lateral de prioridad. `accent-red-600` se mantiene en los `input` radio/checkbox de `intervention-form.tsx` y `MaintenanceVisitForm.tsx`.
 
 ---
 
