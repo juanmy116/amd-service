@@ -2,15 +2,18 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
-
-const ROLE_STYLE: Record<string, string> = {
-  admin:      'bg-red-50 text-red-700',
-  technician: 'bg-blue-50 text-blue-700',
-}
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import type { BadgeVariant } from '@/components/ui/Badge'
 
 const ROLE_LABEL: Record<string, string> = {
   admin:      'Administrateur',
   technician: 'Technicien',
+}
+
+const ROLE_VARIANT: Record<string, BadgeVariant> = {
+  admin:      'danger',
+  technician: 'info',
 }
 
 export default async function TeamPage() {
@@ -31,52 +34,51 @@ export default async function TeamPage() {
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+        <h1 className="text-2xl font-semibold font-display text-ink">
           Équipe
         </h1>
         <Link
           href="/admin/team/new"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
-          style={{ backgroundColor: '#BF0D0D' }}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-accent transition-opacity hover:opacity-90"
         >
           <Plus size={16} />
           Inviter un membre
         </Link>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <Card className="overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Nom</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Email</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Téléphone</th>
-              <th className="text-left px-5 py-3.5 font-medium text-gray-500">Rôle</th>
+            <tr className="bg-neutral-soft border-b border-line-subtle">
+              <th className="text-left px-5 py-3.5 font-medium text-ink-muted">Nom</th>
+              <th className="text-left px-5 py-3.5 font-medium text-ink-muted">Email</th>
+              <th className="text-left px-5 py-3.5 font-medium text-ink-muted">Téléphone</th>
+              <th className="text-left px-5 py-3.5 font-medium text-ink-muted">Rôle</th>
               <th />
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-line-subtle">
             {(!profiles || profiles.length === 0) && (
               <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-gray-400">
+                <td colSpan={5} className="px-5 py-10 text-center text-ink-muted">
                   Aucun membre dans l&apos;équipe
                 </td>
               </tr>
             )}
             {profiles?.map((p) => (
-              <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-5 py-4 font-medium text-gray-900">{p.full_name ?? '—'}</td>
-                <td className="px-5 py-4 text-gray-600">{emailMap.get(p.id) ?? '—'}</td>
-                <td className="px-5 py-4 text-gray-600">{p.phone ?? '—'}</td>
+              <tr key={p.id} className="hover:bg-neutral-soft transition-colors">
+                <td className="px-5 py-4 font-medium text-ink">{p.full_name ?? '—'}</td>
+                <td className="px-5 py-4 text-ink-soft">{emailMap.get(p.id) ?? '—'}</td>
+                <td className="px-5 py-4 text-ink-soft">{p.phone ?? '—'}</td>
                 <td className="px-5 py-4">
-                  <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${ROLE_STYLE[p.role] ?? 'bg-gray-100 text-gray-500'}`}>
+                  <Badge variant={ROLE_VARIANT[p.role] ?? 'neutral'}>
                     {ROLE_LABEL[p.role] ?? p.role}
-                  </span>
+                  </Badge>
                 </td>
                 <td className="px-5 py-4 text-right">
                   <Link
                     href={`/admin/team/${p.id}`}
-                    className="text-sm font-medium text-gray-600 hover:text-gray-900 underline underline-offset-2"
+                    className="text-sm font-medium text-ink-soft hover:text-ink underline underline-offset-2"
                   >
                     Modifier
                   </Link>
@@ -85,7 +87,7 @@ export default async function TeamPage() {
             ))}
           </tbody>
         </table>
-      </div>
+      </Card>
     </div>
   )
 }
