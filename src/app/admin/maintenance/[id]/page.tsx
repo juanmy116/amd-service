@@ -1,17 +1,27 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, CheckCircle2, Clock, AlertTriangle, Wrench } from 'lucide-react'
+import { ArrowLeft, Wrench } from 'lucide-react'
+import { Card } from '@/components/ui/Card'
+import { PanelHeader } from '@/components/ui/PanelHeader'
+import { Badge } from '@/components/ui/Badge'
+import type { BadgeVariant } from '@/components/ui/Badge'
 
 const FREQ_LABEL: Record<string, string> = {
   mensuel:     'Mensuel',
   trimestriel: 'Trimestriel',
 }
 
-const STATUS_CFG = {
-  fait:      { label: 'Fait',      class: 'bg-green-50 text-green-700',  icon: CheckCircle2   },
-  planifié:  { label: 'Planifié',  class: 'bg-blue-50 text-blue-700',    icon: Clock          },
-  en_retard: { label: 'En retard', class: 'bg-red-50 text-red-700',      icon: AlertTriangle  },
+const STATUS_BADGE: Record<string, BadgeVariant> = {
+  fait:      'success',
+  planifié:  'info',
+  en_retard: 'danger',
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  fait:      'Fait',
+  planifié:  'Planifié',
+  en_retard: 'En retard',
 }
 
 export default async function MaintenancePlanDetailPage({
@@ -63,15 +73,15 @@ export default async function MaintenancePlanDetailPage({
       <div className="flex items-center gap-3">
         <Link
           href="/admin/maintenance"
-          className="flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 bg-white"
+          className="flex items-center justify-center w-9 h-9 rounded-xl border border-line bg-card hover:bg-neutral-soft transition-colors"
         >
-          <ArrowLeft size={16} className="text-gray-600" />
+          <ArrowLeft size={16} className="text-ink-soft" />
         </Link>
         <div>
-          <h1 className="text-xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <h1 className="text-xl font-semibold text-ink font-display">
             {contract.clients.nom_client}
           </h1>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-ink-muted">
             {contract.machines.marque} {contract.machines.modele} · {contract.numero_contrat}
           </p>
         </div>
@@ -79,92 +89,87 @@ export default async function MaintenancePlanDetailPage({
 
       {/* Info cards */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-400 mb-1">Fréquence</p>
-          <p className="text-sm font-semibold text-gray-900">{FREQ_LABEL[plan.frequency]}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-400 mb-1">Visites au total</p>
-          <p className="text-sm font-semibold text-gray-900">{visits.length}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-400 mb-1">Faites</p>
-          <p className="text-sm font-semibold text-green-700">
+        <Card className="p-4">
+          <p className="text-xs text-ink-muted mb-1">Fréquence</p>
+          <p className="text-sm font-semibold text-ink">{FREQ_LABEL[plan.frequency]}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs text-ink-muted mb-1">Visites au total</p>
+          <p className="text-sm font-semibold text-ink">{visits.length}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs text-ink-muted mb-1">Faites</p>
+          <p className="text-sm font-semibold text-success">
             {visits.filter(v => v.status === 'fait').length}
           </p>
-        </div>
+        </Card>
       </div>
 
       {/* Notes */}
       {plan.notes && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
-          <Wrench size={15} className="text-amber-600 shrink-0 mt-0.5" />
-          <p className="text-sm text-amber-800">{plan.notes}</p>
+        <div className="bg-warning-soft border border-warning/30 rounded-card p-4 flex gap-3">
+          <Wrench size={15} className="text-warning shrink-0 mt-0.5" />
+          <p className="text-sm text-ink">{plan.notes}</p>
         </div>
       )}
 
       {/* Historial visitas */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <p className="text-sm font-semibold text-gray-900">Historique des visites</p>
-        </div>
+      <Card className="overflow-hidden">
+        <PanelHeader title="Historique des visites" />
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="text-left px-5 py-3 text-xs font-medium text-gray-500">Date planifiée</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Statut</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Réalisée le</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Technicien</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">QR</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Notes</th>
+            <tr className="bg-neutral-soft border-b border-line-subtle">
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Date planifiée</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Statut</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Réalisée le</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Technicien</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">QR</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Notes</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-line-subtle">
             {visits.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-sm">
+                <td colSpan={6} className="px-4 py-10 text-center text-ink-muted text-sm">
                   Aucune visite planifiée
                 </td>
               </tr>
             )}
             {visits.map(v => {
-              const cfg = STATUS_CFG[v.status as keyof typeof STATUS_CFG] ?? STATUS_CFG.planifié
-              const Icon = cfg.icon
+              const variant = STATUS_BADGE[v.status as keyof typeof STATUS_BADGE] ?? 'info'
+              const label   = STATUS_LABEL[v.status as keyof typeof STATUS_LABEL] ?? v.status
               return (
-                <tr key={v.id} className="hover:bg-gray-50">
-                  <td className="px-5 py-3.5 font-medium text-gray-900">
+                <tr key={v.id} className="hover:bg-neutral-soft transition-colors">
+                  <td className="px-4 py-3.5 font-medium text-ink">
                     {new Date(v.scheduled_date).toLocaleDateString('fr-FR')}
                   </td>
                   <td className="px-4 py-3.5">
-                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium ${cfg.class}`}>
-                      <Icon size={11} />
-                      {cfg.label}
-                    </span>
+                    <Badge variant={variant}>{label}</Badge>
                   </td>
-                  <td className="px-4 py-3.5 text-gray-500">
+                  <td className="px-4 py-3.5 text-ink-soft">
                     {v.done_at
                       ? new Date(v.done_at).toLocaleDateString('fr-FR')
-                      : <span className="text-gray-300">—</span>
+                      : <span className="text-ink-muted">—</span>
                     }
                   </td>
-                  <td className="px-4 py-3.5 text-gray-500">
-                    {v.profiles?.[0]?.full_name ?? <span className="text-gray-300">—</span>}
+                  <td className="px-4 py-3.5 text-ink-soft">
+                    {v.profiles?.[0]?.full_name ?? <span className="text-ink-muted">—</span>}
                   </td>
                   <td className="px-4 py-3.5">
                     {v.qr_verified
-                      ? <span className="text-xs text-green-600 font-medium">✓ Vérifié</span>
-                      : <span className="text-xs text-gray-300">—</span>
+                      ? <span className="text-xs text-success font-medium">✓ Vérifié</span>
+                      : <span className="text-xs text-ink-muted">—</span>
                     }
                   </td>
-                  <td className="px-4 py-3.5 text-gray-500 text-xs max-w-xs truncate">
-                    {v.notes ?? <span className="text-gray-300">—</span>}
+                  <td className="px-4 py-3.5 text-ink-soft text-xs max-w-xs truncate">
+                    {v.notes ?? <span className="text-ink-muted">—</span>}
                   </td>
                 </tr>
               )
             })}
           </tbody>
         </table>
-      </div>
+      </Card>
     </div>
   )
 }
