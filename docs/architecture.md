@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-22 (sesión 18 — formulario público QR + 3 fixes de seguridad)
+> Última actualización: 2026-05-22 (sesión 19 — rediseño bloque 1d: 5 formularios + 2 páginas de detalle /admin)
 
 ---
 
@@ -829,7 +829,7 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 **Componentes UI compartidos** — `src/components/ui/` (sin barrel, imports directos):
 `Card`, `PanelHeader`, `Badge` (variantes solid/danger/success/warning/info/violet/neutral), `Button` (+ `buttonClasses`), `Avatar`, `KpiCard`.
 
-**Progreso:** Fase 0 (sistema de diseño) ✅ · `/admin` bloques 1a (chrome) ✅, 1b (Dashboard) ✅, 1c (Listados) ✅. Pendiente: `/admin` 1d (detalles/formularios) y 1e (secundarias), luego `/portal` y `/tech`.
+**Progreso:** Fase 0 (sistema de diseño) ✅ · `/admin` bloques 1a (chrome) ✅, 1b (Dashboard) ✅, 1c (Listados) ✅, 1d (detalles/formularios) ✅. Pendiente: `/admin` 1e (secundarias), luego `/portal` y `/tech`.
 
 ---
 
@@ -1016,12 +1016,12 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - [ ] Exportación de contadores a PDF/Excel para facturación
 - [ ] Agente IA para asignación automática de técnicos
 
-### Fase 4 — Rediseño UI «Híbrido» (en curso, sesiones 15–16)
+### Fase 4 — Rediseño UI «Híbrido» (en curso, sesiones 15–19)
 - [x] Fase 0 — sistema de diseño: tokens `@theme` + 6 componentes UI compartidos (PR #12)
 - [x] `/admin` bloque 1a — chrome: layout + sidebar oscura + loading skeleton (PR #13)
 - [x] `/admin` bloque 1b — Dashboard: KPIs, paneles y gráficas (PR #14)
 - [x] `/admin` bloque 1c — Listados: 6 páginas + SearchFilters/ViewToggle/IncidentsListView + Kanban (PR #15)
-- [ ] `/admin` bloque 1d — detalles (`[id]`) y formularios (`*Form`, `new`)
+- [x] `/admin` bloque 1d — 5 formularios (`ClientForm`, `MachineForm`, `ContractForm`, `NewMaintenancePlanForm`, `IncidentForm`) + 2 páginas de detalle (`incidents/[id]`, `maintenance/[id]`) (PR #20, merge `ea216fe`)
 - [ ] `/admin` bloque 1e — secundarias (calendrier, team, princity, detalle compteurs, QR)
 - [ ] Fase 2 — `/portal` + `/login` + `/csat`
 - [ ] Fase 3 — `/tech` (PWA técnico)

@@ -26,7 +26,7 @@ La app SAV está **completa y en producción** (`https://amd-service.vercel.app`
 ### 🔄 En curso — Rediseño UI "Híbrido"
 Refresco visual de la app interna (presentación pura, sin cambios de lógica ni rutas).
 - Fase 0 (sistema de diseño) ✅ · `/admin` bloques 1a (chrome) ✅, 1b (Dashboard) ✅, 1c (Listados) ✅
-- Pendiente: `/admin` 1d (detalles/formularios), 1e (secundarias) · `/portal` · `/tech`
+- Pendiente: `/admin` 1e (secundarias) · `/portal` · `/tech`
 - Specs y planes en `docs/superpowers/`. Detalle en `docs/architecture.md`.
 
 ---
