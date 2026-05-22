@@ -7,10 +7,10 @@ import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
-  nuevo: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success', fermé: 'neutral',
+  nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success', fermé: 'neutral',
 }
 const STATUS_LABEL: Record<string, string> = {
-  nuevo: 'Nuevo', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu', fermé: 'Fermé',
+  nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu', fermé: 'Fermé',
 }
 
 export default async function PortalPage() {
