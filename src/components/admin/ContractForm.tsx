@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
+import { Card } from '@/components/ui/Card'
 
 type FormState = { error: string } | null
 
@@ -30,6 +31,12 @@ type Props = {
   deleteAction?: (formData: FormData) => Promise<void>
 }
 
+const inputClass =
+  'w-full px-3.5 py-2.5 rounded-lg border border-line text-ink text-sm placeholder-ink-muted bg-card focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent'
+
+const selectClass =
+  'w-full px-3.5 py-2.5 rounded-lg border border-line text-ink text-sm bg-card focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent'
+
 export default function ContractForm({
   action, defaultValues, clients, machines, title, isEdit, contractId, deleteAction,
 }: Props) {
@@ -43,11 +50,11 @@ export default function ContractForm({
       <div className="flex items-center gap-4 mb-8">
         <Link
           href="/admin/contracts"
-          className="flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+          className="flex items-center justify-center w-9 h-9 rounded-lg border border-line bg-card hover:bg-neutral-soft transition-colors"
         >
-          <ArrowLeft size={16} className="text-gray-600" />
+          <ArrowLeft size={16} className="text-ink-soft" />
         </Link>
-        <h1 className="flex-1 text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+        <h1 className="flex-1 text-2xl font-semibold text-ink font-display">
           {title}
         </h1>
 
@@ -55,16 +62,15 @@ export default function ContractForm({
         {deleteAction && contractId && (
           confirming ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 flex items-center gap-1.5">
-                <AlertTriangle size={14} className="text-red-500" />
+              <span className="text-sm text-ink-soft flex items-center gap-1.5">
+                <AlertTriangle size={14} className="text-accent" />
                 Confirmer ?
               </span>
               <form action={deleteAction} className="contents">
                 <input type="hidden" name="id" value={contractId} />
                 <button
                   type="submit"
-                  className="px-3 py-2 rounded-lg text-sm font-medium text-white"
-                  style={{ backgroundColor: '#BF0D0D' }}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-white bg-accent"
                 >
                   Oui, supprimer
                 </button>
@@ -72,7 +78,7 @@ export default function ContractForm({
               <button
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-300 hover:bg-gray-50"
+                className="px-3 py-2 rounded-lg text-sm font-medium text-ink-soft border border-line hover:bg-neutral-soft"
               >
                 Annuler
               </button>
@@ -81,7 +87,7 @@ export default function ContractForm({
             <button
               type="button"
               onClick={() => setConfirming(true)}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-red-200 text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition-colors"
+              className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-accent/20 text-sm font-medium text-accent bg-card hover:bg-accent-soft transition-colors"
             >
               <Trash2 size={15} />
               Supprimer
@@ -92,21 +98,21 @@ export default function ContractForm({
 
       {/* Form */}
       <form action={formAction}>
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        <Card className="p-6 space-y-5">
 
           {state?.error && (
-            <div className="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+            <div className="px-4 py-3 rounded-lg bg-accent-soft border border-accent/20 text-sm text-accent">
               {state.error}
             </div>
           )}
 
           {/* Nº Contrat */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Numéro de contrat {!isEdit && <span className="text-red-500">*</span>}
+            <label className="block text-sm font-medium text-ink-soft mb-1.5">
+              Numéro de contrat {!isEdit && <span className="text-accent">*</span>}
             </label>
             {isEdit ? (
-              <div className="px-3.5 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-600 font-mono">
+              <div className="px-3.5 py-2.5 rounded-lg border border-line bg-neutral-soft text-sm text-ink-soft font-mono">
                 {defaultValues?.numero_contrat}
               </div>
             ) : (
@@ -116,7 +122,7 @@ export default function ContractForm({
                 required
                 defaultValue={defaultValues?.numero_contrat}
                 placeholder="AMD-2026-001"
-                className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent font-mono"
+                className={`${inputClass} font-mono`}
               />
             )}
           </div>
@@ -124,14 +130,14 @@ export default function ContractForm({
           {/* Client + Machine */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Client <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                Client <span className="text-accent">*</span>
               </label>
               <select
                 name="client_id"
                 required
                 defaultValue={defaultValues?.client_id ?? ''}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white"
+                className={selectClass}
               >
                 <option value="" disabled>Sélectionner...</option>
                 {clients.map((c) => (
@@ -140,14 +146,14 @@ export default function ContractForm({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Machine <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                Machine <span className="text-accent">*</span>
               </label>
               <select
                 name="machine_id"
                 required
                 defaultValue={defaultValues?.machine_id ?? ''}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white"
+                className={selectClass}
               >
                 <option value="" disabled>Sélectionner...</option>
                 {machines.map((m) => (
@@ -157,7 +163,7 @@ export default function ContractForm({
                 ))}
               </select>
               {!isEdit && machines.length === 0 && (
-                <p className="text-xs text-amber-600 mt-1.5">
+                <p className="text-xs text-warning mt-1.5">
                   Aucune machine disponible (toutes sont déjà assignées à un contrat actif).
                 </p>
               )}
@@ -167,68 +173,67 @@ export default function ContractForm({
           {/* Dates */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Date de début <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                Date de début <span className="text-accent">*</span>
               </label>
               <input
                 name="date_debut"
                 type="date"
                 required
                 defaultValue={defaultValues?.date_debut ?? ''}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className={inputClass}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de renouvellement</label>
+              <label className="block text-sm font-medium text-ink-soft mb-1.5">Date de renouvellement</label>
               <input
                 name="date_renouvellement"
                 type="date"
                 defaultValue={defaultValues?.date_renouvellement ?? ''}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className={inputClass}
               />
             </div>
           </div>
 
           {/* Lieu d'installation */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Lieu d&apos;installation</label>
+            <label className="block text-sm font-medium text-ink-soft mb-1.5">Lieu d&apos;installation</label>
             <input
               name="lieu_installation"
               type="text"
               defaultValue={defaultValues?.lieu_installation ?? ''}
               placeholder="Rue 10, Point E, Dakar"
-              className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              className={inputClass}
             />
           </div>
 
           {/* Statut */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Statut</label>
+            <label className="block text-sm font-medium text-ink-soft mb-1.5">Statut</label>
             <select
               name="statut"
               defaultValue={defaultValues?.statut ?? 'actif'}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white"
+              className={selectClass}
             >
               <option value="actif">Actif</option>
               <option value="suspendu">Suspendu</option>
               <option value="terminé">Terminé</option>
             </select>
           </div>
-        </div>
+        </Card>
 
         {/* Actions */}
         <div className="flex items-center justify-end gap-3 mt-6">
           <Link
             href="/admin/contracts"
-            className="px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+            className="px-4 py-2.5 rounded-lg border border-line text-sm font-medium text-ink bg-card hover:bg-neutral-soft transition-colors"
           >
             Annuler
           </Link>
           <button
             type="submit"
             disabled={pending}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-60 transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#BF0D0D' }}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white bg-accent disabled:opacity-60 transition-opacity hover:opacity-90"
           >
             {pending && <Loader2 size={15} className="animate-spin" />}
             Enregistrer

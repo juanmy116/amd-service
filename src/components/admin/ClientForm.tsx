@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
+import { Card } from '@/components/ui/Card'
 
 type FormState = { error: string } | null
 
@@ -24,6 +25,9 @@ type Props = {
   deleteAction?: (formData: FormData) => Promise<void>
 }
 
+const inputClass =
+  'w-full px-3.5 py-2.5 rounded-lg border border-line text-ink text-sm placeholder-ink-muted bg-card focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent'
+
 export default function ClientForm({ action, defaultValues, title, clientId, deleteAction }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
   const [confirming, setConfirming] = useState(false)
@@ -35,11 +39,11 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
       <div className="flex items-center gap-4 mb-8">
         <Link
           href="/admin/clients"
-          className="flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+          className="flex items-center justify-center w-9 h-9 rounded-lg border border-line bg-card hover:bg-neutral-soft transition-colors"
         >
-          <ArrowLeft size={16} className="text-gray-600" />
+          <ArrowLeft size={16} className="text-ink-soft" />
         </Link>
-        <h1 className="flex-1 text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+        <h1 className="flex-1 text-2xl font-semibold text-ink font-display">
           {title}
         </h1>
 
@@ -47,16 +51,15 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
         {deleteAction && clientId && (
           confirming ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 flex items-center gap-1.5">
-                <AlertTriangle size={14} className="text-red-500" />
+              <span className="text-sm text-ink-soft flex items-center gap-1.5">
+                <AlertTriangle size={14} className="text-accent" />
                 Confirmer ?
               </span>
               <form action={deleteAction} className="contents">
                 <input type="hidden" name="id" value={clientId} />
                 <button
                   type="submit"
-                  className="px-3 py-2 rounded-lg text-sm font-medium text-white"
-                  style={{ backgroundColor: '#BF0D0D' }}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-white bg-accent"
                 >
                   Oui, supprimer
                 </button>
@@ -64,7 +67,7 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
               <button
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="px-3 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-300 hover:bg-gray-50"
+                className="px-3 py-2 rounded-lg text-sm font-medium text-ink-soft border border-line hover:bg-neutral-soft"
               >
                 Annuler
               </button>
@@ -73,7 +76,7 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
             <button
               type="button"
               onClick={() => setConfirming(true)}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-red-200 text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition-colors"
+              className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-accent/20 text-sm font-medium text-accent bg-card hover:bg-accent-soft transition-colors"
             >
               <Trash2 size={15} />
               Supprimer
@@ -84,10 +87,10 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
 
       {/* Form */}
       <form action={formAction}>
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        <Card className="p-6 space-y-5">
 
           {state?.error && (
-            <div className="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+            <div className="px-4 py-3 rounded-lg bg-accent-soft border border-accent/20 text-sm text-accent">
               {state.error}
             </div>
           )}
@@ -95,8 +98,8 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
           {/* Row 1: nom + ninea */}
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Nom du client <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                Nom du client <span className="text-accent">*</span>
               </label>
               <input
                 name="nom_client"
@@ -104,12 +107,12 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
                 required
                 defaultValue={defaultValues?.nom_client}
                 placeholder="Société ABC"
-                className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className={inputClass}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                NINEA <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                NINEA <span className="text-accent">*</span>
               </label>
               <input
                 name="ninea"
@@ -117,7 +120,7 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
                 required
                 defaultValue={defaultValues?.ninea ?? ''}
                 placeholder="00000000"
-                className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className={inputClass}
               />
             </div>
           </div>
@@ -125,8 +128,8 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
           {/* Row 2: email + telephone */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                Email <span className="text-accent">*</span>
               </label>
               <input
                 name="email"
@@ -134,12 +137,12 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
                 required
                 defaultValue={defaultValues?.email ?? ''}
                 placeholder="contact@societe.sn"
-                className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className={inputClass}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Téléphone <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                Téléphone <span className="text-accent">*</span>
               </label>
               <input
                 name="telephone"
@@ -147,15 +150,15 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
                 required
                 defaultValue={defaultValues?.telephone ?? ''}
                 placeholder="+221 33 000 00 00"
-                className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className={inputClass}
               />
             </div>
           </div>
 
           {/* Row 3: adresse */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Adresse <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-ink-soft mb-1.5">
+              Adresse <span className="text-accent">*</span>
             </label>
             <input
               name="adresse"
@@ -163,15 +166,15 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
               required
               defaultValue={defaultValues?.adresse ?? ''}
               placeholder="Rue 10, Point E"
-              className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              className={inputClass}
             />
           </div>
 
           {/* Row 4: ville + statut */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Ville <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                Ville <span className="text-accent">*</span>
               </label>
               <input
                 name="ville"
@@ -179,37 +182,36 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
                 required
                 defaultValue={defaultValues?.ville ?? ''}
                 placeholder="Dakar"
-                className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className={inputClass}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Statut</label>
+              <label className="block text-sm font-medium text-ink-soft mb-1.5">Statut</label>
               <label className="flex items-center gap-3 h-[42px] cursor-pointer">
                 <input
                   name="active"
                   type="checkbox"
                   defaultChecked={defaultValues?.active ?? true}
-                  className="w-4 h-4 rounded accent-red-600"
+                  className="w-4 h-4 rounded accent-accent"
                 />
-                <span className="text-sm text-gray-700">Client actif</span>
+                <span className="text-sm text-ink">Client actif</span>
               </label>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Actions */}
         <div className="flex items-center justify-end gap-3 mt-6">
           <Link
             href="/admin/clients"
-            className="px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+            className="px-4 py-2.5 rounded-lg border border-line text-sm font-medium text-ink bg-card hover:bg-neutral-soft transition-colors"
           >
             Annuler
           </Link>
           <button
             type="submit"
             disabled={pending}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-60 transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#BF0D0D' }}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white bg-accent disabled:opacity-60 transition-opacity hover:opacity-90"
           >
             {pending && <Loader2 size={15} className="animate-spin" />}
             Enregistrer

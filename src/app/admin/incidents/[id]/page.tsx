@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import IncidentForm from '@/components/admin/IncidentForm'
 import { updateIncidentAction, deleteIncidentAction } from './actions'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
 
 const STATUS_DOT: Record<string, string> = {
   nouveau:  'bg-blue-500',
@@ -84,94 +86,92 @@ export default async function EditIncidentPage({
       {/* Contact public (incidente via QR sin autenticación) */}
       {incident.contact_name && (
         <div className="px-8 pb-4 max-w-3xl">
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <Card className="p-6">
             <div className="flex items-center gap-2 mb-4">
-              <h2 className="text-sm font-semibold text-gray-700">Contact</h2>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                Public
-              </span>
+              <h2 className="text-sm font-semibold text-ink">Contact</h2>
+              <Badge variant="warning">Public</Badge>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex gap-2">
-                <span className="text-gray-500 w-24 shrink-0">Nom</span>
-                <span className="text-gray-900 font-medium">{incident.contact_name}</span>
+                <span className="text-ink-muted w-24 shrink-0">Nom</span>
+                <span className="text-ink font-medium">{incident.contact_name}</span>
               </div>
               <div className="flex gap-2">
-                <span className="text-gray-500 w-24 shrink-0">Téléphone</span>
+                <span className="text-ink-muted w-24 shrink-0">Téléphone</span>
                 <a
                   href={`tel:${incident.contact_phone}`}
-                  className="text-gray-900 hover:underline"
+                  className="text-ink hover:underline"
                 >
                   {incident.contact_phone}
                 </a>
               </div>
               {incident.contact_email && (
                 <div className="flex gap-2">
-                  <span className="text-gray-500 w-24 shrink-0">Email</span>
+                  <span className="text-ink-muted w-24 shrink-0">Email</span>
                   <a
                     href={`mailto:${incident.contact_email}`}
-                    className="text-gray-900 hover:underline"
+                    className="text-ink hover:underline"
                   >
                     {incident.contact_email}
                   </a>
                 </div>
               )}
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
       {/* Rapport d'intervention */}
       {incident.rapport_intervention && (
         <div className="px-8 pb-4 max-w-3xl">
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">Rapport d&apos;intervention</h2>
-            <p className="text-sm text-gray-600 whitespace-pre-wrap">{incident.rapport_intervention}</p>
+          <Card className="p-6">
+            <h2 className="text-sm font-semibold text-ink mb-3">Rapport d&apos;intervention</h2>
+            <p className="text-sm text-ink-soft whitespace-pre-wrap">{incident.rapport_intervention}</p>
             {incident.autres_pieces && (
-              <div className="mt-3 pt-3 border-t border-gray-100">
-                <p className="text-xs font-medium text-gray-500 mb-1">Autres pièces</p>
-                <p className="text-sm text-gray-600">{incident.autres_pieces}</p>
+              <div className="mt-3 pt-3 border-t border-line-subtle">
+                <p className="text-xs font-medium text-ink-muted mb-1">Autres pièces</p>
+                <p className="text-sm text-ink-soft">{incident.autres_pieces}</p>
               </div>
             )}
-          </div>
+          </Card>
         </div>
       )}
 
       {/* Historique */}
       {history && history.length > 0 && (
         <div className="px-8 pb-8 max-w-3xl">
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-sm font-semibold text-gray-700 mb-5">Historique</h2>
+          <Card className="p-6">
+            <h2 className="text-sm font-semibold text-ink mb-5">Historique</h2>
             <div className="space-y-4">
               {history.map((h) => (
                 <div key={h.id} className="flex gap-3">
                   <div className="flex flex-col items-center pt-1">
                     <div className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[h.new_status] ?? 'bg-gray-400'}`} />
                   </div>
-                  <div className="flex-1 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
+                  <div className="flex-1 pb-4 border-b border-line-subtle last:border-0 last:pb-0">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       {h.old_status ? (
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-ink-muted">
                           {STATUS_LABEL[h.old_status] ?? h.old_status}
                           {' → '}
-                          <span className="font-medium text-gray-800">{STATUS_LABEL[h.new_status] ?? h.new_status}</span>
+                          <span className="font-medium text-ink">{STATUS_LABEL[h.new_status] ?? h.new_status}</span>
                         </span>
                       ) : (
-                        <span className="text-xs font-medium text-gray-800">{STATUS_LABEL[h.new_status] ?? h.new_status}</span>
+                        <span className="text-xs font-medium text-ink">{STATUS_LABEL[h.new_status] ?? h.new_status}</span>
                       )}
-                      <span className="text-xs text-gray-300">·</span>
-                      <span className="text-xs text-gray-400">{profileMap.get(h.changed_by) ?? 'Système'}</span>
-                      <span className="text-xs text-gray-300">·</span>
-                      <span className="text-xs text-gray-400">{formatDateTime(h.created_at)}</span>
+                      <span className="text-xs text-ink-muted">·</span>
+                      <span className="text-xs text-ink-muted">{profileMap.get(h.changed_by) ?? 'Système'}</span>
+                      <span className="text-xs text-ink-muted">·</span>
+                      <span className="text-xs text-ink-muted">{formatDateTime(h.created_at)}</span>
                     </div>
                     {h.comment && (
-                      <p className="mt-1 text-xs text-gray-500 italic">{h.comment}</p>
+                      <p className="mt-1 text-xs text-ink-muted italic">{h.comment}</p>
                     )}
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>
