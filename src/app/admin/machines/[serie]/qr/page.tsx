@@ -47,14 +47,11 @@ export default async function MachineQrPage({
       {/* Etiqueta imprimible */}
       <div className="flex justify-center px-6 pb-10">
         <div
-          className="label bg-white rounded-2xl shadow-lg overflow-hidden"
+          className="label bg-card rounded-card shadow-card overflow-hidden"
           style={{ width: 320, fontFamily: 'Helvetica, Arial, sans-serif' }}
         >
           {/* Cabecera roja */}
-          <div
-            className="flex items-center justify-between px-5 py-4"
-            style={{ backgroundColor: '#BF0D0D' }}
-          >
+          <div className="flex items-center justify-between px-5 py-4 bg-accent">
             <Image
               src="/images/logos/logo-amd.png"
               alt="AMD Service"
@@ -70,18 +67,18 @@ export default async function MachineQrPage({
           {/* Datos máquina */}
           <div className="px-5 pt-4 pb-2 space-y-2">
             <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Machine</p>
-              <p className="text-base font-bold text-gray-900">{machine.marque} {machine.modele}</p>
+              <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">Machine</p>
+              <p className="text-base font-bold text-ink">{machine.marque} {machine.modele}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">N° Série</p>
-                <p className="text-xs font-mono font-semibold text-gray-800">{machine.numero_serie}</p>
+                <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">N° Série</p>
+                <p className="text-xs font-mono font-semibold text-ink">{machine.numero_serie}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Type</p>
-                <p className="text-xs font-semibold text-gray-800">
+                <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">Type</p>
+                <p className="text-xs font-semibold text-ink">
                   {machine.type === 'color' ? 'Couleur' : 'Noir & Blanc'}
                 </p>
               </div>
@@ -89,51 +86,51 @@ export default async function MachineQrPage({
 
             {machine.localisation && (
               <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Localisation</p>
-                <p className="text-xs text-gray-800">{machine.localisation}</p>
+                <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">Localisation</p>
+                <p className="text-xs text-ink">{machine.localisation}</p>
               </div>
             )}
           </div>
 
           {/* Separador */}
-          <div className="mx-5 border-t border-gray-100 my-2" />
+          <div className="mx-5 border-t border-line-subtle my-2" />
 
           {/* Datos cliente */}
           <div className="px-5 pb-2 space-y-2">
             {client ? (
               <>
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Client</p>
-                  <p className="text-sm font-semibold text-gray-900">{client.nom_client}</p>
+                  <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">Client</p>
+                  <p className="text-sm font-semibold text-ink">{client.nom_client}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">N° Client</p>
-                    <p className="text-xs font-mono font-semibold text-gray-800">{client.id}</p>
+                    <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">N° Client</p>
+                    <p className="text-xs font-mono font-semibold text-ink">{client.id}</p>
                   </div>
                   {contract?.numero_contrat && (
                     <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">N° Contrat</p>
-                      <p className="text-xs font-mono font-semibold text-gray-800">{contract.numero_contrat}</p>
+                      <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">N° Contrat</p>
+                      <p className="text-xs font-mono font-semibold text-ink">{contract.numero_contrat}</p>
                     </div>
                   )}
                 </div>
                 {contract?.lieu_installation && (
                   <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Site</p>
-                    <p className="text-xs text-gray-800">{contract.lieu_installation}</p>
+                    <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">Site</p>
+                    <p className="text-xs text-ink">{contract.lieu_installation}</p>
                   </div>
                 )}
               </>
             ) : (
-              <p className="text-xs text-gray-400 italic">Aucun client associé</p>
+              <p className="text-xs text-ink-muted italic">Aucun client associé</p>
             )}
           </div>
 
           {/* QR code */}
-          <div className="flex flex-col items-center py-4 bg-gray-50 mt-2">
+          <div className="flex flex-col items-center py-4 bg-neutral-soft mt-2">
             <QrCanvas value={qrUrl} />
-            <p className="text-xs text-gray-400 mt-2 text-center px-4">
+            <p className="text-xs text-ink-muted mt-2 text-center px-4">
               Scanner pour accéder à la fiche machine
             </p>
           </div>
