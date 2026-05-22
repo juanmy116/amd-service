@@ -13,7 +13,7 @@ export default async function MachineGateway({
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect(`/login?redirectTo=/m/${encoded}`)
+    redirect(`/signaler/${encoded}`)
   }
 
   const { data: profile } = await supabase
