@@ -2,6 +2,8 @@ import { createClient }    from '@/lib/supabase/server'
 import { redirect }        from 'next/navigation'
 import { CheckCircle2, XCircle, Activity } from 'lucide-react'
 import InitialImportButton from './InitialImportButton'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
 
 const THRESHOLD_LABELS: Record<string, string> = {
   'princity-alerts':   'Alertes (seuil: 2h)',
@@ -35,49 +37,49 @@ export default async function PrincityPage() {
   return (
     <div className="p-8 max-w-5xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+        <h1 className="text-2xl font-semibold font-display text-ink">
           Intégration Princity
         </h1>
-        <p className="text-sm text-gray-500 mt-1">Surveillance et importation des données Princity</p>
+        <p className="text-sm text-ink-soft mt-1">Surveillance et importation des données Princity</p>
       </div>
 
       {/* Salud de las funciones */}
       <section className="mb-8">
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">État des fonctions</h2>
+        <h2 className="text-sm font-semibold text-ink uppercase tracking-wider mb-3">État des fonctions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {(health ?? []).map(row => {
             const ok = row.last_success_at && !row.alert_sent
             return (
-              <div key={row.function_name} className="bg-white rounded-xl border border-gray-200 p-5">
+              <Card key={row.function_name} className="p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-medium text-gray-500">
+                  <span className="text-xs font-medium text-ink-muted">
                     {THRESHOLD_LABELS[row.function_name] ?? row.function_name}
                   </span>
                   {ok
-                    ? <CheckCircle2 size={16} className="text-green-500" />
-                    : <XCircle     size={16} className="text-red-500" />}
+                    ? <CheckCircle2 size={16} className="text-success" />
+                    : <XCircle     size={16} className="text-accent" />}
                 </div>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-ink-soft">
                   <span className="font-medium">Dernière sync:</span> {formatDate(row.last_success_at)}
                 </p>
                 {row.last_error_message && (
-                  <p className="text-xs text-red-600 mt-1 truncate" title={row.last_error_message}>
+                  <p className="text-xs text-accent mt-1 truncate" title={row.last_error_message}>
                     ⚠ {row.last_error_message}
                   </p>
                 )}
-              </div>
+              </Card>
             )
           })}
         </div>
       </section>
 
       {/* Importación inicial */}
-      <section className="mb-8 bg-amber-50 border border-amber-200 rounded-xl p-6">
-        <h2 className="text-sm font-semibold text-amber-800 mb-2 flex items-center gap-2">
+      <section className="mb-8 bg-warning-soft border border-warning/30 rounded-card p-6">
+        <h2 className="text-sm font-semibold text-ink mb-2 flex items-center gap-2">
           <Activity size={15} />
           Importation initiale
         </h2>
-        <p className="text-xs text-amber-700 mb-4">
+        <p className="text-xs text-ink-soft mb-4">
           Efface toutes les données de test et importe clients + équipements depuis Princity.{' '}
           <strong>Action irréversible.</strong> Les contrats devront être créés manuellement ensuite.
         </p>
@@ -86,43 +88,45 @@ export default async function PrincityPage() {
 
       {/* Logs recientes */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
+        <h2 className="text-sm font-semibold text-ink uppercase tracking-wider mb-3">
           Journal (20 dernières exécutions)
         </h2>
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <Card className="overflow-hidden">
           <table className="w-full text-xs">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-neutral-soft border-b border-line-subtle">
               <tr>
                 {['Fonction', 'Endpoint', 'Date', 'Statut', 'Traités', 'Créés'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left font-medium text-gray-500">{h}</th>
+                  <th key={h} className="px-4 py-3 text-left font-medium text-ink-muted">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-line-subtle">
               {(logs ?? []).map((log, i) => (
-                <tr key={i} className="hover:bg-gray-50">
-                  <td className="px-4 py-2.5 font-mono text-gray-700">{log.function_name}</td>
-                  <td className="px-4 py-2.5 text-gray-500 truncate max-w-32">{log.endpoint_called}</td>
-                  <td className="px-4 py-2.5 text-gray-500">{formatDate(log.executed_at)}</td>
+                <tr key={i} className="hover:bg-neutral-soft transition-colors">
+                  <td className="px-4 py-2.5 font-mono text-ink-soft">{log.function_name}</td>
+                  <td className="px-4 py-2.5 text-ink-muted truncate max-w-32">{log.endpoint_called}</td>
+                  <td className="px-4 py-2.5 text-ink-muted">{formatDate(log.executed_at)}</td>
                   <td className="px-4 py-2.5">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      log.status === 'success' ? 'bg-green-50 text-green-700' :
-                      log.status === 'partial'  ? 'bg-amber-50 text-amber-700' :
-                                                   'bg-red-50 text-red-700'
-                    }`}>{log.status}</span>
+                    <Badge variant={
+                      log.status === 'success' ? 'success' :
+                      log.status === 'partial'  ? 'warning' :
+                                                   'danger'
+                    }>
+                      {log.status}
+                    </Badge>
                   </td>
-                  <td className="px-4 py-2.5 text-gray-600">{log.records_processed}</td>
-                  <td className="px-4 py-2.5 text-gray-600">{log.records_created}</td>
+                  <td className="px-4 py-2.5 text-ink-soft">{log.records_processed}</td>
+                  <td className="px-4 py-2.5 text-ink-soft">{log.records_created}</td>
                 </tr>
               ))}
               {!logs?.length && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">Aucun log disponible</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-ink-muted">Aucun log disponible</td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
+        </Card>
       </section>
     </div>
   )
