@@ -20,7 +20,7 @@ export default async function TechLayout({ children }: { children: React.ReactNo
   if (profile?.role !== 'technician') redirect('/dashboard')
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-page">
       <div className="hidden lg:block">
         <TechDesktopSidebar fullName={profile?.full_name ?? null} />
       </div>
@@ -35,8 +35,7 @@ export default async function TechLayout({ children }: { children: React.ReactNo
       <div className="lg:hidden fixed bottom-16 left-0 right-0 flex justify-center px-4 z-40 pointer-events-none">
         <Link
           href="/tech/scan"
-          className="pointer-events-auto flex items-center gap-2 px-6 py-3.5 rounded-full shadow-lg text-white text-sm font-semibold"
-          style={{ backgroundColor: '#BF0D0D' }}
+          className="pointer-events-auto flex items-center gap-2 px-6 py-3.5 rounded-full text-white text-sm font-semibold bg-accent shadow-raised"
         >
           <QrCode size={20} />
           Scanner une machine
