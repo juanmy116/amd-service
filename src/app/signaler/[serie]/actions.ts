@@ -1,7 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import { sendEmail } from '@/lib/email'
 
 type State =
@@ -62,9 +62,12 @@ export async function submitPublicIncident(
     return { error: "L'adresse email n'est pas valide." }
   }
 
+  const ip = await getClientIp()
+  const rlKey = `${ip}:${serie}`
+
   const [okHourly, okDaily] = await Promise.all([
-    checkRateLimit('public_incident_hourly', serie),
-    checkRateLimit('public_incident_daily', serie),
+    checkRateLimit('public_incident_hourly', rlKey),
+    checkRateLimit('public_incident_daily', rlKey),
   ])
 
   if (!okHourly || !okDaily) {

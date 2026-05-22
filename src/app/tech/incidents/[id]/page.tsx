@@ -31,11 +31,13 @@ export default async function TechIncidentPage({
   // Error opaco: notFound en lugar de 403 para no revelar que el incidente existe.
   if (profile.role === 'technician' && incident.assigned_to !== user.id) notFound()
 
-  const { data: contract } = await supabase
-    .from('contracts')
-    .select('numero_contrat, lieu_installation, clients(nom_client), machines(marque, modele, localisation)')
-    .eq('id', incident.contract_id)
-    .single()
+  const { data: contract } = incident.contract_id
+    ? await supabase
+        .from('contracts')
+        .select('numero_contrat, lieu_installation, clients(nom_client), machines(marque, modele, localisation)')
+        .eq('id', incident.contract_id)
+        .maybeSingle()
+    : { data: null }
 
   const client  = contract?.clients  as unknown as { nom_client: string }                                  | null
   const machine = contract?.machines as unknown as { marque: string; modele: string; localisation: string | null } | null

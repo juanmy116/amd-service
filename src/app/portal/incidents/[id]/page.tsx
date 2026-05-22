@@ -48,6 +48,7 @@ export default async function PortalIncidentDetailPage({
     .select('*')
     .eq('id', id)
     .in('contract_id', contractIds.length > 0 ? contractIds : [''])
+    .or('source.is.null,source.neq.public')
     .single()
 
   if (!incident) notFound()
@@ -58,11 +59,13 @@ export default async function PortalIncidentDetailPage({
     .eq('incident_id', id)
     .order('created_at', { ascending: false })
 
-  const { data: contract } = await supabase
-    .from('contracts')
-    .select('numero_contrat, machines(marque, modele)')
-    .eq('id', incident.contract_id)
-    .single()
+  const { data: contract } = incident.contract_id
+    ? await supabase
+        .from('contracts')
+        .select('numero_contrat, machines(marque, modele)')
+        .eq('id', incident.contract_id)
+        .maybeSingle()
+    : { data: null }
 
   const machine = contract?.machines as unknown as { marque: string; modele: string } | null
 

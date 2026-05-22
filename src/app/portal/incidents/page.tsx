@@ -47,6 +47,7 @@ export default async function PortalIncidentsPage() {
     .from('incidents')
     .select('id, numero_incident, title, status, priority, category, created_at, machine_id')
     .in('contract_id', ids)
+    .or('source.is.null,source.neq.public')
     .order('created_at', { ascending: false })
 
   return (
