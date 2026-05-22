@@ -18,7 +18,7 @@ export default async function TechIncidentsPage() {
 
   return (
     <div className="p-4 space-y-4">
-      <h1 className="text-lg font-semibold text-gray-900 pt-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
+      <h1 className="text-lg font-semibold text-ink pt-2 font-display">
         Mes interventions
       </h1>
       <TechIncidentList incidents={incidents} />

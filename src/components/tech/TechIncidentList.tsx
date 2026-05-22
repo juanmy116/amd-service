@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import { Badge } from '@/components/ui/Badge'
+import type { BadgeVariant } from '@/components/ui/Badge'
 
 const PRIORITY_COLOR: Record<string, string> = {
   urgente: '#BF0D0D',
@@ -17,12 +19,8 @@ const PRIORITY_LABEL: Record<string, string> = {
   basse:   'Basse',
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  nouveau:  'bg-blue-50 text-blue-700',
-  assigné:  'bg-purple-50 text-purple-700',
-  en_cours: 'bg-amber-50 text-amber-700',
-  résolu:   'bg-green-50 text-green-700',
-  fermé:    'bg-gray-100 text-gray-500',
+const STATUS_BADGE: Record<string, BadgeVariant> = {
+  nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success', fermé: 'neutral',
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -78,10 +76,9 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
             onClick={() => setFilter(chip.key)}
             className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
               filter === chip.key
-                ? 'text-white border-transparent'
-                : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                ? 'bg-accent text-white border-transparent'
+                : 'bg-card text-ink-muted border-line hover:border-line'
             }`}
-            style={filter === chip.key ? { backgroundColor: '#BF0D0D' } : {}}
           >
             {chip.label} ({chip.count})
           </button>
@@ -89,27 +86,27 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-12">Aucune intervention</p>
+        <p className="text-sm text-ink-muted text-center py-12">Aucune intervention</p>
       ) : (
         <div className="space-y-3">
           {filtered.map(inc => (
             <Link
               key={inc.id}
               href={`/tech/incidents/${inc.id}`}
-              className="relative flex items-center justify-between bg-white rounded-xl border border-gray-200 p-4 pl-5 overflow-hidden active:scale-[0.98] transition-transform"
+              className="relative flex items-center justify-between bg-card rounded-[var(--radius-card)] border border-line p-4 pl-5 overflow-hidden active:scale-[0.98] transition-transform"
             >
               <div
                 className="absolute left-0 top-0 bottom-0 w-1"
                 style={{ backgroundColor: PRIORITY_COLOR[inc.priority] ?? '#9CA3AF' }}
               />
               <div className="min-w-0 flex-1">
-                <p className="font-mono text-[10px] font-semibold tracking-wide mb-0.5" style={{ color: '#BF0D0D' }}>
+                <p className="font-mono text-[10px] font-semibold tracking-wide mb-0.5 text-accent">
                   {inc.numero_incident}
                 </p>
-                <p className="text-sm font-semibold text-gray-900 truncate">
+                <p className="text-sm font-semibold text-ink truncate">
                   {inc.clients?.nom_client ?? inc.title}
                 </p>
-                <p className="text-xs text-gray-500 truncate mt-0.5">{inc.title}</p>
+                <p className="text-xs text-ink-muted truncate mt-0.5">{inc.title}</p>
                 <div className="flex items-center gap-2 mt-1.5">
                   <span
                     className="text-[10px] font-bold uppercase tracking-wide"
@@ -118,13 +115,15 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
                     {PRIORITY_LABEL[inc.priority] ?? inc.priority}
                   </span>
                   <span className="text-gray-300">·</span>
-                  <span className="text-[10px] text-gray-400">
+                  <span className="text-[10px] text-ink-muted">
                     {new Date(inc.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                   </span>
                 </div>
               </div>
-              <span className={`shrink-0 ml-3 inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_STYLE[inc.status] ?? ''}`}>
-                {STATUS_LABEL[inc.status] ?? inc.status}
+              <span className="shrink-0 ml-3">
+                <Badge variant={STATUS_BADGE[inc.status] ?? 'neutral'}>
+                  {STATUS_LABEL[inc.status] ?? inc.status}
+                </Badge>
               </span>
             </Link>
           ))}
