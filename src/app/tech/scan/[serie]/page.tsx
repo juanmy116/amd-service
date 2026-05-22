@@ -3,10 +3,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Printer, MapPin, Building2, Wrench, AlertTriangle } from 'lucide-react'
+import { Badge } from '@/components/ui/Badge'
+import { Card } from '@/components/ui/Card'
+import type { BadgeVariant } from '@/components/ui/Badge'
 
-const STATUS_STYLE: Record<string, string> = {
-  nouveau: 'bg-blue-50 text-blue-700', assigné: 'bg-purple-50 text-purple-700',
-  en_cours: 'bg-amber-50 text-amber-700', résolu: 'bg-green-50 text-green-700',
+const STATUS_BADGE: Record<string, BadgeVariant> = {
+  nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success',
 }
 const STATUS_LABEL: Record<string, string> = {
   nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu',
@@ -109,38 +111,38 @@ export default async function MachineScanPage({
   return (
     <div className="p-4 space-y-5">
       <div className="flex items-center gap-3 pt-2">
-        <Link href="/tech/scan" className="flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 bg-white shrink-0">
-          <ArrowLeft size={16} className="text-gray-600" />
+        <Link href="/tech/scan" className="flex items-center justify-center w-9 h-9 rounded-xl border border-line bg-card shrink-0">
+          <ArrowLeft size={16} className="text-ink-muted" />
         </Link>
-        <h1 className="text-base font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+        <h1 className="text-base font-semibold text-ink font-display">
           Fiche machine
         </h1>
       </div>
 
       {/* Machine info */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-4">
+      <Card className="p-4 space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#BF0D0D' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-accent">
             <Printer size={18} className="text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-900">{machine.marque} {machine.modele}</p>
-            <p className="font-mono text-xs text-gray-400">{machine.numero_serie}</p>
+            <p className="text-sm font-bold text-ink">{machine.marque} {machine.modele}</p>
+            <p className="font-mono text-xs text-ink-muted">{machine.numero_serie}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 pt-1 border-t border-gray-100">
+        <div className="grid grid-cols-2 gap-3 pt-1 border-t border-line-subtle">
           <div>
-            <p className="text-xs text-gray-400 mb-0.5">Type</p>
-            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${machine.type === 'color' ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+            <p className="text-xs text-ink-muted mb-0.5">Type</p>
+            <Badge variant={machine.type === 'color' ? 'violet' : 'neutral'}>
               {machine.type === 'color' ? 'Couleur' : 'N&B'}
-            </span>
+            </Badge>
           </div>
           {machine.localisation && (
             <div>
-              <p className="text-xs text-gray-400 mb-0.5">Position</p>
-              <div className="flex items-center gap-1 text-xs text-gray-700">
-                <MapPin size={11} className="text-gray-400" />
+              <p className="text-xs text-ink-muted mb-0.5">Position</p>
+              <div className="flex items-center gap-1 text-xs text-ink-soft">
+                <MapPin size={11} className="text-ink-muted" />
                 {machine.localisation}
               </div>
             </div>
@@ -148,75 +150,81 @@ export default async function MachineScanPage({
         </div>
 
         {client && (
-          <div className="flex items-center gap-2 text-sm text-gray-700 pt-1 border-t border-gray-100">
-            <Building2 size={14} className="text-gray-400 shrink-0" />
+          <div className="flex items-center gap-2 text-sm text-ink-soft pt-1 border-t border-line-subtle">
+            <Building2 size={14} className="text-ink-muted shrink-0" />
             <span className="font-medium">{client.nom_client}</span>
             {contract?.lieu_installation && (
-              <span className="text-gray-400 text-xs truncate">— {contract.lieu_installation}</span>
+              <span className="text-ink-muted text-xs truncate">— {contract.lieu_installation}</span>
             )}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Maintenance en attente */}
       {pendingVisit && (
         <div>
-          <p className="text-sm font-semibold text-gray-900 mb-3">Maintenance préventive</p>
+          <p className="text-sm font-semibold text-ink mb-3">Maintenance préventive</p>
           <Link
             href={`/tech/scan/${encodeURIComponent(serie)}/maintenance/${pendingVisit.id}`}
-            className="flex items-center justify-between bg-white rounded-2xl border-2 p-4"
-            style={{ borderColor: pendingVisit.status === 'en_retard' ? '#EF4444' : '#3B82F6' }}
+            className={`flex items-center justify-between rounded-[var(--radius-card)] border-2 p-4 ${
+              pendingVisit.status === 'en_retard'
+                ? 'border-accent/50 bg-accent-soft'
+                : 'border-info/50 bg-info-soft'
+            }`}
           >
             <div className="flex items-center gap-3">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ backgroundColor: pendingVisit.status === 'en_retard' ? '#FEF2F2' : '#EFF6FF' }}
-              >
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                pendingVisit.status === 'en_retard' ? 'bg-accent/10' : 'bg-info/10'
+              }`}>
                 {pendingVisit.status === 'en_retard'
-                  ? <AlertTriangle size={16} className="text-red-500" />
-                  : <Wrench size={16} className="text-blue-500" />
+                  ? <AlertTriangle size={16} className="text-accent" />
+                  : <Wrench size={16} className="text-info" />
                 }
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-900">
+                <p className="text-sm font-semibold text-ink">
                   {pendingVisit.status === 'en_retard' ? 'Maintenance en retard' : 'Maintenance planifiée'}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5">
+                <p className="text-xs text-ink-muted mt-0.5">
                   Prévue le {new Date(pendingVisit.scheduled_date + 'T00:00:00').toLocaleDateString('fr-FR')}
                 </p>
               </div>
             </div>
-            <span className="text-sm text-gray-400">→</span>
+            <span className="text-sm text-ink-muted">→</span>
           </Link>
         </div>
       )}
 
       {/* Incidents actifs */}
       <div>
-        <p className="text-sm font-semibold text-gray-900 mb-3">Incidents actifs</p>
+        <p className="text-sm font-semibold text-ink mb-3">Incidents actifs</p>
         {(!incidents || incidents.length === 0) ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center">
-            <p className="text-sm text-gray-400">Aucun incident actif sur cette machine</p>
-          </div>
+          <Card className="p-6 text-center">
+            <p className="text-sm text-ink-muted">Aucun incident actif sur cette machine</p>
+          </Card>
         ) : (
           <div className="space-y-2">
             {incidents.map((inc) => (
               <Link
                 key={inc.id}
                 href={`/tech/incidents/${inc.id}`}
-                className={`flex items-center justify-between bg-white rounded-2xl border p-4 ${inc.status === 'en_cours' ? 'border-amber-300' : 'border-gray-200'}`}
+                className={`flex items-center justify-between bg-card rounded-[var(--radius-card)] border p-4 ${
+                  inc.status === 'en_cours' ? 'border-warning/50' : 'border-line'
+                }`}
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{inc.title}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{new Date(inc.created_at).toLocaleDateString('fr-FR')}</p>
+                  <p className="text-sm font-semibold text-ink truncate">{inc.title}</p>
+                  <p className="text-xs text-ink-muted mt-0.5">{new Date(inc.created_at).toLocaleDateString('fr-FR')}</p>
                   {inc.status === 'en_cours' && (
-                    <p className="text-xs font-medium mt-1" style={{ color: '#BF0D0D' }}>
+                    <p className="text-xs font-medium mt-1 text-accent">
                       Faire l&apos;intervention →
                     </p>
                   )}
                 </div>
-                <span className={`shrink-0 ml-3 inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_STYLE[inc.status] ?? 'bg-gray-100 text-gray-500'}`}>
-                  {STATUS_LABEL[inc.status] ?? inc.status}
+                <span className="shrink-0 ml-3">
+                  <Badge variant={STATUS_BADGE[inc.status] ?? 'neutral'}>
+                    {STATUS_LABEL[inc.status] ?? inc.status}
+                  </Badge>
                 </span>
               </Link>
             ))}
