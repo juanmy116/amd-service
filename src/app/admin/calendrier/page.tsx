@@ -86,16 +86,16 @@ export default async function CalendrierPage() {
 
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <h1 className="text-2xl font-semibold font-display text-ink">
             Calendrier
           </h1>
-          <p className="text-sm text-gray-400 mt-0.5">
+          <p className="text-sm text-ink-muted mt-0.5">
             {totalVisits} visite{totalVisits !== 1 ? 's' : ''} de maintenance
             {overdueVisits > 0 && (
-              <span className="ml-2 text-red-500 font-medium">· {overdueVisits} en retard</span>
+              <span className="ml-2 text-accent font-medium">· {overdueVisits} en retard</span>
             )}
             {openIncidents > 0 && (
-              <span className="ml-2 text-orange-500 font-medium">· {openIncidents} incident{openIncidents !== 1 ? 's' : ''} ouvert{openIncidents !== 1 ? 's' : ''}</span>
+              <span className="ml-2 text-warning font-medium">· {openIncidents} incident{openIncidents !== 1 ? 's' : ''} ouvert{openIncidents !== 1 ? 's' : ''}</span>
             )}
           </p>
         </div>

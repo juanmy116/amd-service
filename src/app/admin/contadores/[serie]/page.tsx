@@ -6,6 +6,9 @@ import CounterForm from './counter-form'
 import CounterChart, { ChartEntry } from './counter-chart'
 import { MONTHS_FR } from '../constants'
 import CancelModal from './cancel-modal'
+import { Card } from '@/components/ui/Card'
+import { PanelHeader } from '@/components/ui/PanelHeader'
+import { Badge } from '@/components/ui/Badge'
 
 interface Counter {
   id:                   string
@@ -112,38 +115,38 @@ export default async function ContadoresDetailPage({
       <div className="flex items-center gap-3">
         <Link
           href="/admin/contadores"
-          className="flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 bg-white"
+          className="flex items-center justify-center w-9 h-9 rounded-xl border border-line bg-card"
         >
-          <ArrowLeft size={16} className="text-gray-600" />
+          <ArrowLeft size={16} className="text-ink-soft" />
         </Link>
         <div>
-          <h1 className="text-xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <h1 className="text-xl font-semibold font-display text-ink">
             {machine.marque} {machine.modele}
           </h1>
-          <p className="font-mono text-xs text-gray-400">{machine.numero_serie}</p>
+          <p className="font-mono text-xs text-ink-muted">{machine.numero_serie}</p>
         </div>
       </div>
 
       {/* Info cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {client && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
-            <Building2 size={16} className="text-gray-400 shrink-0" />
+          <Card className="p-4 flex items-center gap-3">
+            <Building2 size={16} className="text-ink-muted shrink-0" />
             <div>
-              <p className="text-xs text-gray-400">Client</p>
-              <p className="text-sm font-semibold text-gray-900">{client.nom_client}</p>
-              <p className="text-xs text-gray-400">N° {client.id}</p>
+              <p className="text-xs text-ink-muted">Client</p>
+              <p className="text-sm font-semibold text-ink">{client.nom_client}</p>
+              <p className="text-xs text-ink-muted">N° {client.id}</p>
             </div>
-          </div>
+          </Card>
         )}
         {contract && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
-            <FileText size={16} className="text-gray-400 shrink-0" />
+          <Card className="p-4 flex items-center gap-3">
+            <FileText size={16} className="text-ink-muted shrink-0" />
             <div>
-              <p className="text-xs text-gray-400">Contrat actif</p>
-              <p className="text-sm font-semibold text-gray-900">{contract.numero_contrat}</p>
+              <p className="text-xs text-ink-muted">Contrat actif</p>
+              <p className="text-sm font-semibold text-ink">{contract.numero_contrat}</p>
             </div>
-          </div>
+          </Card>
         )}
       </div>
 
@@ -153,34 +156,32 @@ export default async function ContadoresDetailPage({
         <div className="lg:col-span-2 space-y-6">
 
           {/* Graphique */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-sm font-semibold text-gray-900 mb-4">
+          <Card className="p-5">
+            <p className="text-sm font-semibold text-ink mb-4">
               Évolution mensuelle (pages imprimées)
             </p>
             <CounterChart data={chartData} />
-          </div>
+          </Card>
 
           {/* Historique */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <p className="text-sm font-semibold text-gray-900">Historique des relevés</p>
-            </div>
+          <Card className="overflow-hidden">
+            <PanelHeader title="Historique des relevés" />
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left px-5 py-3 text-xs font-medium text-gray-500">Période</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">N&amp;B total</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">Δ N&amp;B</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">Couleur total</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">Δ Couleur</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Statut</th>
+                <tr className="bg-neutral-soft border-b border-line-subtle">
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Période</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">N&amp;B total</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Δ N&amp;B</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Couleur total</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Δ Couleur</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Statut</th>
                   <th />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-line-subtle">
                 {tableRows.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-sm">
+                    <td colSpan={7} className="px-5 py-10 text-center text-ink-muted text-sm">
                       Aucun relevé enregistré
                     </td>
                   </tr>
@@ -192,55 +193,51 @@ export default async function ContadoresDetailPage({
                   const deltaCol: number | null = d?.delta_color ?? null
 
                   return (
-                    <tr key={c.id} className={isAnnule ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'}>
+                    <tr key={c.id} className={isAnnule ? 'bg-neutral-soft opacity-60' : 'hover:bg-neutral-soft transition-colors'}>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-1.5">
                           {c.is_replacement_start && (
                             <span title="Remplacement de machine">
-                              <RefreshCw size={12} className="text-blue-400 shrink-0" />
+                              <RefreshCw size={12} className="text-info shrink-0" />
                             </span>
                           )}
-                          <span className={isAnnule ? 'line-through text-gray-400' : 'font-medium text-gray-900'}>
+                          <span className={isAnnule ? 'line-through text-ink-muted' : 'font-medium text-ink'}>
                             {c.day ? `${c.day} ` : ''}{MONTHS_FR[c.month]} {c.year}
                           </span>
                         </div>
-                        {c.notes && <p className="text-xs text-gray-400 mt-0.5">{c.notes}</p>}
+                        {c.notes && <p className="text-xs text-ink-muted mt-0.5">{c.notes}</p>}
                         {isAnnule && c.annulation_reason && (
-                          <p className="text-xs text-amber-600 mt-0.5">↳ {c.annulation_reason}</p>
+                          <p className="text-xs text-warning mt-0.5">↳ {c.annulation_reason}</p>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 text-right font-mono text-xs text-gray-700">
+                      <td className="px-4 py-3.5 text-right font-mono text-xs text-ink-soft">
                         {c.counter_bw.toLocaleString('fr-FR')}
                       </td>
                       <td className="px-4 py-3.5 text-right font-mono text-xs">
                         {deltaBw === null ? (
-                          <span className="text-gray-300">—</span>
+                          <span className="text-ink-muted">—</span>
                         ) : (
-                          <span className={deltaBw < 0 ? 'text-red-600 font-semibold' : 'text-gray-700'}>
+                          <span className={deltaBw < 0 ? 'text-accent font-semibold' : 'text-ink-soft'}>
                             {deltaBw < 0 ? '⚠ ' : ''}{deltaBw.toLocaleString('fr-FR')}
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 text-right font-mono text-xs text-gray-700">
+                      <td className="px-4 py-3.5 text-right font-mono text-xs text-ink-soft">
                         {c.counter_color.toLocaleString('fr-FR')}
                       </td>
                       <td className="px-4 py-3.5 text-right font-mono text-xs">
                         {deltaCol === null ? (
-                          <span className="text-gray-300">—</span>
+                          <span className="text-ink-muted">—</span>
                         ) : (
-                          <span className={deltaCol < 0 ? 'text-red-600 font-semibold' : 'text-gray-700'}>
+                          <span className={deltaCol < 0 ? 'text-accent font-semibold' : 'text-ink-soft'}>
                             {deltaCol < 0 ? '⚠ ' : ''}{deltaCol.toLocaleString('fr-FR')}
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-3.5">
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                          isAnnule
-                            ? 'bg-gray-100 text-gray-400'
-                            : 'bg-green-50 text-green-700'
-                        }`}>
+                        <Badge variant={isAnnule ? 'neutral' : 'success'}>
                           {isAnnule ? 'Annulé' : 'Actif'}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         {!isAnnule && (
@@ -259,15 +256,15 @@ export default async function ContadoresDetailPage({
                 })}
               </tbody>
             </table>
-          </div>
+          </Card>
         </div>
 
         {/* Formulario nuevo relevé */}
         <div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5 sticky top-6">
-            <p className="text-sm font-semibold text-gray-900 mb-4">Nouveau relevé</p>
+          <Card className="p-5 sticky top-6">
+            <p className="text-sm font-semibold text-ink mb-4">Nouveau relevé</p>
             <CounterForm machineId={numero_serie} />
-          </div>
+          </Card>
         </div>
 
       </div>
