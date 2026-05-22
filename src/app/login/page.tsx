@@ -8,10 +8,10 @@ export default async function LoginPage({
   const { message } = await searchParams
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12" style={{ backgroundColor: '#F5F5F5' }}>
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-page">
       <div className="w-full max-w-sm space-y-4">
         {message === 'confirm-email' && (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <div className="rounded-xl border border-info/20 bg-info-soft px-4 py-3 text-sm text-ink">
             Vérifiez votre boîte email et cliquez sur le lien de confirmation pour activer votre compte.
           </div>
         )}
