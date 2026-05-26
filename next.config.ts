@@ -5,10 +5,10 @@ const SUPABASE_HOST = 'myyejbviunyvywfukysj.supabase.co';
 const csp = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: https://images.unsplash.com`,
   `connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST}`,
-  "font-src 'self' https://fonts.gstatic.com",
+  "font-src 'self'",
   "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",
