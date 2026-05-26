@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Plus, QrCode } from 'lucide-react'
+import { Plus, QrCode, Upload, CheckCircle2 } from 'lucide-react'
 import SearchFilters from '@/components/admin/SearchFilters'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -10,6 +10,7 @@ import {
   buildSafeOr,
   parseBooleanParam,
   firstParam,
+  parsePositiveIntParam,
 } from '@/lib/search'
 import { parseEnum, MACHINE_TYPES } from '@/lib/enums'
 
@@ -24,6 +25,8 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
   const q = sanitizeSearchQuery(firstParam(sp.q))
   const typeFilter = parseEnum(firstParam(sp.type), MACHINE_TYPES)
   const activeFilter = parseBooleanParam(firstParam(sp.active))
+  const importedCount = parsePositiveIntParam(firstParam(sp.imported))
+  const skippedCount = parsePositiveIntParam(firstParam(sp.skipped))
 
   const supabase = await createClient()
 
@@ -44,11 +47,29 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <h1 className="font-display text-2xl font-semibold text-ink">Machines</h1>
-        <Link href="/admin/machines/new" className={buttonClasses('primary')}>
-          <Plus size={16} />
-          Nouvelle machine
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/admin/machines/import" className={buttonClasses('secondary')}>
+            <Upload size={16} />
+            Importer CSV
+          </Link>
+          <Link href="/admin/machines/new" className={buttonClasses('primary')}>
+            <Plus size={16} />
+            Nouvelle machine
+          </Link>
+        </div>
       </div>
+
+      {importedCount !== null && (
+        <div className="mb-6 flex items-start gap-3 p-4 rounded-card bg-success-soft border border-success/20">
+          <CheckCircle2 size={20} className="text-success shrink-0 mt-0.5" />
+          <div className="text-sm text-success">
+            <strong>{importedCount} machine{importedCount > 1 ? 's' : ''} importée{importedCount > 1 ? 's' : ''}</strong> avec succès.
+            {skippedCount !== null && skippedCount > 0 && (
+              <> {skippedCount} ligne{skippedCount > 1 ? 's' : ''} ignorée{skippedCount > 1 ? 's' : ''} (déjà existante{skippedCount > 1 ? 's' : ''}).</>
+            )}
+          </div>
+        </div>
+      )}
 
       <SearchFilters
         placeholder="Rechercher par nº série, marque ou modèle…"
