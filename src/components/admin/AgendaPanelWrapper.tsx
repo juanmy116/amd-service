@@ -19,7 +19,7 @@ export default function AgendaPanelWrapper({ children }: { children: React.React
         {/* Cabecera de cierre — solo visible en mobile cuando abierto */}
         {open && (
           <div className="xl:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shrink-0">
-            <span className="text-sm font-semibold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
+            <span className="text-sm font-semibold text-gray-800 font-display">
               Agenda
             </span>
             <button

@@ -70,7 +70,7 @@ export default function HeroStats({ theme = 'dark' }: { theme?: 'dark' | 'light'
         >
           <Icon className="w-5 h-5 flex-shrink-0" style={{ color: isLight ? 'white' : '#BF0D0D' }} />
           <div>
-            <div className="text-3xl font-bold text-white" style={{ fontFamily: 'Poppins, sans-serif' }}>
+            <div className="text-3xl font-bold text-white font-display">
               {formatNumber(reduced ? numericValue : counts[i])}{suffix}
             </div>
             <div className="text-sm mt-0.5" style={{ color: isLight ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.65)' }}>

@@ -25,8 +25,8 @@ export default function ClientLogosDisplay({ logos }: { logos: string[] }) {
           </span>
         </div>
         <h2
-          className="text-3xl md:text-4xl font-bold"
-          style={{ color: '#111827', fontFamily: 'Poppins, sans-serif' }}
+          className="text-3xl md:text-4xl font-bold font-display"
+          style={{ color: '#111827' }}
         >
           Ils nous font confiance
         </h2>

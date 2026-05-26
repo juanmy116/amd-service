@@ -108,7 +108,7 @@ export default async function ClientContadoresPage({
           <ArrowLeft size={16} className="text-gray-600" />
         </Link>
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <h1 className="text-2xl font-semibold text-gray-900 font-display">
             {client.nom_client}
           </h1>
           <p className="text-sm text-gray-400 mt-0.5">

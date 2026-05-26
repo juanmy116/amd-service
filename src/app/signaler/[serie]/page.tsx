@@ -26,11 +26,11 @@ export default async function SignalerPage({
             className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
             style={{ backgroundColor: '#BF0D0D' }}
           >
-            <span className="text-white font-bold text-sm" style={{ fontFamily: 'Poppins, sans-serif' }}>
+            <span className="text-white font-bold text-sm font-display">
               A
             </span>
           </div>
-          <span className="text-sm font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+          <span className="text-sm font-semibold text-gray-900 font-display">
             AMD Service
           </span>
         </div>

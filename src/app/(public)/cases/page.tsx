@@ -92,7 +92,7 @@ export default function CasesPage() {
               {/* Metric */}
               <div className="flex flex-col items-center justify-center p-10 border-b lg:border-b-0 lg:border-r text-center" style={{ borderColor: '#E5E7EB' }}>
                 <c.Icon className="w-6 h-6 mb-4" style={{ color: '#BF0D0D' }} />
-                <div className="text-4xl font-bold mb-1" style={{ color: '#111827', fontFamily: 'Poppins, sans-serif' }}>{c.metric}</div>
+                <div className="text-4xl font-bold mb-1 font-display" style={{ color: '#111827' }}>{c.metric}</div>
                 <div className="text-xs uppercase tracking-widest mb-3" style={{ color: '#9CA3AF' }}>{c.metricLabel}</div>
                 <div className="text-xs font-semibold px-2 py-1 text-white" style={{ backgroundColor: '#BF0D0D' }}>{c.sector}</div>
               </div>

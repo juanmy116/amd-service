@@ -121,8 +121,8 @@ export default function PlanCards() {
               </span>
             </div>
             <h3
-              className="text-lg font-bold mb-1 text-center"
-              style={{ color: '#111827', fontFamily: 'Poppins, sans-serif' }}
+              className="text-lg font-bold mb-1 text-center font-display"
+              style={{ color: '#111827' }}
             >
               {plan.model}
             </h3>
@@ -136,7 +136,7 @@ export default function PlanCards() {
               style={{ borderColor: '#E5E7EB' }}
             >
               {plan.price === 'Sur devis' ? (
-                <span className="text-3xl font-bold" style={{ color: '#111827', fontFamily: 'Poppins, sans-serif' }}>
+                <span className="text-3xl font-bold font-display" style={{ color: '#111827' }}>
                   Sur devis
                 </span>
               ) : (
@@ -144,7 +144,7 @@ export default function PlanCards() {
                   <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: '#9CA3AF' }}>
                     Dès
                   </p>
-                  <span className="text-3xl font-bold" style={{ color: '#111827', fontFamily: 'Poppins, sans-serif' }}>
+                  <span className="text-3xl font-bold font-display" style={{ color: '#111827' }}>
                     {plan.price}
                   </span>
                   <span className="text-xs font-medium ml-2" style={{ color: '#9CA3AF' }}>

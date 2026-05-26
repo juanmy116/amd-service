@@ -240,7 +240,7 @@ export default function ServicesPage() {
         <div className="mx-auto grid max-w-7xl grid-cols-2 gap-px md:grid-cols-4" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
           {STATS.map(({ value, label }) => (
             <div key={label} className="px-8 py-12 text-center" style={{ backgroundColor: '#BF0D0D' }}>
-              <div className="mb-1 text-4xl font-bold text-white" style={{ fontFamily: 'Poppins, sans-serif' }}>
+              <div className="mb-1 text-4xl font-bold text-white font-display">
                 {value}
               </div>
               <div className="text-xs uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.75)' }}>

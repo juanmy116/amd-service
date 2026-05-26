@@ -82,10 +82,7 @@ export default function LocationStats() {
             animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: reduced ? 0 : 0.4, delay: reduced ? 0 : i * 0.1 }}
           >
-            <div
-              className="text-4xl font-bold mb-1 text-white tabular-nums"
-              style={{ fontFamily: 'Poppins, sans-serif' }}
-            >
+            <div className="text-4xl font-bold mb-1 text-white tabular-nums font-display">
               <Counter
                 numeric={numeric}
                 prefix={prefix}

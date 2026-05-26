@@ -90,7 +90,7 @@ export default async function AdminAgendaPanel() {
 
       {/* Header */}
       <div className="px-4 py-5 border-b border-gray-100 sticky top-0 bg-white z-10">
-        <h2 className="text-sm font-semibold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+        <h2 className="text-sm font-semibold text-gray-900 font-display">
           Agenda
         </h2>
         <p className="text-xs text-gray-400 mt-0.5">
