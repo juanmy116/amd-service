@@ -46,9 +46,7 @@ export default function ImportPreview() {
     })
   }
 
-  const insertableCount = preview
-    ? preview.rows.filter((r) => !preview.duplicatesInDb.includes(r.numero_serie)).length
-    : 0
+  const insertableCount = preview?.insertableCount ?? 0
 
   return (
     <div className="space-y-6">
@@ -56,10 +54,10 @@ export default function ImportPreview() {
         <label className="flex flex-col items-center justify-center gap-3 cursor-pointer">
           <Upload size={36} className="text-ink-muted" />
           <span className="text-sm text-ink-soft">Sélectionnez un fichier CSV</span>
-          <span className="text-xs text-ink-muted">
+          <span className="text-xs text-ink-muted text-center">
             Colonnes requises: numero_serie, marque, modele, type (color | noir_blanc)
             <br />
-            Optionnelles: nom_client, localisation
+            Optionnelle: localisation
           </span>
           <input
             type="file"
@@ -70,7 +68,7 @@ export default function ImportPreview() {
         </label>
         {file && (
           <p className="mt-4 text-center text-sm text-ink">
-            <strong>{file.name}</strong> ({Math.round(file.size / 1024)} KB)
+            <strong>{file.name}</strong> ({Math.round(file.size / 1024)} Ko)
           </p>
         )}
       </Card>
@@ -87,12 +85,21 @@ export default function ImportPreview() {
         </Card>
       )}
 
-      {preview?.missingColumns && preview.missingColumns.length > 0 && (
+      {preview && preview.missingColumns.length > 0 && (
         <Card className="p-4 bg-accent-soft">
           <p className="text-sm text-accent font-semibold">Colonnes manquantes:</p>
           <ul className="mt-2 text-sm text-accent list-disc pl-5">
             {preview.missingColumns.map((c) => <li key={c}>{c}</li>)}
           </ul>
+        </Card>
+      )}
+
+      {preview && preview.truncated && (
+        <Card className="p-4 bg-warning-soft">
+          <p className="text-sm text-warning">
+            Le fichier dépasse la limite par import. Seules les premières lignes sont prises en compte.
+            Découpez le CSV en plusieurs fichiers pour tout importer.
+          </p>
         </Card>
       )}
 
@@ -116,16 +123,6 @@ export default function ImportPreview() {
         </Card>
       )}
 
-      {preview && preview.unknownClients.length > 0 && (
-        <Card className="p-4 bg-warning-soft">
-          <p className="text-sm text-warning">
-            <strong>{preview.unknownClients.length} client{preview.unknownClients.length > 1 ? 's' : ''} inconnu{preview.unknownClients.length > 1 ? 's' : ''}</strong>
-            {' — '}les machines seront importées sans lien client:
-          </p>
-          <p className="mt-1 text-xs text-warning">{preview.unknownClients.join(', ')}</p>
-        </Card>
-      )}
-
       {preview && preview.rows.length > 0 && (
         <Card className="overflow-hidden">
           <div className="px-6 py-4 border-b border-line">
@@ -146,7 +143,6 @@ export default function ImportPreview() {
                   <Th>Marque</Th>
                   <Th>Modèle</Th>
                   <Th>Type</Th>
-                  <Th>Client</Th>
                   <Th>Localisation</Th>
                   <Th>État</Th>
                 </tr>
@@ -154,7 +150,6 @@ export default function ImportPreview() {
               <tbody>
                 {preview.rows.slice(0, 50).map((r) => {
                   const isDup = preview.duplicatesInDb.includes(r.numero_serie)
-                  const unknownClient = r.nom_client !== null && preview.unknownClients.includes(r.nom_client)
                   return (
                     <tr key={r.numero_serie} className="border-t border-line">
                       <td className="px-4 py-2 font-mono text-xs">{r.numero_serie}</td>
@@ -162,16 +157,11 @@ export default function ImportPreview() {
                       <td className="px-4 py-2">{r.modele}</td>
                       <td className="px-4 py-2">{r.type === 'color' ? 'Couleur' : 'N & B'}</td>
                       <td className="px-4 py-2">
-                        {r.nom_client ?? <span className="text-ink-muted italic">–</span>}
-                      </td>
-                      <td className="px-4 py-2">
                         {r.localisation ?? <span className="text-ink-muted italic">–</span>}
                       </td>
                       <td className="px-4 py-2">
                         {isDup ? (
                           <Badge variant="warning">Déjà existant</Badge>
-                        ) : unknownClient ? (
-                          <Badge variant="info">Sans client</Badge>
                         ) : (
                           <Badge variant="success">Nouveau</Badge>
                         )}

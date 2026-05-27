@@ -10,7 +10,7 @@ import {
   buildSafeOr,
   parseBooleanParam,
   firstParam,
-  parsePositiveIntParam,
+  parseNonNegativeIntParam,
 } from '@/lib/search'
 import { parseEnum, MACHINE_TYPES } from '@/lib/enums'
 
@@ -25,8 +25,8 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
   const q = sanitizeSearchQuery(firstParam(sp.q))
   const typeFilter = parseEnum(firstParam(sp.type), MACHINE_TYPES)
   const activeFilter = parseBooleanParam(firstParam(sp.active))
-  const importedCount = parsePositiveIntParam(firstParam(sp.imported))
-  const skippedCount = parsePositiveIntParam(firstParam(sp.skipped))
+  const importedCount = parseNonNegativeIntParam(firstParam(sp.imported))
+  const skippedCount = parseNonNegativeIntParam(firstParam(sp.skipped))
 
   const supabase = await createClient()
 
@@ -63,7 +63,13 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
         <div className="mb-6 flex items-start gap-3 p-4 rounded-card bg-success-soft border border-success/20">
           <CheckCircle2 size={20} className="text-success shrink-0 mt-0.5" />
           <div className="text-sm text-success">
-            <strong>{importedCount} machine{importedCount > 1 ? 's' : ''} importée{importedCount > 1 ? 's' : ''}</strong> avec succès.
+            {importedCount > 0 ? (
+              <>
+                <strong>{importedCount} machine{importedCount > 1 ? 's' : ''} importée{importedCount > 1 ? 's' : ''}</strong> avec succès.
+              </>
+            ) : (
+              <strong>Aucune nouvelle machine importée.</strong>
+            )}
             {skippedCount !== null && skippedCount > 0 && (
               <> {skippedCount} ligne{skippedCount > 1 ? 's' : ''} ignorée{skippedCount > 1 ? 's' : ''} (déjà existante{skippedCount > 1 ? 's' : ''}).</>
             )}

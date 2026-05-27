@@ -24,6 +24,7 @@ export default async function ImportMachinesPage() {
           <code className="px-1.5 py-0.5 bg-neutral-soft rounded text-xs"> princity_device_id = NULL</code>
           {' '}et{' '}
           <code className="px-1.5 py-0.5 bg-neutral-soft rounded text-xs">princity_pending = false</code>.
+          Pour les lier à un client, créez ensuite un contrat depuis la fiche machine.
         </p>
       </div>
 

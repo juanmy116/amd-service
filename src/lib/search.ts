@@ -47,3 +47,11 @@ export function parsePositiveIntParam(value: string | string[] | null | undefine
   const n = Number(str)
   return Number.isInteger(n) && n > 0 ? n : null
 }
+
+export function parseNonNegativeIntParam(value: string | string[] | null | undefined): number | null {
+  const str = firstParam(value)
+  if (str === null) return null
+  if (!/^[0-9]{1,15}$/.test(str)) return null
+  const n = Number(str)
+  return Number.isInteger(n) && n >= 0 ? n : null
+}
