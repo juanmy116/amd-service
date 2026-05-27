@@ -29,9 +29,10 @@ export type CsvParseResult = {
   truncated: boolean
 }
 
-// Control chars (incl. tab/newline), DEL, zero-width range and BOM. NBSP and other
-// unicode spaces collapse via \s+ in the next pass.
-const STRIP_INVISIBLE_RE = new RegExp('[\\x00-\\x1F\\x7F\\u200B-\\u200D\\uFEFF]', 'g')
+// Non-whitespace invisible chars: control range (excluding TAB/LF/CR), DEL, zero-width,
+// BOM. The control-whitespace chars (TAB/LF/CR) appear in RFC-4180 quoted cells and must
+// be preserved as a space rather than dropped — `\s+` collapses them afterwards.
+const STRIP_INVISIBLE_RE = new RegExp('[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F\\u200B-\\u200D\\uFEFF]', 'g')
 
 function normalizeString(v: unknown): string {
   if (typeof v !== 'string') return ''
@@ -63,21 +64,29 @@ export function parseMachinesCsv(content: string): CsvParseResult {
 
   const errors: CsvParseError[] = []
 
-  // Surface papaparse-level errors (mismatched quotes, field-count drift) so the admin
-  // sees the real cause instead of confusing "Valeur manquante" downstream.
+  // Surface papaparse-level errors (mismatched quotes) so the admin sees the real cause.
+  // FieldMismatch is intentionally skipped: those rows ALSO appear in parsed.data with
+  // undefined fields and trigger the per-row "Valeur manquante" path, so reporting both
+  // would double the noise. UndetectableDelimiter would just mean the file has 1 column,
+  // which falls through to the missingColumns check.
   for (const err of parsed.errors) {
+    if (err.type === 'FieldMismatch') continue
     if (err.type === 'Delimiter' && err.code === 'UndetectableDelimiter') continue
-    const row = typeof err.row === 'number' ? err.row + 2 : 0
-    errors.push({ row, message: `Erreur de format CSV: ${err.message}` })
+    const row = typeof err.row === 'number' ? err.row + 2 : null
+    errors.push({ row: row ?? 0, message: `Erreur de format CSV: ${err.message}` })
   }
 
   const rows: CsvMachineRow[] = []
   const seenSeries = new Set<string>()
+  let truncated = false
 
   // +2 because: papaparse with header:true strips the header row, and Excel rows are 1-indexed.
   // idx 0 → file line 2.
   parsed.data.forEach((raw, idx) => {
-    if (rows.length >= MAX_ROWS) return
+    if (rows.length >= MAX_ROWS) {
+      truncated = true
+      return
+    }
     const rowNum = idx + 2
 
     const numero_serie = normalizeString(raw.numero_serie)
@@ -137,8 +146,6 @@ export function parseMachinesCsv(content: string): CsvParseResult {
       localisation,
     })
   })
-
-  const truncated = parsed.data.length > MAX_ROWS
 
   return { rows, errors, missingColumns: [], truncated }
 }

@@ -29,6 +29,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  // CSV importer (/admin/machines/import) acepta hasta 1 MB. Con el overhead multipart
+  // de FormData, el body real ronda 1.1 MB — el default de 1 MB de Server Actions
+  // rechazaría peticiones legítimas antes de que la validación amistosa corra.
+  experimental: {
+    serverActions: { bodySizeLimit: '2mb' },
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },

@@ -41,15 +41,40 @@ const EMPTY_PREVIEW: PreviewState = {
   fatalError: null,
 }
 
-async function decodeCsv(file: File): Promise<string> {
-  const buf = await file.arrayBuffer()
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(buf)
-  } catch {
-    // French Excel exports default to Windows-1252; without this fallback, accents
-    // mojibake silently and nom_client/localisation lookups break.
-    return new TextDecoder('windows-1252').decode(buf)
+// Threshold of suspicious characters (replacement / non-printable) before we declare
+// the upload binary. Real CSVs are ≥99% printable text; a JPEG/PDF/ZIP is ≥30%.
+const BINARY_RATIO_THRESHOLD = 0.05
+
+function looksBinary(text: string): boolean {
+  const sample = text.slice(0, 2048)
+  if (sample.length === 0) return false
+  let suspicious = 0
+  for (let i = 0; i < sample.length; i++) {
+    const code = sample.charCodeAt(i)
+    // U+FFFD replacement char + non-whitespace control range.
+    if (
+      code === 0xfffd ||
+      (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d)
+    ) {
+      suspicious++
+    }
   }
+  return suspicious / sample.length > BINARY_RATIO_THRESHOLD
+}
+
+async function decodeCsv(file: File): Promise<{ text: string | null; error: string | null }> {
+  const buf = await file.arrayBuffer()
+  let text: string
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(buf)
+  } catch {
+    // French Excel exports default to Windows-1252; fall back rather than refuse.
+    text = new TextDecoder('windows-1252').decode(buf)
+  }
+  if (looksBinary(text)) {
+    return { text: null, error: 'Le fichier ne semble pas être un CSV (contenu binaire détecté).' }
+  }
+  return { text, error: null }
 }
 
 async function findExistingSerials(
@@ -80,12 +105,15 @@ async function buildPreview(supabase: AdminSupabase, file: File): Promise<Previe
   if (file.size > MAX_CSV_BYTES) {
     return {
       ...EMPTY_PREVIEW,
-      fatalError: `Fichier trop volumineux (max ${Math.floor(MAX_CSV_BYTES / 1024)} Ko).`,
+      fatalError: `Fichier trop volumineux (max ${MAX_CSV_BYTES / (1024 * 1024)} Mo).`,
     }
   }
 
-  const content = await decodeCsv(file)
-  const { rows, errors, missingColumns, truncated } = parseMachinesCsv(content)
+  const decoded = await decodeCsv(file)
+  if (decoded.error) {
+    return { ...EMPTY_PREVIEW, fatalError: decoded.error }
+  }
+  const { rows, errors, missingColumns, truncated } = parseMachinesCsv(decoded.text!)
 
   if (missingColumns.length > 0) {
     return { ...EMPTY_PREVIEW, missingColumns }
@@ -190,7 +218,7 @@ export async function importCsvAction(formData: FormData): Promise<ImportResult>
 
   revalidatePath('/admin')
   revalidatePath('/admin/machines')
-  revalidatePath('/tech/machines')
+  revalidatePath('/admin/contadores')
 
   return { inserted, skipped, error: null }
 }

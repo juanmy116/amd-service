@@ -6,6 +6,7 @@ import { Upload, CheckCircle2 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { buttonClasses } from '@/components/ui/Button'
+import { MAX_ROWS } from '@/lib/csv-import'
 import { previewCsvAction, importCsvAction, type PreviewState } from './actions'
 
 export default function ImportPreview() {
@@ -97,8 +98,8 @@ export default function ImportPreview() {
       {preview && preview.truncated && (
         <Card className="p-4 bg-warning-soft">
           <p className="text-sm text-warning">
-            Le fichier dépasse la limite par import. Seules les premières lignes sont prises en compte.
-            Découpez le CSV en plusieurs fichiers pour tout importer.
+            Le fichier dépasse la limite par import: seules les {MAX_ROWS} premières lignes
+            sont prises en compte. Découpez le CSV en plusieurs fichiers pour tout importer.
           </p>
         </Card>
       )}
@@ -109,11 +110,16 @@ export default function ImportPreview() {
             {preview.errors.length} ligne{preview.errors.length > 1 ? 's' : ''} avec erreur:
           </p>
           <ul className="mt-2 text-sm text-accent list-disc pl-5 max-h-48 overflow-y-auto">
-            {preview.errors.slice(0, 20).map((e, i) => (
-              <li key={i}>
-                Ligne {e.row}{e.field ? ` (${e.field})` : ''}: {e.message}
-              </li>
-            ))}
+            {preview.errors.slice(0, 20).map((e, i) => {
+              const location = e.row > 0
+                ? `Ligne ${e.row}${e.field ? ` (${e.field})` : ''}`
+                : 'Fichier'
+              return (
+                <li key={i}>
+                  {location}: {e.message}
+                </li>
+              )
+            })}
             {preview.errors.length > 20 && (
               <li className="text-ink-muted italic">
                 … et {preview.errors.length - 20} autres
