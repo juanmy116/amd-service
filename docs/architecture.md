@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-22 (sesión 22 — rediseño Fase 3: PWA técnico `/tech` migrada — rediseño UI «Híbrido» completo en las 3 superficies)
+> Última actualización: 2026-05-26 (sesión 23 — importador CSV de máquinas en `/admin/machines/import` para preparar Fase B OCR)
 
 ---
 
@@ -260,9 +260,21 @@ Cliente
 
 > **Flujo de creación desacoplado (sin dependencia circular):**
 > 1. Crear cliente (`/admin/clients/new`) — solo datos del cliente
-> 2. Crear máquina (`/admin/machines/new`) — solo datos de la máquina
+> 2. Crear máquina (`/admin/machines/new` individual o `/admin/machines/import` en bloque vía CSV) — solo datos de la máquina
 > 3. Crear contrato (`/admin/contracts/new`) — une cliente + máquina (solo muestra máquinas sin contrato activo)
 > 4. Crear plan de mantenimiento (`/admin/maintenance/new`) — enlazado al contrato
+
+### Importador CSV de máquinas (`/admin/machines/import`) — sesión 23
+
+Para dar de alta en bloque las máquinas que **no están en Princity**:
+- Flujo 2 pasos: upload CSV → preview con validaciones → confirmar import.
+- Parser `papaparse` (BOM UTF-8, exports Excel OK). Helper en `src/lib/csv-import.ts`.
+- Columnas requeridas: `numero_serie`, `marque`, `modele`, `type` (`color` | `noir_blanc`).
+- Columnas opcionales: `nom_client` (informacional para preview, machines no tiene `client_id`), `localisation`.
+- Marca distintiva: las máquinas creadas reciben `princity_device_id=NULL` + `princity_pending=false`. El cron `princity-counters` ya filtra por `princity_device_id IS NOT NULL` → no las toca.
+- Idempotencia: serie duplicada en BD → marcada «Déjà existant», NO se actualiza.
+- Tamaño máximo CSV: 1 MB.
+- **Prerequisito de la Fase B OCR de contadores** (spec en `docs/superpowers/specs/2026-05-26-ocr-contadores.md`).
 
 ---
 

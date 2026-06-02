@@ -46,3 +46,7 @@ supabase/.temp/
 
 # brainstorming visual companion (mockups, no van al repo)
 .superpowers/
+
+# Local-only test fixtures and spike scripts (sesion 23)
+test-fixtures/
+scripts/
