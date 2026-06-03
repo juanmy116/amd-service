@@ -23,6 +23,7 @@ Deno.serve(async (_req: Request) => {
       .select(`
         machine_id,
         contract_id,
+        billing_day_override,
         contracts!inner (
           id,
           client_id,
@@ -35,24 +36,25 @@ Deno.serve(async (_req: Request) => {
         )
       `)
       .is('date_fin', null)
+      .eq('statut', 'actif')
       .eq('contracts.statut', 'actif')
       .not('machines.princity_device_id', 'is', null)
 
     const machinesWithContracts = (lines ?? []).map(l => ({
-      numero_serie:       (l.machines as unknown as { numero_serie: string; princity_device_id: string | null }).numero_serie,
-      princity_device_id: (l.machines as unknown as { numero_serie: string; princity_device_id: string | null }).princity_device_id,
-      contracts:          l.contracts as unknown as { id: string; client_id: number; billing_day: number | null; statut: string },
+      numero_serie:         (l.machines as unknown as { numero_serie: string; princity_device_id: string | null }).numero_serie,
+      princity_device_id:   (l.machines as unknown as { numero_serie: string; princity_device_id: string | null }).princity_device_id,
+      billing_day_override: l.billing_day_override as number | null,
+      contracts:            l.contracts as unknown as { id: string; client_id: number; billing_day: number | null; statut: string },
     }))
 
     const machines = machinesWithContracts
     processed = machines.length
 
     for (const m of machines) {
-      const contract   = m.contracts
-      const billingDay = contract.billing_day
+      const contract            = m.contracts
+      const effectiveBillingDay = m.billing_day_override ?? contract.billing_day
 
-      // Optimización: si ya conocemos el día y hoy no es ese día, saltar
-      if (billingDay !== null && billingDay !== todayDay) continue
+      if (effectiveBillingDay !== null && effectiveBillingDay !== todayDay) continue
 
       const entries = await princity.fetchAll('/v3/billingCounters', {
         cursorParams: {
@@ -109,13 +111,17 @@ Deno.serve(async (_req: Request) => {
       })
 
       if (insertErr) {
+        if ((insertErr as { code?: string }).code === '23505') {
+          // Relevé ya existe (race entre cron y guardado manual) — idempotencia OK
+          continue
+        }
         console.error('[princity-counters] insert error:', insertErr.message)
         errors++
         continue
       }
 
       // Aprender el día de facturación si no estaba guardado
-      if (billingDay === null) {
+      if (effectiveBillingDay === null) {
         await db.from('contracts')
           .update({ billing_day: counterDay })
           .eq('id', contract.id)
