@@ -61,13 +61,14 @@ Deno.serve(async (_req: Request) => {
         .eq('princity_device_id', deviceId)
         .maybeSingle()
 
-      // Buscar contrato activo de la máquina
-      const { data: contract } = machine ? await db
-        .from('contracts')
-        .select('id, client_id')
+      // Buscar línea de contrato activa de la máquina (nuevo modelo N máquinas)
+      const { data: openLine } = machine ? await db
+        .from('contract_machines')
+        .select('id, contract_id, contracts(id, client_id)')
         .eq('machine_id', machine.numero_serie)
-        .eq('statut', 'actif')
+        .is('date_fin', null)
         .maybeSingle() : { data: null }
+      const contract = (openLine?.contracts as { id: string; client_id: number } | null) ?? null
 
       const alertType = classifyAlert(entry)
 
@@ -94,18 +95,19 @@ Deno.serve(async (_req: Request) => {
         continue
       }
 
-      // Crear incidencia si es panne
-      if (alertType === 'panne' && machine && contract) {
+      // Crear incidencia si es panne (con o sin contrato activo)
+      if (alertType === 'panne' && machine) {
         const { data: incident } = await db
           .from('incidents')
           .insert({
-            contract_id:  contract.id,
-            machine_id:   machine.numero_serie,
-            title:        `Panne détectée par Princity: ${entry['Alert.description']}`,
-            description:  String(entry['Alert.description'] ?? ''),
-            category:     'panne',
-            priority:     'haute',
-            status:       'nouveau',
+            contract_machine_id: openLine?.id ?? null,
+            machine_id:          openLine ? null : machine.numero_serie,
+            contract_id:         contract?.id ?? null,
+            title:               `Panne détectée par Princity: ${entry['Alert.description']}`,
+            description:         String(entry['Alert.description'] ?? ''),
+            category:            'panne',
+            priority:            'haute',
+            status:              'nouveau',
           })
           .select('id')
           .single()
