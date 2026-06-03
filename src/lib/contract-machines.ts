@@ -28,6 +28,12 @@ export type ContractMachineWithMachine = ContractMachine & {
 /**
  * Línea de contract_machine ABIERTA (date_fin IS NULL) para una máquina dada.
  * Devuelve null si la máquina no tiene línea abierta.
+ *
+ * NOTA DE DISEÑO: filtra únicamente por `date_fin IS NULL`, sin importar `statut`.
+ * Una máquina con statut='suspendue' sigue vinculada a su contrato hasta que se le
+ * asigne una date_fin — esto es correcto por spec (sección 2.2: la exclusividad de
+ * vinculación se basa en date_fin, no en statut). Para obtener las líneas que están
+ * realmente en servicio usar `getActiveLinesForContract`, que sí filtra `statut='actif'`.
  */
 export async function getOpenLineForMachine(
   supabase: SupabaseClient,
