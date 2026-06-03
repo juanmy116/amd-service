@@ -12,41 +12,42 @@ export async function createIncidentAction(
 ): Promise<FormState> {
   const { user, supabase } = await requireAdmin()
 
-  const title       = (formData.get('title')       as string).trim()
-  const contract_id = (formData.get('contract_id') as string).trim()
+  const title = ((formData.get('title') as string) ?? '').trim()
+  const contract_machine_id = ((formData.get('contract_machine_id') as string) ?? '').trim()
 
-  if (!title)       return { error: 'Le titre est obligatoire.' }
-  if (!contract_id) return { error: 'Veuillez sélectionner un contrat.' }
+  if (!title) return { error: 'Le titre est obligatoire.' }
+  if (!contract_machine_id) return { error: 'Veuillez sélectionner une machine du contrat.' }
 
-  const { data: contract } = await supabase
-    .from('contracts')
-    .select('machine_id')
-    .eq('id', contract_id)
-    .single()
+  // Validar que la línea existe y obtener cliente para autorización
+  const { data: line } = await supabase
+    .from('contract_machines')
+    .select('id, contract_id, machine_id, contracts!inner(client_id)')
+    .eq('id', contract_machine_id)
+    .maybeSingle()
 
-  if (!contract) return { error: 'Contrat introuvable.' }
+  if (!line) return { error: 'Ligne de contrat introuvable.' }
 
   const category = parseEnum(formData.get('category'), INCIDENT_CATEGORIES)
   const priority = parseEnum(formData.get('priority'), INCIDENT_PRIORITIES)
   if (!category) return { error: 'Catégorie invalide.' }
   if (!priority) return { error: 'Priorité invalide.' }
 
-  const assigned_to = (formData.get('assigned_to') as string).trim() || null
-  const status      = assigned_to ? 'assigné' : 'nouveau'
+  const assigned_to = ((formData.get('assigned_to') as string) ?? '').trim() || null
+  const status = assigned_to ? 'assigné' : 'nouveau'
 
   const { data: incident, error } = await supabase
     .from('incidents')
     .insert({
-      contract_id,
-      machine_id:  contract.machine_id,
-      opened_by:   user.id,
+      contract_machine_id,
+      machine_id: null,             // forzar NULL por XOR
+      opened_by: user.id,
       assigned_to,
       title,
-      description: (formData.get('description') as string).trim() || null,
+      description: ((formData.get('description') as string) ?? '').trim() || null,
       category,
       priority,
       status,
-    })
+    } as any)
     .select('id')
     .single()
 
@@ -55,10 +56,10 @@ export async function createIncidentAction(
   if (incident) {
     await supabase.from('incident_history').insert({
       incident_id: incident.id,
-      changed_by:  user.id,
-      old_status:  null,
-      new_status:  status,
-      comment:     'Incident créé',
+      changed_by: user.id,
+      old_status: null,
+      new_status: status,
+      comment: 'Incident créé',
     })
   }
 

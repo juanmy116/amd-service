@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import QrCanvas from './qr-canvas'
 import PrintButtons from './print-buttons'
+import { getOpenLineForMachine } from '@/lib/contract-machines'
 
 export default async function MachineQrPage({
   params,
@@ -21,12 +22,16 @@ export default async function MachineQrPage({
 
   if (!machine) notFound()
 
-  const { data: contract } = await supabase
-    .from('contracts')
-    .select('numero_contrat, lieu_installation, clients(id, nom_client)')
-    .eq('machine_id', numero_serie)
-    .eq('statut', 'actif')
-    .maybeSingle()
+  const openLine = await getOpenLineForMachine(supabase, numero_serie)
+  let contract: { numero_contrat: string; clients: unknown } | null = null
+  if (openLine) {
+    const { data } = await supabase
+      .from('contracts')
+      .select('numero_contrat, clients(id, nom_client)')
+      .eq('id', openLine.contract_id)
+      .maybeSingle()
+    contract = data
+  }
 
   const client = contract?.clients as unknown as { id: number; nom_client: string } | null
   const qrUrl = `${process.env.NEXT_PUBLIC_APP_URL}/m/${encodeURIComponent(numero_serie)}`
@@ -115,10 +120,10 @@ export default async function MachineQrPage({
                     </div>
                   )}
                 </div>
-                {contract?.lieu_installation && (
+                {machine.localisation && (
                   <div>
                     <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">Site</p>
-                    <p className="text-xs text-ink">{contract.lieu_installation}</p>
+                    <p className="text-xs text-ink">{machine.localisation}</p>
                   </div>
                 )}
               </>

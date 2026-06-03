@@ -9,7 +9,7 @@ export default async function NewMaintenancePlanPage() {
   const [{ data: allContracts }, { data: existingPlans }] = await Promise.all([
     supabase
       .from('contracts')
-      .select('id, numero_contrat, clients(nom_client), machines(marque, modele)')
+      .select('id, numero_contrat, clients(nom_client)')
       .eq('statut', 'actif')
       .order('numero_contrat'),
     supabase

@@ -1,6 +1,7 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth'
+import { getOpenLineForMachine } from '@/lib/contract-machines'
 import { revalidatePath } from 'next/cache'
 
 export type CounterFormState = { error?: string; success?: boolean } | null
@@ -37,18 +38,24 @@ export async function saveCounterAction(
 
   if (existing) return { error: `Un relevé actif existe déjà pour ce mois. Annulez-le d'abord avant d'en créer un nouveau.` }
 
-  // Capturar contrato y cliente activos en el momento del relevé
-  const { data: contract } = await supabase
-    .from('contracts')
-    .select('id, client_id')
-    .eq('machine_id', machine_id)
-    .eq('statut', 'actif')
-    .maybeSingle()
+  // Capturar contrato y cliente activos en el momento del relevé via contract_machines
+  const openLine = await getOpenLineForMachine(supabase, machine_id)
+  let contract_id: string | null = null
+  let client_id_val: number | null = null
+  if (openLine) {
+    const { data: contractRow } = await supabase
+      .from('contracts')
+      .select('id, client_id')
+      .eq('id', openLine.contract_id)
+      .single()
+    contract_id = contractRow?.id ?? null
+    client_id_val = contractRow?.client_id ?? null
+  }
 
   const { error } = await supabase.from('machine_counters').insert({
     machine_id,
-    contract_id:          contract?.id ?? null,
-    client_id:            contract?.client_id ?? null,
+    contract_id:          contract_id,
+    client_id:            client_id_val,
     year,
     month,
     day,
