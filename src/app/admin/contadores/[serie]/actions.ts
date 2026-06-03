@@ -68,6 +68,9 @@ export async function saveCounterAction(
   })
 
   if (error) {
+    if (error.code === '23505') {
+      return { error: `Un relevé actif existe déjà pour ce mois. Annulez-le d'abord avant d'en créer un nouveau.` }
+    }
     console.error('[saveCounter]', error)
     return { error: 'Une erreur est survenue. Veuillez réessayer.' }
   }
