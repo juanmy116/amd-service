@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
+import { Loader2, ArrowLeft, Trash2, AlertTriangle, Plus, X } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 
 type FormState = { error: string } | null
@@ -10,11 +10,20 @@ type FormState = { error: string } | null
 type ContractData = {
   numero_contrat?: string
   client_id?: number
-  machine_id?: string
   date_debut?: string
   date_renouvellement?: string | null
-  lieu_installation?: string | null
   statut?: 'actif' | 'suspendu' | 'terminé'
+  billing_day?: number | null
+  maintenance_frequency?: 'mensuel' | 'trimestriel' | null
+}
+
+type LineInput = {
+  id?: string                                               // present for existing lines
+  machine_id: string
+  date_debut: string
+  billing_day_override: number | null
+  maintenance_frequency_override: 'mensuel' | 'trimestriel' | null
+  notes: string | null
 }
 
 type ClientOption = { id: number; nom_client: string }
@@ -23,8 +32,9 @@ type MachineOption = { numero_serie: string; marque: string; modele: string }
 type Props = {
   action: (prev: FormState, data: FormData) => Promise<FormState>
   defaultValues?: ContractData
+  initialLines?: LineInput[]
   clients: ClientOption[]
-  machines: MachineOption[]
+  availableMachines: MachineOption[]
   title: string
   isEdit?: boolean
   contractId?: string
@@ -37,11 +47,43 @@ const inputClass =
 const selectClass =
   'w-full px-3.5 py-2.5 rounded-lg border border-line text-ink text-sm bg-card focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent'
 
+const inputSmClass =
+  'w-full px-3 py-2 rounded-lg border border-line text-ink text-sm placeholder-ink-muted bg-card focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent'
+
+const selectSmClass =
+  'w-full px-3 py-2 rounded-lg border border-line text-ink text-sm bg-card focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent'
+
+function emptyLine(): LineInput {
+  return {
+    machine_id: '',
+    date_debut: new Date().toISOString().slice(0, 10),
+    billing_day_override: null,
+    maintenance_frequency_override: null,
+    notes: null,
+  }
+}
+
 export default function ContractForm({
-  action, defaultValues, clients, machines, title, isEdit, contractId, deleteAction,
+  action, defaultValues, initialLines, clients, availableMachines, title, isEdit, contractId, deleteAction,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
   const [confirming, setConfirming] = useState(false)
+  const [lines, setLines] = useState<LineInput[]>(initialLines ?? [emptyLine()])
+
+  function addLine() {
+    setLines((prev) => [...prev, emptyLine()])
+  }
+
+  function removeLine(idx: number) {
+    setLines((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  function updateLine<K extends keyof LineInput>(idx: number, key: K, value: LineInput[K]) {
+    setLines((prev) => prev.map((l, i) => i === idx ? { ...l, [key]: value } : l))
+  }
+
+  // Machine IDs already used in other lines (to avoid duplicates)
+  const usedMachineIds = new Set(lines.map((l) => l.machine_id).filter(Boolean))
 
   return (
     <div className="p-8 max-w-3xl">
@@ -98,7 +140,15 @@ export default function ContractForm({
 
       {/* Form */}
       <form action={formAction}>
-        <Card className="p-6 space-y-5">
+        {/* Hidden field: serialised lines */}
+        <input type="hidden" name="lines" value={JSON.stringify(lines)} />
+
+        {/* ── Section 1: Contrat ── */}
+        <Card className="p-6 space-y-5 mb-6">
+
+          <h2 className="text-sm font-semibold text-ink-soft uppercase tracking-wide">
+            Informations du contrat
+          </h2>
 
           {state?.error && (
             <div className="px-4 py-3 rounded-lg bg-accent-soft border border-accent/20 text-sm text-accent">
@@ -127,47 +177,22 @@ export default function ContractForm({
             )}
           </div>
 
-          {/* Client + Machine */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-ink-soft mb-1.5">
-                Client <span className="text-accent">*</span>
-              </label>
-              <select
-                name="client_id"
-                required
-                defaultValue={defaultValues?.client_id ?? ''}
-                className={selectClass}
-              >
-                <option value="" disabled>Sélectionner...</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nom_client}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink-soft mb-1.5">
-                Machine <span className="text-accent">*</span>
-              </label>
-              <select
-                name="machine_id"
-                required
-                defaultValue={defaultValues?.machine_id ?? ''}
-                className={selectClass}
-              >
-                <option value="" disabled>Sélectionner...</option>
-                {machines.map((m) => (
-                  <option key={m.numero_serie} value={m.numero_serie}>
-                    {m.marque} {m.modele} — {m.numero_serie}
-                  </option>
-                ))}
-              </select>
-              {!isEdit && machines.length === 0 && (
-                <p className="text-xs text-warning mt-1.5">
-                  Aucune machine disponible (toutes sont déjà assignées à un contrat actif).
-                </p>
-              )}
-            </div>
+          {/* Client */}
+          <div>
+            <label className="block text-sm font-medium text-ink-soft mb-1.5">
+              Client <span className="text-accent">*</span>
+            </label>
+            <select
+              name="client_id"
+              required
+              defaultValue={defaultValues?.client_id ?? ''}
+              className={selectClass}
+            >
+              <option value="" disabled>Sélectionner...</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>{c.nom_client}</option>
+              ))}
+            </select>
           </div>
 
           {/* Dates */}
@@ -195,31 +220,204 @@ export default function ContractForm({
             </div>
           </div>
 
-          {/* Lieu d'installation */}
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1.5">Lieu d&apos;installation</label>
-            <input
-              name="lieu_installation"
-              type="text"
-              defaultValue={defaultValues?.lieu_installation ?? ''}
-              placeholder="Rue 10, Point E, Dakar"
-              className={inputClass}
-            />
+          {/* Statut + Billing day + Maintenance frequency */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-ink-soft mb-1.5">Statut</label>
+              <select
+                name="statut"
+                defaultValue={defaultValues?.statut ?? 'actif'}
+                className={selectClass}
+              >
+                <option value="actif">Actif</option>
+                <option value="suspendu">Suspendu</option>
+                <option value="terminé">Terminé</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                Jour de facturation
+                <span className="ml-1 text-xs font-normal text-ink-muted">(défaut contrat)</span>
+              </label>
+              <input
+                name="billing_day"
+                type="number"
+                min={1}
+                max={31}
+                defaultValue={defaultValues?.billing_day ?? ''}
+                placeholder="1–31"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                Fréquence maintenance
+                <span className="ml-1 text-xs font-normal text-ink-muted">(défaut)</span>
+              </label>
+              <select
+                name="maintenance_frequency"
+                defaultValue={defaultValues?.maintenance_frequency ?? ''}
+                className={selectClass}
+              >
+                <option value="">—</option>
+                <option value="mensuel">Mensuel</option>
+                <option value="trimestriel">Trimestriel</option>
+              </select>
+            </div>
+          </div>
+        </Card>
+
+        {/* ── Section 2: Machines du contrat ── */}
+        <Card className="p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-ink-soft uppercase tracking-wide">
+              Machines du contrat
+            </h2>
+            <button
+              type="button"
+              onClick={addLine}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line text-sm font-medium text-ink-soft hover:bg-neutral-soft transition-colors"
+            >
+              <Plus size={14} />
+              Ajouter une machine
+            </button>
           </div>
 
-          {/* Statut */}
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1.5">Statut</label>
-            <select
-              name="statut"
-              defaultValue={defaultValues?.statut ?? 'actif'}
-              className={selectClass}
-            >
-              <option value="actif">Actif</option>
-              <option value="suspendu">Suspendu</option>
-              <option value="terminé">Terminé</option>
-            </select>
+          {availableMachines.length === 0 && lines.length === 0 && (
+            <p className="text-sm text-ink-muted">
+              Aucune machine disponible (toutes sont déjà assignées à un contrat actif).
+            </p>
+          )}
+
+          <div className="space-y-4">
+            {lines.map((line, idx) => {
+              // This line's machine is always available to itself even if "used"
+              const selectableMachines = availableMachines.filter(
+                (m) => !usedMachineIds.has(m.numero_serie) || m.numero_serie === line.machine_id
+              )
+
+              return (
+                <div
+                  key={idx}
+                  className="p-4 rounded-lg border border-line bg-neutral-soft space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
+                      Machine {idx + 1}
+                    </span>
+                    {lines.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeLine(idx)}
+                        className="flex items-center gap-1 text-xs text-accent hover:text-accent/80 transition-colors"
+                      >
+                        <X size={13} />
+                        Retirer
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Machine selector + date_debut */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-ink-muted mb-1">
+                        Numéro de série <span className="text-accent">*</span>
+                      </label>
+                      <select
+                        value={line.machine_id}
+                        onChange={(e) => updateLine(idx, 'machine_id', e.target.value)}
+                        className={selectSmClass}
+                        required
+                      >
+                        <option value="" disabled>Sélectionner...</option>
+                        {selectableMachines.map((m) => (
+                          <option key={m.numero_serie} value={m.numero_serie}>
+                            {m.marque} {m.modele} — {m.numero_serie}
+                          </option>
+                        ))}
+                        {/* If the machine is already assigned to this contract (edit mode), show it */}
+                        {line.machine_id && !selectableMachines.find(m => m.numero_serie === line.machine_id) && (
+                          <option value={line.machine_id}>{line.machine_id} (actuel)</option>
+                        )}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-ink-muted mb-1">
+                        Date de début <span className="text-accent">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={line.date_debut}
+                        onChange={(e) => updateLine(idx, 'date_debut', e.target.value)}
+                        required
+                        className={inputSmClass}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Overrides */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-ink-muted mb-1">
+                        Jour facturation (override)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={31}
+                        value={line.billing_day_override ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value === '' ? null : Number(e.target.value)
+                          updateLine(idx, 'billing_day_override', v)
+                        }}
+                        placeholder="1–31"
+                        className={inputSmClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-ink-muted mb-1">
+                        Fréquence maintenance (override)
+                      </label>
+                      <select
+                        value={line.maintenance_frequency_override ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value as 'mensuel' | 'trimestriel' | ''
+                          updateLine(idx, 'maintenance_frequency_override', v === '' ? null : v)
+                        }}
+                        className={selectSmClass}
+                      >
+                        <option value="">— (défaut contrat)</option>
+                        <option value="mensuel">Mensuel</option>
+                        <option value="trimestriel">Trimestriel</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-xs font-medium text-ink-muted mb-1">Notes</label>
+                    <input
+                      type="text"
+                      value={line.notes ?? ''}
+                      onChange={(e) => updateLine(idx, 'notes', e.target.value || null)}
+                      placeholder="Consignes particulières pour cette machine…"
+                      className={inputSmClass}
+                    />
+                  </div>
+                </div>
+              )
+            })}
           </div>
+
+          {lines.length === 0 && availableMachines.length > 0 && (
+            <button
+              type="button"
+              onClick={addLine}
+              className="mt-3 text-sm text-ink-soft hover:text-ink transition-colors"
+            >
+              + Ajouter une première machine
+            </button>
+          )}
         </Card>
 
         {/* Actions */}

@@ -11,6 +11,7 @@ type ContractOption = {
   id: string
   numero_contrat: string
   clients:  { nom_client: string }
+  /** Representative machine for the contract (first active line, or placeholder) */
   machines: { marque: string; modele: string }
 }
 
