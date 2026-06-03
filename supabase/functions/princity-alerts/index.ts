@@ -102,7 +102,6 @@ Deno.serve(async (_req: Request) => {
           .insert({
             contract_machine_id: openLine?.id ?? null,
             machine_id:          openLine ? null : machine.numero_serie,
-            contract_id:         contract?.id ?? null,
             title:               `Panne détectée par Princity: ${entry['Alert.description']}`,
             description:         String(entry['Alert.description'] ?? ''),
             category:            'panne',

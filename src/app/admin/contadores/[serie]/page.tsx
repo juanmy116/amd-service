@@ -9,6 +9,7 @@ import CancelModal from './cancel-modal'
 import { Card } from '@/components/ui/Card'
 import { PanelHeader } from '@/components/ui/PanelHeader'
 import { Badge } from '@/components/ui/Badge'
+import { getOpenLineForMachine } from '@/lib/contract-machines'
 
 interface Counter {
   id:                   string
@@ -83,12 +84,16 @@ export default async function ContadoresDetailPage({
 
   if (!machine) notFound()
 
-  const { data: contract } = await supabase
-    .from('contracts')
-    .select('id, numero_contrat, clients(id, nom_client)')
-    .eq('machine_id', numero_serie)
-    .eq('statut', 'actif')
-    .maybeSingle()
+  const openLine = await getOpenLineForMachine(supabase, numero_serie)
+  let contract: { id: string; numero_contrat: string; clients: { id: number; nom_client: string } | null } | null = null
+  if (openLine?.contract_id) {
+    const { data } = await supabase
+      .from('contracts')
+      .select('id, numero_contrat, clients(id, nom_client)')
+      .eq('id', openLine.contract_id)
+      .maybeSingle()
+    contract = data as { id: string; numero_contrat: string; clients: { id: number; nom_client: string } | null } | null
+  }
 
   const client = contract?.clients as unknown as { id: number; nom_client: string } | null
 

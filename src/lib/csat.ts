@@ -4,28 +4,41 @@ import { sendEmail } from './email'
 export async function sendCsatForIncident(incidentId: string): Promise<void> {
   const admin = createAdminClient()
 
-  // Comprobamos si ya existe una entrada CSAT para este incidente
   const { data: existing } = await admin
     .from('csat_responses')
     .select('token, responded_at')
     .eq('incident_id', incidentId)
     .maybeSingle()
 
-  // Si ya respondió, no reenviamos
   if (existing?.responded_at) return
 
-  // Obtenemos el incidente y el contrato vinculado
   const { data: incident } = await admin
     .from('incidents')
-    .select('id, title, contract_id, contracts(client_id)')
+    .select('id, title, contract_id, contract_machine_id, contracts(client_id)')
     .eq('id', incidentId)
     .single()
 
-  if (!incident?.contract_id) return
-  const clientId = (incident.contracts as unknown as { client_id: number } | null)?.client_id
+  if (!incident) return
+
+  // Resolver client_id: primero por contract_machine_id (modelo nuevo),
+  // luego por contract_id (fallback legacy).
+  let clientId: number | null = null
+
+  if (incident.contract_machine_id) {
+    const { data: line } = await admin
+      .from('contract_machines')
+      .select('contracts(client_id)')
+      .eq('id', incident.contract_machine_id)
+      .single()
+    clientId = (line?.contracts as unknown as { client_id: number } | null)?.client_id ?? null
+  }
+
+  if (!clientId && incident.contract_id) {
+    clientId = (incident.contracts as unknown as { client_id: number } | null)?.client_id ?? null
+  }
+
   if (!clientId) return
 
-  // Obtenemos el profile_id del cliente
   const { data: cp } = await admin
     .from('client_profiles')
     .select('profile_id')
@@ -34,11 +47,9 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
 
   if (!cp?.profile_id) return
 
-  // Obtenemos el email desde auth.users
   const { data: { user } } = await admin.auth.admin.getUserById(cp.profile_id)
   if (!user?.email) return
 
-  // Creamos (o recuperamos) la entrada CSAT
   let token: string
   if (existing) {
     token = existing.token
@@ -61,7 +72,6 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
     data: { title: incident.title, csat_url: csatUrl },
   })
 
-  // Cierre automático tras envío del CSAT — guard .eq('status','résolu') previene dobles cierres
   const { data: closed } = await admin
     .from('incidents')
     .update({ status: 'fermé', closed_at: new Date().toISOString() })

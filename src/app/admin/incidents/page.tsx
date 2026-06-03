@@ -37,11 +37,20 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
       : Promise.resolve({ data: null }),
   ])
 
+  // Para incidencias nuevas (post-refactor) el cliente está en contract_machines,
+  // no en contracts. Cargamos los IDs de líneas del cliente seleccionado.
+  const contractIds = (contractIdsRes.data ?? []).map((c) => c.id)
+  const cmIds: string[] = clientId && contractIds.length > 0
+    ? ((await supabase.from('contract_machines').select('id').in('contract_id', contractIds)).data ?? []).map((l) => l.id)
+    : []
+
   let query = supabase
     .from('incidents')
     .select(`
-      id, numero_incident, title, category, priority, status, machine_id, created_at, contract_id, assigned_to,
+      id, numero_incident, title, category, priority, status, machine_id, created_at,
+      contract_id, contract_machine_id, assigned_to,
       contracts(client_id, clients(nom_client)),
+      contract_machines(machine_id, machines(numero_serie), contracts(client_id, clients(nom_client))),
       profiles!assigned_to(full_name)
     `)
     .order('created_at', { ascending: false })
@@ -51,31 +60,52 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
   if (statusFilter) query = query.eq('status', statusFilter)
   if (priorityFilter) query = query.eq('priority', priorityFilter)
   if (clientId) {
-    // .in() con array vacío genera 0 resultados (cliente sin contratos).
-    const ids = (contractIdsRes.data ?? []).map((c) => c.id)
-    query = query.in('contract_id', ids)
+    const orParts: string[] = []
+    if (contractIds.length > 0) orParts.push(`contract_id.in.(${contractIds.join(',')})`)
+    if (cmIds.length > 0) orParts.push(`contract_machine_id.in.(${cmIds.join(',')})`)
+    if (orParts.length > 0) {
+      query = query.or(orParts.join(','))
+    } else {
+      // Cliente existe pero no tiene contratos ni líneas → sin resultados
+      query = query.eq('id', '00000000-0000-0000-0000-000000000000')
+    }
   }
 
   const { data: incidents } = await query
   const truncated = (incidents?.length ?? 0) >= RESULT_LIMIT
 
   // Transformación a filas planas para los dos renderizados.
+  type CmNested = {
+    machine_id: string
+    machines: { numero_serie: string } | null
+    contracts: { client_id: number; clients: { nom_client: string } | null } | null
+  } | null
   type Row = NonNullable<typeof incidents>[number] & {
     contracts: { client_id: number; clients: { nom_client: string } | null } | null
+    contract_machines: CmNested
     profiles: { full_name: string | null } | null
   }
-  const rows = ((incidents ?? []) as unknown as Row[]).map((inc) => ({
-    id: inc.id,
-    numero_incident: inc.numero_incident,
-    title: inc.title,
-    status: inc.status,
-    priority: inc.priority,
-    category: inc.category,
-    machine_id: inc.machine_id,
-    created_at: inc.created_at,
-    clientName: inc.contracts?.clients?.nom_client ?? null,
-    technicianName: inc.profiles?.full_name ?? null,
-  }))
+
+  const rows = ((incidents ?? []) as unknown as Row[]).map((inc) => {
+    const cm = inc.contract_machines
+    const resolvedMachineId = cm?.machine_id ?? inc.machine_id
+    const resolvedClientName =
+      cm?.contracts?.clients?.nom_client ??
+      inc.contracts?.clients?.nom_client ??
+      null
+    return {
+      id: inc.id,
+      numero_incident: inc.numero_incident,
+      title: inc.title,
+      status: inc.status,
+      priority: inc.priority,
+      category: inc.category,
+      machine_id: resolvedMachineId,
+      created_at: inc.created_at,
+      clientName: resolvedClientName,
+      technicianName: (inc.profiles as unknown as { full_name: string | null } | null)?.full_name ?? null,
+    }
+  })
 
   const kanbanIncidents = rows.map((r) => ({
     id: r.id,
