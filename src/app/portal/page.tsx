@@ -5,6 +5,7 @@ import { Printer, AlertCircle, CheckCircle, Clock } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
+import { getActiveLinesForContract } from '@/lib/contract-machines'
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
   nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success', fermé: 'neutral',
@@ -28,24 +29,27 @@ export default async function PortalPage() {
 
   const clientName = (clientProfile.clients as unknown as { nom_client: string } | null)?.nom_client ?? ''
 
-  const [{ data: contracts }, { data: incidents }] = await Promise.all([
-    supabase
-      .from('contracts')
-      .select('id, numero_contrat, machine_id, lieu_installation, machines(marque, modele, type, localisation)')
-      .eq('client_id', clientProfile.client_id)
-      .eq('statut', 'actif'),
-    supabase
-      .from('incidents')
-      .select('id, title, status, priority, created_at')
-      .in('contract_id', (await supabase
-        .from('contracts')
-        .select('id')
-        .eq('client_id', clientProfile.client_id)
-        .then(r => r.data?.map(c => c.id) ?? []))
-      )
-      .order('created_at', { ascending: false })
-      .limit(5),
-  ])
+  // Contratos activos del cliente
+  const { data: contracts } = await supabase
+    .from('contracts')
+    .select('id, numero_contrat')
+    .eq('client_id', clientProfile.client_id)
+    .eq('statut', 'actif')
+
+  const contractIds = (contracts ?? []).map(c => c.id)
+
+  // Líneas activas de todos los contratos (máquinas del cliente)
+  const allLines = (
+    await Promise.all(contractIds.map(cid => getActiveLinesForContract(supabase, cid)))
+  ).flat()
+
+  // Incidencias recientes del cliente (via contract_machine_id)
+  const { data: incidents } = await supabase
+    .from('incidents')
+    .select('id, title, status, priority, created_at')
+    .in('contract_machine_id', allLines.length > 0 ? allLines.map(l => l.id) : [''])
+    .order('created_at', { ascending: false })
+    .limit(5)
 
   const openCount     = incidents?.filter(i => !['résolu', 'fermé'].includes(i.status)).length ?? 0
   const resolvedCount = incidents?.filter(i =>  ['résolu', 'fermé'].includes(i.status)).length ?? 0
@@ -70,7 +74,7 @@ export default async function PortalPage() {
             </div>
             <span className="text-sm text-ink-soft">Machines actives</span>
           </div>
-          <p className="text-3xl font-semibold text-ink">{contracts?.length ?? 0}</p>
+          <p className="text-3xl font-semibold text-ink">{allLines.length}</p>
         </Card>
         <Card className="p-5">
           <div className="flex items-center gap-3 mb-2">
@@ -106,21 +110,22 @@ export default async function PortalPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line-subtle">
-              {(!contracts || contracts.length === 0) && (
+              {allLines.length === 0 && (
                 <tr><td colSpan={4} className="px-5 py-8 text-center text-ink-muted">Aucune machine active</td></tr>
               )}
-              {contracts?.map((c) => {
-                const m = c.machines as unknown as { marque: string; modele: string; type: string; localisation: string | null } | null
+              {allLines.map((line) => {
+                const m = line.machines
+                const contract = (contracts ?? []).find(c => c.id === line.contract_id)
                 return (
-                  <tr key={c.id} className="hover:bg-neutral-soft transition-colors">
-                    <td className="px-5 py-4 font-medium text-ink">{m ? `${m.marque} ${m.modele}` : c.machine_id}</td>
+                  <tr key={line.id} className="hover:bg-neutral-soft transition-colors">
+                    <td className="px-5 py-4 font-medium text-ink">{m ? `${m.marque} ${m.modele}` : line.machine_id}</td>
                     <td className="px-5 py-4">
                       <Badge variant={m?.type === 'color' ? 'violet' : 'neutral'}>
                         {m?.type === 'color' ? 'Couleur' : 'N&B'}
                       </Badge>
                     </td>
-                    <td className="px-5 py-4 text-ink-soft">{m?.localisation ?? c.lieu_installation ?? '—'}</td>
-                    <td className="px-5 py-4 font-mono text-xs text-ink-muted">{c.numero_contrat}</td>
+                    <td className="px-5 py-4 text-ink-soft">{m?.localisation ?? '—'}</td>
+                    <td className="px-5 py-4 font-mono text-xs text-ink-muted">{contract?.numero_contrat ?? '—'}</td>
                   </tr>
                 )
               })}

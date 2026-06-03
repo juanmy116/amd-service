@@ -32,6 +32,13 @@ function formatDate(d: string | null) {
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 
+type ContractMachineLine = {
+  id: string
+  statut: string
+  date_fin: string | null
+  machines: { marque: string; modele: string } | null
+}
+
 export default async function ContractsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams
   const q = sanitizeSearchQuery(firstParam(sp.q))
@@ -53,7 +60,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
 
   let query = supabase
     .from('contracts')
-    .select('id, numero_contrat, date_debut, date_renouvellement, lieu_installation, statut, client_id, clients(nom_client), machines(marque, modele)')
+    .select('id, numero_contrat, date_debut, date_renouvellement, statut, client_id, clients(nom_client), contract_machines(id, statut, date_fin, machines(marque, modele))')
     .order('created_at', { ascending: false })
     .limit(RESULT_LIMIT)
 
@@ -100,7 +107,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
             <tr className="bg-neutral-soft border-b border-line-subtle">
               <th className={TH}>Nº Contrat</th>
               <th className={TH}>Client</th>
-              <th className={TH}>Machine</th>
+              <th className={TH}>Machines</th>
               <th className={TH}>Début</th>
               <th className={TH}>Renouvellement</th>
               <th className={TH}>Statut</th>
@@ -116,8 +123,18 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
               </tr>
             )}
             {contracts?.map((c) => {
-              const client  = c.clients  as unknown as { nom_client: string } | null
-              const machine = c.machines as unknown as { marque: string; modele: string } | null
+              const client = c.clients as unknown as { nom_client: string } | null
+              const allLines = (c.contract_machines ?? []) as unknown as ContractMachineLine[]
+              const activeLines = allLines.filter(
+                (l) => l.statut === 'actif' && l.date_fin === null
+              )
+              const activeMachineCount = activeLines.length
+              // Tooltip: first 3 machine labels
+              const machineLabels = activeLines
+                .slice(0, 3)
+                .map((l) => l.machines ? `${l.machines.marque} ${l.machines.modele}` : '—')
+              const tooltipText = machineLabels.join(', ') + (activeLines.length > 3 ? ', …' : '')
+
               const statut = STATUT[c.statut]
               const href = `/admin/contracts/${c.id}`
               return (
@@ -136,8 +153,17 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
                       <span className="text-ink-muted">—</span>
                     )}
                   </td>
-                  <td className="px-5 py-4 text-ink-soft">
-                    {machine ? `${machine.marque} ${machine.modele}` : '—'}
+                  <td className="px-5 py-4">
+                    {activeMachineCount === 0 ? (
+                      <span className="text-ink-muted text-xs">—</span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full bg-neutral-soft border border-line text-xs font-semibold text-ink-soft cursor-default"
+                        title={tooltipText || undefined}
+                      >
+                        {activeMachineCount}
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-4 text-ink-soft">{formatDate(c.date_debut)}</td>
                   <td className="px-5 py-4 text-ink-soft">{formatDate(c.date_renouvellement)}</td>

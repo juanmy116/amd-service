@@ -18,26 +18,37 @@ Deno.serve(async (_req: Request) => {
   let errors    = 0
 
   try {
-    const { data: rows } = await db
-      .from('machines')
+    const { data: lines } = await db
+      .from('contract_machines')
       .select(`
-        numero_serie,
-        princity_device_id,
+        machine_id,
+        contract_id,
         contracts!inner (
           id,
           client_id,
           billing_day,
           statut
+        ),
+        machines!inner (
+          numero_serie,
+          princity_device_id
         )
       `)
-      .not('princity_device_id', 'is', null)
+      .is('date_fin', null)
       .eq('contracts.statut', 'actif')
+      .not('machines.princity_device_id', 'is', null)
 
-    const machines = rows ?? []
+    const machinesWithContracts = (lines ?? []).map(l => ({
+      numero_serie:       (l.machines as unknown as { numero_serie: string; princity_device_id: string | null }).numero_serie,
+      princity_device_id: (l.machines as unknown as { numero_serie: string; princity_device_id: string | null }).princity_device_id,
+      contracts:          l.contracts as unknown as { id: string; client_id: number; billing_day: number | null; statut: string },
+    }))
+
+    const machines = machinesWithContracts
     processed = machines.length
 
     for (const m of machines) {
-      const contract   = (m.contracts as unknown as { id: string; client_id: number; billing_day: number | null; statut: string })
+      const contract   = m.contracts
       const billingDay = contract.billing_day
 
       // Optimización: si ya conocemos el día y hoy no es ese día, saltar

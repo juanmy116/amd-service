@@ -16,14 +16,28 @@ type IncidentData = {
   assigned_to?: string | null
 }
 
-type ContractOption    = { id: string; numero_contrat: string; client_name: string }
+/** Shape used in create mode: contracts with their active lines */
+type ContractWithLines = {
+  id: string
+  numero_contrat: string
+  client_id: number
+  lines: Array<{
+    id: string
+    machine: {
+      numero_serie: string
+      marque: string
+      modele: string
+    }
+  }>
+}
+
 type TechnicianOption  = { id: string; full_name: string | null }
 type ContextInfo       = { clientName: string | null; machineName: string | null; contractNumber: string | null }
 
 type Props = {
   action: (prev: FormState, data: FormData) => Promise<FormState>
   defaultValues?: IncidentData
-  contracts?: ContractOption[]
+  contracts?: ContractWithLines[]
   technicians: TechnicianOption[]
   title: string
   isEdit?: boolean
@@ -66,6 +80,19 @@ export default function IncidentForm({
 }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
   const [confirming, setConfirming] = useState(false)
+
+  // Cascade state for contract → machine selection
+  const firstContract = contracts?.[0]
+  const [selectedContractId, setSelectedContractId] = useState<string>(firstContract?.id ?? '')
+  const [selectedLineId, setSelectedLineId] = useState<string>('')
+
+  const selectedContract = contracts?.find((c) => c.id === selectedContractId) ?? null
+  const linesForContract = selectedContract?.lines ?? []
+
+  function handleContractChange(contractId: string) {
+    setSelectedContractId(contractId)
+    setSelectedLineId('')  // reset line when contract changes
+  }
 
   return (
     <div className="p-8 max-w-3xl">
@@ -156,26 +183,58 @@ export default function IncidentForm({
             />
           </div>
 
-          {/* Contrat — create only */}
+          {/* Contrat → Machine cascade — create only */}
           {!isEdit && contracts && (
-            <div>
-              <label className="block text-sm font-medium text-ink-soft mb-1.5">
-                Contrat <span className="text-accent">*</span>
-              </label>
-              <select
-                name="contract_id"
-                required
-                defaultValue=""
-                className={selectClass}
-              >
-                <option value="" disabled>Sélectionner un contrat...</option>
-                {contracts.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.numero_contrat} — {c.client_name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <>
+              {/* Hidden field that the action reads */}
+              <input type="hidden" name="contract_machine_id" value={selectedLineId} />
+
+              <div>
+                <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                  Contrat <span className="text-accent">*</span>
+                </label>
+                <select
+                  value={selectedContractId}
+                  onChange={(e) => handleContractChange(e.target.value)}
+                  className={selectClass}
+                  required
+                >
+                  <option value="" disabled>Sélectionner un contrat...</option>
+                  {contracts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.numero_contrat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                  Machine du contrat <span className="text-accent">*</span>
+                </label>
+                {linesForContract.length === 0 ? (
+                  <p className="text-sm text-ink-muted px-3.5 py-2.5">
+                    {selectedContractId
+                      ? 'Aucune machine active sur ce contrat.'
+                      : 'Sélectionnez d\'abord un contrat.'}
+                  </p>
+                ) : (
+                  <select
+                    value={selectedLineId}
+                    onChange={(e) => setSelectedLineId(e.target.value)}
+                    required
+                    className={selectClass}
+                  >
+                    <option value="" disabled>Sélectionner une machine...</option>
+                    {linesForContract.map((line) => (
+                      <option key={line.id} value={line.id}>
+                        {line.machine.marque} {line.machine.modele} — {line.machine.numero_serie}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </>
           )}
 
           {/* Context — edit only */}

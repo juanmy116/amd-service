@@ -6,6 +6,7 @@ import { ArrowLeft, Printer, MapPin, Building2, Wrench, AlertTriangle } from 'lu
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import type { BadgeVariant } from '@/components/ui/Badge'
+import { getOpenLineForMachine } from '@/lib/contract-machines'
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
   nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success',
@@ -41,14 +42,34 @@ export default async function MachineScanPage({
 
   if (!machine || !machine.active) notFound()
 
+  // Obtener línea abierta para la máquina (nuevo modelo contract_machines)
+  const openLine = await getOpenLineForMachine(supabase, numero_serie)
+  let contract: { id: string; numero_contrat: string; clients: unknown } | null = null
+  if (openLine) {
+    const { data } = await supabase
+      .from('contracts')
+      .select('id, numero_contrat, clients(nom_client)')
+      .eq('id', openLine.contract_id)
+      .maybeSingle()
+    contract = data
+  }
+
+  const client = contract?.clients as unknown as { nom_client: string } | null
+
   // Auto-transición primer escaneo: assigné → en_cours para incidentes asignados a este técnico en esta máquina.
   // Se ejecuta después del guard machine.active para no mutar incidentes en máquinas dadas de baja.
   // createAdminClient() bypassa RLS — server-only, nunca llamar desde un Client Component.
   const admin = createAdminClient()
+
+  // Filtrar incidentes por contract_machine_id (nuevo modelo) y machine_id (legacy)
+  const filterExpr = openLine
+    ? `contract_machine_id.eq.${openLine.id},machine_id.eq.${numero_serie}`
+    : `machine_id.eq.${numero_serie}`
+
   const { data: toTransition } = await admin
     .from('incidents')
     .select('id')
-    .eq('machine_id', numero_serie)
+    .or(filterExpr)
     .eq('assigned_to', user.id)
     .eq('status', 'assigné')
 
@@ -68,19 +89,10 @@ export default async function MachineScanPage({
     )
   }
 
-  const { data: contract } = await supabase
-    .from('contracts')
-    .select('id, numero_contrat, lieu_installation, statut, clients(nom_client)')
-    .eq('machine_id', numero_serie)
-    .eq('statut', 'actif')
-    .single()
-
-  const client = contract?.clients as unknown as { nom_client: string } | null
-
   const { data: incidents } = await supabase
     .from('incidents')
     .select('id, title, status, priority, created_at')
-    .eq('machine_id', numero_serie)
+    .or(filterExpr)
     .not('status', 'in', '("fermé")')
     .order('created_at', { ascending: false })
     .limit(5)
@@ -153,8 +165,8 @@ export default async function MachineScanPage({
           <div className="flex items-center gap-2 text-sm text-ink-soft pt-1 border-t border-line-subtle">
             <Building2 size={14} className="text-ink-muted shrink-0" />
             <span className="font-medium">{client.nom_client}</span>
-            {contract?.lieu_installation && (
-              <span className="text-ink-muted text-xs truncate">— {contract.lieu_installation}</span>
+            {machine.localisation && (
+              <span className="text-ink-muted text-xs truncate">— {machine.localisation}</span>
             )}
           </div>
         )}

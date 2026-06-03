@@ -84,21 +84,14 @@ export async function submitPublicIncident(
 
   if (!machine) return { error: 'Équipement non trouvé.' }
 
-  const { data: contract } = await admin
-    .from('contracts')
-    .select('id, client_id')
-    .eq('machine_id', serie)
-    .eq('statut', 'actif')
-    .maybeSingle()
-
   const title = `Incident QR — ${machine.marque} ${machine.modele} (${serie})`
 
   const { data: incident, error: insertError } = await admin
     .from('incidents')
     .insert({
-      machine_id:    serie,
-      contract_id:   contract?.id ?? null,
-      opened_by:     null,
+      machine_id:          serie,          // FK directa a machines, conservada para públicas
+      contract_machine_id: null,           // por XOR — incidencias públicas no tienen línea
+      opened_by:           null,
       title,
       description,
       category:      'panne',
@@ -108,7 +101,7 @@ export async function submitPublicIncident(
       contact_phone: contactPhone,
       contact_email: contactEmail || null,
       source:        'public',
-    })
+    } as any)
     .select('numero_incident')
     .single()
 

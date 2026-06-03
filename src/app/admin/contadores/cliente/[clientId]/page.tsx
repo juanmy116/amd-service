@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, BarChart2, AlertTriangle } from 'lucide-react'
 
+
 const MONTHS_FR = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
                    'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
 
@@ -33,14 +34,15 @@ export default async function ClientContadoresPage({
 
   if (!client) notFound()
 
-  // Máquinas de este cliente (a través de sus contratos activos)
-  const { data: contracts } = await supabase
-    .from('contracts')
-    .select('machine_id')
-    .eq('client_id', clientIdNum)
+  // Máquinas de este cliente via contract_machines (líneas abiertas de sus contratos)
+  const { data: contractLines } = await supabase
+    .from('contract_machines')
+    .select('machine_id, contracts!inner(client_id)')
+    .eq('contracts.client_id', clientIdNum)
+    .is('date_fin', null)
     .eq('statut', 'actif')
 
-  const machineIds = (contracts ?? []).map(c => c.machine_id)
+  const machineIds = (contractLines ?? []).map(l => l.machine_id)
 
   const { data: machines } = machineIds.length > 0
     ? await supabase

@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-05-26 (sesión 23 — importador CSV de máquinas en `/admin/machines/import` para preparar Fase B OCR)
+> Última actualización: 2026-06-03 (sesión 24 — refactor contratos N máquinas: tabla `contract_machines`, helpers TS, UI actualizada)
 
 ---
 
@@ -246,22 +246,34 @@ Sitio de marketing B2B en francés con 6 páginas + layout compartido (Navigatio
 ```
 Cliente
   └── Contrato (nº contrato = llave de verificación del portal)
-        ├── Máquina (nº serie = PK de todo el sistema)
-        │     ├── Incidencias
-        │     │     ├── Piezas reemplazadas (incident_parts → parts)
-        │     │     ├── Fotos de intervención (incident_photos)
-        │     │     ├── Historial de cambios de estado (incident_history)
-        │     │     └── Respuesta CSAT (csat_responses)
-        │     └── Contadores mensuales (machine_counters — inmutables)
+        ├── Líneas contrato-máquina (contract_machines — N por contrato)
+        │     └── Máquina (numero_serie = PK de todo el sistema)
+        │           ├── Incidencias (contract_machine_id → contract_machines)
+        │           │     ├── Piezas reemplazadas (incident_parts → parts)
+        │           │     ├── Fotos de intervención (incident_photos)
+        │           │     ├── Historial de cambios de estado (incident_history)
+        │           │     └── Respuesta CSAT (csat_responses)
+        │           └── Contadores mensuales (machine_counters — inmutables)
         └── Plan de mantenimiento (maintenance_plans — 1 por contrato)
               └── Visitas (maintenance_visits — auto-programadas)
                     └── Piezas reemplazadas (maintenance_parts → parts)
 ```
 
+### Modelo N máquinas por contrato (`contract_machines`) — sesión 24
+
+Un contrato puede tener varias máquinas. La vinculación se gestiona mediante la tabla `contract_machines`:
+
+- **`date_debut` / `date_fin`** — período de la vinculación. `date_fin IS NULL` = línea abierta (máquina actualmente asignada).
+- **`statut`** — `actif | suspendu | terminé`. Una máquina con `date_fin IS NULL` y `statut = suspendu` sigue bloqueada para otro contrato hasta que se le asigne `date_fin`.
+- **Índice único parcial** `contract_machines_one_open_per_machine (machine_id) WHERE date_fin IS NULL`: una máquina solo puede tener una línea abierta a la vez, independientemente del `statut`.
+- **Overrides por línea**: `billing_day_override` y `maintenance_frequency_override` anulan el valor por defecto del contrato para esa máquina concreta. Los helpers `resolveBillingDay()` y `resolveMaintenanceFrequency()` en `src/lib/contract-machines.ts` aplican la lógica override→fallback.
+- **Incidencias**: `incidents.contract_machine_id` (UUID) referencia la línea. La columna `incidents.machine_id` queda `NULL` en incidencias internas (XOR garantizado por constraint). Las incidencias públicas (`source='public'`) conservan `machine_id`.
+- **PR-cleanup** pendiente (5-7 días post-merge): eliminar `contracts.machine_id`, `contracts.lieu_installation` e `incidents.contract_id` (columnas legacy, ya sin uso en la app).
+
 > **Flujo de creación desacoplado (sin dependencia circular):**
 > 1. Crear cliente (`/admin/clients/new`) — solo datos del cliente
 > 2. Crear máquina (`/admin/machines/new` individual o `/admin/machines/import` en bloque vía CSV) — solo datos de la máquina
-> 3. Crear contrato (`/admin/contracts/new`) — une cliente + máquina (solo muestra máquinas sin contrato activo)
+> 3. Crear contrato (`/admin/contracts/new`) — une cliente + N máquinas (solo muestra máquinas sin línea abierta en otro contrato); cada máquina se puede configurar con overrides de facturación y mantenimiento
 > 4. Crear plan de mantenimiento (`/admin/maintenance/new`) — enlazado al contrato
 
 ### Importador CSV de máquinas (`/admin/machines/import`) — sesión 23

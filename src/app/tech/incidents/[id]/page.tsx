@@ -31,16 +31,47 @@ export default async function TechIncidentPage({
   // Error opaco: notFound en lugar de 403 para no revelar que el incidente existe.
   if (profile.role === 'technician' && incident.assigned_to !== user.id) notFound()
 
-  const { data: contract } = incident.contract_id
-    ? await supabase
-        .from('contracts')
-        .select('numero_contrat, lieu_installation, clients(nom_client), machines(marque, modele, localisation)')
-        .eq('id', incident.contract_id)
-        .maybeSingle()
-    : { data: null }
+  // Resolver contexto de cliente/máquina/contrato para el incidente.
+  // Incidencias nuevas (post-refactor) tienen contract_id=NULL y contract_machine_id=<uuid>.
+  let contractInfo: {
+    numero_contrat: string | null
+    lieu_installation: string | null
+    clients: { nom_client: string } | null
+    machines: { marque: string; modele: string; localisation: string | null } | null
+  } | null = null
 
-  const client  = contract?.clients  as unknown as { nom_client: string }                                  | null
-  const machine = contract?.machines as unknown as { marque: string; modele: string; localisation: string | null } | null
+  if (incident.contract_id) {
+    const { data } = await supabase
+      .from('contracts')
+      .select('numero_contrat, lieu_installation, clients(nom_client), machines(marque, modele, localisation)')
+      .eq('id', incident.contract_id)
+      .maybeSingle()
+    contractInfo = data as typeof contractInfo
+  } else if (incident.contract_machine_id) {
+    const { data } = await supabase
+      .from('contract_machines')
+      .select('contracts(numero_contrat, clients(nom_client)), machines(marque, modele, localisation, numero_serie)')
+      .eq('id', incident.contract_machine_id)
+      .maybeSingle()
+    if (data) {
+      const cm = data as unknown as {
+        contracts: { numero_contrat: string; clients: { nom_client: string } | null } | null
+        machines: { marque: string; modele: string; localisation: string | null; numero_serie: string } | null
+      }
+      contractInfo = {
+        numero_contrat: cm.contracts?.numero_contrat ?? null,
+        lieu_installation: cm.machines?.localisation ?? null,
+        clients: cm.contracts?.clients ?? null,
+        machines: cm.machines ? { marque: cm.machines.marque, modele: cm.machines.modele, localisation: cm.machines.localisation } : null,
+      }
+    }
+  }
+
+  const clientName  = contractInfo?.clients?.nom_client ?? null
+  const machine     = contractInfo?.machines ?? null
+  const machineName = machine ? `${machine.marque} ${machine.modele}` : (incident.machine_id ?? '')
+  const machineLocation = machine?.localisation ?? contractInfo?.lieu_installation ?? null
+  const contractNumber = contractInfo?.numero_contrat ?? null
 
   const checkedParts = new Set(parts?.map((p) => p.part_id) ?? [])
   const boundAction  = submitInterventionAction.bind(null, incident.id)
@@ -49,10 +80,10 @@ export default async function TechIncidentPage({
     <InterventionForm
       incident={incident}
       boundAction={boundAction}
-      clientName={client?.nom_client ?? null}
-      machineName={machine ? `${machine.marque} ${machine.modele}` : incident.machine_id}
-      machineLocation={machine?.localisation ?? contract?.lieu_installation ?? null}
-      contractNumber={contract?.numero_contrat ?? null}
+      clientName={clientName}
+      machineName={machineName}
+      machineLocation={machineLocation}
+      contractNumber={contractNumber}
       checkedParts={checkedParts}
     />
   )

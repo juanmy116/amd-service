@@ -33,19 +33,51 @@ export default async function PortalIncidentsPage() {
 
   if (!clientProfile) redirect('/portal/verify')
 
-  const { data: contractIds } = await supabase
+  // Contratos del cliente → líneas activas (date_fin IS NULL) → ids de línea + numero_serie
+  const { data: contractRows } = await supabase
     .from('contracts')
     .select('id')
     .eq('client_id', clientProfile.client_id)
 
-  const ids = contractIds?.map(c => c.id) ?? []
+  const contractIds = contractRows?.map(c => c.id) ?? []
 
-  const { data: incidents } = await supabase
-    .from('incidents')
-    .select('id, numero_incident, title, status, priority, category, created_at, machine_id')
-    .in('contract_id', ids)
-    .or('source.is.null,source.neq.public')
-    .order('created_at', { ascending: false })
+  let incidents: Array<{
+    id: string
+    numero_incident: string
+    title: string
+    status: string
+    priority: string
+    category: string
+    created_at: string
+    machine_id: string | null
+  }> | null = null
+
+  if (contractIds.length > 0) {
+    // Líneas activas del cliente (date_fin IS NULL) → ids de contract_machine + numero_serie de máquinas
+    const { data: activeLines } = await supabase
+      .from('contract_machines')
+      .select('id, machine_id')
+      .in('contract_id', contractIds)
+      .is('date_fin', null)
+
+    const lineIds = activeLines?.map(l => l.id) ?? []
+    const machineIds = activeLines?.map(l => l.machine_id) ?? []
+
+    // Construir filtro OR: incidencias nuevas (por contract_machine_id) + legado (por machine_id)
+    const orParts: string[] = []
+    if (lineIds.length > 0) orParts.push(`contract_machine_id.in.(${lineIds.join(',')})`)
+    if (machineIds.length > 0) orParts.push(`machine_id.in.(${machineIds.join(',')})`)
+
+    if (orParts.length > 0) {
+      const { data } = await supabase
+        .from('incidents')
+        .select('id, numero_incident, title, status, priority, category, created_at, machine_id')
+        .or(orParts.join(','))
+        .or('source.is.null,source.neq.public')
+        .order('created_at', { ascending: false })
+      incidents = data
+    }
+  }
 
   return (
     <div>

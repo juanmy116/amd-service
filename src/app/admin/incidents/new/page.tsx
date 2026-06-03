@@ -8,7 +8,7 @@ export default async function NewIncidentPage() {
   const [{ data: rawContracts }, { data: technicians }] = await Promise.all([
     supabase
       .from('contracts')
-      .select('id, numero_contrat, clients(nom_client)')
+      .select('id, numero_contrat, client_id, contract_machines(id, statut, date_fin, machines(numero_serie, marque, modele))')
       .eq('statut', 'actif')
       .order('numero_contrat'),
     supabase
@@ -18,11 +18,39 @@ export default async function NewIncidentPage() {
       .order('full_name'),
   ])
 
-  const contracts = rawContracts?.map((c) => ({
-    id:             c.id,
-    numero_contrat: c.numero_contrat,
-    client_name:    (c.clients as unknown as { nom_client: string } | null)?.nom_client ?? '',
-  })) ?? []
+  type RawLine = {
+    id: string
+    statut: string
+    date_fin: string | null
+    machines: { numero_serie: string; marque: string; modele: string } | null
+  }
+
+  type RawContract = {
+    id: string
+    numero_contrat: string
+    client_id: number
+    contract_machines: RawLine[]
+  }
+
+  // Transform to the shape IncidentForm expects, keeping only active lines
+  const contracts = ((rawContracts ?? []) as unknown as RawContract[])
+    .map((c) => ({
+      id: c.id,
+      numero_contrat: c.numero_contrat,
+      client_id: c.client_id,
+      lines: (c.contract_machines ?? [])
+        .filter((l) => l.statut === 'actif' && l.date_fin === null && l.machines !== null)
+        .map((l) => ({
+          id: l.id,
+          machine: {
+            numero_serie: l.machines!.numero_serie,
+            marque: l.machines!.marque,
+            modele: l.machines!.modele,
+          },
+        })),
+    }))
+    // Only include contracts that have at least one active machine line
+    .filter((c) => c.lines.length > 0)
 
   return (
     <IncidentForm

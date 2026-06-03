@@ -37,17 +37,11 @@ export default async function PortalIncidentDetailPage({
     .single()
   if (!clientProfile) redirect('/portal/verify')
 
-  const { data: clientContracts } = await supabase
-    .from('contracts')
-    .select('id')
-    .eq('client_id', clientProfile.client_id)
-  const contractIds = (clientContracts ?? []).map(c => c.id)
-
+  // Incidencia — RLS garantiza que solo ve las propias
   const { data: incident } = await supabase
     .from('incidents')
     .select('*')
     .eq('id', id)
-    .in('contract_id', contractIds.length > 0 ? contractIds : [''])
     .or('source.is.null,source.neq.public')
     .single()
 
@@ -59,15 +53,29 @@ export default async function PortalIncidentDetailPage({
     .eq('incident_id', id)
     .order('created_at', { ascending: false })
 
-  const { data: contract } = incident.contract_id
-    ? await supabase
-        .from('contracts')
-        .select('numero_contrat, machines(marque, modele)')
-        .eq('id', incident.contract_id)
-        .maybeSingle()
-    : { data: null }
+  // Obtener máquina y contrato via contract_machine_id si está disponible
+  let machine: { marque: string; modele: string } | null = null
+  let contractNumero: string | null = null
 
-  const machine = contract?.machines as unknown as { marque: string; modele: string } | null
+  if (incident.contract_machine_id) {
+    const { data: line } = await supabase
+      .from('contract_machines')
+      .select('machine_id, contracts!inner(numero_contrat), machines!inner(marque, modele)')
+      .eq('id', incident.contract_machine_id)
+      .maybeSingle()
+    if (line) {
+      machine = line.machines as unknown as { marque: string; modele: string } | null
+      contractNumero = (line.contracts as unknown as { numero_contrat: string } | null)?.numero_contrat ?? null
+    }
+  } else if (incident.machine_id) {
+    // Incidencia pública legacy con machine_id directo
+    const { data: m } = await supabase
+      .from('machines')
+      .select('marque, modele')
+      .eq('numero_serie', incident.machine_id)
+      .maybeSingle()
+    machine = m
+  }
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -86,7 +94,7 @@ export default async function PortalIncidentDetailPage({
           </h1>
           <p className="text-sm text-ink-muted mt-0.5">
             {machine ? `${machine.marque} ${machine.modele}` : incident.machine_id}
-            {contract?.numero_contrat && ` · ${contract.numero_contrat}`}
+            {contractNumero && ` · ${contractNumero}`}
           </p>
         </div>
         <span className="shrink-0">

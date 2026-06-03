@@ -79,7 +79,7 @@ export default function NewIncidentForm({ action, contracts, preselectedContract
               <p className="text-sm text-ink-muted">Aucune machine active sur votre contrat.</p>
             ) : (
               <select
-                name="contract_id"
+                name="contract_machine_id"
                 required
                 defaultValue={preselectedContractId ?? ''}
                 className={selectClass}
