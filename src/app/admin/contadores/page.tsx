@@ -55,18 +55,26 @@ export default async function ContadoresPage({ searchParams }: { searchParams: S
 
   const supabase = await createClient()
 
-  const { data: rawMachines } = await supabase
-    .from('machines')
-    .select('numero_serie, marque, modele, contracts(statut, client_id, clients(id, nom_client))')
-    .eq('active', true)
-    .order('marque')
+  const [activeLinesRes, allMachinesRes, allActiveCountersRes] = await Promise.all([
+    supabase
+      .from('contract_machines')
+      .select('machine_id, machines(numero_serie, marque, modele), contracts(client_id, clients(id, nom_client))')
+      .is('date_fin', null)
+      .eq('statut', 'actif'),
+    supabase
+      .from('machines')
+      .select('numero_serie, marque, modele')
+      .eq('active', true)
+      .order('marque'),
+    supabase
+      .from('machine_counters')
+      .select('machine_id, year, month')
+      .eq('status', 'actif')
+      .order('year',  { ascending: false })
+      .order('month', { ascending: false }),
+  ])
 
-  const { data: allActiveCounters } = await supabase
-    .from('machine_counters')
-    .select('machine_id, year, month')
-    .eq('status', 'actif')
-    .order('year',  { ascending: false })
-    .order('month', { ascending: false })
+  const allActiveCounters = allActiveCountersRes.data
 
   // Set de pares (machine_id, year, month) presentes para chequeo exacto.
   const presence = new Set<string>()
@@ -89,33 +97,41 @@ export default async function ContadoresPage({ searchParams }: { searchParams: S
   const periodLabel = `${MONTHS_FR_LONG[cMonth]} ${cYear}`
   const isCustomPeriod = monthFilter !== null || yearFilter !== null
 
-  const machines: Machine[] = (rawMachines ?? []).map((m) => {
-    const contracts = m.contracts as unknown as {
-      statut: string
-      client_id: number | null
-      clients: { id: number; nom_client: string } | null
-    }[] | null
-    const active = contracts?.find((c) => c.statut === 'actif') ?? null
+  type ActiveLine = {
+    machine_id: string
+    machines: { numero_serie: string; marque: string; modele: string } | null
+    contracts: { client_id: number; clients: { id: number; nom_client: string } | null } | null
+  }
+
+  const activeMachineIds = new Set<string>()
+  const machines: Machine[] = (activeLinesRes.data ?? []).map((l) => {
+    const line = l as unknown as ActiveLine
+    const m = line.machines
+    if (!m) return null
+    activeMachineIds.add(m.numero_serie)
+    const c = line.contracts
     return {
       numero_serie: m.numero_serie,
       marque:       m.marque,
       modele:       m.modele,
-      clientId:     active?.client_id ?? null,
-      clientName:   active?.clients?.nom_client ?? null,
+      clientId:     c?.client_id ?? null,
+      clientName:   c?.clients?.nom_client ?? null,
     }
-  })
+  }).filter((m): m is Machine => m !== null)
+
+  // Máquinas activas sin línea de contrato abierta
+  const noClient: Machine[] = (allMachinesRes.data ?? [])
+    .filter((m) => !activeMachineIds.has(m.numero_serie))
+    .map((m) => ({ ...m, clientId: null, clientName: null }))
 
   // Agrupar por cliente
   const clientMap = new Map<number, { name: string; machines: Machine[] }>()
-  const noClient: Machine[] = []
   machines.forEach((m) => {
     if (m.clientId !== null && m.clientName !== null) {
       if (!clientMap.has(m.clientId)) {
         clientMap.set(m.clientId, { name: m.clientName, machines: [] })
       }
       clientMap.get(m.clientId)!.machines.push(m)
-    } else {
-      noClient.push(m)
     }
   })
 
