@@ -13,7 +13,7 @@ Aplicación web para la gestión de incidencias (SAV) de AMD Service, empresa de
 
 ## Estado actual del desarrollo
 
-La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). 17 PRs mergeados.
+La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). Último merge: PR #23 (`89ac2e8`) el 2026-06-03 — refactor de contratos a modelo N máquinas.
 
 ### ✅ Completado
 - Sitio web público AMD + página `/location` (SEO Dakar)
@@ -22,6 +22,11 @@ La app SAV está **completa y en producción** (`https://amd-service.vercel.app`
 - Auth por rol, RLS, rate limiting, integraciones (Resend/CSAT, Princity API)
 - Búsqueda + filtros admin · `numero_incident` (SAV-YYYY-NNNN)
 - **Dashboard Atelier** (`/atelier`): kiosko de taller para TV 32" — cuenta «Atelier» (rol técnico + flag `is_dispatcher`) que asigna incidencias y mantenimientos a los técnicos
+- **Importador CSV de máquinas** (PR #22)
+- **Refactor contratos N máquinas** (PR #23): tabla `contract_machines` con date_debut/date_fin/statut por línea + overrides billing_day/maintenance_frequency. Una máquina solo puede tener una línea abierta (date_fin NULL) a la vez. Incidencias internas vía `contract_machine_id`; públicas mantienen `machine_id` directo. CHECK XOR en `incidents`. Edge functions Princity (alerts + counters) actualizadas y redeployed a v6.
+
+### ⚠️ Pendiente — PR-cleanup del refactor (ventana ≥ 2026-06-10)
+DROP columnas legacy (`contracts.machine_id`, `contracts.lieu_installation`, `incidents.contract_id`) + funciones SECURITY DEFINER legacy (`auth_tech_incident_*`). Detalles en `docs/superpowers/specs/2026-06-03-contracts-n-machines-design.md` §6 y memoria `project_contracts_refactor.md`.
 
 ### ✅ Rediseño UI "Híbrido" — completado
 Refresco visual de la app interna (presentación pura, sin cambios de lógica ni rutas).
@@ -95,7 +100,7 @@ El middleware de Next.js (`src/middleware.ts`) redirige según el rol del usuari
 | URL | `https://myyejbviunyvywfukysj.supabase.co` |
 
 ### Tablas principales
-`profiles` · `clients` · `machines` · `contracts` · `client_profiles` · `incidents` · `parts` · `incident_parts` · `incident_photos` · `incident_history` · `csat_responses` · `princity_alerts`
+`profiles` · `clients` · `machines` · `contracts` · `contract_machines` · `client_profiles` · `incidents` · `parts` · `incident_parts` · `incident_photos` · `incident_history` · `csat_responses` · `princity_alerts`
 
 ### Roles de usuario
 - `admin` — administrador AMD, acceso total
