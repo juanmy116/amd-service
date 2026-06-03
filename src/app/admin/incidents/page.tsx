@@ -14,7 +14,7 @@ import {
 } from '@/lib/search'
 import { parseEnum, INCIDENT_STATUSES, INCIDENT_PRIORITIES } from '@/lib/enums'
 
-const SEARCH_COLUMNS = ['numero_incident', 'title', 'machine_id'] as const
+const SEARCH_COLUMNS = ['numero_incident', 'title'] as const
 const RESULT_LIMIT = 300
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
