@@ -93,8 +93,17 @@ export async function createContractAction(
   const { error: linesError } = await supabase.from('contract_machines').insert(linesPayload as any)
 
   if (linesError) {
-    // Rollback manual del contract recién creado
-    await supabase.from('contracts').delete().eq('id', contractRow.id)
+    // F10: rollback manual del contract recién creado — capturar error para detectar contratos huérfanos
+    const { error: rollbackError, count } = await supabase
+      .from('contracts')
+      .delete({ count: 'exact' })
+      .eq('id', contractRow.id)
+    if (rollbackError || count === 0) {
+      console.error('[createContract.rollback]', { rollbackError, count, contractId: contractRow.id })
+      return { error: linesError.code === '23505'
+        ? 'Une ou plusieurs machines sont déjà assignées à un autre contrat actif. Le contrat a été créé sans machines — contactez le support pour le nettoyage.'
+        : "Erreur lors de l'ajout des machines. Contactez le support si le contrat reste visible." }
+    }
     if (linesError.code === '23505') {
       return { error: 'Une ou plusieurs machines sont déjà assignées à un autre contrat actif.' }
     }

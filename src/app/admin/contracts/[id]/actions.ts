@@ -62,17 +62,20 @@ export async function updateContractAction(
     return { error: 'Liste de machines invalide.' }
   }
 
+  // F6: filtrar solo líneas abiertas (date_fin IS NULL) para que las históricas cerradas
+  // no caigan en toRetire y se les sobreescriba su date_fin real.
   const { data: existingLines } = await supabase
     .from('contract_machines')
     .select('id, machine_id')
     .eq('contract_id', id)
+    .is('date_fin', null)
 
   const desiredIds = new Set(desiredLines.filter((l) => l.id).map((l) => l.id))
 
   // Inserts (sin id en el cliente → líneas nuevas)
   const toInsert = desiredLines.filter((l) => !l.id)
   if (toInsert.length > 0) {
-    await supabase.from('contract_machines').insert(toInsert.map((l) => ({
+    const { error: insertError } = await supabase.from('contract_machines').insert(toInsert.map((l) => ({
       contract_id: id,
       machine_id: l.machine_id,
       date_debut: l.date_debut,
@@ -81,19 +84,36 @@ export async function updateContractAction(
       maintenance_frequency_override: l.maintenance_frequency_override ?? null,
       notes: l.notes ?? null,
     })) as any)
+    if (insertError) {
+      console.error('[updateContract.lines.insert]', insertError)
+      if (insertError.code === '23505') return { error: 'Une ou plusieurs machines sont déjà assignées à un autre contrat actif.' }
+      return { error: 'Une erreur est survenue lors de la mise à jour des machines.' }
+    }
   }
 
-  // Updates (id presente → líneas existentes con posibles cambios)
-  for (const l of desiredLines) {
-    if (!l.id) continue
-    await supabase.from('contract_machines').update({
+  // F9: Updates via batch upsert en lugar de loop secuencial (N round-trips → 1)
+  const updates = desiredLines
+    .filter((l) => l.id)
+    .map((l) => ({
+      id: l.id,
+      contract_id: id,
+      machine_id: l.machine_id,
       date_debut: l.date_debut,
       date_fin: l.date_fin ?? null,
       statut: l.statut ?? 'actif',
       billing_day_override: l.billing_day_override ?? null,
       maintenance_frequency_override: l.maintenance_frequency_override ?? null,
       notes: l.notes ?? null,
-    }).eq('id', l.id)
+    }))
+
+  if (updates.length > 0) {
+    const { error: updatesError } = await supabase
+      .from('contract_machines')
+      .upsert(updates as any, { onConflict: 'id' })
+    if (updatesError) {
+      console.error('[updateContract.lines.update]', updatesError)
+      return { error: 'Une erreur est survenue lors de la mise à jour des machines.' }
+    }
   }
 
   // "Retire" — líneas que existían pero no están en desired → poner date_fin=hoy + statut=terminé
@@ -101,10 +121,14 @@ export async function updateContractAction(
   const toRetire = (existingLines ?? []).filter((l) => !desiredIds.has(l.id))
   if (toRetire.length > 0) {
     const today = new Date().toISOString().slice(0, 10)
-    await supabase.from('contract_machines').update({
+    const { error: retireError } = await supabase.from('contract_machines').update({
       date_fin: today,
       statut: 'terminé',
     }).in('id', toRetire.map((l) => l.id))
+    if (retireError) {
+      console.error('[updateContract.lines.retire]', retireError)
+      return { error: 'Une erreur est survenue lors de la mise à jour des machines.' }
+    }
   }
 
   redirect('/admin/contracts')
