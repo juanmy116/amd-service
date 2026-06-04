@@ -1,6 +1,7 @@
 'use server'
 
 import { requireTechnician } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -23,101 +24,56 @@ async function notifyMatrix(message: string): Promise<void> {
   ).catch(err => console.error('[Matrix]', err))
 }
 
+const RPC_ERRORS: Record<string, string> = {
+  visit_not_found:   'Visite introuvable.',
+  already_closed:    'Cette visite est déjà clôturée.',
+  permission_denied: 'Permission refusée.',
+}
+
 export async function closeMaintenance(
   visitId: string,
   serie: string,
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
-  const { user, profile, supabase } = await requireTechnician()
+  const { user, profile } = await requireTechnician()
 
-  // Cargar visita con su línea de contrato (modelo N máquinas).
-  const { data: visit } = await supabase
-    .from('maintenance_visits')
-    .select(`
-      id, status, scheduled_date, plan_id, contract_machine_id,
-      maintenance_plans ( frequency, notes ),
-      contract_machines (
-        machine_id,
-        maintenance_frequency_override,
-        machines ( numero_serie, marque, modele ),
-        contracts ( numero_contrat, clients ( nom_client ) )
-      )
-    `)
-    .eq('id', visitId)
-    .single()
+  const notes        = ((formData.get('notes') as string) ?? '').trim() || null
+  const partIds      = PART_IDS.filter(id => formData.get(`part_${id}`) === 'on')
+  const autresPieces = ((formData.get('autres_pieces') as string) ?? '').trim() || null
 
-  if (!visit) return { error: 'Visite introuvable.' }
-
-  // Verificar que la visita pertenece a la máquina escaneada.
-  const line = visit.contract_machines as unknown as {
-    machine_id: string
-    maintenance_frequency_override: 'mensuel' | 'trimestriel' | null
-    machines: { numero_serie: string; marque: string; modele: string } | null
-    contracts: { numero_contrat: string; clients: { nom_client: string } | null } | null
-  } | null
-
-  if (line?.machine_id !== serie) return { error: 'Visite introuvable.' }
-  if (visit.status === 'fait') return { error: 'Cette visite est déjà clôturée.' }
-
-  const notes = ((formData.get('notes') as string) ?? '').trim() || null
-
-  const { error: visitErr } = await supabase
-    .from('maintenance_visits')
-    .update({
-      status:       'fait',
-      done_at:      new Date().toISOString(),
-      done_by:      user.id,
-      qr_verified:  true,
-      notes,
-    })
-    .eq('id', visitId)
-
-  if (visitErr) return { error: 'Erreur lors de la clôture de la visite.' }
-
-  // Piezas reemplazadas.
-  const partsToInsert = PART_IDS
-    .filter(id => formData.get(`part_${id}`) === 'on')
-    .map(id => ({ visit_id: visitId, part_id: id, quantity: 1 }))
-
-  const autresPieces = ((formData.get('autres_pieces') as string) ?? '').trim()
-  if (autresPieces) {
-    await supabase.from('maintenance_parts').insert({
-      visit_id: visitId, description: autresPieces, quantity: 1,
-    })
-  }
-  if (partsToInsert.length > 0) {
-    await supabase.from('maintenance_parts').insert(partsToInsert)
-  }
-
-  // Auto-programar siguiente visita para LA MISMA máquina.
-  // Frecuencia: override de la línea, si no la del plan.
-  const plan = visit.maintenance_plans as unknown as { frequency: string; notes: string | null } | null
-  const effectiveFreq = line?.maintenance_frequency_override ?? plan?.frequency
-  const days = effectiveFreq === 'mensuel' ? 30 : 90
-  const base = new Date(visit.scheduled_date + 'T00:00:00')
-  base.setDate(base.getDate() + days)
-  const nextDateStr = base.toISOString().split('T')[0]
-
-  await supabase.from('maintenance_visits').insert({
-    plan_id:             visit.plan_id,
-    contract_machine_id: visit.contract_machine_id,
-    scheduled_date:      nextDateStr,
-    status:              'planifié',
+  // RPC atómica vía service_role (la action ya validó el rol con requireTechnician).
+  const admin = createAdminClient()
+  const { data, error } = await admin.rpc('close_maintenance_visit', {
+    p_visit_id:      visitId,
+    p_serie:         serie,
+    p_done_by:       user.id,
+    p_notes:         notes,
+    p_part_ids:      partIds,
+    p_autres_pieces: autresPieces,
   })
 
-  // Notificación Matrix de cierre.
-  const machine = line?.machines
-  const client  = line?.contracts?.clients
-  const nextFmt = new Date(nextDateStr + 'T00:00:00').toLocaleDateString('fr-FR')
+  if (error) {
+    for (const code of Object.keys(RPC_ERRORS)) {
+      if (error.message.includes(code)) return { error: RPC_ERRORS[code] }
+    }
+    console.error('[closeMaintenance.rpc]', error)
+    return { error: 'Erreur lors de la clôture de la visite.' }
+  }
 
+  // Notificación Matrix: best-effort, fuera de la transacción ya commiteada.
+  const r = data as {
+    next_date: string; marque: string | null; modele: string | null
+    numero_serie: string | null; client: string | null; parts_count: number
+  }
+  const nextFmt = new Date(r.next_date + 'T00:00:00').toLocaleDateString('fr-FR')
   await notifyMatrix([
     '✅ MAINTENANCE EFFECTUÉE',
-    `Client     : ${client?.nom_client ?? '—'}`,
-    `Machine    : ${machine?.marque ?? ''} ${machine?.modele ?? ''} (${machine?.numero_serie ?? serie})`,
+    `Client     : ${r.client ?? '—'}`,
+    `Machine    : ${r.marque ?? ''} ${r.modele ?? ''} (${r.numero_serie ?? serie})`,
     `Technicien : ${profile.full_name ?? user.email}`,
     `Prochaine  : ${nextFmt}`,
-    partsToInsert.length > 0 ? `Pièces     : ${partsToInsert.length} remplacée(s)` : '',
+    r.parts_count > 0 ? `Pièces     : ${r.parts_count} remplacée(s)` : '',
   ].filter(Boolean).join('\n'))
 
   redirect(`/tech/scan/${encodeURIComponent(serie)}`)
