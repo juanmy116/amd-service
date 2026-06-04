@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { sendEmail } from '@/lib/email'
+import { NEEDS_LABELS, buildLeadEmailHtml } from '@/lib/lead-email'
 
 const VALID_NEEDS = new Set(['rental', 'sales', 'management', 'maintenance', 'other'])
 
@@ -40,8 +43,31 @@ export async function POST(req: NextRequest) {
   if (!VALID_NEEDS.has(needs))          return NextResponse.json({ success: false, message: 'Besoin invalide.' },     { status: 422 })
   if (message.length > 2000)            return NextResponse.json({ success: false, message: 'Message trop long.' },   { status: 422 })
 
-  // TODO: Supabase — store lead
-  // TODO: Mailjet — send confirmation email
+  // 1. Persistir el lead — CRÍTICO. Si falla, el usuario debe reintentar.
+  const admin = createAdminClient()
+  const { error: insertErr } = await admin.from('leads').insert({
+    name, email, company, phone, needs, message: message || null,
+  })
+  if (insertErr) {
+    console.error('[contact.insert]', insertErr)
+    return NextResponse.json({ success: false, message: 'Une erreur est survenue. Veuillez réessayer.' }, { status: 500 })
+  }
+
+  // 2. Notificar al equipo comercial — best-effort. El lead ya está guardado.
+  const to = process.env.COMMERCIAL_EMAIL
+  if (to) {
+    const needsLabel = NEEDS_LABELS[needs] ?? needs
+    await sendEmail({
+      template: 'raw',
+      to,
+      data: {
+        subject: `Nouveau lead : ${company} (${needsLabel})`,
+        html: buildLeadEmailHtml({ name, email, company, phone, needsLabel, message }),
+      },
+    }).catch((e) => console.error('[contact.notify]', e))
+  } else {
+    console.warn('[contact.notify] COMMERCIAL_EMAIL non configurée — lead enregistré sin notification')
+  }
 
   return NextResponse.json({ success: true, message: 'Message reçu' }, { status: 200 })
 }
