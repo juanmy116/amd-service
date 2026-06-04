@@ -31,6 +31,9 @@ type RetiredLine = {
   machine_id: string
   date_debut: string
   date_fin: string
+  billing_day_override: number | null
+  maintenance_frequency_override: 'mensuel' | 'trimestriel' | null
+  notes: string | null
 }
 
 type ClientOption = { id: number; nom_client: string }
@@ -100,6 +103,9 @@ export default function ContractForm({
           machine_id: line.machine_id,
           date_debut: line.date_debut,
           date_fin: today,
+          billing_day_override: line.billing_day_override,
+          maintenance_frequency_override: line.maintenance_frequency_override,
+          notes: line.notes,
         }])
       }
       return prev.filter((_, i) => i !== idx)
@@ -128,9 +134,9 @@ export default function ContractForm({
           id: item.id,
           machine_id: item.machine_id,
           date_debut: item.date_debut,
-          billing_day_override: null,
-          maintenance_frequency_override: null,
-          notes: null,
+          billing_day_override: item.billing_day_override,
+          maintenance_frequency_override: item.maintenance_frequency_override,
+          notes: item.notes,
         }])
       }
       return prev.filter((r) => r.id !== id)
