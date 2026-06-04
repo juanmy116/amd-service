@@ -54,7 +54,7 @@ export default async function AtelierPage() {
       .from('maintenance_visits')
       .select(`
         id, scheduled_date, status, assigned_to,
-        maintenance_plans ( contracts ( clients ( nom_client ), machines ( marque, modele ) ) ),
+        contract_machines ( machines ( marque, modele ), contracts ( clients ( nom_client ) ) ),
         profiles!assigned_to ( full_name )
       `)
       .gte('scheduled_date', mondayIso)
@@ -109,23 +109,23 @@ export default async function AtelierPage() {
     scheduled_date: string
     status: string
     assigned_to: string | null
-    maintenance_plans: {
-      contracts: {
-        clients: { nom_client: string } | null
-        machines: { marque: string; modele: string } | null
-      } | null
+    contract_machines: {
+      machines: { marque: string; modele: string } | null
+      contracts: { clients: { nom_client: string } | null } | null
     } | null
     profiles: { full_name: string | null } | null
   }
   const rawVisits = (visitsRes.data ?? []) as unknown as VisitRow[]
   const visits: AtelierMaintenanceVisit[] = rawVisits.map((v) => {
-    const contract = v.maintenance_plans?.contracts
+    const line = v.contract_machines
+    const contract = line?.contracts
+    const machine = line?.machines
     return {
       id: v.id,
       scheduledDate: v.scheduled_date,
       clientName: contract?.clients?.nom_client ?? '—',
-      machineLabel: contract?.machines
-        ? `${contract.machines.marque} ${contract.machines.modele}`
+      machineLabel: machine
+        ? `${machine.marque} ${machine.modele}`
         : '—',
       status: v.status,
       technicianId: v.assigned_to,

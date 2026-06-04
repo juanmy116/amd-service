@@ -48,8 +48,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
     .from('incidents')
     .select(`
       id, numero_incident, title, category, priority, status, machine_id, created_at,
-      contract_id, contract_machine_id, assigned_to,
-      contracts(client_id, clients(nom_client)),
+      contract_machine_id, assigned_to,
       contract_machines(machine_id, machines(numero_serie), contracts(client_id, clients(nom_client))),
       profiles!assigned_to(full_name)
     `)
@@ -60,13 +59,11 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
   if (statusFilter) query = query.eq('status', statusFilter)
   if (priorityFilter) query = query.eq('priority', priorityFilter)
   if (clientId) {
-    const orParts: string[] = []
-    if (contractIds.length > 0) orParts.push(`contract_id.in.(${contractIds.join(',')})`)
-    if (cmIds.length > 0) orParts.push(`contract_machine_id.in.(${cmIds.join(',')})`)
-    if (orParts.length > 0) {
-      query = query.or(orParts.join(','))
+    // El cliente de una incidencia se resuelve por su línea de contrato.
+    if (cmIds.length > 0) {
+      query = query.in('contract_machine_id', cmIds)
     } else {
-      // Cliente existe pero no tiene contratos ni líneas → sin resultados
+      // Cliente sin líneas → sin resultados
       query = query.eq('id', '00000000-0000-0000-0000-000000000000')
     }
   }
@@ -81,7 +78,6 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
     contracts: { client_id: number; clients: { nom_client: string } | null } | null
   } | null
   type Row = NonNullable<typeof incidents>[number] & {
-    contracts: { client_id: number; clients: { nom_client: string } | null } | null
     contract_machines: CmNested
     profiles: { full_name: string | null } | null
   }
@@ -89,10 +85,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
   const rows = ((incidents ?? []) as unknown as Row[]).map((inc) => {
     const cm = inc.contract_machines
     const resolvedMachineId = cm?.machine_id ?? inc.machine_id
-    const resolvedClientName =
-      cm?.contracts?.clients?.nom_client ??
-      inc.contracts?.clients?.nom_client ??
-      null
+    const resolvedClientName = cm?.contracts?.clients?.nom_client ?? null
     return {
       id: inc.id,
       numero_incident: inc.numero_incident,

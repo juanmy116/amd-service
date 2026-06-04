@@ -14,14 +14,13 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
 
   const { data: incident } = await admin
     .from('incidents')
-    .select('id, title, contract_id, contract_machine_id, contracts(client_id)')
+    .select('id, title, contract_machine_id')
     .eq('id', incidentId)
     .single()
 
   if (!incident) return
 
-  // Resolver client_id: primero por contract_machine_id (modelo nuevo),
-  // luego por contract_id (fallback legacy).
+  // Resolver client_id por contract_machine_id.
   let clientId: number | null = null
 
   if (incident.contract_machine_id) {
@@ -31,10 +30,6 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
       .eq('id', incident.contract_machine_id)
       .single()
     clientId = (line?.contracts as unknown as { client_id: number } | null)?.client_id ?? null
-  }
-
-  if (!clientId && incident.contract_id) {
-    clientId = (incident.contracts as unknown as { client_id: number } | null)?.client_id ?? null
   }
 
   if (!clientId) return

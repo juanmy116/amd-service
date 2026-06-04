@@ -50,11 +50,9 @@ export default async function AdminAgendaPanel() {
       .from('maintenance_visits')
       .select(`
         id, scheduled_date, status,
-        maintenance_plans (
-          contracts (
-            clients  ( nom_client ),
-            machines ( marque, modele )
-          )
+        contract_machines (
+          machines ( marque, modele ),
+          contracts ( clients ( nom_client ) )
         )
       `)
       .in('status', ['planifié', 'en_retard'])
@@ -119,8 +117,9 @@ export default async function AdminAgendaPanel() {
           ) : (
             <div className="space-y-0.5">
               {visits.slice(0, 6).map(v => {
-                const plan     = v.maintenance_plans as any
-                const contract = plan?.contracts as any
+                const line     = v.contract_machines as any
+                const contract = line?.contracts as any
+                const machine  = line?.machines as any
                 const { label, isOverdue } = fmtDate(v.scheduled_date)
                 return (
                   <Link
@@ -134,7 +133,7 @@ export default async function AdminAgendaPanel() {
                         {contract?.clients?.nom_client ?? '—'}
                       </p>
                       <p className="text-[11px] text-gray-400 truncate">
-                        {contract?.machines?.marque} {contract?.machines?.modele}
+                        {machine?.marque} {machine?.modele}
                       </p>
                     </div>
                     <span className={`shrink-0 text-[11px] font-medium whitespace-nowrap ${isOverdue ? 'text-red-500' : 'text-gray-400'}`}>

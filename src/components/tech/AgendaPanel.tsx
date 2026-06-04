@@ -38,11 +38,9 @@ export default async function TechAgendaPanel() {
       .from('maintenance_visits')
       .select(`
         id, scheduled_date, status,
-        maintenance_plans (
-          contracts (
-            clients  ( nom_client ),
-            machines ( numero_serie, marque, modele )
-          )
+        contract_machines (
+          machines ( numero_serie, marque, modele ),
+          contracts ( clients ( nom_client ) )
         )
       `)
       .in('status', ['planifié', 'en_retard'])
@@ -88,9 +86,9 @@ export default async function TechAgendaPanel() {
           ) : (
             <div className="space-y-0.5">
               {visits.map(v => {
-                const plan     = v.maintenance_plans as any
-                const contract = plan?.contracts as any
-                const machine  = contract?.machines as any
+                const line     = v.contract_machines as any
+                const contract = line?.contracts as any
+                const machine  = line?.machines as any
                 const { label, isOverdue } = fmtDate(v.scheduled_date)
                 const serie = machine?.numero_serie as string | undefined
                 return (
@@ -105,7 +103,7 @@ export default async function TechAgendaPanel() {
                         {contract?.clients?.nom_client ?? '—'}
                       </p>
                       <p className="text-[11px] text-ink-muted truncate">
-                        {machine?.marque} {machine?.modelo}
+                        {machine?.marque} {machine?.modele}
                       </p>
                     </div>
                     <span className={`shrink-0 text-[11px] font-medium whitespace-nowrap ${isOverdue ? 'text-accent' : 'text-ink-muted'}`}>
