@@ -41,12 +41,9 @@ export default async function TechPlanningPage() {
       .from('maintenance_visits')
       .select(`
         id, scheduled_date, status,
-        maintenance_plans (
-          contracts (
-            lieu_installation,
-            clients  ( nom_client ),
-            machines ( numero_serie, marque, modele )
-          )
+        contract_machines (
+          machines ( numero_serie, marque, modele ),
+          contracts ( lieu_installation, clients ( nom_client ) )
         )
       `)
       .in('status', ['planifié', 'en_retard'])
@@ -64,8 +61,47 @@ export default async function TechPlanningPage() {
     v.status === 'en_retard' || v.scheduled_date <= in14Str
   )
 
-  const overdueVisits  = visits.filter(v => v.status === 'en_retard')
-  const plannedVisits  = visits.filter(v => v.status === 'planifié')
+  type VisitRow = {
+    id: string; scheduled_date: string; status: string
+    serie: string | null
+    marque: string | null
+    modele: string | null
+    client: string
+    lieu: string | null
+  }
+
+  function toRow(v: (typeof visits)[number]): VisitRow {
+    const line = v.contract_machines as unknown as {
+      machines: { numero_serie: string; marque: string; modele: string } | null
+      contracts: { lieu_installation: string | null; clients: { nom_client: string } | null } | null
+    } | null
+    return {
+      id: v.id,
+      scheduled_date: v.scheduled_date,
+      status: v.status,
+      serie:  line?.machines?.numero_serie ?? null,
+      marque: line?.machines?.marque ?? null,
+      modele: line?.machines?.modele ?? null,
+      client: line?.contracts?.clients?.nom_client ?? '—',
+      lieu:   line?.contracts?.lieu_installation ?? null,
+    }
+  }
+
+  type VisitGroup = { key: string; client: string; lieu: string | null; rows: VisitRow[] }
+  function groupByContract(rows: VisitRow[]): VisitGroup[] {
+    const map = new Map<string, VisitGroup>()
+    for (const r of rows) {
+      const key = `${r.client}|${r.lieu ?? ''}`
+      if (!map.has(key)) map.set(key, { key, client: r.client, lieu: r.lieu, rows: [] })
+      map.get(key)!.rows.push(r)
+    }
+    return [...map.values()]
+  }
+
+  const overdueGroups = groupByContract(visits.filter(v => v.status === 'en_retard').map(toRow))
+  const plannedGroups = groupByContract(visits.filter(v => v.status === 'planifié').map(toRow))
+  const overdueCount  = overdueGroups.reduce((n, g) => n + g.rows.length, 0)
+  const plannedCount  = plannedGroups.reduce((n, g) => n + g.rows.length, 0)
 
   return (
     <div className="p-4 space-y-6 pt-5">
@@ -80,42 +116,38 @@ export default async function TechPlanningPage() {
       </div>
 
       {/* ── MAINTENANCES EN RETARD ── */}
-      {overdueVisits.length > 0 && (
+      {overdueCount > 0 && (
         <section className="space-y-2">
           <div className="flex items-center gap-2">
             <AlertTriangle size={14} className="text-accent" />
-            <p className="text-sm font-semibold text-accent">En retard ({overdueVisits.length})</p>
+            <p className="text-sm font-semibold text-accent">En retard ({overdueCount})</p>
           </div>
-          {overdueVisits.map(v => {
-            const plan     = v.maintenance_plans as any
-            const contract = plan?.contracts as any
-            const machine  = contract?.machines as any
-            const { label } = fmtDate(v.scheduled_date)
-            const serie = machine?.numero_serie as string | undefined
-            return (
-              <Link
-                key={v.id}
-                href={serie ? `/tech/scan/${encodeURIComponent(serie)}` : '/tech'}
-                className="flex items-start gap-3 bg-card rounded-[var(--radius-card)] border-2 border-accent/30 p-4"
-              >
-                <div className="w-9 h-9 rounded-xl bg-accent-soft flex items-center justify-center shrink-0">
-                  <Wrench size={16} className="text-accent" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-ink truncate">
-                    {contract?.clients?.nom_client ?? '—'}
-                  </p>
-                  <p className="text-xs text-ink-soft truncate">
-                    {machine?.marque} {machine?.modele}
-                  </p>
-                  {contract?.lieu_installation && (
-                    <p className="text-xs text-ink-muted truncate mt-0.5">{contract.lieu_installation}</p>
-                  )}
-                </div>
-                <span className="shrink-0 text-xs font-semibold text-accent whitespace-nowrap">{label}</span>
-              </Link>
-            )
-          })}
+          {overdueGroups.map(group => (
+            <div key={group.key} className="bg-card rounded-[var(--radius-card)] border-2 border-accent/30 p-4 space-y-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink truncate">{group.client}</p>
+                {group.lieu && <p className="text-xs text-ink-muted truncate">{group.lieu}</p>}
+              </div>
+              <div className="space-y-1.5">
+                {group.rows.map(r => {
+                  const { label } = fmtDate(r.scheduled_date)
+                  return (
+                    <Link
+                      key={r.id}
+                      href={r.serie ? `/tech/scan/${encodeURIComponent(r.serie)}` : '/tech'}
+                      className="flex items-center justify-between gap-3 rounded-lg bg-accent-soft/50 px-3 py-2"
+                    >
+                      <span className="text-xs text-ink-soft truncate flex items-center gap-1.5">
+                        <Wrench size={12} className="text-accent shrink-0" />
+                        {r.marque} {r.modele}
+                      </span>
+                      <span className="shrink-0 text-xs font-semibold text-accent whitespace-nowrap">{label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </section>
       )}
 
@@ -125,49 +157,45 @@ export default async function TechPlanningPage() {
           <Wrench size={14} className="text-ink-muted" />
           <p className="text-sm font-semibold text-ink-soft">
             Maintenance — 14 prochains jours
-            {plannedVisits.length > 0 && (
-              <span className="ml-2 text-xs font-normal text-ink-muted">({plannedVisits.length})</span>
+            {plannedCount > 0 && (
+              <span className="ml-2 text-xs font-normal text-ink-muted">({plannedCount})</span>
             )}
           </p>
         </div>
 
-        {plannedVisits.length === 0 ? (
+        {plannedCount === 0 ? (
           <div className="bg-card rounded-[var(--radius-card)] border border-line p-6 text-center">
             <p className="text-sm text-ink-muted">Aucune visite planifiée dans 14 jours</p>
           </div>
         ) : (
-          plannedVisits.map(v => {
-            const plan     = v.maintenance_plans as any
-            const contract = plan?.contracts as any
-            const machine  = contract?.machines as any
-            const { label, isOverdue } = fmtDate(v.scheduled_date)
-            const serie = machine?.numero_serie as string | undefined
-            return (
-              <Link
-                key={v.id}
-                href={serie ? `/tech/scan/${encodeURIComponent(serie)}` : '/tech'}
-                className="flex items-start gap-3 bg-card rounded-[var(--radius-card)] border border-line p-4"
-              >
-                <div className="w-9 h-9 rounded-xl bg-info-soft flex items-center justify-center shrink-0">
-                  <Wrench size={16} className="text-info" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-ink truncate">
-                    {contract?.clients?.nom_client ?? '—'}
-                  </p>
-                  <p className="text-xs text-ink-soft truncate">
-                    {machine?.marque} {machine?.modele}
-                  </p>
-                  {contract?.lieu_installation && (
-                    <p className="text-xs text-ink-muted truncate mt-0.5">{contract.lieu_installation}</p>
-                  )}
-                </div>
-                <span className={`shrink-0 text-xs font-semibold whitespace-nowrap ${isOverdue ? 'text-accent' : 'text-info'}`}>
-                  {label}
-                </span>
-              </Link>
-            )
-          })
+          plannedGroups.map(group => (
+            <div key={group.key} className="bg-card rounded-[var(--radius-card)] border border-line p-4 space-y-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink truncate">{group.client}</p>
+                {group.lieu && <p className="text-xs text-ink-muted truncate">{group.lieu}</p>}
+              </div>
+              <div className="space-y-1.5">
+                {group.rows.map(r => {
+                  const { label, isOverdue } = fmtDate(r.scheduled_date)
+                  return (
+                    <Link
+                      key={r.id}
+                      href={r.serie ? `/tech/scan/${encodeURIComponent(r.serie)}` : '/tech'}
+                      className="flex items-center justify-between gap-3 rounded-lg bg-info-soft/40 px-3 py-2"
+                    >
+                      <span className="text-xs text-ink-soft truncate flex items-center gap-1.5">
+                        <Wrench size={12} className="text-info shrink-0" />
+                        {r.marque} {r.modele}
+                      </span>
+                      <span className={`shrink-0 text-xs font-semibold whitespace-nowrap ${isOverdue ? 'text-accent' : 'text-info'}`}>
+                        {label}
+                      </span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          ))
         )}
       </section>
 

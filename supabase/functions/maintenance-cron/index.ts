@@ -55,13 +55,10 @@ Deno.serve(async () => {
     .from('maintenance_visits')
     .select(`
       id, scheduled_date, status,
-      maintenance_plans (
-        frequency, notes,
-        contracts (
-          numero_contrat,
-          clients  ( nom_client ),
-          machines ( numero_serie, marque, modele )
-        )
+      maintenance_plans ( frequency, notes ),
+      contract_machines (
+        machines ( numero_serie, marque, modele ),
+        contracts ( numero_contrat, clients ( nom_client ) )
       )
     `)
     .gte('scheduled_date', todayStr)
@@ -77,9 +74,10 @@ Deno.serve(async () => {
   for (const visit of visits ?? []) {
     try {
       const plan     = visit.maintenance_plans as any
-      const contract = plan?.contracts as any
+      const line     = visit.contract_machines as any
+      const contract = line?.contracts as any
       const client   = contract?.clients as any
-      const machine  = contract?.machines as any
+      const machine  = line?.machines as any
 
       const dateFormatted = new Date(visit.scheduled_date + 'T00:00:00')
         .toLocaleDateString('fr-FR')

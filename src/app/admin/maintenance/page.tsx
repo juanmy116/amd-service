@@ -79,11 +79,10 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
       id, frequency, active, notes,
       contracts (
         id, numero_contrat,
-        clients   ( nom_client ),
-        machines  ( numero_serie, marque, modele )
+        clients ( nom_client )
       ),
       maintenance_visits (
-        id, scheduled_date, status, done_at
+        id, scheduled_date, status, done_at, contract_machine_id
       )
     `)
     .order('created_at', { ascending: false })
@@ -104,32 +103,32 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
   const allRows = (plans ?? []).map((p) => {
     const contract = p.contracts as unknown as {
       id: string; numero_contrat: string
-      clients:  { nom_client: string }
-      machines: { numero_serie: string; marque: string; modele: string }
+      clients: { nom_client: string }
     }
     const visits = (p.maintenance_visits ?? []) as {
-      id: string; scheduled_date: string; status: string; done_at: string | null
+      id: string; scheduled_date: string; status: string; done_at: string | null; contract_machine_id: string
     }[]
+    const machineCount = new Set(visits.map((v) => v.contract_machine_id)).size
     const nextVisit = visits
       .filter((v) => v.status !== 'fait')
       .sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date))[0] ?? null
     const lastDone = visits
       .filter((v) => v.status === 'fait')
       .sort((a, b) => b.scheduled_date.localeCompare(a.scheduled_date))[0] ?? null
-    return { plan: p, contract, visits, nextVisit, lastDone }
+    const anyOverdue = visits.some((v) => v.status === 'en_retard')
+    return { plan: p, contract, visits, nextVisit, lastDone, machineCount, anyOverdue }
   })
 
   const rows = statusFilter
     ? allRows.filter((r) => {
-        // "fait" = el plan tiene al menos una visita realizada (independiente de pendientes).
-        // "planifié" / "en_retard" = estado de la próxima visita pendiente.
         if (statusFilter === 'fait') return r.lastDone !== null
-        return r.nextVisit?.status === statusFilter
+        if (statusFilter === 'en_retard') return r.anyOverdue
+        return r.nextVisit?.status === statusFilter && !r.anyOverdue
       })
     : allRows
 
   const totalPlans  = rows.length
-  const overdue     = rows.filter((r) => r.nextVisit?.status === 'en_retard').length
+  const overdue     = rows.filter((r) => r.anyOverdue).length
   const dueThisWeek = rows.filter((r) => {
     if (!r.nextVisit || r.nextVisit.status !== 'planifié') return false
     const diff = (new Date(r.nextVisit.scheduled_date).getTime() - Date.now()) / 86400000
@@ -218,7 +217,8 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-neutral-soft border-b border-line-subtle">
-                <th className={TH}>Client / Machine</th>
+                <th className={TH}>Client</th>
+                <th className={TH}>Machines</th>
                 <th className={TH}>Contrat</th>
                 <th className={TH}>Fréquence</th>
                 <th className={TH}>Prochaine visite</th>
@@ -228,10 +228,9 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
               </tr>
             </thead>
             <tbody className="divide-y divide-line-subtle">
-              {rows.map(({ plan, contract, nextVisit, lastDone }) => {
+              {rows.map(({ plan, contract, nextVisit, lastDone, machineCount, anyOverdue }) => {
                 const href = `/admin/maintenance/${plan.id}`
-                const overdueRow = nextVisit?.status === 'en_retard'
-                const statusKey = nextVisit?.status ?? (lastDone ? 'fait' : 'planifié')
+                const statusKey = anyOverdue ? 'en_retard' : (nextVisit?.status ?? (lastDone ? 'fait' : 'planifié'))
                 const status = STATUS[statusKey as keyof typeof STATUS] ?? STATUS.planifié
                 return (
                   <tr key={plan.id} className="hover:bg-neutral-soft transition-colors">
@@ -239,9 +238,9 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
                       <Link href={href} className="font-medium text-ink hover:text-accent transition-colors">
                         {contract.clients.nom_client}
                       </Link>
-                      <p className="text-xs text-ink-muted font-mono mt-0.5">
-                        {contract.machines.marque} {contract.machines.modele}
-                      </p>
+                    </td>
+                    <td className="px-5 py-3.5 text-ink-soft">
+                      {machineCount} machine{machineCount !== 1 ? 's' : ''}
                     </td>
                     <td className="px-5 py-3.5 font-mono text-xs">
                       <Link href={href} className="text-ink-soft hover:text-accent transition-colors">
@@ -253,7 +252,7 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
                     </td>
                     <td className="px-5 py-3.5">
                       {nextVisit ? (
-                        <span className={overdueRow ? 'text-accent font-semibold' : 'text-ink-soft'}>
+                        <span className={anyOverdue ? 'text-accent font-semibold' : 'text-ink-soft'}>
                           {new Date(nextVisit.scheduled_date).toLocaleDateString('fr-FR')}
                         </span>
                       ) : (
@@ -270,10 +269,7 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
                       <Badge variant={status.variant}>{status.label}</Badge>
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      <Link
-                        href={href}
-                        className="text-xs font-medium text-ink-soft hover:text-ink"
-                      >
+                      <Link href={href} className="text-xs font-medium text-ink-soft hover:text-ink">
                         Détail →
                       </Link>
                     </td>

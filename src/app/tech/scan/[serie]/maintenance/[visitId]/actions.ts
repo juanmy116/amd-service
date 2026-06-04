@@ -31,18 +31,17 @@ export async function closeMaintenance(
 ): Promise<FormState> {
   const { user, profile, supabase } = await requireTechnician()
 
-  // Cargar visita con plan y contrato
+  // Cargar visita con su línea de contrato (modelo N máquinas).
   const { data: visit } = await supabase
     .from('maintenance_visits')
     .select(`
-      id, status, scheduled_date, plan_id,
-      maintenance_plans (
-        frequency, notes,
-        contracts (
-          numero_contrat,
-          clients  ( nom_client ),
-          machines ( numero_serie, marque, modele )
-        )
+      id, status, scheduled_date, plan_id, contract_machine_id,
+      maintenance_plans ( frequency, notes ),
+      contract_machines (
+        machine_id,
+        maintenance_frequency_override,
+        machines ( numero_serie, marque, modele ),
+        contracts ( numero_contrat, clients ( nom_client ) )
       )
     `)
     .eq('id', visitId)
@@ -51,15 +50,18 @@ export async function closeMaintenance(
   if (!visit) return { error: 'Visite introuvable.' }
 
   // Verificar que la visita pertenece a la máquina escaneada.
-  // Impide cerrar visitas de otras máquinas conociendo solo el visitId.
-  const machineSerie = (visit.maintenance_plans as any)?.contracts?.machines?.numero_serie
-  if (machineSerie !== serie) return { error: 'Visite introuvable.' }
+  const line = visit.contract_machines as unknown as {
+    machine_id: string
+    maintenance_frequency_override: 'mensuel' | 'trimestriel' | null
+    machines: { numero_serie: string; marque: string; modele: string } | null
+    contracts: { numero_contrat: string; clients: { nom_client: string } | null } | null
+  } | null
 
+  if (line?.machine_id !== serie) return { error: 'Visite introuvable.' }
   if (visit.status === 'fait') return { error: 'Cette visite est déjà clôturée.' }
 
   const notes = ((formData.get('notes') as string) ?? '').trim() || null
 
-  // Cerrar visita
   const { error: visitErr } = await supabase
     .from('maintenance_visits')
     .update({
@@ -73,42 +75,41 @@ export async function closeMaintenance(
 
   if (visitErr) return { error: 'Erreur lors de la clôture de la visite.' }
 
-  // Guardar piezas reemplazadas
+  // Piezas reemplazadas.
   const partsToInsert = PART_IDS
     .filter(id => formData.get(`part_${id}`) === 'on')
     .map(id => ({ visit_id: visitId, part_id: id, quantity: 1 }))
 
   const autresPieces = ((formData.get('autres_pieces') as string) ?? '').trim()
   if (autresPieces) {
-    partsToInsert.push({ visit_id: visitId, part_id: null as any, quantity: 1 } as any)
-    // insertar como descripción libre
     await supabase.from('maintenance_parts').insert({
       visit_id: visitId, description: autresPieces, quantity: 1,
     })
   }
-
   if (partsToInsert.length > 0) {
     await supabase.from('maintenance_parts').insert(partsToInsert)
   }
 
-  // Auto-programar siguiente visita
-  const plan = visit.maintenance_plans as any
-  const days = plan?.frequency === 'mensuel' ? 30 : 90
+  // Auto-programar siguiente visita para LA MISMA máquina.
+  // Frecuencia: override de la línea, si no la del plan.
+  const plan = visit.maintenance_plans as unknown as { frequency: string; notes: string | null } | null
+  const effectiveFreq = line?.maintenance_frequency_override ?? plan?.frequency
+  const days = effectiveFreq === 'mensuel' ? 30 : 90
   const base = new Date(visit.scheduled_date + 'T00:00:00')
   base.setDate(base.getDate() + days)
   const nextDateStr = base.toISOString().split('T')[0]
 
   await supabase.from('maintenance_visits').insert({
-    plan_id:        visit.plan_id,
-    scheduled_date: nextDateStr,
-    status:         'planifié',
+    plan_id:             visit.plan_id,
+    contract_machine_id: visit.contract_machine_id,
+    scheduled_date:      nextDateStr,
+    status:              'planifié',
   })
 
-  // Notificación Matrix de cierre
-  const contract = plan?.contracts as any
-  const machine  = contract?.machines as any
-  const client   = contract?.clients as any
-  const nextFmt  = new Date(nextDateStr + 'T00:00:00').toLocaleDateString('fr-FR')
+  // Notificación Matrix de cierre.
+  const machine = line?.machines
+  const client  = line?.contracts?.clients
+  const nextFmt = new Date(nextDateStr + 'T00:00:00').toLocaleDateString('fr-FR')
 
   await notifyMatrix([
     '✅ MAINTENANCE EFFECTUÉE',

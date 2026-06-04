@@ -16,13 +16,11 @@ export default async function MaintenanceVisitPage({
     .from('maintenance_visits')
     .select(`
       id, scheduled_date, status,
-      maintenance_plans (
-        notes,
-        contracts (
-          lieu_installation,
-          clients  ( nom_client ),
-          machines ( numero_serie, marque, modele )
-        )
+      maintenance_plans ( notes ),
+      contract_machines (
+        machine_id,
+        machines ( numero_serie, marque, modele ),
+        contracts ( lieu_installation, clients ( nom_client ) )
       )
     `)
     .eq('id', visitId)
@@ -30,13 +28,17 @@ export default async function MaintenanceVisitPage({
 
   if (!visit) notFound()
 
-  const plan     = visit.maintenance_plans as any
-  const contract = plan?.contracts as any
-  const machine  = contract?.machines as any
-  const client   = contract?.clients as any
+  const plan    = visit.maintenance_plans as unknown as { notes: string | null } | null
+  const line    = visit.contract_machines as unknown as {
+    machine_id: string
+    machines: { numero_serie: string; marque: string; modele: string } | null
+    contracts: { lieu_installation: string | null; clients: { nom_client: string } | null } | null
+  } | null
+  const machine = line?.machines
+  const client  = line?.contracts?.clients
 
   // Verificar que esta visita corresponde a la máquina del QR
-  if (machine?.numero_serie !== numero_serie) notFound()
+  if (line?.machine_id !== numero_serie) notFound()
 
   const boundAction = closeMaintenance.bind(null, visitId, numero_serie)
 
@@ -48,7 +50,7 @@ export default async function MaintenanceVisitPage({
       isOverdue={visit.status === 'en_retard'}
       clientName={client?.nom_client ?? null}
       machineName={`${machine?.marque ?? ''} ${machine?.modele ?? ''}`.trim()}
-      machineLocation={contract?.lieu_installation ?? null}
+      machineLocation={line?.contracts?.lieu_installation ?? null}
       planNotes={plan?.notes ?? null}
     />
   )
