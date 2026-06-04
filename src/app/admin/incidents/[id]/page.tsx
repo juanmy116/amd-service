@@ -37,9 +37,8 @@ export default async function EditIncidentPage({
   if (!incident) notFound()
 
   // Resolución de contexto en orden de prioridad:
-  // 1. contract_machine_id (incidencias internas nuevas, post-refactor)
+  // 1. contract_machine_id (incidencias internas)
   // 2. machine_id directo (incidencias públicas QR)
-  // 3. contract_id (incidencias internas legacy, pre-refactor)
   let contextInfo = { clientName: null as string | null, machineName: null as string | null, contractNumber: null as string | null }
 
   if (incident.contract_machine_id) {
@@ -60,23 +59,9 @@ export default async function EditIncidentPage({
         contractNumber: lineTyped.contracts?.numero_contrat ?? null,
       }
     }
-  } else if (incident.machine_id && !incident.contract_id) {
+  } else if (incident.machine_id) {
     // Incidencia pública QR: solo tenemos machine_id
     contextInfo = { clientName: null, machineName: incident.machine_id, contractNumber: null }
-  } else if (incident.contract_id) {
-    // Legacy pre-refactor
-    const { data: contract } = await supabase
-      .from('contracts')
-      .select('numero_contrat, clients(nom_client), machines(marque, modele)')
-      .eq('id', incident.contract_id)
-      .maybeSingle()
-    const clientData  = contract?.clients  as unknown as { nom_client: string } | null
-    const machineData = contract?.machines as unknown as { marque: string; modele: string } | null
-    contextInfo = {
-      clientName:     clientData?.nom_client ?? null,
-      machineName:    machineData ? `${machineData.marque} ${machineData.modele}` : incident.machine_id,
-      contractNumber: contract?.numero_contrat ?? null,
-    }
   }
 
   // History
