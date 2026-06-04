@@ -31,23 +31,15 @@ export default async function TechIncidentPage({
   // Error opaco: notFound en lugar de 403 para no revelar que el incidente existe.
   if (profile.role === 'technician' && incident.assigned_to !== user.id) notFound()
 
-  // Resolver contexto de cliente/máquina/contrato para el incidente.
-  // Incidencias nuevas (post-refactor) tienen contract_id=NULL y contract_machine_id=<uuid>.
+  // Resolver contexto de cliente/máquina/contrato vía contract_machine_id.
+  // Incidencias públicas (QR) sin línea muestran solo machine_id.
   let contractInfo: {
     numero_contrat: string | null
-    lieu_installation: string | null
     clients: { nom_client: string } | null
     machines: { marque: string; modele: string; localisation: string | null } | null
   } | null = null
 
-  if (incident.contract_id) {
-    const { data } = await supabase
-      .from('contracts')
-      .select('numero_contrat, lieu_installation, clients(nom_client), machines(marque, modele, localisation)')
-      .eq('id', incident.contract_id)
-      .maybeSingle()
-    contractInfo = data as typeof contractInfo
-  } else if (incident.contract_machine_id) {
+  if (incident.contract_machine_id) {
     const { data } = await supabase
       .from('contract_machines')
       .select('contracts(numero_contrat, clients(nom_client)), machines(marque, modele, localisation, numero_serie)')
@@ -60,7 +52,6 @@ export default async function TechIncidentPage({
       }
       contractInfo = {
         numero_contrat: cm.contracts?.numero_contrat ?? null,
-        lieu_installation: cm.machines?.localisation ?? null,
         clients: cm.contracts?.clients ?? null,
         machines: cm.machines ? { marque: cm.machines.marque, modele: cm.machines.modele, localisation: cm.machines.localisation } : null,
       }
@@ -70,7 +61,7 @@ export default async function TechIncidentPage({
   const clientName  = contractInfo?.clients?.nom_client ?? null
   const machine     = contractInfo?.machines ?? null
   const machineName = machine ? `${machine.marque} ${machine.modele}` : (incident.machine_id ?? '')
-  const machineLocation = machine?.localisation ?? contractInfo?.lieu_installation ?? null
+  const machineLocation = machine?.localisation ?? null
   const contractNumber = contractInfo?.numero_contrat ?? null
 
   const checkedParts = new Set(parts?.map((p) => p.part_id) ?? [])
