@@ -1,7 +1,9 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { CONTRACT_STATUSES, MAINTENANCE_FREQUENCIES, parseEnum } from '@/lib/enums'
+import { mapRpcError } from '@/lib/contract-errors'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -18,7 +20,7 @@ export async function createContractAction(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
-  const { supabase } = await requireAdmin()
+  await requireAdmin()
 
   const numero_contrat = ((formData.get('numero_contrat') as string) ?? '').trim()
   const client_id = Number(formData.get('client_id'))
@@ -37,7 +39,6 @@ export async function createContractAction(
     return { error: 'Le jour de facturation doit être entre 1 et 31.' }
   }
 
-  // Parsear líneas serializadas en formData (formato JSON en el campo "lines")
   const linesRaw = (formData.get('lines') as string) ?? '[]'
   let lines: LineInput[]
   try {
@@ -48,7 +49,6 @@ export async function createContractAction(
   if (!Array.isArray(lines) || lines.length === 0) {
     return { error: 'Veuillez ajouter au moins une machine au contrat.' }
   }
-
   for (const ln of lines) {
     if (!ln.machine_id || !ln.date_debut) {
       return { error: 'Chaque machine doit avoir un numéro de série et une date de début.' }
@@ -58,57 +58,23 @@ export async function createContractAction(
     }
   }
 
-  // 1. Insert contract
-  const { data: contractRow, error: contractError } = await supabase
-    .from('contracts')
-    .insert({
-      numero_contrat,
-      client_id,
-      date_debut,
-      date_renouvellement,
-      statut,
-      billing_day,
-      maintenance_frequency,
-    })
-    .select('id')
-    .single()
-
-  if (contractError || !contractRow) {
-    if (contractError?.code === '23505') return { error: 'Ce numéro de contrat existe déjà.' }
-    console.error('[createContract]', contractError)
-    return { error: 'Une erreur est survenue lors de la création du contrat.' }
+  const payload = {
+    numero_contrat,
+    client_id,
+    date_debut,
+    date_renouvellement,
+    statut,
+    billing_day,
+    maintenance_frequency,
+    lines,
   }
 
-  // 2. Insert lines
-  const linesPayload = lines.map((ln) => ({
-    contract_id: contractRow.id,
-    machine_id: ln.machine_id,
-    date_debut: ln.date_debut,
-    statut: 'actif' as const,
-    billing_day_override: ln.billing_day_override,
-    maintenance_frequency_override: ln.maintenance_frequency_override,
-    notes: ln.notes,
-  }))
+  const admin = createAdminClient()
+  const { error } = await admin.rpc('create_contract_with_lines', { payload })
 
-  const { error: linesError } = await supabase.from('contract_machines').insert(linesPayload as any)
-
-  if (linesError) {
-    // F10: rollback manual del contract recién creado — capturar error para detectar contratos huérfanos
-    const { error: rollbackError, count } = await supabase
-      .from('contracts')
-      .delete({ count: 'exact' })
-      .eq('id', contractRow.id)
-    if (rollbackError || count === 0) {
-      console.error('[createContract.rollback]', { rollbackError, count, contractId: contractRow.id })
-      return { error: linesError.code === '23505'
-        ? 'Une ou plusieurs machines sont déjà assignées à un autre contrat actif. Le contrat a été créé sans machines — contactez le support pour le nettoyage.'
-        : "Erreur lors de l'ajout des machines. Contactez le support si le contrat reste visible." }
-    }
-    if (linesError.code === '23505') {
-      return { error: 'Une ou plusieurs machines sont déjà assignées à un autre contrat actif.' }
-    }
-    console.error('[createContract.lines]', linesError)
-    return { error: "Une erreur est survenue lors de l'ajout des machines." }
+  if (error) {
+    console.error('[createContract.rpc]', error)
+    return { error: mapRpcError(error.message, 'Une erreur est survenue lors de la création du contrat.') }
   }
 
   redirect('/admin/contracts')

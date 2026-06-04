@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, ArrowLeft, Trash2, AlertTriangle, Plus, X } from 'lucide-react'
+import { Loader2, ArrowLeft, Trash2, AlertTriangle, Plus, X, RefreshCw } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 
 type FormState = { error: string } | null
@@ -26,6 +26,16 @@ type LineInput = {
   notes: string | null
 }
 
+type RetiredLine = {
+  id: string
+  machine_id: string
+  date_debut: string
+  date_fin: string
+  billing_day_override: number | null
+  maintenance_frequency_override: 'mensuel' | 'trimestriel' | null
+  notes: string | null
+}
+
 type ClientOption = { id: number; nom_client: string }
 type MachineOption = { numero_serie: string; marque: string; modele: string }
 
@@ -38,7 +48,7 @@ type Props = {
   title: string
   isEdit?: boolean
   contractId?: string
-  deleteAction?: (formData: FormData) => Promise<void>
+  deleteAction?: (prev: FormState, data: FormData) => Promise<FormState>
 }
 
 const inputClass =
@@ -67,19 +77,70 @@ export default function ContractForm({
   action, defaultValues, initialLines, clients, availableMachines, title, isEdit, contractId, deleteAction,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
+  const noopDelete = async (_prev: FormState, _fd: FormData): Promise<FormState> => null
+  const [deleteState, deleteFormAction, deletePending] = useActionState(
+    deleteAction ?? noopDelete,
+    null
+  )
   const [confirming, setConfirming] = useState(false)
   const [lines, setLines] = useState<LineInput[]>(initialLines ?? [emptyLine()])
+  const [retired, setRetired] = useState<RetiredLine[]>([])
+
+  const today = new Date().toISOString().slice(0, 10)
 
   function addLine() {
     setLines((prev) => [...prev, emptyLine()])
   }
 
+  // Retirar una línea. Si es existente (tiene id) se mueve a "retired" con date_fin
+  // por defecto = hoy (editable). Si es nueva (sin id) se elimina sin más.
   function removeLine(idx: number) {
-    setLines((prev) => prev.filter((_, i) => i !== idx))
+    setLines((prev) => {
+      const line = prev[idx]
+      if (line.id) {
+        setRetired((r) => [...r, {
+          id: line.id!,
+          machine_id: line.machine_id,
+          date_debut: line.date_debut,
+          date_fin: today,
+          billing_day_override: line.billing_day_override,
+          maintenance_frequency_override: line.maintenance_frequency_override,
+          notes: line.notes,
+        }])
+      }
+      return prev.filter((_, i) => i !== idx)
+    })
+  }
+
+  // "Remplacer": retira la línea existente (con fecha) y añade una nueva vacía.
+  function replaceLine(idx: number) {
+    removeLine(idx)
+    addLine()
   }
 
   function updateLine<K extends keyof LineInput>(idx: number, key: K, value: LineInput[K]) {
     setLines((prev) => prev.map((l, i) => i === idx ? { ...l, [key]: value } : l))
+  }
+
+  function updateRetiredDate(id: string, date_fin: string) {
+    setRetired((prev) => prev.map((r) => r.id === id ? { ...r, date_fin } : r))
+  }
+
+  function undoRetire(id: string) {
+    setRetired((prev) => {
+      const item = prev.find((r) => r.id === id)
+      if (item) {
+        setLines((l) => [...l, {
+          id: item.id,
+          machine_id: item.machine_id,
+          date_debut: item.date_debut,
+          billing_day_override: item.billing_day_override,
+          maintenance_frequency_override: item.maintenance_frequency_override,
+          notes: item.notes,
+        }])
+      }
+      return prev.filter((r) => r.id !== id)
+    })
   }
 
   // Machine IDs already used in other lines (to avoid duplicates)
@@ -108,13 +169,14 @@ export default function ContractForm({
                 <AlertTriangle size={14} className="text-accent" />
                 Confirmer ?
               </span>
-              <form action={deleteAction} className="contents">
+              <form action={deleteFormAction} className="contents">
                 <input type="hidden" name="id" value={contractId} />
                 <button
                   type="submit"
-                  className="px-3 py-2 rounded-lg text-sm font-medium text-white bg-accent"
+                  disabled={deletePending}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-white bg-accent disabled:opacity-60"
                 >
-                  Oui, supprimer
+                  {deletePending ? '…' : 'Oui, supprimer'}
                 </button>
               </form>
               <button
@@ -138,10 +200,17 @@ export default function ContractForm({
         )}
       </div>
 
+      {deleteState?.error && (
+        <div className="mb-4 px-4 py-3 rounded-lg bg-accent-soft border border-accent/20 text-sm text-accent">
+          {deleteState.error}
+        </div>
+      )}
+
       {/* Form */}
       <form action={formAction}>
         {/* Hidden field: serialised lines */}
         <input type="hidden" name="lines" value={JSON.stringify(lines)} />
+        <input type="hidden" name="retire" value={JSON.stringify(retired)} />
 
         {/* ── Section 1: Contrat ── */}
         <Card className="p-6 space-y-5 mb-6">
@@ -323,23 +392,36 @@ export default function ContractForm({
                       <label className="block text-xs font-medium text-ink-muted mb-1">
                         Numéro de série <span className="text-accent">*</span>
                       </label>
-                      <select
-                        value={line.machine_id}
-                        onChange={(e) => updateLine(idx, 'machine_id', e.target.value)}
-                        className={selectSmClass}
-                        required
-                      >
-                        <option value="" disabled>Sélectionner...</option>
-                        {selectableMachines.map((m) => (
-                          <option key={m.numero_serie} value={m.numero_serie}>
-                            {m.marque} {m.modele} — {m.numero_serie}
-                          </option>
-                        ))}
-                        {/* If the machine is already assigned to this contract (edit mode), show it */}
-                        {line.machine_id && !selectableMachines.find(m => m.numero_serie === line.machine_id) && (
-                          <option value={line.machine_id}>{line.machine_id} (actuel)</option>
-                        )}
-                      </select>
+                      {line.id ? (
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 px-3 py-2 rounded-lg border border-line bg-neutral-soft text-sm text-ink-soft font-mono">
+                            {line.machine_id}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => replaceLine(idx)}
+                            title="Remplacer la machine (clôture cette ligne et en ouvre une nouvelle)"
+                            className="flex items-center gap-1 px-2.5 py-2 rounded-lg border border-line text-xs text-ink-soft hover:bg-neutral-soft transition-colors shrink-0"
+                          >
+                            <RefreshCw size={13} />
+                            Remplacer
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          value={line.machine_id}
+                          onChange={(e) => updateLine(idx, 'machine_id', e.target.value)}
+                          className={selectSmClass}
+                          required
+                        >
+                          <option value="" disabled>Sélectionner...</option>
+                          {selectableMachines.map((m) => (
+                            <option key={m.numero_serie} value={m.numero_serie}>
+                              {m.marque} {m.modele} — {m.numero_serie}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-ink-muted mb-1">
@@ -417,6 +499,36 @@ export default function ContractForm({
             >
               + Ajouter une première machine
             </button>
+          )}
+
+          {retired.length > 0 && (
+            <div className="mt-5 pt-5 border-t border-line-subtle space-y-3">
+              <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
+                Machines retirées
+              </h3>
+              {retired.map((r) => (
+                <div key={r.id} className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-line bg-neutral-soft">
+                  <span className="flex-1 text-sm font-mono text-ink-soft line-through">{r.machine_id}</span>
+                  <div>
+                    <label className="block text-[10px] font-medium text-ink-muted mb-1">Date de fin</label>
+                    <input
+                      type="date"
+                      value={r.date_fin}
+                      min={r.date_debut}
+                      onChange={(e) => updateRetiredDate(r.id, e.target.value)}
+                      className={inputSmClass}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => undoRetire(r.id)}
+                    className="text-xs text-ink-soft hover:text-ink transition-colors shrink-0 self-end pb-2"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
         </Card>
 
