@@ -25,12 +25,10 @@ export default async function CalendrierPage() {
       .from('maintenance_visits')
       .select(`
         id, scheduled_date, status,
-        maintenance_plans (
-          id,
-          contracts (
-            clients  ( nom_client ),
-            machines ( marque, modele )
-          )
+        maintenance_plans ( id ),
+        contract_machines (
+          machines ( marque, modele ),
+          contracts ( clients ( nom_client ) )
         )
       `)
       .gte('scheduled_date', from)
@@ -47,10 +45,13 @@ export default async function CalendrierPage() {
   const events: CalEvent[] = []
 
   for (const v of visits ?? []) {
-    const plan     = v.maintenance_plans as any
-    const contract = plan?.contracts as any
-    const client   = contract?.clients?.nom_client ?? '—'
-    const machine  = `${contract?.machines?.marque ?? ''} ${contract?.machines?.modele ?? ''}`.trim()
+    const plan     = v.maintenance_plans as unknown as { id: string } | null
+    const line     = v.contract_machines as unknown as {
+      machines: { marque: string; modele: string } | null
+      contracts: { clients: { nom_client: string } | null } | null
+    } | null
+    const client   = line?.contracts?.clients?.nom_client ?? '—'
+    const machine  = `${line?.machines?.marque ?? ''} ${line?.machines?.modele ?? ''}`.trim()
     const cfg      = VISIT_COLOR[v.status] ?? VISIT_COLOR.planifié
 
     events.push({
