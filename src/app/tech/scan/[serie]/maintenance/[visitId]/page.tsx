@@ -19,8 +19,8 @@ export default async function MaintenanceVisitPage({
       maintenance_plans ( notes ),
       contract_machines (
         machine_id,
-        machines ( numero_serie, marque, modele ),
-        contracts ( lieu_installation, clients ( nom_client ) )
+        machines ( numero_serie, marque, modele, localisation ),
+        contracts ( clients ( nom_client ) )
       )
     `)
     .eq('id', visitId)
@@ -31,8 +31,8 @@ export default async function MaintenanceVisitPage({
   const plan    = visit.maintenance_plans as unknown as { notes: string | null } | null
   const line    = visit.contract_machines as unknown as {
     machine_id: string
-    machines: { numero_serie: string; marque: string; modele: string } | null
-    contracts: { lieu_installation: string | null; clients: { nom_client: string } | null } | null
+    machines: { numero_serie: string; marque: string; modele: string; localisation: string | null } | null
+    contracts: { clients: { nom_client: string } | null } | null
   } | null
   const machine = line?.machines
   const client  = line?.contracts?.clients
@@ -50,7 +50,7 @@ export default async function MaintenanceVisitPage({
       isOverdue={visit.status === 'en_retard'}
       clientName={client?.nom_client ?? null}
       machineName={`${machine?.marque ?? ''} ${machine?.modele ?? ''}`.trim()}
-      machineLocation={line?.contracts?.lieu_installation ?? null}
+      machineLocation={line?.machines?.localisation ?? null}
       planNotes={plan?.notes ?? null}
     />
   )

@@ -42,8 +42,8 @@ export default async function TechPlanningPage() {
       .select(`
         id, scheduled_date, status,
         contract_machines (
-          machines ( numero_serie, marque, modele ),
-          contracts ( lieu_installation, clients ( nom_client ) )
+          machines ( numero_serie, marque, modele, localisation ),
+          contracts ( clients ( nom_client ) )
         )
       `)
       .in('status', ['planifié', 'en_retard'])
@@ -72,8 +72,8 @@ export default async function TechPlanningPage() {
 
   function toRow(v: (typeof visits)[number]): VisitRow {
     const line = v.contract_machines as unknown as {
-      machines: { numero_serie: string; marque: string; modele: string } | null
-      contracts: { lieu_installation: string | null; clients: { nom_client: string } | null } | null
+      machines: { numero_serie: string; marque: string; modele: string; localisation: string | null } | null
+      contracts: { clients: { nom_client: string } | null } | null
     } | null
     return {
       id: v.id,
@@ -83,7 +83,7 @@ export default async function TechPlanningPage() {
       marque: line?.machines?.marque ?? null,
       modele: line?.machines?.modele ?? null,
       client: line?.contracts?.clients?.nom_client ?? '—',
-      lieu:   line?.contracts?.lieu_installation ?? null,
+      lieu:   line?.machines?.localisation ?? null,
     }
   }
 
