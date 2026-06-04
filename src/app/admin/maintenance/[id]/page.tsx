@@ -38,12 +38,13 @@ export default async function MaintenancePlanDetailPage({
       id, frequency, active, notes, created_at,
       contracts (
         id, numero_contrat,
-        clients  ( nom_client ),
-        machines ( numero_serie, marque, modele )
+        clients ( nom_client )
       ),
       maintenance_visits (
         id, scheduled_date, done_at, status, qr_verified, notes, matrix_notified,
-        profiles ( full_name )
+        contract_machine_id,
+        profiles ( full_name ),
+        contract_machines ( machines ( numero_serie, marque, modele ) )
       )
     `)
     .eq('id', id)
@@ -53,15 +54,16 @@ export default async function MaintenancePlanDetailPage({
 
   const contract = plan.contracts as unknown as {
     id: string; numero_contrat: string
-    clients:  { nom_client: string }
-    machines: { numero_serie: string; marque: string; modele: string }
+    clients: { nom_client: string }
   }
 
   type Visit = {
     id: string; scheduled_date: string; done_at: string | null
     status: string; qr_verified: boolean; notes: string | null
     matrix_notified: boolean
+    contract_machine_id: string
     profiles: { full_name: string }[] | null
+    contract_machines: { machines: { numero_serie: string; marque: string; modele: string } | null } | null
   }
   const visits = ((plan.maintenance_visits ?? []) as unknown as Visit[])
     .sort((a, b) => b.scheduled_date.localeCompare(a.scheduled_date))
@@ -82,7 +84,7 @@ export default async function MaintenancePlanDetailPage({
             {contract.clients.nom_client}
           </h1>
           <p className="text-xs text-ink-muted">
-            {contract.machines.marque} {contract.machines.modele} · {contract.numero_contrat}
+            {contract.numero_contrat} · {visits.length} visite{visits.length !== 1 ? 's' : ''}
           </p>
         </div>
       </div>
@@ -119,6 +121,7 @@ export default async function MaintenancePlanDetailPage({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-neutral-soft border-b border-line-subtle">
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Machine</th>
               <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Date planifiée</th>
               <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Statut</th>
               <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Réalisée le</th>
@@ -130,7 +133,7 @@ export default async function MaintenancePlanDetailPage({
           <tbody className="divide-y divide-line-subtle">
             {visits.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-ink-muted text-sm">
+                <td colSpan={7} className="px-4 py-10 text-center text-ink-muted text-sm">
                   Aucune visite planifiée
                 </td>
               </tr>
@@ -140,6 +143,11 @@ export default async function MaintenancePlanDetailPage({
               const label   = STATUS_LABEL[v.status as keyof typeof STATUS_LABEL] ?? v.status
               return (
                 <tr key={v.id} className="hover:bg-neutral-soft transition-colors">
+                  <td className="px-4 py-3.5 font-mono text-xs text-ink-soft">
+                    {v.contract_machines?.machines
+                      ? `${v.contract_machines.machines.marque} ${v.contract_machines.machines.modele}`
+                      : '—'}
+                  </td>
                   <td className="px-4 py-3.5 font-medium text-ink">
                     {new Date(v.scheduled_date).toLocaleDateString('fr-FR')}
                   </td>
