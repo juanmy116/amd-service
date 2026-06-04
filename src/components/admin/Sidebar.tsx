@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, Printer, FileText,
   AlertCircle, UserCog, LogOut, BarChart2, Wrench, CalendarDays,
-  ChevronLeft, ChevronRight, Plug,
+  ChevronLeft, ChevronRight, Plug, Inbox,
 } from 'lucide-react'
 import { signOut } from '@/app/login/actions'
 import { Avatar } from '@/components/ui/Avatar'
@@ -17,6 +17,7 @@ const NAV_GROUPS = [
     items: [
       { href: '/admin',            label: 'Tableau de bord', icon: LayoutDashboard, exact: true },
       { href: '/admin/clients',    label: 'Clients',         icon: Users },
+      { href: '/admin/leads',      label: 'Leads',           icon: Inbox },
       { href: '/admin/machines',   label: 'Machines',        icon: Printer },
       { href: '/admin/contadores', label: 'Compteurs',       icon: BarChart2 },
       { href: '/admin/contracts',  label: 'Contrats',        icon: FileText },
