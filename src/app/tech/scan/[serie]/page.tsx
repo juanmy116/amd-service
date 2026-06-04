@@ -99,7 +99,7 @@ export default async function MachineScanPage({
 
   // Mantenimiento pendiente para esta máquina
   let pendingVisit: { id: string; scheduled_date: string; status: string } | null = null
-  if (contract) {
+  if (contract && openLine) {
     const { data: plan } = await supabase
       .from('maintenance_plans')
       .select('id')
@@ -112,6 +112,7 @@ export default async function MachineScanPage({
         .from('maintenance_visits')
         .select('id, scheduled_date, status')
         .eq('plan_id', plan.id)
+        .eq('contract_machine_id', openLine.id)
         .in('status', ['planifié', 'en_retard'])
         .order('scheduled_date')
         .limit(1)
