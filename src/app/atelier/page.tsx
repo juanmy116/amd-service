@@ -44,7 +44,7 @@ export default async function AtelierPage() {
       .from('incidents')
       .select(`
         id, numero_incident, title, status, priority, resolved_at, assigned_to,
-        contracts ( clients ( nom_client ) ),
+        contract_machines ( contracts ( clients ( nom_client ) ) ),
         profiles!assigned_to ( full_name )
       `)
       .neq('status', 'fermé')
@@ -75,7 +75,7 @@ export default async function AtelierPage() {
     priority: string
     resolved_at: string | null
     assigned_to: string | null
-    contracts: { clients: { nom_client: string } | null } | null
+    contract_machines: { contracts: { clients: { nom_client: string } | null } | null } | null
     profiles: { full_name: string | null } | null
   }
   const rawIncidents = (incidentsRes.data ?? []) as unknown as IncRow[]
@@ -91,7 +91,7 @@ export default async function AtelierPage() {
       title: i.title,
       status: i.status,
       priority: i.priority,
-      clientName: i.contracts?.clients?.nom_client ?? null,
+      clientName: i.contract_machines?.contracts?.clients?.nom_client ?? null,
       technicianId: i.assigned_to,
       technicianName: i.profiles?.full_name ?? null,
     }))
