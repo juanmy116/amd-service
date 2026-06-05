@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-06-03 (sesión 24 — refactor contratos N máquinas: tabla `contract_machines`, helpers TS, UI actualizada)
+> Última actualización: 2026-06-05 (auditoría técnica post-refactor — fases 1-4: índices, RPCs atómicas de contratos, mantenimiento granular por máquina, formulario de contacto/leads, cleanup legacy de columnas)
 
 ---
 
@@ -35,6 +35,7 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 - Generación de QR por máquina (etiqueta imprimible con logo, datos y código QR)
 - Módulo de contadores de copias agrupado por cliente
 - Gestión de usuarios internos (técnicos y admins)
+- Gestión de **Leads** (`/admin/leads`): leads recibidos del formulario público de contacto del sitio web, con estado (nouveau / traité / archivé). Entrada "Leads" en el grupo **Pilotage** de la sidebar admin
 - Creación directa de cuentas: admin introduce email + contraseña temporal → cuenta activa al instante (`createUser` con `email_confirm: true`), sin flujo de invitación por email
 
 ### 2. Portal Cliente (`/portal`) ✅
@@ -142,12 +143,12 @@ Ruta pública **sin autenticación** para que cualquier persona abra un incident
    - Sanitización: strip HTML, control chars, allowlist teléfono `[0-9 +\-().]`, límite server-side en todos los campos
    - Rate limit: `${ip}:${serie}` — 2/hora y 5/día (Upstash Redis, limiters `public_incident_hourly` / `public_incident_daily`)
    - Si superado → estado `rateLimited` con mensaje "Il y a déjà un incident en attente…"
-   - Lookup `machines` (verifica existencia) + lookup `contracts` activo (obtiene `contract_id` si existe)
-   - INSERT en `incidents` con `opened_by=null`, `source='public'`, campos de contacto
+   - Lookup `machines` (verifica existencia)
+   - INSERT en `incidents` con `opened_by=null`, `source='public'`, `machine_id` directo, campos de contacto
    - Email de notificación a `savamdservice@gmail.com` (template `raw` via Resend, contenido HTML escapado)
 5. Estado de éxito: mensaje de agradecimiento + número de referencia `SAV-YYYY-NNNN`
 
-**Seguridad:** datos del reporter anónimo (`contact_name/phone/email`) son visibles solo en el detalle de admin. El portal del cliente los excluye con filtro `.or('source.is.null,source.neq.public')` en listado y detalle. La página tech detail usa query condicional para evitar crash con `contract_id=null`.
+**Seguridad:** datos del reporter anónimo (`contact_name/phone/email`) son visibles solo en el detalle de admin. El portal del cliente los excluye con filtro `.or('source.is.null,source.neq.public')` en listado y detalle. Las incidencias públicas se vinculan por `machine_id` directo (sin `contract_machine_id`).
 
 ### 7. Sistema CSAT ✅
 - Al resolver un ticket, se envía email al cliente vía Resend
@@ -204,13 +205,24 @@ Sitio de marketing B2B en francés con 6 páginas + layout compartido (Navigatio
 - Keywords principales: `location imprimante Dakar`, `location photocopieur Dakar`, `coût par copie Sénégal`, `louer imprimante entreprise Dakar`
 - Competidores directos identificados: AFAM (Sharp), NexaPrint (MPS)
 
+### 8b. Formulario Público de Contacto (`/api/contact` + `/contact`) ✅
+Route handler que recibe el formulario de contacto del sitio web público y captura leads comerciales.
+
+- **Persistencia (crítica):** inserta el lead en la tabla `leads` vía `service_role` (campos `name`, `email`, `company`, `phone`, `needs`, `message`; `status` default `nouveau`).
+- **Notificación (best-effort):** notifica al equipo comercial por email (template `raw` vía Resend, destino en la env var `COMMERCIAL_EMAIL`). Si el email falla, el lead ya quedó persistido — no se pierde.
+- **Rate limiting:** `contact` API (3/h por IP).
+- **Gestión:** pantalla admin `/admin/leads` para revisar y cambiar el estado de los leads (nouveau / traité / archivé).
+
 ### 10. Sistema de Mantenimiento Preventivo (`/admin/maintenance`) ✅
 - Planes de mantenimiento por contrato: frecuencia mensual (30 días) o trimestral (90 días)
-- Admin crea plan → primera visita programada → sistema auto-genera siguientes visitas al cerrar cada una
+- **Granular por máquina (Fase 3):** al crear un plan se genera **una visita por cada línea activa del contrato** (`contract_machines`). Cada `maintenance_visit` pertenece a una máquina concreta vía `contract_machine_id`.
+- Admin crea plan → primera tanda de visitas (una por máquina) → sistema auto-genera la siguiente visita **por máquina** al cerrar cada una
+- Auto-programación de la siguiente visita usa la frecuencia override de la línea (`maintenance_frequency_override`) o, si no existe, la del plan
 - Back-office: lista con KPIs (total, en retard, esta semana), formulario nuevo plan, detalle con historial
 - Edge Function `maintenance-cron` con pg_cron diario a las 8h UTC:
   - Marca visitas atrasadas como `en_retard`
-- Cierre de visita vía QR: técnico escanea la máquina → ve mantenimiento pendiente → formulario con checklist de piezas + notas → `qr_verified = true`
+- Cierre de visita vía QR: técnico escanea la máquina → ve mantenimiento pendiente → formulario con checklist de piezas + notas → `qr_verified = true`. El cierre **valida que el QR escaneado corresponde a la `contract_machine_id` de la visita**
+- Cierre atómico vía RPC `close_maintenance_visit` (SECURITY DEFINER, idempotente): marca la visita como `fait`, inserta piezas y programa la siguiente visita en una sola transacción
 - Piezas reemplazadas guardadas en `maintenance_parts` (catálogo `parts` + campo libre)
 
 ### 11. Dashboard Atelier (`/atelier`) ✅
@@ -255,11 +267,11 @@ Cliente
         │           │     └── Respuesta CSAT (csat_responses)
         │           └── Contadores mensuales (machine_counters — inmutables)
         └── Plan de mantenimiento (maintenance_plans — 1 por contrato)
-              └── Visitas (maintenance_visits — auto-programadas)
+              └── Visitas (maintenance_visits — 1 por máquina, contract_machine_id, auto-programadas)
                     └── Piezas reemplazadas (maintenance_parts → parts)
 ```
 
-### Modelo N máquinas por contrato (`contract_machines`) — sesión 24
+### Modelo N máquinas por contrato (`contract_machines`) — ✅ COMPLETO + cleanup legacy aplicado (2026-06-05)
 
 Un contrato puede tener varias máquinas. La vinculación se gestiona mediante la tabla `contract_machines`:
 
@@ -267,8 +279,10 @@ Un contrato puede tener varias máquinas. La vinculación se gestiona mediante l
 - **`statut`** — `actif | suspendu | terminé`. Una máquina con `date_fin IS NULL` y `statut = suspendu` sigue bloqueada para otro contrato hasta que se le asigne `date_fin`.
 - **Índice único parcial** `contract_machines_one_open_per_machine (machine_id) WHERE date_fin IS NULL`: una máquina solo puede tener una línea abierta a la vez, independientemente del `statut`.
 - **Overrides por línea**: `billing_day_override` y `maintenance_frequency_override` anulan el valor por defecto del contrato para esa máquina concreta. Los helpers `resolveBillingDay()` y `resolveMaintenanceFrequency()` en `src/lib/contract-machines.ts` aplican la lógica override→fallback.
-- **Incidencias**: `incidents.contract_machine_id` (UUID) referencia la línea. La columna `incidents.machine_id` queda `NULL` en incidencias internas (XOR garantizado por constraint). Las incidencias públicas (`source='public'`) conservan `machine_id`.
-- **PR-cleanup** pendiente (5-7 días post-merge): eliminar `contracts.machine_id`, `contracts.lieu_installation` e `incidents.contract_id` (columnas legacy, ya sin uso en la app).
+- **Incidencias internas**: se vinculan **solo** por `incidents.contract_machine_id` (UUID), que referencia la línea. La columna `incidents.machine_id` queda `NULL` en incidencias internas.
+- **Incidencias públicas** (`source='public'`, vía QR): se vinculan por `incidents.machine_id` directo (sin `contract_machine_id`).
+- **Mantenimiento granular**: cada `maintenance_visit` referencia una `contract_machine_id` (una visita por máquina). Ver §10.
+- **Cleanup legacy aplicado** (migración `20260605000000_cleanup_legacy_contracts.sql`): se hizo **DROP** de las columnas legacy `contracts.machine_id`, `contracts.lieu_installation` e `incidents.contract_id`, además de su FK `incidents_contract_id_fkey`. El modelo viejo 1↔1 ya no existe en la BD.
 
 > **Flujo de creación desacoplado (sin dependencia circular):**
 > 1. Crear cliente (`/admin/clients/new`) — solo datos del cliente
@@ -321,7 +335,7 @@ Cualquier persona escanea el QR de la máquina
   → Rellena formulario (nombre, teléfono, email opcional, descripción 500 chars)
   → submitPublicIncident: sanitiza + rate limit (2/h · 5/día por IP:serie)
   → Si rate limit superado → mensaje "Il y a déjà un incident en attente…"
-  → INSERT incidents (source='public', opened_by=null, contract_id según contrato activo)
+  → INSERT incidents (source='public', opened_by=null, machine_id directo)
   → Email notificación a savamdservice@gmail.com
   → Muestra número de referencia SAV-YYYY-NNNN
 ```
@@ -335,7 +349,8 @@ Admin crea plan en /admin/maintenance/new
   → Selecciona contrato (solo contratos sin plan activo)
   → Elige frecuencia: mensual (30 días) o trimestral (90 días)
   → Indica fecha primera visita + notas opcionales
-  → Se crea maintenance_plan + primera maintenance_visit (status: planifié)
+  → Se crea maintenance_plan + UNA maintenance_visit (status: planifié) POR CADA línea activa
+    del contrato (cada visita lleva su contract_machine_id)
 
 Edge Function maintenance-cron (diario 8h UTC, via pg_cron + pg_net):
   → Visitas con scheduled_date < hoy y status='planifié' → status='en_retard'
@@ -345,10 +360,12 @@ Técnico va a la instalación
   → Ve card "Maintenance planifiée" (azul) o "Maintenance en retard" (roja)
   → Pulsa la card → /tech/scan/[serie]/maintenance/[visitId]
   → Rellena checklist 12 piezas + campo libre + notas
-  → Pulsa "Clôturer la maintenance"
+  → Pulsa "Clôturer la maintenance" → RPC close_maintenance_visit (atómico, idempotente):
+    → Valida que el QR escaneado corresponde a la contract_machine_id de la visita
     → visit: status='fait', done_at=now(), done_by=user.id, qr_verified=true
     → Inserta filas en maintenance_parts para cada pieza marcada
-    → Crea siguiente maintenance_visit (scheduled_date = scheduled_date actual + 30/90 días)
+    → Crea la siguiente maintenance_visit de ESA máquina (scheduled_date actual + frecuencia
+      override de la línea, o del plan; +30/90 días)
     → Redirige a /tech/scan/[serie]
 ```
 
@@ -503,19 +520,19 @@ Una fila por máquina física. El número de serie es la clave de todo el sistem
 ---
 
 ### Tabla: `contracts`
-Vincula cliente ↔ máquina. El número de contrato es la llave del portal cliente.
+Vincula cliente ↔ N máquinas (vía `contract_machines`). El número de contrato es la llave del portal cliente.
 
 | Campo | Tipo | Notas |
 |---|---|---|
 | `id` | UUID PK | |
 | `numero_contrat` | text | unique |
 | `client_id` | bigint | FK → clients |
-| `machine_id` | text | FK → machines.numero_serie |
 | `date_debut` | date | |
 | `date_renouvellement` | date | nullable |
-| `lieu_installation` | text | nullable |
 | `statut` | enum | actif / suspendu / terminé |
 | `created_at` | timestamptz | |
+
+> Las columnas legacy `machine_id` y `lieu_installation` (modelo 1↔1) fueron eliminadas en el cleanup del 2026-06-05. La vinculación con máquinas vive ahora en `contract_machines`.
 
 ---
 
@@ -537,8 +554,8 @@ Núcleo del sistema SAV.
 |---|---|---|
 | `id` | UUID PK | |
 | `numero_incident` | text UNIQUE NOT NULL | Identificador humano `SAV-YYYY-NNNN`, asignado por trigger BEFORE INSERT |
-| `contract_id` | UUID | FK → contracts, **nullable** (null en incidentes públicos sin contrato activo) |
-| `machine_id` | text | FK → machines.numero_serie |
+| `contract_machine_id` | UUID | FK → contract_machines, **nullable** — vínculo de las incidencias internas (NULL en públicas) |
+| `machine_id` | text | FK → machines.numero_serie, nullable — usado en incidencias públicas (`source='public'`); NULL en internas |
 | `opened_by` | UUID | FK → profiles, nullable (null en incidentes públicos) |
 | `assigned_to` | UUID | FK → profiles (técnico), nullable |
 | `title` | text | |
@@ -559,7 +576,9 @@ Núcleo del sistema SAV.
 
 > **`numero_incident` (SAV-YYYY-NNNN):** contador secuencial por año, reseteado el 1 de enero. Generado por `public.next_incident_number()` (upsert atómico sobre `incident_counters`). Asignado por el trigger `trg_set_incident_numero` BEFORE INSERT. Visible en Kanban, vista lista admin, detalle admin, PWA técnico (lista + detalle) y portal cliente (lista + detalle).
 
-> **Incidentes públicos (`source='public'`):** creados por `submitPublicIncident` sin autenticación, con `opened_by=null` y `contract_id` nullable. El detalle admin muestra una sección "Contact" con badge "Public". El portal cliente los excluye con `.or('source.is.null,source.neq.public')`. La página tech/incidents/[id] usa query condicional para no crashear con `contract_id=null`.
+> **Vinculación internas vs públicas:** las incidencias **internas** se vinculan solo por `contract_machine_id` (con `machine_id=NULL`); las **públicas** (`source='public'`) por `machine_id` directo (con `contract_machine_id=NULL`). La columna legacy `contract_id` y su FK `incidents_contract_id_fkey` fueron eliminadas en el cleanup del 2026-06-05.
+
+> **Incidentes públicos (`source='public'`):** creados por `submitPublicIncident` sin autenticación, con `opened_by=null` y `contract_machine_id` nullable. El detalle admin muestra una sección "Contact" con badge "Public". El portal cliente los excluye con `.or('source.is.null,source.neq.public')`.
 
 ---
 
@@ -772,6 +791,7 @@ Una fila por visita programada o realizada.
 |---|---|---|
 | `id` | UUID PK | |
 | `plan_id` | UUID | FK → maintenance_plans |
+| `contract_machine_id` | UUID NOT NULL | FK → contract_machines — máquina concreta de la visita (mantenimiento granular) |
 | `scheduled_date` | date | fecha planificada de la visita |
 | `done_at` | timestamptz | fecha/hora real de cierre, nullable |
 | `done_by` | UUID | FK → profiles (técnico que la realizó), nullable |
@@ -794,6 +814,25 @@ Piezas reemplazadas en una visita de mantenimiento.
 | `part_id` | smallint | FK → parts, nullable (null si es pieza libre) |
 | `description` | text | descripción libre para piezas no catalogadas, nullable |
 | `quantity` | smallint | default: 1 |
+
+---
+
+### Tabla: `leads`
+Leads recibidos del formulario público de contacto del sitio web (`/api/contact`).
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `id` | UUID PK | |
+| `name` | text | nombre del contacto |
+| `email` | text | |
+| `company` | text | nullable |
+| `phone` | text | nullable |
+| `needs` | text | CHECK `rental` / `sales` / `management` / `maintenance` / `other` |
+| `message` | text | nullable |
+| `status` | text | CHECK `nouveau` / `traité` / `archivé`, default `nouveau` |
+| `created_at` | timestamptz | default: now() |
+
+> **RLS:** política `admin_all` (solo admin gestiona) con `WITH CHECK`. Permiso a `anon` revocado. El INSERT público se hace vía `service_role` desde el route handler `/api/contact`. Gestión desde la pantalla admin `/admin/leads`.
 
 ---
 
@@ -821,7 +860,7 @@ Patrón compartido aplicado a 6 páginas admin para búsqueda + filtros vía `se
 | `/admin/clients` | `nom_client`, `ninea`, `ville` | `active` | — |
 | `/admin/machines` | `numero_serie`, `marque`, `modele` | `type`, `active` | — |
 | `/admin/contracts` | `numero_contrat` + nom_client | `statut` | Pre-lookup `clients.id` → `client_id.in.(...)` |
-| `/admin/incidents` | `numero_incident`, `title`, `machine_id` | `client`, `status`, `priority` + toggle vista | Pre-lookup `contracts.id` por client_id → `contract_id.in.(...)` |
+| `/admin/incidents` | `numero_incident`, `title`, `machine_id` | `client`, `status`, `priority` + toggle vista | Pre-lookup contratos por client_id → líneas `contract_machines.id` → `contract_machine_id.in.(...)` |
 | `/admin/maintenance` | nom_client + `numero_contrat` | `frequency`, status visita (JS) | Pre-lookup clients + contracts |
 | `/admin/contadores` | nom_client (JS) | `month`, `year` | Filtro JS sobre datos cargados |
 
@@ -869,7 +908,13 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 
 - **RLS activado** en todas las tablas
 - **Políticas por rol:** admin acceso total, technician acceso a sus incidencias, client acceso a sus contratos/máquinas/incidencias
-- **Recursión infinita resuelta** mediante 6 funciones `SECURITY DEFINER`: `auth_tech_incident_ids`, `auth_tech_incident_contract_ids`, `auth_tech_incident_machine_ids`, `auth_tech_assigned_client_ids`, `auth_client_contract_ids`, `auth_client_machine_ids`
+- **Recursión infinita resuelta** mediante funciones `SECURITY DEFINER`: `auth_tech_incident_ids`, `auth_tech_incident_contract_ids` (reescrita: deriva vía `contract_machine_id`), `auth_tech_incident_machine_ids`, `auth_tech_assigned_client_ids` (reescrita: deriva vía `contract_machine_id`), `auth_client_contract_ids`, `auth_client_machine_ids`. Las dos reescritas ya no usan `incidents.contract_id` (columna eliminada).
+- **RPCs SECURITY DEFINER de contratos/mantenimiento** (todas con guard `IF auth.role() <> 'service_role' THEN RAISE EXCEPTION`):
+  - `create_contract_with_lines(payload jsonb)` — crea contrato + sus N líneas `contract_machines` atómicamente
+  - `update_contract_with_lines(p_contract_id uuid, payload jsonb)` — actualiza contrato y reconcilia sus líneas
+  - `can_delete_contract(p_contract_id uuid)` — comprueba si un contrato puede borrarse (sin dependencias)
+  - `close_maintenance_visit(...)` — cierre atómico e idempotente de visita (marca `fait`, inserta piezas, programa siguiente)
+  - **Eliminadas (Fase 4, modelo viejo, 0 usos):** `create_client_with_contract`, `create_machine_with_contract`
 - **`service_role`** solo en servidor (Edge Functions, Server Actions) — nunca expuesto al cliente
 - **`machine_counters`** accesible únicamente por admins — datos de facturación
 - **Rate limiting** con Upstash Redis (sliding window) en endpoints públicos: login (5/15m por IP+email), signup (3/h por IP), verify contrato (10/h por IP+user), CSAT (5/h por IP+token), contact API (3/h por IP), **formulario público QR (2/h · 5/24h por `IP:serie`)**. Helper centralizado en `src/lib/rate-limit.ts`. Fail-open con `console.error` si faltan credenciales en producción
@@ -955,6 +1000,17 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 ---
 
 ## Roadmap
+
+### Auditoría técnica post-refactor ✅ COMPLETADA (2026-06-04/05)
+Seis entregas en producción tras el refactor de contratos N máquinas (PR #23):
+- [x] **Fase 1 — hotfixes de BD** (PR #25): índices de rendimiento. Migración `20260603210000_fase1_indices`
+- [x] **Fase 2 — RPCs atómicas de contratos** (PR #26): `create_contract_with_lines`, `update_contract_with_lines`, `can_delete_contract` (SECURITY DEFINER, guard service_role). Migración `20260604120000_fase2_rpcs_contratos`
+- [x] **Fase 3 — mantenimiento granular por máquina** (PR #27): `maintenance_visits.contract_machine_id`; una visita por línea activa del contrato; auto-programación por máquina con frecuencia override. Migración `20260604130000_fase3_maintenance_granular`
+- [x] **Hotfix cierre de mantenimiento** (PR #28): RPC `close_maintenance_visit` atómica e idempotente. Migración `20260604140000_close_maintenance_visit_rpc`
+- [x] **Formulario de contacto + leads** (PR #29): tabla `leads` + route handler `/api/contact` (persiste lead + notifica a `COMMERCIAL_EMAIL`) + pantalla admin `/admin/leads`. Migraciones `20260604150000_leads` y `20260604160000_leads_permissions_hardening`
+- [x] **Fase 4 — cleanup legacy** (PR #30 + DROP + hotfix atelier PR #31): DROP de `contracts.machine_id`, `contracts.lieu_installation`, `incidents.contract_id` + FK; eliminadas `create_client_with_contract` y `create_machine_with_contract`; reescritas `auth_tech_incident_contract_ids` y `auth_tech_assigned_client_ids` para derivar vía `contract_machine_id`. Migración `20260605000000_cleanup_legacy_contracts`
+
+> **Nota sobre timestamps de migración:** los timestamps de los archivos de migración difieren de los `version` registrados en la BD por el MCP — es el comportamiento establecido del proyecto.
 
 ### Fase 1 — SAV ✅ COMPLETADO
 - [x] Schema de BD (13 tablas + RLS)
