@@ -16,9 +16,10 @@ type Props = {
   options: MachineOption[]
   value: string
   onChange: (machineId: string) => void
+  invalid?: boolean
 }
 
-export default function MachineCombobox({ options, value, onChange }: Props) {
+export default function MachineCombobox({ options, value, onChange, invalid }: Props) {
   const [query, setQuery] = useState('')
 
   const selected = options.find((m) => m.numero_serie === value) ?? null
@@ -34,6 +35,10 @@ export default function MachineCombobox({ options, value, onChange }: Props) {
     )
   }, [options, query])
 
+  const borderClass = invalid
+    ? 'border-accent ring-2 ring-accent/30'
+    : 'border-line focus:ring-2 focus:ring-accent/30 focus:border-accent'
+
   return (
     <Combobox
       value={selected}
@@ -41,10 +46,11 @@ export default function MachineCombobox({ options, value, onChange }: Props) {
         onChange(m?.numero_serie ?? '')
         setQuery('')
       }}
+      onClose={() => setQuery('')}
     >
       <div className="relative">
         <ComboboxInput
-          className="w-full px-3 py-2 pr-8 rounded-lg border border-line text-ink text-sm placeholder-ink-muted bg-card focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+          className={`w-full px-3 py-2 pr-8 rounded-lg border text-ink text-sm placeholder-ink-muted bg-card focus:outline-none ${borderClass}`}
           displayValue={(m: MachineOption | null) =>
             m ? `${m.marque} ${m.modele} — ${m.numero_serie}` : ''
           }

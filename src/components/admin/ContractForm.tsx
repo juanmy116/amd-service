@@ -86,6 +86,7 @@ export default function ContractForm({
   const [confirming, setConfirming] = useState(false)
   const [lines, setLines] = useState<LineInput[]>(initialLines ?? [emptyLine()])
   const [retired, setRetired] = useState<RetiredLine[]>([])
+  const [submitted, setSubmitted] = useState(false)
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -208,7 +209,7 @@ export default function ContractForm({
       )}
 
       {/* Form */}
-      <form action={formAction}>
+      <form action={formAction} onSubmit={() => setSubmitted(true)}>
         {/* Hidden field: serialised lines */}
         <input type="hidden" name="lines" value={JSON.stringify(lines)} />
         <input type="hidden" name="retire" value={JSON.stringify(retired)} />
@@ -413,6 +414,7 @@ export default function ContractForm({
                           options={selectableMachines}
                           value={line.machine_id}
                           onChange={(id) => updateLine(idx, 'machine_id', id)}
+                          invalid={submitted && !line.machine_id}
                         />
                       )}
                     </div>
