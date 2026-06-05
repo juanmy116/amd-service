@@ -53,6 +53,15 @@ export async function updateContractAction(
     return { error: 'Liste de machines invalide.' }
   }
 
+  for (const ln of lines) {
+    if (!ln.machine_id || !ln.date_debut) {
+      return { error: 'Chaque machine doit avoir un numéro de série et une date de début.' }
+    }
+    if (ln.billing_day_override !== null && (ln.billing_day_override < 1 || ln.billing_day_override > 31)) {
+      return { error: `Jour de facturation invalide pour la machine ${ln.machine_id}.` }
+    }
+  }
+
   const payload = {
     client_id,
     date_debut,

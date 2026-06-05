@@ -530,6 +530,8 @@ Vincula cliente ↔ N máquinas (vía `contract_machines`). El número de contra
 | `date_debut` | date | |
 | `date_renouvellement` | date | nullable |
 | `statut` | enum | actif / suspendu / terminé |
+| `billing_day` | smallint | nullable — día de facturación por defecto del contrato (1–31); sobreescribible por línea en `contract_machines.billing_day_override` |
+| `maintenance_frequency` | text | nullable — frecuencia de mantenimiento por defecto (`mensuel` / `trimestriel`); sobreescribible por línea en `contract_machines.maintenance_frequency_override` |
 | `created_at` | timestamptz | |
 
 > Las columnas legacy `machine_id` y `lieu_installation` (modelo 1↔1) fueron eliminadas en el cleanup del 2026-06-05. La vinculación con máquinas vive ahora en `contract_machines`.
@@ -1118,7 +1120,7 @@ Seis entregas en producción tras el refactor de contratos N máquinas (PR #23):
 - [x] Migración `is_dispatcher` (profiles) + `assigned_to` (maintenance_visits) — PR #16
 - [x] Ruta `/atelier` — kiosko de taller: Kanban + mantenimientos lun–vie + KPIs, auto-refresco (PR #16)
 - [x] Fix: FKs hacia `profiles` a `ON DELETE SET NULL` — permite borrar técnicos (PR #17)
-- [ ] Operativo: crear las cuentas reales de los técnicos AMD en `/admin/team/new`
+- [x] Operativo: cuentas reales creadas (2026-05-26) — Abdoul Marena, Mamadou Lamine, Ousmane Diop, Ousmane Sy + Atelier (dispatcher)
 
 ### Pasarela QR cliente ✅ COMPLETADO (sesión 17, 2026-05-21) — PR #18 (`6c7865b`)
 - [x] Nueva ruta `/m/[serie]` — pasarela universal para QR de máquinas:

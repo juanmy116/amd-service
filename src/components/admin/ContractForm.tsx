@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, ArrowLeft, Trash2, AlertTriangle, Plus, X, RefreshCw } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import MachineCombobox from '@/components/admin/MachineCombobox'
 
 type FormState = { error: string } | null
 
@@ -85,6 +86,7 @@ export default function ContractForm({
   const [confirming, setConfirming] = useState(false)
   const [lines, setLines] = useState<LineInput[]>(initialLines ?? [emptyLine()])
   const [retired, setRetired] = useState<RetiredLine[]>([])
+  const [submitted, setSubmitted] = useState(false)
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -207,7 +209,7 @@ export default function ContractForm({
       )}
 
       {/* Form */}
-      <form action={formAction}>
+      <form action={formAction} onSubmit={() => setSubmitted(true)}>
         {/* Hidden field: serialised lines */}
         <input type="hidden" name="lines" value={JSON.stringify(lines)} />
         <input type="hidden" name="retire" value={JSON.stringify(retired)} />
@@ -408,19 +410,12 @@ export default function ContractForm({
                           </button>
                         </div>
                       ) : (
-                        <select
+                        <MachineCombobox
+                          options={selectableMachines}
                           value={line.machine_id}
-                          onChange={(e) => updateLine(idx, 'machine_id', e.target.value)}
-                          className={selectSmClass}
-                          required
-                        >
-                          <option value="" disabled>Sélectionner...</option>
-                          {selectableMachines.map((m) => (
-                            <option key={m.numero_serie} value={m.numero_serie}>
-                              {m.marque} {m.modele} — {m.numero_serie}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(id) => updateLine(idx, 'machine_id', id)}
+                          invalid={submitted && !line.machine_id}
+                        />
                       )}
                     </div>
                     <div>
