@@ -151,8 +151,6 @@ export type Database = {
           date_debut: string
           date_renouvellement: string | null
           id: string
-          lieu_installation: string | null
-          machine_id: string
           maintenance_frequency: string | null
           numero_contrat: string
           statut: Database["public"]["Enums"]["contract_status"]
@@ -164,8 +162,6 @@ export type Database = {
           date_debut: string
           date_renouvellement?: string | null
           id?: string
-          lieu_installation?: string | null
-          machine_id: string
           maintenance_frequency?: string | null
           numero_contrat: string
           statut?: Database["public"]["Enums"]["contract_status"]
@@ -177,8 +173,6 @@ export type Database = {
           date_debut?: string
           date_renouvellement?: string | null
           id?: string
-          lieu_installation?: string | null
-          machine_id?: string
           maintenance_frequency?: string | null
           numero_contrat?: string
           statut?: Database["public"]["Enums"]["contract_status"]
@@ -190,13 +184,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contracts_machine_id_fkey"
-            columns: ["machine_id"]
-            isOneToOne: false
-            referencedRelation: "machines"
-            referencedColumns: ["numero_serie"]
           },
         ]
       }
@@ -379,7 +366,6 @@ export type Database = {
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
-          contract_id: string | null
           contract_machine_id: string | null
           created_at: string
           description: string | null
@@ -403,7 +389,6 @@ export type Database = {
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
-          contract_id?: string | null
           contract_machine_id?: string | null
           created_at?: string
           description?: string | null
@@ -427,7 +412,6 @@ export type Database = {
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
-          contract_id?: string | null
           contract_machine_id?: string | null
           created_at?: string
           description?: string | null
@@ -452,13 +436,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "incidents_contract_id_fkey"
-            columns: ["contract_id"]
-            isOneToOne: false
-            referencedRelation: "contracts"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "incidents_contract_machine_id_fkey"
             columns: ["contract_machine_id"]
             isOneToOne: false
@@ -480,6 +457,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      leads: {
+        Row: {
+          company: string
+          created_at: string
+          email: string
+          id: string
+          message: string | null
+          name: string
+          needs: string
+          phone: string
+          status: string
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          email: string
+          id?: string
+          message?: string | null
+          name: string
+          needs: string
+          phone: string
+          status?: string
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string | null
+          name?: string
+          needs?: string
+          phone?: string
+          status?: string
+        }
+        Relationships: []
       }
       machine_counters: {
         Row: {
@@ -700,6 +713,7 @@ export type Database = {
       maintenance_visits: {
         Row: {
           assigned_to: string | null
+          contract_machine_id: string
           created_at: string
           done_at: string | null
           done_by: string | null
@@ -713,6 +727,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          contract_machine_id: string
           created_at?: string
           done_at?: string | null
           done_by?: string | null
@@ -726,6 +741,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          contract_machine_id?: string
           created_at?: string
           done_at?: string | null
           done_by?: string | null
@@ -743,6 +759,13 @@ export type Database = {
             columns: ["assigned_to"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_visits_contract_machine_id_fkey"
+            columns: ["contract_machine_id"]
+            isOneToOne: false
+            referencedRelation: "contract_machines"
             referencedColumns: ["id"]
           },
           {
@@ -959,41 +982,25 @@ export type Database = {
       auth_tech_incident_contract_ids: { Args: never; Returns: string[] }
       auth_tech_incident_ids: { Args: never; Returns: string[] }
       auth_tech_incident_machine_ids: { Args: never; Returns: string[] }
-      create_client_with_contract: {
+      can_delete_contract: { Args: { p_contract_id: string }; Returns: Json }
+      close_maintenance_visit: {
         Args: {
-          p_active: boolean
-          p_adresse: string
-          p_date_debut: string
-          p_date_renouvellement?: string
-          p_email: string
-          p_lieu_installation?: string
-          p_machine_id: string
-          p_ninea: string
-          p_nom_client: string
-          p_numero_contrat: string
-          p_telephone: string
-          p_ville: string
+          p_autres_pieces: string
+          p_done_by: string
+          p_notes: string
+          p_part_ids: number[]
+          p_serie: string
+          p_visit_id: string
         }
         Returns: Json
       }
-      create_machine_with_contract: {
-        Args: {
-          p_active: boolean
-          p_client_id: number
-          p_date_debut: string
-          p_date_renouvellement?: string
-          p_lieu_installation?: string
-          p_localisation?: string
-          p_marque: string
-          p_modele: string
-          p_numero_contrat: string
-          p_numero_serie: string
-          p_type: string
-        }
-        Returns: Json
-      }
+      create_contract_with_lines: { Args: { payload: Json }; Returns: Json }
       is_admin: { Args: never; Returns: boolean }
       next_incident_number: { Args: never; Returns: string }
+      update_contract_with_lines: {
+        Args: { p_contract_id: string; payload: Json }
+        Returns: Json
+      }
       wipe_data_tables: { Args: never; Returns: undefined }
     }
     Enums: {
