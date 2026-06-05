@@ -7,7 +7,7 @@ export default async function NewContractPage() {
 
   // availableMachines = machines that have NO open line (date_fin IS NULL)
   const [{ data: clients }, { data: allMachines }, { data: openLines }] = await Promise.all([
-    supabase.from('clients').select('id, nom_client').eq('active', true).order('nom_client'),
+    supabase.from('clients').select('id, nom_client, princity_company_id').eq('active', true).order('nom_client'),
     supabase.from('machines').select('numero_serie, marque, modele').eq('active', true).order('marque').order('modele'),
     supabase.from('contract_machines').select('machine_id').is('date_fin', null),
   ])

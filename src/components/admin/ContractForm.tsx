@@ -37,7 +37,7 @@ type RetiredLine = {
   notes: string | null
 }
 
-type ClientOption = { id: number; nom_client: string }
+type ClientOption = { id: number; nom_client: string; princity_company_id?: string | null }
 type MachineOption = { numero_serie: string; marque: string; modele: string }
 
 type Props = {
@@ -87,6 +87,11 @@ export default function ContractForm({
   const [lines, setLines] = useState<LineInput[]>(initialLines ?? [emptyLine()])
   const [retired, setRetired] = useState<RetiredLine[]>([])
   const [submitted, setSubmitted] = useState(false)
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(defaultValues?.client_id ?? null)
+
+  const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null
+  const princityId = selectedClient?.princity_company_id ?? null
+  const princityPadded = princityId ? String(princityId).padStart(3, '0') : null
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -257,6 +262,7 @@ export default function ContractForm({
               name="client_id"
               required
               defaultValue={defaultValues?.client_id ?? ''}
+              onChange={(e) => setSelectedClientId(e.target.value ? Number(e.target.value) : null)}
               className={selectClass}
             >
               <option value="" disabled>Sélectionner...</option>
@@ -264,6 +270,19 @@ export default function ContractForm({
                 <option key={c.id} value={c.id}>{c.nom_client}</option>
               ))}
             </select>
+            {princityPadded ? (
+              <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-muted">
+                <span>→ ID Princity&nbsp;:</span>
+                <span className="font-mono font-semibold text-ink">{princityId}</span>
+                <span className="text-line">·</span>
+                <span>Suffixe contrat suggéré&nbsp;:</span>
+                <span className="font-mono font-semibold text-accent">-{princityPadded}</span>
+              </p>
+            ) : selectedClient && !princityId ? (
+              <p className="mt-1.5 text-xs text-ink-muted">
+                → Ce client n&apos;a pas d&apos;ID Princity enregistré.
+              </p>
+            ) : null}
           </div>
 
           {/* Dates */}
