@@ -28,17 +28,23 @@ export async function updateIncidentAction(
   const comment     = (formData.get('comment')   as string)?.trim() || null
   const assigned_to = (formData.get('assigned_to') as string).trim() || null
 
+  // Auto-transición: asignar técnico a un incident 'nouveau' lo pasa a 'assigné'
+  const effective_status =
+    assigned_to !== null && old_status === 'nouveau' && new_status === 'nouveau'
+      ? 'assigné' as const
+      : new_status
+
   const updates: Record<string, unknown> = {
     title,
     description:  (formData.get('description') as string).trim() || null,
     category,
     priority,
-    status:       new_status,
+    status:       effective_status,
     assigned_to,
   }
 
-  if (new_status === 'résolu' && old_status !== 'résolu') updates.resolved_at = new Date().toISOString()
-  if (new_status === 'fermé'  && old_status !== 'fermé')  updates.closed_at   = new Date().toISOString()
+  if (effective_status === 'résolu' && old_status !== 'résolu') updates.resolved_at = new Date().toISOString()
+  if (effective_status === 'fermé'  && old_status !== 'fermé')  updates.closed_at   = new Date().toISOString()
 
   const { error } = await supabase.from('incidents').update(updates).eq('id', id)
   if (error) {
@@ -46,12 +52,12 @@ export async function updateIncidentAction(
     return { error: 'Une erreur est survenue. Veuillez réessayer.' }
   }
 
-  if (new_status !== old_status) {
+  if (effective_status !== old_status) {
     await supabase.from('incident_history').insert({
       incident_id: id,
       changed_by:  user.id,
       old_status,
-      new_status,
+      new_status:  effective_status,
       comment,
     })
   }
