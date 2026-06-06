@@ -9,8 +9,9 @@ type TemplateName = 'ticket_open' | 'ticket_assigned' | 'ticket_resolved' | 'csa
 
 interface EmailPayload {
   template: TemplateName
-  to: string
+  to: string | string[]
   data?: Record<string, string>
+  attachments?: { filename: string; content: string }[]
 }
 
 function renderTemplate(
@@ -144,9 +145,10 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  const { template, to, data = {} } = payload
+  const { template, to, data = {}, attachments } = payload
 
-  if (!template || !to) {
+  const toEmpty = !to || (Array.isArray(to) && to.length === 0)
+  if (!template || toEmpty) {
     return new Response(JSON.stringify({ error: 'template et to sont requis' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
@@ -170,7 +172,7 @@ Deno.serve(async (req: Request) => {
       Authorization: `Bearer ${RESEND_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from: FROM, to, subject, html }),
+    body: JSON.stringify({ from: FROM, to, subject, html, ...(attachments?.length ? { attachments } : {}) }),
   })
 
   const result = await res.json()
