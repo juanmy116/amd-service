@@ -6,10 +6,12 @@ import { buildInvoiceWorkbook, type InvoiceHeader, type InvoiceLineRow } from '@
 export async function annulInvoiceAction(id: string, fd: FormData): Promise<void> {
   const { user, supabase } = await requireAdmin()
   const reason = (fd.get('reason') as string)?.trim() || null
-  const { error } = await supabase.from('invoices')
+  const { data, error } = await supabase.from('invoices')
     .update({ status: 'annulee', annulled_by: user.id, annulled_at: new Date().toISOString(), annulation_reason: reason })
     .eq('id', id).eq('status', 'emise')
+    .select('id')
   if (error) { console.error('[annul]', error); throw new Error('Annulation impossible.') }
+  if (!data || data.length === 0) throw new Error('Facture déjà annulée ou introuvable.')
   redirect(`/admin/factures/${id}`)
 }
 
@@ -20,6 +22,7 @@ export async function emailInvoiceAction(id: string): Promise<void> {
 
   const { data: inv } = await supabase.from('invoices').select('*').eq('id', id).single()
   if (!inv) throw new Error('Facture introuvable.')
+  if (inv.status !== 'emise') throw new Error('Facture annulée : envoi impossible.')
   const { data: lines } = await supabase.from('invoice_lines').select('*').eq('invoice_id', id).order('numero_contrat')
 
   const buf = await buildInvoiceWorkbook(inv as InvoiceHeader, (lines ?? []) as InvoiceLineRow[])

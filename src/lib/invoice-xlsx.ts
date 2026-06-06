@@ -26,11 +26,13 @@ export async function buildInvoiceWorkbook(h: InvoiceHeader, lines: InvoiceLineR
   const firstDataRow = headerRow.number + 1
   lines.forEach((l, i) => {
     const r = firstDataRow + i
-    // N2: la fórmula D+E*F+G*H solo es válida para precio plano. En hybrid_tiered los precios
-    // son null y el importe vive en los tramos → escribir amount_total como valor literal.
+    // N2: la fórmula solo es válida para precio plano. En hybrid_tiered los precios son null
+    // y el importe vive en los tramos → escribir amount_total como valor literal.
+    // H11: redondear cada producto (ROUND(.,0)) para cuadrar con amount_total, que se calculó
+    // con Math.round por componente; con precios decimales un E*F sin redondear divergería.
     const totalCell = l.billing_type === 'hybrid_tiered'
       ? l.amount_total
-      : { formula: `D${r}+E${r}*F${r}+G${r}*H${r}` }
+      : { formula: `D${r}+ROUND(E${r}*F${r},0)+ROUND(G${r}*H${r},0)` }
     ws.addRow([
       l.numero_contrat, l.machine_label, l.plan_name,
       l.amount_fixed, l.price_bw ?? 0, l.delta_bw, l.price_color ?? 0, l.delta_color,

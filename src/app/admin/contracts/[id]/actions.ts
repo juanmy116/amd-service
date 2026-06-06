@@ -15,6 +15,10 @@ type LineInput = {
   billing_day_override: number | null
   maintenance_frequency_override: 'mensuel' | 'trimestriel' | null
   notes: string | null
+  billing_plan_id: string | null
+  price_bw_override: number | null
+  price_color_override: number | null
+  fixed_fee_override: number | null
 }
 
 type RetireInput = {

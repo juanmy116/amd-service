@@ -17,10 +17,26 @@ export async function updateBillingPlanAction(id: string, _p: FormState, fd: For
   const price_bw    = type !== 'hybrid_tiered' ? Number(fd.get('price_bw'))    : null
   const price_color = type !== 'hybrid_tiered' ? Number(fd.get('price_color')) : null
 
+  // H7: validación numérica server-side (la BD también lo atrapa, pero el mensaje es mejor aquí)
+  if (fixed_fee   !== null && !Number.isFinite(fixed_fee))   return { error: 'Forfait invalide.' }
+  if (price_bw    !== null && !Number.isFinite(price_bw))    return { error: 'Prix B&N invalide.' }
+  if (price_color !== null && !Number.isFinite(price_color)) return { error: 'Prix couleur invalide.' }
+
   let tiers: BillingTier[] | null = null
   if (type === 'hybrid_tiered') {
     try { tiers = JSON.parse(fd.get('tiers') as string) } catch { return { error: 'Format des tranches invalide.' } }
     const err = validateTiers(tiers!); if (err) return { error: err }
+  }
+
+  // H8: no permitir cambiar el TYPE de un plan ya asignado a líneas de contrato
+  // (cambiaría el modelo de facturación del preview en silencio; las facturas emitidas son snapshot).
+  const { data: current } = await supabase.from('billing_plans').select('type').eq('id', id).single()
+  if (current && current.type !== type) {
+    const { count } = await supabase.from('contract_machines')
+      .select('id', { count: 'exact', head: true }).eq('billing_plan_id', id)
+    if (count && count > 0) {
+      return { error: 'Impossible de changer le type : ce plan est utilisé par des machines. Créez un nouveau plan.' }
+    }
   }
 
   const { error } = await supabase.from('billing_plans')
@@ -36,6 +52,7 @@ export async function toggleBillingPlanAction(fd: FormData): Promise<void> {
   const id = fd.get('id') as string
   const active = fd.get('active') === 'true'
   const { supabase } = await requireAdmin()
-  await supabase.from('billing_plans').update({ active: !active }).eq('id', id)
+  const { error } = await supabase.from('billing_plans').update({ active: !active }).eq('id', id)
+  if (error) console.error('[toggleBillingPlan]', error)
   redirect('/admin/billing-plans')
 }
