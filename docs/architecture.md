@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-06-05 (auditoría técnica post-refactor — fases 1-4: índices, RPCs atómicas de contratos, mantenimiento granular por máquina, formulario de contacto/leads, cleanup legacy de columnas)
+> Última actualización: 2026-06-06 (sesión 28-29 — Sistema de Facturación: catálogo de planes, asignación por máquina, preview mensual, emisión inmutable vía RPC, export xlsx + email. Núcleo Tasks 1-11 en rama `feat/billing-plans`, sin mergear)
 
 ---
 
@@ -31,6 +31,7 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 ### 1. Back-office AMD (`/admin`) ✅
 - Dashboard de dirección: KPIs globales, CSAT, incidencias por técnico, distribución de estados
 - Gestión de clientes, máquinas y contratos
+- **Formulario de contratos** (`/admin/contracts/new` + `/admin/contracts/[id]`): selector de máquinas buscable en tiempo real (`MachineCombobox` con `@headlessui/react`) — filtra por marca, modelo o serial. Al seleccionar cliente muestra su ID Princity y el sufijo sugerido para el número de contrato (ej. `-007` para ID Princity `7`). Fix: edición de contrato con cliente inactivo siempre incluye ese cliente en la lista para no sobreescribir el `client_id`.
 - Gestión y asignación de incidencias (Kanban drag & drop)
 - Generación de QR por máquina (etiqueta imprimible con logo, datos y código QR)
 - Módulo de contadores de copias agrupado por cliente
@@ -231,6 +232,24 @@ Route handler que recibe el formulario de contacto del sitio web público y capt
 - Cuenta especial «Atelier»: rol `technician` + flag `profiles.is_dispatcher` → un *dispatcher* puede asignar incidencias y visitas de mantenimiento a los técnicos sin ser admin
 - Las Server Actions de despacho validan `admin OR is_dispatcher` y escriben vía `createAdminClient()`; el middleware protege `/atelier` y `/dashboard` redirige ahí a los dispatchers
 
+### 12. Sistema de Facturación (`/admin/billing-plans`, `/admin/facturation`, `/admin/factures`) ✅ — sesión 28-29 (núcleo Tasks 1-11)
+
+Emisor de **facturas inmutables** por cliente y mes, a partir del consumo real de contadores. Tres pantallas + un export.
+
+- **Catálogo de planes** (`/admin/billing-plans`): CRUD de `billing_plans`. 3 tipos:
+  - `per_copy` — solo precio por copia B&N + color.
+  - `hybrid` — forfait fijo mensual + precio por copia.
+  - `hybrid_tiered` — forfait fijo + precio por copia degresivo por tramos (`tiers` JSONB, validados crecientes en `validateTiers`).
+  - No se borran (solo activar/desactivar). No se puede cambiar el `type` si el plan ya está asignado a alguna máquina (las facturas emitidas no se afectan por ser snapshot, pero el preview futuro sí).
+- **Asignación por máquina**: cada línea `contract_machines` referencia un `billing_plan_id` + overrides opcionales (`price_bw_override`, `price_color_override`, `fixed_fee_override`). Se editan en `ContractForm` (selector + campos filtrados por tipo de plan) y se persisten vía las RPC `create/update_contract_with_lines` (que ahora incluyen estos campos).
+- **Preview mensual** (`/admin/facturation`): selector cliente/mes/año. `buildClientInvoiceDraft` (en `src/lib/invoicing.ts`) cruza el delta de copias (reutilizando `calcDeltas` de `src/lib/counters.ts` — **misma fuente de verdad que la pantalla de Contadores**) con la tarifa efectiva (`resolveEffectiveTariff`). Máquinas sin relevé del mes → línea `is_estimated` (forfait sí, consumo 0). Filtro de periodo incluye líneas activas **y** cerradas dentro del mes (no infrafactura la saliente de un reemplazo).
+- **Emisión** (RPC transaccional `emit_invoice(p_payload jsonb)`, SECURITY DEFINER): numera (`FACT-YYYY-NNNN` vía `next_invoice_number()`/`invoice_counters`), inserta cabecera + líneas en una sola transacción. Bloquea doble emisión (índice único parcial `WHERE status='emise'`). Si hay líneas estimadas, exige confirmación explícita del admin ("Émettre malgré tout"). El snapshot congela plan, tarifas y deltas → inmutable.
+- **Vista de facturas** (`/admin/factures` + `/admin/factures/[id]`): lista + detalle de solo lectura. Acciones: descargar hoja `.xlsx`, enviar por email a los admins, anular (con motivo; no se edita, se anula y se reemite).
+- **Export `.xlsx`** (`src/lib/invoice-xlsx.ts`, ExcelJS): hoja interna AMD con fórmulas verificables (`D+ROUND(E*F,0)+ROUND(G*H,0)` para planos; literal para tiered). Route handler `/admin/factures/[id]/xlsx` (`runtime='nodejs'`) para descarga; `emailInvoiceAction` la adjunta vía `send-email` a `BILLING_NOTIFY_EMAILS`.
+- **Moneda:** FCFA (`XOF`), redondeo a entero por línea. **`clients.id` es BIGINT** → `invoices.client_id` es BIGINT.
+
+> Estado: núcleo completo en rama `feat/billing-plans` (no mergeado aún). Falta FASE D (reemplazo de máquina a mitad de mes, facturar el "puesto de servicio"). Acción manual pendiente: definir `BILLING_NOTIFY_EMAILS`.
+
 ---
 
 ## Stack Tecnológico
@@ -247,7 +266,9 @@ Route handler que recibe el formulario de contacto del sitio web público y capt
 | Mantenimiento preventivo | Edge Function `maintenance-cron`, cron diario 8h UTC vía pg_cron + pg_net |
 | QR por máquina | Librería `qrcode`, generado en back-office, página imprimible |
 | Gráficos | Recharts (módulo Compteurs + Dashboard de dirección) |
+| Facturación / hojas de cálculo | ExcelJS v4.4.0 (`.xlsx` con fórmulas, server-only, `runtime='nodejs'`) |
 | Kanban | `@dnd-kit/core` + `@dnd-kit/utilities` |
+| Selector buscable | `@headlessui/react` v2.2.10 (Combobox — compatible React 19) |
 | Scanner QR | `@zxing/browser` (PWA técnico) |
 | Hosting frontend | Vercel (Next.js) |
 
@@ -838,6 +859,60 @@ Leads recibidos del formulario público de contacto del sitio web (`/api/contact
 
 ---
 
+### Tabla: `billing_plans` (facturación, sesión 28-29)
+Catálogo de tipos de facturación AMD. Migración `20260606000000_billing_plans.sql`.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `id` | UUID PK | |
+| `name` | text | UNIQUE |
+| `type` | text | CHECK `per_copy` / `hybrid` / `hybrid_tiered` |
+| `fixed_fee` | numeric(10,4) | nullable (NULL en `per_copy`) |
+| `price_bw` / `price_color` | numeric(10,6) | nullable (NULL en `hybrid_tiered`) |
+| `tiers` | jsonb | `[{up_to, price_bw, price_color}]` (solo `hybrid_tiered`) |
+| `active` | boolean | default true |
+
+> CHECK por tipo (coherencia de campos) + `CHECK >= 0` de no-negatividad. RLS `billing_plans_admin_all` (`USING + WITH CHECK` vía `is_admin()`).
+> La misma migración añade a `contract_machines`: `billing_plan_id` (FK), `price_bw_override`, `price_color_override`, `fixed_fee_override` (todos nullable, con CHECK ≥ 0).
+
+### Tabla: `invoices` (facturación, sesión 28-29)
+Cabecera de factura emitida, una por cliente y mes. Migración `20260606000100_invoices.sql`. **Inmutable** salvo anulación.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `id` | UUID PK | |
+| `numero_facture` | text | UNIQUE, `FACT-YYYY-NNNN` (vía `next_invoice_number()` + tabla `invoice_counters`) |
+| `client_id` | **bigint** | FK → clients.id (que es BIGINT) |
+| `client_name` | text | snapshot |
+| `period_year` / `period_month` | int | |
+| `status` | text | CHECK `emise` / `annulee` |
+| `has_estimated` | boolean | true si contiene líneas sin relevé |
+| `currency` | text | default `XOF` |
+| `total_amount` | numeric(14,2) | |
+| `issued_by` / `annulled_by` | UUID | FK → profiles |
+| `annulation_reason` | text | nullable |
+
+> Índice único parcial `invoices_client_period_emise_unique (client_id, period_year, period_month) WHERE status='emise'` → evita doble emisión; permite reemitir tras anular.
+
+### Tabla: `invoice_lines` (facturación, sesión 28-29)
+Snapshot inmutable por máquina: plan, tarifa efectiva y consumo congelados al emitir.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `id` | UUID PK | |
+| `invoice_id` | UUID | FK → invoices ON DELETE CASCADE |
+| `contract_id` / `numero_contrat` / `machine_id` / `machine_label` | — | refs + snapshots |
+| `plan_name` / `billing_type` | text | snapshot |
+| `fixed_fee` / `price_bw` / `price_color` / `tiers` | — | snapshot tarifa efectiva |
+| `delta_bw` / `delta_color` | int | consumo facturado |
+| `is_estimated` | boolean | true si faltaba relevé |
+| `amount_fixed` / `amount_bw` / `amount_color` / `amount_total` | numeric(14,2) | redondeados a entero |
+
+> **RPC `emit_invoice(p_payload jsonb)`** (SECURITY DEFINER, guard `service_role`): numera + inserta cabecera + líneas en una transacción. Invocada con `admin.rpc` (la función revoca EXECUTE de `authenticated`). El draft lo calcula `src/lib/invoicing.ts` (compartido con el preview).
+> Migración `20260606000300_billing_in_contract_rpcs.sql`: `CREATE OR REPLACE` de `create/update_contract_with_lines` para persistir los campos billing por línea.
+
+---
+
 ## Búsqueda y Filtros del Back-Office (sesión 14, 2026-05-19)
 
 Patrón compartido aplicado a 6 páginas admin para búsqueda + filtros vía `searchParams` en URL, con defensa contra SQL/PostgREST injection.
@@ -893,6 +968,9 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 
 **Componentes UI compartidos** — `src/components/ui/` (sin barrel, imports directos):
 `Card`, `PanelHeader`, `Badge` (variantes solid/danger/success/warning/info/violet/neutral), `Button` (+ `buttonClasses`), `Avatar`, `KpiCard`.
+
+**Componentes admin reutilizables** — `src/components/admin/`:
+`MachineCombobox` — selector buscable de máquinas (Headless UI Combobox, filtra por marque/modele/numero_serie, prop `invalid` para estado de error). Usado en `ContractForm` para líneas nuevas.
 
 **Progreso:** ✅ **COMPLETO** — las 3 superficies de la app interna migradas. Solo la web pública (`/`) conserva el estilo antiguo, a propósito.
 - Fase 0 (sistema de diseño) ✅
@@ -1088,6 +1166,10 @@ Seis entregas en producción tras el refactor de contratos N máquinas (PR #23):
 - [x] Búsqueda + filtros aplicados a 6 páginas admin: clients, machines, contracts, incidents, maintenance, contadores
 - [x] Nombres clicables en todas las tablas (cliente, máquina, contrato, incidente) → detalle, hover rojo `#BF0D0D`
 - [x] `numero_incident` SAV-YYYY-NNNN visible en Kanban admin, lista admin, detalle admin, PWA técnico (lista + detalle), portal cliente (lista + detalle)
+
+### Mejoras formulario de contratos ✅ (sesión 27, 2026-06-05) — PRs #32 y #33
+- [x] **PR #32** — `MachineCombobox`: selector buscable en tiempo real con `@headlessui/react`. Filtra por marca, modelo o serial. Prop `invalid` muestra borde rojo al enviar vacío. Reset de query al cerrar sin seleccionar. Validación por línea añadida a `updateContractAction`.
+- [x] **PR #33** — Hint Princity en selector de cliente: al seleccionar un cliente muestra su ID Princity y el sufijo sugerido para el número de contrato. Fix bug preexistente: edición de contrato con cliente inactivo ya no sobreescribe el `client_id` con el primero de la lista.
 
 ### Fase 3 — Sitio Web & SEO (en curso)
 - [x] Página `/location` — core del negocio, SEO-optimizada para Dakar
