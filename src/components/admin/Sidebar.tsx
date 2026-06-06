@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, Printer, FileText,
   AlertCircle, UserCog, LogOut, BarChart2, Wrench, CalendarDays,
-  ChevronLeft, ChevronRight, Plug, Inbox,
+  ChevronLeft, ChevronRight, Plug, Inbox, Receipt, FileSpreadsheet,
 } from 'lucide-react'
 import { signOut } from '@/app/login/actions'
 import { Avatar } from '@/components/ui/Avatar'
@@ -21,6 +21,14 @@ const NAV_GROUPS = [
       { href: '/admin/machines',   label: 'Machines',        icon: Printer },
       { href: '/admin/contadores', label: 'Compteurs',       icon: BarChart2 },
       { href: '/admin/contracts',  label: 'Contrats',        icon: FileText },
+    ],
+  },
+  {
+    label: 'Facturation',
+    items: [
+      { href: '/admin/billing-plans', label: 'Plans tarifaires', icon: Receipt },
+      { href: '/admin/facturation',   label: 'Rapport mensuel',  icon: FileSpreadsheet },
+      { href: '/admin/factures',      label: 'Factures émises',  icon: FileText },
     ],
   },
   {
