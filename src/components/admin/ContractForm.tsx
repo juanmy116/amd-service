@@ -5,8 +5,11 @@ import Link from 'next/link'
 import { Loader2, ArrowLeft, Trash2, AlertTriangle, Plus, X, RefreshCw } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import MachineCombobox from '@/components/admin/MachineCombobox'
+import type { BillingType } from '@/lib/billing'
 
 type FormState = { error: string } | null
+
+type BillingPlanOption = { id: string; name: string; type: BillingType }
 
 type ContractData = {
   numero_contrat?: string
@@ -25,6 +28,10 @@ type LineInput = {
   billing_day_override: number | null
   maintenance_frequency_override: 'mensuel' | 'trimestriel' | null
   notes: string | null
+  billing_plan_id: string | null
+  price_bw_override: number | null
+  price_color_override: number | null
+  fixed_fee_override: number | null
 }
 
 type RetiredLine = {
@@ -35,6 +42,10 @@ type RetiredLine = {
   billing_day_override: number | null
   maintenance_frequency_override: 'mensuel' | 'trimestriel' | null
   notes: string | null
+  billing_plan_id: string | null
+  price_bw_override: number | null
+  price_color_override: number | null
+  fixed_fee_override: number | null
 }
 
 type ClientOption = { id: number; nom_client: string; princity_company_id?: string | null }
@@ -46,6 +57,7 @@ type Props = {
   initialLines?: LineInput[]
   clients: ClientOption[]
   availableMachines: MachineOption[]
+  billingPlans: BillingPlanOption[]
   title: string
   isEdit?: boolean
   contractId?: string
@@ -71,11 +83,15 @@ function emptyLine(): LineInput {
     billing_day_override: null,
     maintenance_frequency_override: null,
     notes: null,
+    billing_plan_id: null,
+    price_bw_override: null,
+    price_color_override: null,
+    fixed_fee_override: null,
   }
 }
 
 export default function ContractForm({
-  action, defaultValues, initialLines, clients, availableMachines, title, isEdit, contractId, deleteAction,
+  action, defaultValues, initialLines, clients, availableMachines, billingPlans, title, isEdit, contractId, deleteAction,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
   const noopDelete = async (_prev: FormState, _fd: FormData): Promise<FormState> => null
@@ -113,6 +129,10 @@ export default function ContractForm({
           billing_day_override: line.billing_day_override,
           maintenance_frequency_override: line.maintenance_frequency_override,
           notes: line.notes,
+          billing_plan_id: line.billing_plan_id,
+          price_bw_override: line.price_bw_override,
+          price_color_override: line.price_color_override,
+          fixed_fee_override: line.fixed_fee_override,
         }])
       }
       return prev.filter((_, i) => i !== idx)
@@ -144,6 +164,10 @@ export default function ContractForm({
           billing_day_override: item.billing_day_override,
           maintenance_frequency_override: item.maintenance_frequency_override,
           notes: item.notes,
+          billing_plan_id: item.billing_plan_id,
+          price_bw_override: item.price_bw_override,
+          price_color_override: item.price_color_override,
+          fixed_fee_override: item.fixed_fee_override,
         }])
       }
       return prev.filter((r) => r.id !== id)
@@ -487,6 +511,72 @@ export default function ContractForm({
                         <option value="trimestriel">Trimestriel</option>
                       </select>
                     </div>
+                  </div>
+
+                  {/* Facturation: plan + overrides (filtrados por tipo de plan) */}
+                  <div className="pt-3 border-t border-line-subtle space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-ink-muted mb-1">
+                        Plan de facturation
+                      </label>
+                      <select
+                        value={line.billing_plan_id ?? ''}
+                        onChange={(e) => updateLine(idx, 'billing_plan_id', e.target.value || null)}
+                        className={selectSmClass}
+                      >
+                        <option value="">Sans plan</option>
+                        {billingPlans.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {(() => {
+                      const plan = billingPlans.find((p) => p.id === line.billing_plan_id)
+                      if (!plan) return null
+                      const showFixed = plan.type === 'hybrid' || plan.type === 'hybrid_tiered'
+                      const showFlat  = plan.type === 'per_copy' || plan.type === 'hybrid'
+                      return (
+                        <div className="grid grid-cols-3 gap-3">
+                          {showFixed && (
+                            <div>
+                              <label className="block text-xs font-medium text-ink-muted mb-1">Forfait (override)</label>
+                              <input
+                                type="number" min={0} step="1"
+                                value={line.fixed_fee_override ?? ''}
+                                onChange={(e) => updateLine(idx, 'fixed_fee_override', e.target.value === '' ? null : Number(e.target.value))}
+                                placeholder="Du plan"
+                                className={inputSmClass}
+                              />
+                            </div>
+                          )}
+                          {showFlat && (
+                            <>
+                              <div>
+                                <label className="block text-xs font-medium text-ink-muted mb-1">Prix B&N (override)</label>
+                                <input
+                                  type="number" min={0} step="0.000001"
+                                  value={line.price_bw_override ?? ''}
+                                  onChange={(e) => updateLine(idx, 'price_bw_override', e.target.value === '' ? null : Number(e.target.value))}
+                                  placeholder="Du plan"
+                                  className={inputSmClass}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-ink-muted mb-1">Prix couleur (override)</label>
+                                <input
+                                  type="number" min={0} step="0.000001"
+                                  value={line.price_color_override ?? ''}
+                                  onChange={(e) => updateLine(idx, 'price_color_override', e.target.value === '' ? null : Number(e.target.value))}
+                                  placeholder="Du plan"
+                                  className={inputSmClass}
+                                />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Notes */}
