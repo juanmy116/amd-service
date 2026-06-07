@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import ContractForm from '@/components/admin/ContractForm'
+import ReplaceMachineModal from '@/components/admin/ReplaceMachineModal'
 import { updateContractAction, deleteContractAction } from './actions'
+import { replaceMachineAction } from './replace-actions'
 
 export default async function EditContractPage({
   params,
@@ -53,20 +55,48 @@ export default async function EditContractPage({
       fixed_fee_override: l.fixed_fee_override ?? null,
     }))
 
+  // replacementCandidates = machines not busy in this contract or any other
+  const busyInThisContract = new Set(initialLines.map((l) => l.machine_id))
+  const replacementCandidates = availableMachines.filter((m) => !busyInThisContract.has(m.numero_serie))
+
   const boundUpdateAction = updateContractAction.bind(null, contract.id)
 
   return (
-    <ContractForm
-      action={boundUpdateAction}
-      defaultValues={contract}
-      initialLines={initialLines}
-      clients={clients ?? []}
-      availableMachines={availableMachines}
-      billingPlans={billingPlans ?? []}
-      title={contract.numero_contrat}
-      isEdit
-      contractId={contract.id}
-      deleteAction={deleteContractAction}
-    />
+    <div className="space-y-8">
+      <ContractForm
+        action={boundUpdateAction}
+        defaultValues={contract}
+        initialLines={initialLines}
+        clients={clients ?? []}
+        availableMachines={availableMachines}
+        billingPlans={billingPlans ?? []}
+        title={contract.numero_contrat}
+        isEdit
+        contractId={contract.id}
+        deleteAction={deleteContractAction}
+      />
+
+      {initialLines.length > 0 && (
+        <section className="rounded-xl bg-surface border border-line p-6">
+          <h2 className="text-sm font-semibold text-ink mb-4">Remplacement de machine</h2>
+          <div className="divide-y divide-line">
+            {initialLines.map((line) => {
+              const boundReplaceAction = replaceMachineAction.bind(null, contract.id)
+              return (
+                <div key={line.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                  <span className="font-mono text-sm text-ink">{line.machine_id}</span>
+                  <ReplaceMachineModal
+                    outLineId={line.id}
+                    outMachineId={line.machine_id}
+                    replacementCandidates={replacementCandidates}
+                    action={boundReplaceAction}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+    </div>
   )
 }
