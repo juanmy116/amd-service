@@ -1,4 +1,5 @@
 'use client'
+import { Fragment } from 'react'
 import { formatPrice } from '@/lib/billing'
 import { emitInvoiceAction } from '@/app/admin/facturation/actions'
 import type { ClientDraft } from '@/lib/invoicing'
@@ -66,8 +67,8 @@ export default function FacturationPreview({ clients, selectedClient, year, mont
                 </tr></thead>
                 <tbody className="divide-y divide-line-subtle">
                   {draft.lines.map((l, i) => (
-                    <>
-                      <tr key={i} className="hover:bg-neutral-soft/50">
+                    <Fragment key={i}>
+                      <tr className="hover:bg-neutral-soft/50">
                         <td className="px-5 py-3 font-mono text-xs">
                           {l.machine_label}
                           {l.breakdown && <span className="ml-2 text-[10px] font-medium text-info bg-info-soft rounded-full px-2 py-0.5">Remplacement</span>}
@@ -89,7 +90,7 @@ export default function FacturationPreview({ clients, selectedClient, year, mont
                           <td className="px-5 py-1.5" />
                         </tr>
                       ))}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

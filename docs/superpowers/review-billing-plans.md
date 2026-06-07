@@ -222,3 +222,56 @@ Añadir `contract_machines.replaces_contract_machine_id uuid NULL REFERENCES con
 | 2026-06-06 | 7 | `billing-plans/{page,new/page,[id]/page}.tsx` + `Sidebar.tsx` (`2b46793`) | ✅ Aprobado | 3 pages con `requireAdmin`+`createAdminClient`, `notFound`, `bind(null,id)`. Sidebar grupo "Facturation" (3 entradas, iconos OK). Task 7 completa. 🟡 cosmético: list muestra `price_bw` crudo (6 decimales, sin formatear). |
 | 2026-06-06 | 8 (BD) | `migrations/20260606000300_billing_in_contract_rpcs.sql` (sin commit) | ✅ Aprobado c/ H9 | CREATE OR REPLACE de las RPC de contratos + 4 campos billing. No-regresión verificada por diff. 🟡 H9 (GRANT service_role omitidos). ⚠️ aplicar en prod + test regresión. |
 | 2026-06-06 | 8 | `ContractForm.tsx` + `contracts/{new,[id]}/page.tsx` + RPC 000300 (`0cab0be`) | ✅ COMPLETA | Form: selector plan + overrides filtrados por tipo. **Flujo billing end-to-end verificado**: form `JSON.stringify(lines)` (con billing) → actions pass-through (`JSON.parse`+payload entero, sin re-mapear) → RPC lee `elem->>'billing_plan_id'`. Creación Y edición OK. Las actions NO necesitaron cambios (ya eran pass-through). 🟡 tipo `LineInput` no declara billing (riesgo mantenimiento, no bug). ⚠️ aplicar migración 000300 + test regresión contratos. **FASE B CERRADA.** |
+
+## Revisión FASE D — Reemplazo de máquina (PR #35, `65e208d`, ya mergeado) — 2026-06-07
+
+Revisión post-merge (rol: jefe de proyecto). Núcleo (PR #34) ya validado e2e y en prod. La FASE D la implementó y mergeó el otro Claude SIN validación e2e registrada.
+
+| Sev | ID | Archivo | Hallazgo |
+|---|---|---|---|
+| 🔴 CRÍTICO | **H-D5** | `migrations/...000200` (RPC) + premisa del plan | **La RPC `replace_contract_machine` viola el índice `machine_counters_one_active_per_month` (UNIQUE (machine_id,year,month) WHERE status='actif')**, creado en `20260603210000_fase1_indices.sql` (preexistente). **El plan v3 afirmó "sin UNIQUE(machine_id,year,month)" (líneas 31 y 42) — premisa FALSA; el schema NO se verificó bien.** Impacto: (a) **encadenar 2 reemplazos del mismo puesto en un mes es imposible** — el relevé de cierre `B_out` choca con el inicial `B_in` (mismo machine/año/mes); (b) **reemplazar una máquina que ya tiene relevé del mes en curso falla** (A_out choca con el relevé del periodo); (c) **el consumo de la entrante en su primer mes no es capturable** — `B_in` + `B_fin` chocan. Solo el "caso feliz" (1 reemplazo, saliente sin relevé del mes, entrante sin relevé de fin de mes) no lanza error, pero infra-factura. **Detectado al VALIDAR (montar cadena A→B→C falló con 23505).** Requiere rediseño, no parche. |
+| 🟠 MEDIO | H-D1 | RPC (`...000200`) + `replace-actions.ts` + modal | La RPC heredaba el `billing_plan_id` del puesto pero NO los overrides de precio; ni el modal ni la action los enviaban → la entrante facturaba al precio base del plan, no al negociado. **FIX aplicado**: migración `20260607000000_replacement_inherit_overrides.sql` (CREATE OR REPLACE con `COALESCE` de cada override sobre `v_out`). Aplicada a prod. |
+| 🟠 MEDIO | H-D2 | `lib/invoicing.ts` | Consolidación de cadena asumía longitud 2; con A→B→C el resultado dependía del orden del array (no determinista) → posible doble forfait. **FIX aplicado**: resolución transitiva (busca la cabeza, sigue `replaces_cm_id`, consolida N eslabones, breakdown completo). **NOTA:** dado H-D5, las cadenas no se pueden ni crear hoy; el fix es defensivo / prematuro hasta resolver H-D5. |
+| 🟡 BAJO | H-D3 | `FacturationPreview.tsx` | `.map()` devolvía Fragment `<>` sin `key` (estaba en el `<tr>` interno) → warning React. **FIX**: `<Fragment key={i}>`. |
+| 🟡 BAJO | H-D4 | `replace-actions.ts` | Solo validaba `Number.isFinite`, no `>= 0`; negativo llegaba a la RPC con mensaje genérico. **FIX**: validación `>= 0` con mensaje FR. |
+
+**✅ Bien hecho en la FASE D:** RPC con guard `service_role`, `FOR UPDATE`, validaciones nombradas, atomicidad (el rollback de la cadena fallida fue total); filtros UI correctos (`availableMachines`/`initialLines` solo abiertas/`replacementCandidates`); `emit_invoice` H6 idéntico + `has_replacement`; consolidación del caso 1-reemplazo correcta.
+
+**VEREDICTO FASE D:** ❌ **NO apta para producción tal cual.** El propósito esencial (facturar el consumo de la máquina entrante en el mes del reemplazo) choca con `one_active_per_month`. Fixes H-D1/H-D3/H-D4 aplicados (válidos), H-D2 defensivo. **H-D5 requiere decisión de diseño** (p. ej. mover los relevés de inicio/cierre a columnas de `contract_machines` en vez de filas de `machine_counters`, y ajustar `calcDeltas`/`buildClientInvoiceDraft`). Rama de fix: `fix/billing-replacement-edge-cases`.
+
+### Rediseño H-D5 (PR #36) + segunda revisión cruzada (otro Claude) — 2026-06-07
+
+Opción 1 implementada: `contract_machines.start_counter_*`/`end_counter_*`; RPC fuera de `machine_counters`; `computeLineConsumption` recalcula delta por línea. Validado e2e cadena A→B→C + override → 46200 FCFA (datos sintéticos borrados). **El otro Claude revisó el rediseño y cazó H-D6:**
+
+| Sev | ID | Archivo | Hallazgo |
+|---|---|---|---|
+| 🟠 MEDIO-ALTA | **H-D6** | `lib/invoicing.ts` `computeLineConsumption` | Regresión introducida por el rediseño: una línea **retirada SIN reemplazo** (flujo `retire` en `contracts/[id]/actions.ts` → `date_fin` sin `end_counter`) caía en la rama de cierre y tomaba `end_counter` (NULL) → `ESTIMATED` → consumo 0, aunque existiera su relevé mensual normal. Rompía la regla R1 del núcleo (facturar el último consumo de líneas cerradas en el mes). **FIX**: booleano `closedByReplacementInMonth` (= cerrada en el mes **Y** `end_counter` no null); si no, fallback al relevé normal del mes. Cubre línea abierta, retirada y cerrada-por-reemplazo. |
+| 🟡 BAJO | menor-1 | `lib/invoicing.ts` | Docstring de `buildClientInvoiceDraft` decía "su delta vía `calcDeltas`" (ya no se usa). **FIX**: docstring actualizado a `computeLineConsumption` + consolidación. |
+| 🟡 BAJO | menor-2 | `migrations/...000100` | Comentario a medias entre los pasos de la RPC. **FIX**: eliminado. |
+
+**Estado PR #36:** H-D6 + menores corregidos. `tsc` + `build` OK. ~~Gate E2E PENDIENTE~~ → **✅ GATE E2E PASADO** (ver sección siguiente). Cliente residual `id=67 "test supabase"` borrado durante la limpieza del gate (0 dependencias verificadas).
+
+### ✅ GATE E2E — RESULTADO (2026-06-07, sesión 33) — requisito de trazabilidad cumplido
+
+Validado contra BD de prod con el **código TS REAL** del PR (no SQL reimplementado): `buildClientInvoiceDraft`/`emit_invoice` ejecutados vía `npx tsx` + `node --env-file=.env.local`. Escenario `test_gate` (cliente id=71, plan "Gate Hybride" hybrid 30000/10/50, contrato GATE-001). Reemplazos montados con la RPC real `replace_contract_machine` en DO block con `set_config('request.jwt.claims','{"role":"service_role"}',true)`.
+
+| Caso | Máquinas | Δbw / Δcolor consolidado | Importe | Verifica |
+|---|---|---|---|---|
+| (d) normal | gate_N | 300 / 10 | **33 500** | no-regresión |
+| (c) retire SIN reemplazo | gate_R | 800 / 0 | **38 000** | **H-D6** (factura su consumo, no estimada=0) |
+| (a) reemplazo simple | gate_A→gate_B | 700 / 100 (A 300/20 + B 400/80) | **42 000** | consolidación 1 reemplazo |
+| (b) cadena | gate_C1→C2→C3 | 620 / 200 (200/50 + 220/100 + 200/50) | **46 200** | **H-D5** (cadena A→B→C montada SIN violar `one_active_per_month`) |
+
+**Total junio 2026 = 159 700 FCFA.** `buildClientInvoiceDraft(71,2026,6)` → total=159700, has_replacement=true, has_estimated=false, 4 líneas. Emisión `emit_invoice` → `FACT-2026-0001`, status `emise`, **cabecera = Σ líneas = 159700 (cuadra=true)**. La cadena A→B→C se montó sin error 23505 → **H-D5 confirmado resuelto ejecutando** (la revisión estática no lo cazó: es índice único parcial, no CHECK). Limpieza total verificada por SELECT: 0 residuos `test_gate`/`gate_*`/`GATE-001`, `invoice_counters` 2026 reseteado (FACT-2026-0001 libre de nuevo), cliente `id=67` borrado, scripts temporales eliminados. Prod = estado previo.
+
+### Code review pre-merge (high effort, 4 ángulos + verificación) — 2026-06-07
+
+Sin hallazgos de corrección bloqueantes. Refutados contra el código: filtro `status='annule'` (sí presente, L91/L110), validación `end>=start` en RPC (sí, vía `GREATEST(último relevé, start_counter)`), `SELECT` sin columnas nuevas y `breakdown` rompiendo `emit_invoice` (ambos OK, emisión validada e2e). Hallazgos reales (todos severidad baja):
+
+| Sev | ID | Archivo | Hallazgo | Estado |
+|---|---|---|---|---|
+| 🟡 MUY BAJA | **H-D7 (fix-forward)** | `lib/invoicing.ts:84` `computeLineConsumption` | `closedByReplacementInMonth` solo comprueba `end_counter_bw !== null`, no `end_counter_color`. Si una línea quedara con `end_counter_bw` seteado y `end_counter_color` NULL, toda la línea cae a `ESTIMATED` (consumo 0) e infrafactura el B&N que sí tiene cierre. **No alcanzable vía la app** (la RPC `replace_contract_machine` siempre setea ambos contadores juntos, valida no-null en payload); solo con edición manual directa de la tabla (sin UI). **FIX-FORWARD propuesto** (1 línea: `&& line.end_counter_color !== null`), NO bloqueante. |
+| 🟡 BAJA | altitud | `migrations/...000000` | `CREATE OR REPLACE` de `replace_contract_machine` con el modelo viejo, sobreescrita de inmediato por `...000100` → en el historial la 000000 es código muerto. **No accionable**: ambas migraciones ya aplicadas en prod, no se pueden editar/fusionar retroactivamente. Deuda histórica documentada. |
+| 🟡 BAJA | eficiencia | `lib/invoicing.ts:244` | `chain.includes(prev)` O(n) en bucle + re-sort de `allCounters` por línea. Negligible a escala AMD (cadenas 2-3, ≤~50 líneas/cliente). Limpieza opcional. |
+
+**VEREDICTO: PR #36 apto para merge.** Fixes H-D5/H-D1/H-D2/H-D6 correctos y validados e2e en el camino crítico. H-D7 queda como fix-forward de severidad muy baja.
