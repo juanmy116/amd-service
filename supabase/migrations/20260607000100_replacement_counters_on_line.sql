@@ -88,9 +88,6 @@ BEGIN
     RAISE EXCEPTION 'closing_counter_too_low';
   END IF;
 
-  -- El contador inicial de la entrante no puede ser mayor que el de cierre de la saliente
-  -- no aplica (son máquinas distintas); pero sí validamos coherencia interna ya hecha arriba.
-
   -- 1) Cerrar la línea saliente con su contador de cierre
   UPDATE public.contract_machines
      SET date_fin          = v_date,

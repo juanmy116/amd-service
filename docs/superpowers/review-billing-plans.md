@@ -238,3 +238,15 @@ Revisión post-merge (rol: jefe de proyecto). Núcleo (PR #34) ya validado e2e y
 **✅ Bien hecho en la FASE D:** RPC con guard `service_role`, `FOR UPDATE`, validaciones nombradas, atomicidad (el rollback de la cadena fallida fue total); filtros UI correctos (`availableMachines`/`initialLines` solo abiertas/`replacementCandidates`); `emit_invoice` H6 idéntico + `has_replacement`; consolidación del caso 1-reemplazo correcta.
 
 **VEREDICTO FASE D:** ❌ **NO apta para producción tal cual.** El propósito esencial (facturar el consumo de la máquina entrante en el mes del reemplazo) choca con `one_active_per_month`. Fixes H-D1/H-D3/H-D4 aplicados (válidos), H-D2 defensivo. **H-D5 requiere decisión de diseño** (p. ej. mover los relevés de inicio/cierre a columnas de `contract_machines` en vez de filas de `machine_counters`, y ajustar `calcDeltas`/`buildClientInvoiceDraft`). Rama de fix: `fix/billing-replacement-edge-cases`.
+
+### Rediseño H-D5 (PR #36) + segunda revisión cruzada (otro Claude) — 2026-06-07
+
+Opción 1 implementada: `contract_machines.start_counter_*`/`end_counter_*`; RPC fuera de `machine_counters`; `computeLineConsumption` recalcula delta por línea. Validado e2e cadena A→B→C + override → 46200 FCFA (datos sintéticos borrados). **El otro Claude revisó el rediseño y cazó H-D6:**
+
+| Sev | ID | Archivo | Hallazgo |
+|---|---|---|---|
+| 🟠 MEDIO-ALTA | **H-D6** | `lib/invoicing.ts` `computeLineConsumption` | Regresión introducida por el rediseño: una línea **retirada SIN reemplazo** (flujo `retire` en `contracts/[id]/actions.ts` → `date_fin` sin `end_counter`) caía en la rama de cierre y tomaba `end_counter` (NULL) → `ESTIMATED` → consumo 0, aunque existiera su relevé mensual normal. Rompía la regla R1 del núcleo (facturar el último consumo de líneas cerradas en el mes). **FIX**: booleano `closedByReplacementInMonth` (= cerrada en el mes **Y** `end_counter` no null); si no, fallback al relevé normal del mes. Cubre línea abierta, retirada y cerrada-por-reemplazo. |
+| 🟡 BAJO | menor-1 | `lib/invoicing.ts` | Docstring de `buildClientInvoiceDraft` decía "su delta vía `calcDeltas`" (ya no se usa). **FIX**: docstring actualizado a `computeLineConsumption` + consolidación. |
+| 🟡 BAJO | menor-2 | `migrations/...000100` | Comentario a medias entre los pasos de la RPC. **FIX**: eliminado. |
+
+**Estado PR #36:** H-D6 + menores corregidos. `tsc` + `build` OK. **Gate E2E PENDIENTE** (bloqueado: el MCP de Supabase perdió autorización — hay que re-autenticar para montar el escenario sintético de validación: reemplazo simple con relevé del mes previo, cadena A→B→C, retire en el mes sin reemplazo, y emisión con cuadre). **NO mergear hasta pasar el gate E2E.** Limpieza pendiente: cliente residual `id=67 "test supabase"` (no creado en esta sesión — verificar dependencias antes de borrar).

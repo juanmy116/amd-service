@@ -74,13 +74,19 @@ function computeLineConsumption(
   const inMonth = (d: string | null): boolean => d !== null && d >= periodStart && d <= periodEnd
   const ESTIMATED = { delta_bw: 0, delta_color: 0, is_estimated: true }
 
-  // Lectura final dentro del mes
+  // Lectura final dentro del mes.
+  // H-D6: solo una línea cerrada POR REEMPLAZO tiene end_counter. Una línea retirada sin
+  // reemplazo (flujo "retire": date_fin sin end_counter) debe facturar su último consumo con
+  // el relevé normal del mes — si no, se infrafactura (regla R1 del núcleo).
   let finalBw: number | null = null
   let finalColor: number | null = null
-  if (line.date_fin !== null && inMonth(line.date_fin)) {
+  const closedByReplacementInMonth =
+    line.date_fin !== null && inMonth(line.date_fin) && line.end_counter_bw !== null
+  if (closedByReplacementInMonth) {
     finalBw    = line.end_counter_bw
     finalColor = line.end_counter_color
   } else {
+    // Relevé normal del mes (cubre: línea abierta Y línea retirada sin end_counter).
     const monthReading = counters
       .filter(c => c.status === 'actif' && c.year === year && c.month === month)
       .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0]
@@ -123,8 +129,9 @@ function computeLineConsumption(
  * Construye el borrador de factura de un cliente para (year, month).
  * Filtro de periodo (cubre activas, reemplazadas y terminadas dentro del mes):
  *   date_debut <= fin_periodo AND (date_fin IS NULL OR date_fin >= inicio_periodo)
- * Para cada línea con plan asignado busca el relevé del periodo y su delta vía calcDeltas;
- * si no hay relevé → línea estimada (consumo 0).
+ * Para cada línea con plan calcula su consumo del mes vía computeLineConsumption (relevés
+ * normales + puntos start/end de la línea); si falta algún punto → línea estimada (consumo 0).
+ * Luego consolida las líneas encadenadas por reemplazo en un único puesto de servicio.
  */
 export async function buildClientInvoiceDraft(
   clientId: number,
