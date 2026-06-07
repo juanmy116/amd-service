@@ -25,6 +25,7 @@
     "@upstash/redis": "^1.38.0",
     "@zxing/browser": "^0.2.0",
     "@zxing/library": "^0.22.0",
+    "exceljs": "^4.4.0",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.14.0",
     "next": "^16.2.6",

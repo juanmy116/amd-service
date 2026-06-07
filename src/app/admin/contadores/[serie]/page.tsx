@@ -10,44 +10,7 @@ import { Card } from '@/components/ui/Card'
 import { PanelHeader } from '@/components/ui/PanelHeader'
 import { Badge } from '@/components/ui/Badge'
 import { getOpenLineForMachine } from '@/lib/contract-machines'
-
-interface Counter {
-  id:                   string
-  year:                 number
-  month:                number
-  day:                  number | null
-  counter_bw:           number
-  counter_color:        number
-  status:               string
-  is_replacement_start: boolean
-  previous_machine_id:  string | null
-  annulation_reason:    string | null
-  annule_at:            string | null
-  notes:                string | null
-  recorded_at:          string
-}
-
-function calcDeltas(counters: Counter[]) {
-  const active = [...counters]
-    .filter(c => c.status === 'actif')
-    .sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month)
-
-  const deltaMap = new Map<string, { delta_bw: number | null; delta_color: number | null }>()
-
-  active.forEach((c, i) => {
-    if (i === 0 || c.is_replacement_start) {
-      deltaMap.set(c.id, { delta_bw: null, delta_color: null })
-    } else {
-      const prev = active[i - 1]
-      deltaMap.set(c.id, {
-        delta_bw:    c.counter_bw    - prev.counter_bw,
-        delta_color: c.counter_color - prev.counter_color,
-      })
-    }
-  })
-
-  return deltaMap
-}
+import { calcDeltas, type Counter } from '@/lib/counters'
 
 function buildChartData(counters: Counter[]): ChartEntry[] {
   const active = [...counters]

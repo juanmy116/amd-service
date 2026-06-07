@@ -146,7 +146,7 @@ gh pr merge <número> --merge --delete-branch
 ## Decisiones de diseño importantes
 
 - **Variables de entorno siempre**, nunca hardcodear URLs ni claves
-- **`send-email` Edge Function** encapsula el proveedor de email (Mailjet ahora, intercambiable después)
+- **`send-email` Edge Function** encapsula el proveedor de email (Resend ahora, intercambiable después; soporta adjuntos vía `attachments`)
 - **`service_role`** solo en servidor (Edge Functions, Server Actions) — nunca en el cliente
 - **QR por máquina** codifica la URL `/tech/maquina/[numero_serie]`
 - **RLS** bloqueado hasta que se añadan políticas módulo a módulo
