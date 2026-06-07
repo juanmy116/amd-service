@@ -28,6 +28,9 @@ export async function replaceMachineAction(
       !Number.isFinite(in_counter_bw)  || !Number.isFinite(in_counter_color)) {
     return { error: 'Les valeurs de compteur doivent être des nombres valides.' }
   }
+  if (out_counter_bw < 0 || out_counter_color < 0 || in_counter_bw < 0 || in_counter_color < 0) {
+    return { error: 'Les compteurs ne peuvent pas être négatifs.' }
+  }
 
   const admin = createAdminClient()
   const { error } = await admin.rpc('replace_contract_machine', {
