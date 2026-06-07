@@ -4,9 +4,14 @@ import {
   resolveEffectiveTariff,
   calculateMonthlyAmount,
   type ContractMachineWithBilling,
+  type EffectiveTariff,
+  type BillingType,
+  type BillingTier,
 } from '@/lib/billing'
 
 export type DraftLine = {
+  cm_id: string
+  replaces_cm_id: string | null
   contract_id: string
   numero_contrat: string
   machine_id: string
@@ -24,6 +29,7 @@ export type DraftLine = {
   amount_bw: number
   amount_color: number
   amount_total: number
+  breakdown?: { machine_label: string; delta_bw: number; delta_color: number }[]
 }
 
 export type ClientDraft = {
@@ -34,6 +40,7 @@ export type ClientDraft = {
   lines: DraftLine[]
   total_amount: number
   has_estimated: boolean
+  has_replacement: boolean
 }
 
 /**
@@ -62,6 +69,7 @@ export async function buildClientInvoiceDraft(
     .from('contract_machines')
     .select(`
       id, machine_id, billing_plan_id, date_debut, date_fin,
+      replaces_contract_machine_id,
       price_bw_override, price_color_override, fixed_fee_override,
       billing_plans ( id, name, type, fixed_fee, price_bw, price_color, tiers ),
       machines ( numero_serie, marque, modele ),
@@ -113,6 +121,8 @@ export async function buildClientInvoiceDraft(
     const amounts = calculateMonthlyAmount(tariff, delta_bw, delta_color)
 
     draftLines.push({
+      cm_id:          line.id,
+      replaces_cm_id: (line as unknown as { replaces_contract_machine_id: string | null }).replaces_contract_machine_id ?? null,
       contract_id:    contract.id,
       numero_contrat: contract.numero_contrat,
       machine_id:     line.machine_id,
@@ -128,7 +138,49 @@ export async function buildClientInvoiceDraft(
     })
   }
 
-  draftLines.sort((a, b) =>
+  // Post-process: fusionar líneas encadenadas del mismo puesto de servicio
+  const lineById = new Map<string, DraftLine>()
+  for (const l of draftLines) lineById.set(l.cm_id, l)
+
+  const discarded = new Set<string>()
+  for (const entrante of draftLines) {
+    if (!entrante.replaces_cm_id || discarded.has(entrante.cm_id)) continue
+    const saliente = lineById.get(entrante.replaces_cm_id)
+    if (!saliente || discarded.has(saliente.cm_id)) continue
+
+    const orig_bw    = entrante.delta_bw
+    const orig_color = entrante.delta_color
+    const merged_bw    = orig_bw    + saliente.delta_bw
+    const merged_color = orig_color + saliente.delta_color
+
+    const tariff: EffectiveTariff = {
+      type:        entrante.billing_type as BillingType,
+      fixed_fee:   entrante.fixed_fee ?? 0,
+      price_bw:    entrante.price_bw,
+      price_color: entrante.price_color,
+      tiers:       entrante.tiers as BillingTier[] | null,
+    }
+    const amounts = calculateMonthlyAmount(tariff, merged_bw, merged_color)
+
+    entrante.delta_bw     = merged_bw
+    entrante.delta_color  = merged_color
+    entrante.is_estimated = entrante.is_estimated || saliente.is_estimated
+    entrante.amount_fixed = amounts.amount_fixed
+    entrante.amount_bw    = amounts.amount_bw
+    entrante.amount_color = amounts.amount_color
+    entrante.amount_total = amounts.amount_total
+    entrante.breakdown = [
+      { machine_label: saliente.machine_label, delta_bw: saliente.delta_bw, delta_color: saliente.delta_color },
+      { machine_label: entrante.machine_label, delta_bw: orig_bw,           delta_color: orig_color },
+    ]
+
+    discarded.add(saliente.cm_id)
+  }
+
+  const mergedLines = draftLines.filter(l => !discarded.has(l.cm_id))
+  const has_replacement = mergedLines.some(l => l.breakdown !== undefined)
+
+  mergedLines.sort((a, b) =>
     a.numero_contrat.localeCompare(b.numero_contrat) || a.machine_label.localeCompare(b.machine_label))
 
   return {
@@ -136,9 +188,10 @@ export async function buildClientInvoiceDraft(
     client_name:  client.nom_client,
     period_year:  year,
     period_month: month,
-    lines:        draftLines,
-    total_amount: draftLines.reduce((s, l) => s + l.amount_total, 0),
-    has_estimated: draftLines.some(l => l.is_estimated),
+    lines:        mergedLines,
+    total_amount: mergedLines.reduce((s, l) => s + l.amount_total, 0),
+    has_estimated: mergedLines.some(l => l.is_estimated),
+    has_replacement,
   }
 }
 

@@ -32,6 +32,7 @@ export async function emitInvoiceAction(fd: FormData): Promise<void> {
       period_year: year,
       period_month: month,
       has_estimated: draft.has_estimated,
+      has_replacement: draft.has_replacement,
       confirm_estimated: confirmEstimated,
       total_amount: draft.total_amount,
       issued_by: user.id,

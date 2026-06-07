@@ -66,14 +66,30 @@ export default function FacturationPreview({ clients, selectedClient, year, mont
                 </tr></thead>
                 <tbody className="divide-y divide-line-subtle">
                   {draft.lines.map((l, i) => (
-                    <tr key={i} className="hover:bg-neutral-soft/50">
-                      <td className="px-5 py-3 font-mono text-xs">{l.machine_label}{l.is_estimated && <span className="ml-2 text-[10px] font-medium text-warning bg-warning-soft rounded-full px-2 py-0.5">Estimée</span>}</td>
-                      <td className="px-4 py-3 text-xs text-ink-soft">{l.numero_contrat}</td>
-                      <td className="px-4 py-3 text-xs text-ink-soft">{l.plan_name}</td>
-                      <td className="px-4 py-3 text-right">{l.delta_bw.toLocaleString('fr-FR')}</td>
-                      <td className="px-4 py-3 text-right">{l.delta_color.toLocaleString('fr-FR')}</td>
-                      <td className="px-5 py-3 text-right font-semibold">{formatPrice(l.amount_total)}</td>
-                    </tr>
+                    <>
+                      <tr key={i} className="hover:bg-neutral-soft/50">
+                        <td className="px-5 py-3 font-mono text-xs">
+                          {l.machine_label}
+                          {l.breakdown && <span className="ml-2 text-[10px] font-medium text-info bg-info-soft rounded-full px-2 py-0.5">Remplacement</span>}
+                          {l.is_estimated && <span className="ml-2 text-[10px] font-medium text-warning bg-warning-soft rounded-full px-2 py-0.5">Estimée</span>}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-ink-soft">{l.numero_contrat}</td>
+                        <td className="px-4 py-3 text-xs text-ink-soft">{l.plan_name}</td>
+                        <td className="px-4 py-3 text-right">{l.delta_bw.toLocaleString('fr-FR')}</td>
+                        <td className="px-4 py-3 text-right">{l.delta_color.toLocaleString('fr-FR')}</td>
+                        <td className="px-5 py-3 text-right font-semibold">{formatPrice(l.amount_total)}</td>
+                      </tr>
+                      {l.breakdown && l.breakdown.map((b, bi) => (
+                        <tr key={`${i}-bd-${bi}`} className="bg-neutral-soft/30">
+                          <td className="pl-10 pr-5 py-1.5 font-mono text-[11px] text-ink-muted" colSpan={3}>
+                            ↳ {b.machine_label}
+                          </td>
+                          <td className="px-4 py-1.5 text-right text-[11px] text-ink-muted">{b.delta_bw.toLocaleString('fr-FR')}</td>
+                          <td className="px-4 py-1.5 text-right text-[11px] text-ink-muted">{b.delta_color.toLocaleString('fr-FR')}</td>
+                          <td className="px-5 py-1.5" />
+                        </tr>
+                      ))}
+                    </>
                   ))}
                 </tbody>
               </table>
