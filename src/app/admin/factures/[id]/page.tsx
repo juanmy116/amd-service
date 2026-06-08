@@ -34,8 +34,11 @@ export default async function FactureDetailPage({
   if (!inv) notFound()
   const { data: lines } = await admin.from('invoice_lines').select('*').eq('invoice_id', id).order('numero_contrat')
 
-  const monthLabel = new Date(inv.period_year, inv.period_month - 1)
-    .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+  // Bloque E: si la factura es por ciclo de aniversario (period_start/end), mostrar el rango;
+  // si es legacy por cliente/mes, mostrar el mes natural.
+  const periodLabel = inv.period_start && inv.period_end
+    ? `${new Date(inv.period_start + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })} – ${new Date(inv.period_end + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}`
+    : new Date(inv.period_year, inv.period_month - 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
   const isAnnulee = inv.status === 'annulee'
   const boundAnnul = annulInvoiceAction.bind(null, id)
   const boundEmail = emailInvoiceAction.bind(null, id)
@@ -57,7 +60,7 @@ export default async function FactureDetailPage({
 
       <Card className="p-6 space-y-1">
         <div className="flex justify-between text-sm"><span className="text-ink-muted">Client</span><span className="text-ink font-medium">{inv.client_name}</span></div>
-        <div className="flex justify-between text-sm"><span className="text-ink-muted">Période</span><span className="text-ink font-medium">{monthLabel}</span></div>
+        <div className="flex justify-between text-sm"><span className="text-ink-muted">Période</span><span className="text-ink font-medium">{periodLabel}</span></div>
         <div className="flex justify-between text-sm"><span className="text-ink-muted">Émise le</span><span className="text-ink font-medium">{new Date(inv.issued_at).toLocaleDateString('fr-FR')}</span></div>
         <div className="flex justify-between text-base pt-2 border-t border-line-subtle mt-2"><span className="font-semibold text-ink">Total</span><span className={`font-bold ${isAnnulee ? 'line-through text-ink-muted' : 'text-ink'}`}>{formatPrice(inv.total_amount)}</span></div>
         {isAnnulee && inv.annulation_reason && (

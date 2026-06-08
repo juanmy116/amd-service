@@ -498,4 +498,40 @@ describe('Bloque E — buildContractInvoiceDraft: factura por contrato y ciclo',
     vi.mocked(createAdminClient).mockReturnValue(makeAdmin({ contracts: { data: null, error: { message: 'boom' } } }))
     await expect(buildContractInvoiceDraft('ctr-1', 2026, 1)).rejects.toBeInstanceOf(BillingDataError)
   })
+
+  it('dos contratos del MISMO cliente y mes-ancla: misma terna (client_id, year, month) pero distinto contract_id', async () => {
+    // Invariante que motiva restringir el índice legacy a contract_id IS NULL (fix migración 150000):
+    // la unicidad de factura emise NO puede ir por (client_id, period_year, period_month) — dos
+    // contratos del mismo cliente anclados al mismo mes comparten esa terna. Debe ir por contrato.
+    const mkContract = (id: string) => ({
+      id, numero_contrat: `CT-${id}`, client_id: 7, billing_day: 4, statut: 'actif',
+      clients: { id: 7, nom_client: 'ACME' },
+    })
+    const mkLine = (cmId: string) => ({
+      id: cmId, machine_id: `M-${cmId}`, billing_plan_id: 'plan-1',
+      date_debut: '2025-12-01', date_fin: null, statut: 'actif', replaces_contract_machine_id: null,
+      start_counter_bw: null, start_counter_color: null, end_counter_bw: null, end_counter_color: null,
+      price_bw_override: null, price_color_override: null, fixed_fee_override: null,
+      billing_plans: { id: 'plan-1', name: 'Forfait', type: 'hybrid', fixed_fee: 5000, price_bw: 10, price_color: 50, tiers: null },
+      machines: { numero_serie: `M-${cmId}`, marque: 'HP', modele: 'X' },
+    })
+    const noCounters = { data: [] as unknown[], error: null }
+
+    vi.mocked(createAdminClient).mockReturnValue(
+      makeAdmin({ contracts: { data: mkContract('A'), error: null }, contract_machines: { data: [mkLine('a1')], error: null }, machine_counters: noCounters }),
+    )
+    const dA = await buildContractInvoiceDraft('A', 2026, 1)
+
+    vi.mocked(createAdminClient).mockReturnValue(
+      makeAdmin({ contracts: { data: mkContract('B'), error: null }, contract_machines: { data: [mkLine('b1')], error: null }, machine_counters: noCounters }),
+    )
+    const dB = await buildContractInvoiceDraft('B', 2026, 1)
+
+    // Misma terna legacy (chocaría con el índice viejo)…
+    expect(dA!.client_id).toBe(dB!.client_id)
+    expect([dA!.period_year, dA!.period_month, dA!.period_start])
+      .toEqual([dB!.period_year, dB!.period_month, dB!.period_start])
+    // …pero contratos distintos → el índice por (contract_id, period_start) NO colisiona.
+    expect(dA!.contract_id).not.toBe(dB!.contract_id)
+  })
 })
