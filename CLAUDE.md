@@ -135,6 +135,11 @@ gh pr create --title "Título" --body "Qué hace y por qué"
 gh pr merge <número> --merge --delete-branch
 ```
 
+**CI (GitHub Actions):** cada PR y push a `main` ejecuta `.github/workflows/ci.yml` →
+`npm run typecheck` + `npm test` (vitest) + `npm run build`. Antes de abrir PR, correr
+esos tres en local para no romper el check. El `build` en CI usa env placeholder (las
+rutas son dinámicas, no conecta a Supabase).
+
 **Nomenclatura de ramas:**
 - `feat/` — nueva funcionalidad
 - `fix/` — corrección de bug
