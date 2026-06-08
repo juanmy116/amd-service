@@ -349,6 +349,17 @@ Diferencia clave con el **reemplazo** (`replace_contract_machine`, motivo (b) re
 - **Mantenimiento sigue a la máquina nueva (P1-8)** — el reemplazo migra las `maintenance_visits` futuras y no realizadas (`status <> 'fait' AND scheduled_date >= fecha`) de la línea saliente a la entrante, para no programar mantenimientos sobre la máquina retirada.
 - **Vigencia temporal de tarifas (P1-5)** — pendiente, en **PR aparte tras el Bloque D** (toca `billing.ts`; se coordina con el Bloque 0/soporte).
 
+### Ciclo de facturación por aniversario (Bloque E del core, regla 9) — EN CURSO
+
+Cambia el periodo de facturación de **mes natural** a **ciclo de aniversario por contrato**: del `billing_day` del contrato al día anterior del mismo día del mes siguiente. **Día único por contrato → una sola factura por contrato/ciclo** con todas sus máquinas. Entrega **por fases**:
+
+- **E1 (motor de cálculo, este PR — solo lectura, sin tocar `invoices`/`emit_invoice`):**
+  - `computeBillingCycle(billingDay, anchorYear, anchorMonth)` → `{start, end}` ISO. Caso fin de mes con clamp (ej. day 31 anclado en enero → `[01-31, 02-27]`; día 1 → mes natural). Tests: bisiesto, cruce de año, 31→febrero.
+  - `computeLineConsumptionCycle(line, counters, periodStart, periodEnd)` — consumo por **rango de fechas** del ciclo (no mes natural): final = relevé activo más reciente dentro del ciclo (la captura del `billing_day`), o `end_counter` si se cerró por reemplazo en el ciclo; base = relevé activo más reciente anterior al inicio, o `start_counter` si la línea arrancó en el ciclo. Misma política estimado/negativo que el mensual.
+  - `buildContractInvoiceDraft(contractId, anchorYear, anchorMonth)` → `ContractDraft` (periodo del ciclo + `period_year`/`period_month` como mes-ancla). Reusa la atribución por contrato (P0-3), `isLineBillable` (P1-6) y la consolidación de reemplazos (helper compartido `consolidateReplacements`, una sola implementación para no divergir — P2-8). `listBillableContracts` lista candidatos por ventana amplia.
+  - El draft mensual por cliente (`buildClientInvoiceDraft`) **sigue intacto** para la UI actual hasta E2.
+- **E2 (pendiente):** migración de `invoices` (`contract_id`, `period_start`/`period_end` DATE aditivos + índice de no-duplicado por contrato/ciclo), `emit_invoice` por ciclo (fix-forward sobre el Bloque C), y UI de facturación a selector de contrato. `billing_day_override` por máquina deja de regir el ciclo (es por contrato): se documenta como día de captura, no de ciclo.
+
 > **Coordinación (fix-forward):** `update_contract_with_lines` es función compartida — el Bloque C (soporte, P0-6 pertenencia de líneas) debe reescribirse SOBRE la versión `20260608140100` (incluyendo el guard P1-4), no machacarla. Migraciones del motor en banda `20260608_12xxxx`–`15xxxx`.
 
 ### Importador CSV de máquinas (`/admin/machines/import`) — sesión 23

@@ -61,6 +61,39 @@ export function countersForLine(
 }
 
 /**
+ * BLOQUE E / regla 9 — ciclo de facturación por ANIVERSARIO del contrato.
+ * El periodo NO es el mes natural: va del `billing_day` del contrato al día anterior del mismo
+ * día del mes siguiente (ej. day=4, ancla enero → [2026-01-04, 2026-02-03]).
+ * Caso fin de mes: si el `billing_day` no existe en un mes (ej. 31 en febrero) → último día del
+ * mes (clamp). El ciclo "ancla" en (anchorYear, anchorMonth) = el mes en que CAE su inicio.
+ * Devuelve fechas ISO (YYYY-MM-DD) inclusivas en ambos extremos.
+ */
+export function computeBillingCycle(
+  billingDay: number,
+  anchorYear: number,
+  anchorMonth: number,   // 1-based
+): { start: string; end: string } {
+  const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate()  // m 1-based
+  const clampDay = (y: number, m: number, d: number) => {
+    const dd = Math.min(d, daysInMonth(y, m))
+    return `${y}-${String(m).padStart(2, '0')}-${String(dd).padStart(2, '0')}`
+  }
+
+  const start = clampDay(anchorYear, anchorMonth, billingDay)
+
+  const nextMonth = anchorMonth === 12 ? 1 : anchorMonth + 1
+  const nextYear  = anchorMonth === 12 ? anchorYear + 1 : anchorYear
+  const nextStart = clampDay(nextYear, nextMonth, billingDay)
+
+  // end = día anterior al inicio del ciclo siguiente.
+  const [ny, nm, nd] = nextStart.split('-').map(Number)
+  const e = new Date(ny, nm - 1, nd - 1)
+  const end = `${e.getFullYear()}-${String(e.getMonth() + 1).padStart(2, '0')}-${String(e.getDate()).padStart(2, '0')}`
+
+  return { start, end }
+}
+
+/**
  * BLOQUE D / P1-6 — una línea es facturable según el estado del contrato y de la línea.
  *  - 'suspendu' (contrato O línea) → NO factura (servicio pausado, decisión del dueño).
  *  - 'terminé' NO se filtra por statut: lo gobierna date_fin (el filtro de periodo factura su
@@ -107,6 +140,28 @@ export type ClientDraft = {
   client_name: string
   period_year: number
   period_month: number
+  lines: DraftLine[]
+  total_amount: number
+  has_estimated: boolean
+  has_replacement: boolean
+}
+
+/**
+ * BLOQUE E — borrador de factura por CONTRATO y CICLO de aniversario (regla 9).
+ * Todas las máquinas del contrato van en una sola factura del ciclo [period_start, period_end].
+ * period_year/period_month son el MES-ANCLA (mes en que cae el inicio del ciclo), para
+ * etiquetado y no-duplicado; la verdad del periodo son period_start/period_end.
+ */
+export type ContractDraft = {
+  contract_id: string
+  numero_contrat: string
+  client_id: number
+  client_name: string
+  billing_day: number
+  period_start: string
+  period_end: string
+  period_year: number       // mes-ancla
+  period_month: number      // mes-ancla
   lines: DraftLine[]
   total_amount: number
   has_estimated: boolean
@@ -196,6 +251,72 @@ export function computeLineConsumption(
   const delta_color = counterDelta(finalColor, initColor)
   if (delta_bw === null || delta_color === null) return ESTIMATED  // falta un punto → estimado
   if (delta_bw < 0 || delta_color < 0) return ESTIMATED           // incoherencia → no facturar negativo
+  return { delta_bw, delta_color, is_estimated: false }
+}
+
+/**
+ * BLOQUE E — consumo facturable de UNA línea en un CICLO de aniversario [periodStart, periodEnd]
+ * (fechas ISO inclusivas). Variante de computeLineConsumption que filtra los relevés por su
+ * FECHA real (counterDate), no por mes natural, porque un ciclo cruza dos meses.
+ *  - lectura_final: si la línea se cerró por reemplazo DENTRO del ciclo → end_counter; si no →
+ *    el relevé activo más reciente cuya fecha cae dentro del ciclo (la captura del billing_day).
+ *  - lectura_inicial: si la línea empezó DENTRO del ciclo con start_counter → start_counter; si
+ *    venía de antes → el relevé activo más reciente con fecha ANTERIOR al inicio del ciclo
+ *    (la captura del billing_day del ciclo previo).
+ * Falta de punto o delta negativo → línea estimada (solo forfait). Misma política que el mensual.
+ */
+export function computeLineConsumptionCycle(
+  line: LineCounters,
+  counters: Counter[],
+  periodStart: string,
+  periodEnd: string,
+): { delta_bw: number; delta_color: number; is_estimated: boolean } {
+  const inCycle = (d: string | null): boolean => d !== null && d >= periodStart && d <= periodEnd
+  const ESTIMATED = { delta_bw: 0, delta_color: 0, is_estimated: true }
+
+  // Lectura final dentro del ciclo.
+  let finalBw: number | null = null
+  let finalColor: number | null = null
+  const closedByReplacementInCycle =
+    line.date_fin !== null && inCycle(line.date_fin) &&
+    line.end_counter_bw !== null && line.end_counter_color !== null   // H-D7: ambos puntos
+
+  if (closedByReplacementInCycle) {
+    finalBw    = line.end_counter_bw
+    finalColor = line.end_counter_color
+  } else {
+    const inCycleReading = counters
+      .filter(c => c.status === 'actif' && inCycle(counterDate(c)))
+      .sort((a, b) => counterDate(b).localeCompare(counterDate(a)) || b.recorded_at.localeCompare(a.recorded_at))[0]
+    if (inCycleReading) {
+      finalBw    = inCycleReading.counter_bw
+      finalColor = inCycleReading.counter_color
+    }
+  }
+
+  // Lectura inicial.
+  let initBw: number | null = null
+  let initColor: number | null = null
+  if (inCycle(line.date_debut)) {
+    if (line.start_counter_bw !== null) {
+      initBw    = line.start_counter_bw
+      initColor = line.start_counter_color
+    }
+    // primer ciclo de línea normal (sin start_counter) → sin base previa
+  } else {
+    const prev = counters
+      .filter(c => c.status === 'actif' && counterDate(c) < periodStart)
+      .sort((a, b) => counterDate(b).localeCompare(counterDate(a)) || b.recorded_at.localeCompare(a.recorded_at))[0]
+    if (prev) {
+      initBw    = prev.counter_bw
+      initColor = prev.counter_color
+    }
+  }
+
+  const delta_bw    = counterDelta(finalBw, initBw)
+  const delta_color = counterDelta(finalColor, initColor)
+  if (delta_bw === null || delta_color === null) return ESTIMATED
+  if (delta_bw < 0 || delta_color < 0) return ESTIMATED
   return { delta_bw, delta_color, is_estimated: false }
 }
 
@@ -303,10 +424,27 @@ export async function buildClientInvoiceDraft(
     })
   }
 
-  // Post-process: fusionar las líneas encadenadas de un mismo puesto de servicio en una
-  // sola línea (un único forfait, tramos sobre el consumo consolidado). Resuelve la cadena
-  // completa (A→B→C…) de forma determinista, independientemente del orden del array,
-  // siguiendo replaces_cm_id hasta la raíz presente en el draft.
+  const { lines: mergedLines, has_replacement } = consolidateReplacements(draftLines)
+
+  return {
+    client_id:    client.id,
+    client_name:  client.nom_client,
+    period_year:  year,
+    period_month: month,
+    lines:        mergedLines,
+    total_amount: mergedLines.reduce((s, l) => s + l.amount_total, 0),
+    has_estimated: mergedLines.some(l => l.is_estimated),
+    has_replacement,
+  }
+}
+
+/**
+ * Consolidación del PUESTO DE SERVICIO: fusiona las líneas encadenadas por reemplazo (A→B→C…)
+ * en una sola línea (un único forfait, tramos sobre el consumo consolidado), de forma
+ * determinista e independiente del orden del array. Helper compartido por el draft mensual
+ * (cliente) y el draft por ciclo (contrato) — una sola implementación para no divergir (P2-8).
+ */
+function consolidateReplacements(draftLines: DraftLine[]): { lines: DraftLine[]; has_replacement: boolean } {
   const lineById = new Map<string, DraftLine>()
   for (const l of draftLines) lineById.set(l.cm_id, l)
 
@@ -371,16 +509,7 @@ export async function buildClientInvoiceDraft(
   mergedLines.sort((a, b) =>
     a.numero_contrat.localeCompare(b.numero_contrat) || a.machine_label.localeCompare(b.machine_label))
 
-  return {
-    client_id:    client.id,
-    client_name:  client.nom_client,
-    period_year:  year,
-    period_month: month,
-    lines:        mergedLines,
-    total_amount: mergedLines.reduce((s, l) => s + l.amount_total, 0),
-    has_estimated: mergedLines.some(l => l.is_estimated),
-    has_replacement,
-  }
+  return { lines: mergedLines, has_replacement }
 }
 
 /**
@@ -415,4 +544,163 @@ export async function listBillableClients(year: number, month: number): Promise<
   }
   return [...map.entries()].map(([id, nom_client]) => ({ id, nom_client }))
     .sort((a, b) => a.nom_client.localeCompare(b.nom_client))
+}
+
+/**
+ * BLOQUE E — borrador de factura por CONTRATO para el ciclo de aniversario que ANCLA en
+ * (anchorYear, anchorMonth). El periodo se deriva del billing_day del contrato (regla 9),
+ * NO del mes natural. Todas las máquinas del contrato van en una sola factura del ciclo.
+ * Si el contrato no tiene billing_day → día 1 (mes natural), documentado.
+ */
+export async function buildContractInvoiceDraft(
+  contractId: string,
+  anchorYear: number,
+  anchorMonth: number,
+): Promise<ContractDraft | null> {
+  const admin = createAdminClient()
+
+  const { data: contract, error: contractErr } = await admin
+    .from('contracts')
+    .select('id, numero_contrat, client_id, billing_day, statut, clients!inner ( id, nom_client )')
+    .eq('id', contractId)
+    .maybeSingle()
+  if (contractErr) throw new BillingDataError('contracts')   // P0-7
+  if (!contract) return null
+
+  const client = contract.clients as unknown as { id: number; nom_client: string }
+  const billingDay = (contract.billing_day as number | null) ?? 1
+  const { start: periodStart, end: periodEnd } = computeBillingCycle(billingDay, anchorYear, anchorMonth)
+
+  const { data: lines, error: linesErr } = await admin
+    .from('contract_machines')
+    .select(`
+      id, machine_id, billing_plan_id, date_debut, date_fin, statut,
+      replaces_contract_machine_id,
+      start_counter_bw, start_counter_color, end_counter_bw, end_counter_color,
+      price_bw_override, price_color_override, fixed_fee_override,
+      billing_plans ( id, name, type, fixed_fee, price_bw, price_color, tiers ),
+      machines ( numero_serie, marque, modele )
+    `)
+    .not('billing_plan_id', 'is', null)
+    .eq('contract_id', contractId)
+    .lte('date_debut', periodEnd)
+    .or(`date_fin.is.null,date_fin.gte.${periodStart}`)
+  if (linesErr) throw new BillingDataError('contract_machines')   // P0-7
+
+  const machineIds = [...new Set((lines ?? []).map(l => l.machine_id).filter((id): id is string => !!id))]
+  const { data: allCounters, error: countersErr } = machineIds.length
+    ? await admin
+        .from('machine_counters')
+        .select('id, machine_id, contract_id, year, month, day, counter_bw, counter_color, status, is_replacement_start, previous_machine_id, annulation_reason, annule_at, notes, recorded_at')
+        .in('machine_id', machineIds)
+    : { data: [] as CounterRow[], error: null }
+  if (countersErr) throw new BillingDataError('machine_counters')   // P0-7
+
+  const countersByMachine = new Map<string, CounterRow[]>()
+  for (const c of (allCounters ?? []) as CounterRow[]) {
+    const arr = countersByMachine.get(c.machine_id) ?? []
+    arr.push(c)
+    countersByMachine.set(c.machine_id, arr)
+  }
+
+  const contractStatut = contract.statut as string | null
+  const draftLines: DraftLine[] = []
+
+  for (const line of lines ?? []) {
+    const tariff = resolveEffectiveTariff(line as unknown as ContractMachineWithBilling)
+    if (!tariff) continue
+
+    const machine = line.machines as unknown as { numero_serie: string; marque: string; modele: string } | null
+    const plan    = line.billing_plans as unknown as { name: string } | null
+    if (!line.machine_id) continue
+
+    // P1-6: excluir líneas suspendidas / huérfanas de contrato terminé.
+    const lineStatut = (line as unknown as { statut: string | null }).statut
+    const lc = line as unknown as LineCounters
+    if (!isLineBillable(lineStatut, contractStatut, lc.date_fin)) continue
+
+    // P0-3: atribución por contrato. Consumo del CICLO (no del mes natural).
+    const machineCounters = countersByMachine.get(line.machine_id) ?? []
+    const counters = countersForLine(contractId, lc.date_debut, lc.date_fin, machineCounters)
+    const { delta_bw, delta_color, is_estimated } = computeLineConsumptionCycle(
+      lc, counters, periodStart, periodEnd,
+    )
+
+    const amounts = calculateMonthlyAmount(tariff, delta_bw, delta_color)
+
+    draftLines.push({
+      cm_id:          line.id,
+      replaces_cm_id: (line as unknown as { replaces_contract_machine_id: string | null }).replaces_contract_machine_id ?? null,
+      contract_id:    contractId,
+      numero_contrat: contract.numero_contrat,
+      machine_id:     line.machine_id,
+      machine_label:  machine ? `${machine.marque} ${machine.modele} (${machine.numero_serie})` : line.machine_id,
+      plan_name:      plan?.name ?? '—',
+      billing_type:   tariff.type,
+      fixed_fee:      tariff.fixed_fee,
+      price_bw:       tariff.price_bw,
+      price_color:    tariff.price_color,
+      tiers:          tariff.tiers,
+      delta_bw, delta_color, is_estimated,
+      ...amounts,
+    })
+  }
+
+  const { lines: mergedLines, has_replacement } = consolidateReplacements(draftLines)
+
+  return {
+    contract_id:   contract.id,
+    numero_contrat: contract.numero_contrat,
+    client_id:     client.id,
+    client_name:   client.nom_client,
+    billing_day:   billingDay,
+    period_start:  periodStart,
+    period_end:    periodEnd,
+    period_year:   Number(periodStart.slice(0, 4)),
+    period_month:  Number(periodStart.slice(5, 7)),
+    lines:         mergedLines,
+    total_amount:  mergedLines.reduce((s, l) => s + l.amount_total, 0),
+    has_estimated: mergedLines.some(l => l.is_estimated),
+    has_replacement,
+  }
+}
+
+/**
+ * BLOQUE E — contratos con al menos una línea facturable cuya vigencia toca el ciclo que ancla
+ * en (anchorYear, anchorMonth). Cada contrato calcula su propio ciclo desde su billing_day, así
+ * que aquí se hace un primer filtrado amplio (cualquier línea abierta o cerrada recientemente) y
+ * el cálculo fino del ciclo lo hace buildContractInvoiceDraft.
+ */
+export async function listBillableContracts(
+  anchorYear: number,
+  anchorMonth: number,
+): Promise<{ id: string; numero_contrat: string; client_name: string }[]> {
+  const admin = createAdminClient()
+  // Ventana amplia: el ciclo de cualquier billing_day que ancle en este mes cae dentro de
+  // [primer día del mes-ancla, último día del mes siguiente]. Filtrado fino en el draft.
+  const windowStart = `${anchorYear}-${String(anchorMonth).padStart(2, '0')}-01`
+  const nextMonth = anchorMonth === 12 ? 1 : anchorMonth + 1
+  const nextYear  = anchorMonth === 12 ? anchorYear + 1 : anchorYear
+  const windowEnd = `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(new Date(nextYear, nextMonth, 0).getDate()).padStart(2, '0')}`
+
+  const { data, error } = await admin
+    .from('contract_machines')
+    .select('statut, date_fin, contracts!inner ( id, numero_contrat, statut, clients!inner ( nom_client ) )')
+    .not('billing_plan_id', 'is', null)
+    .lte('date_debut', windowEnd)
+    .or(`date_fin.is.null,date_fin.gte.${windowStart}`)
+  if (error) throw new BillingDataError('contract_machines')   // P0-7
+
+  const map = new Map<string, { id: string; numero_contrat: string; client_name: string }>()
+  for (const row of data ?? []) {
+    const r = row as unknown as {
+      statut: string | null
+      date_fin: string | null
+      contracts: { id: string; numero_contrat: string; statut: string | null; clients: { nom_client: string } }
+    }
+    if (!isLineBillable(r.statut, r.contracts?.statut ?? null, r.date_fin)) continue
+    const c = r.contracts
+    if (c) map.set(c.id, { id: c.id, numero_contrat: c.numero_contrat, client_name: c.clients?.nom_client ?? '—' })
+  }
+  return [...map.values()].sort((a, b) => a.numero_contrat.localeCompare(b.numero_contrat))
 }

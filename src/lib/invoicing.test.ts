@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { calcDeltas, counterDelta, type Counter } from '@/lib/counters'
 import {
   computeLineConsumption, countersForLine, buildClientInvoiceDraft, BillingDataError, isLineBillable,
+  computeBillingCycle, computeLineConsumptionCycle, buildContractInvoiceDraft,
   type LineCounters,
 } from '@/lib/invoicing'
 
@@ -364,5 +365,137 @@ describe('Bloque D — isLineBillable (P1-6): suspendu excluido; terminé gobern
   })
   it('todo actif → factura', () => {
     expect(isLineBillable('actif', 'actif', null)).toBe(true)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BLOQUE E / regla 9 — ciclo de aniversario por contrato (con clamp de fin de mes).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Bloque E — computeBillingCycle (regla 9)', () => {
+  it('día 4, ancla enero → [04 ene, 03 feb]', () => {
+    expect(computeBillingCycle(4, 2026, 1)).toEqual({ start: '2026-01-04', end: '2026-02-03' })
+  })
+  it('día 1 → coincide con el mes natural completo', () => {
+    expect(computeBillingCycle(1, 2026, 1)).toEqual({ start: '2026-01-01', end: '2026-01-31' })
+  })
+  it('día 31 anclado en enero → fin recortado al billing_day clamped de febrero (27, día anterior a feb 28)', () => {
+    expect(computeBillingCycle(31, 2026, 1)).toEqual({ start: '2026-01-31', end: '2026-02-27' })
+  })
+  it('día 31 anclado en febrero → inicio clamped a feb 28; fin = 30 mar (día anterior a mar 31)', () => {
+    expect(computeBillingCycle(31, 2026, 2)).toEqual({ start: '2026-02-28', end: '2026-03-30' })
+  })
+  it('día 31 en año bisiesto: ancla febrero 2024 → inicio feb 29', () => {
+    expect(computeBillingCycle(31, 2024, 2)).toEqual({ start: '2024-02-29', end: '2024-03-30' })
+  })
+  it('cruce de año: día 31 anclado en diciembre → [31 dic, 30 ene del año siguiente]', () => {
+    expect(computeBillingCycle(31, 2026, 12)).toEqual({ start: '2026-12-31', end: '2027-01-30' })
+  })
+  it('día 15, ancla noviembre → [15 nov, 14 dic]', () => {
+    expect(computeBillingCycle(15, 2026, 11)).toEqual({ start: '2026-11-15', end: '2026-12-14' })
+  })
+})
+
+describe('Bloque E — computeLineConsumptionCycle: consumo por rango de fechas del ciclo', () => {
+  // Ciclo de aniversario [2026-01-04, 2026-02-03]. Relevés capturados en los billing_day:
+  //   03 ene (base del ciclo previo) = 1000/200 ; 03 feb (fin de este ciclo) = 1500/260.
+  const cycleStart = '2026-01-04'
+  const cycleEnd   = '2026-02-03'
+  const counters: Counter[] = [
+    mkCounter({ id: 'c-prev', year: 2026, month: 1, day: 3, counter_bw: 1000, counter_color: 200 }),
+    mkCounter({ id: 'c-fin',  year: 2026, month: 2, day: 3, counter_bw: 1500, counter_color: 260 }),
+  ]
+  const NL: LineCounters = {
+    date_debut: '2025-12-01', date_fin: null,
+    start_counter_bw: null, start_counter_color: null, end_counter_bw: null, end_counter_color: null,
+  }
+
+  it('consumo = lectura(fin del ciclo) − lectura(anterior al inicio del ciclo)', () => {
+    const r = computeLineConsumptionCycle(NL, counters, cycleStart, cycleEnd)
+    expect(r.is_estimated).toBe(false)
+    expect(r.delta_bw).toBe(500)     // 1500 − 1000
+    expect(r.delta_color).toBe(60)   // 260 − 200
+  })
+
+  it('NO cuenta un relevé posterior al fin del ciclo (pertenece al ciclo siguiente)', () => {
+    const withNext = [
+      ...counters,
+      mkCounter({ id: 'c-next', year: 2026, month: 2, day: 10, counter_bw: 9999, counter_color: 999 }),
+    ]
+    const r = computeLineConsumptionCycle(NL, withNext, cycleStart, cycleEnd)
+    expect(r.delta_bw).toBe(500)     // ignora el 9999 del 10 feb (fuera del ciclo)
+    expect(r.delta_color).toBe(60)
+  })
+
+  it('línea que arranca dentro del ciclo con start_counter: factura desde su lectura real', () => {
+    const newLine: LineCounters = {
+      date_debut: '2026-01-15', date_fin: null,
+      start_counter_bw: 15, start_counter_color: 5, end_counter_bw: null, end_counter_color: null,
+    }
+    // Relevé del fin del ciclo bajo esta línea: 200/40.
+    const cs: Counter[] = [mkCounter({ id: 'x', year: 2026, month: 2, day: 3, counter_bw: 200, counter_color: 40 })]
+    const r = computeLineConsumptionCycle(newLine, cs, cycleStart, cycleEnd)
+    expect(r.is_estimated).toBe(false)
+    expect(r.delta_bw).toBe(185)     // 200 − 15
+    expect(r.delta_color).toBe(35)
+  })
+
+  it('falta la lectura de cierre del ciclo → estimada', () => {
+    const onlyBase: Counter[] = [
+      mkCounter({ id: 'c-prev', year: 2026, month: 1, day: 3, counter_bw: 1000, counter_color: 200 }),
+    ]
+    const r = computeLineConsumptionCycle(NL, onlyBase, cycleStart, cycleEnd)
+    expect(r.is_estimated).toBe(true)
+    expect(r.delta_bw).toBe(0)
+  })
+})
+
+describe('Bloque E — buildContractInvoiceDraft: factura por contrato y ciclo', () => {
+  // contrato day=4; ciclo ancla enero → [2026-01-04, 2026-02-03]. Una máquina, plan per_copy.
+  const contractRow = {
+    id: 'ctr-1', numero_contrat: 'CT-2026-001', client_id: 7, billing_day: 4, statut: 'actif',
+    clients: { id: 7, nom_client: 'ACME' },
+  }
+  const lineRow = {
+    id: 'cm-1', machine_id: 'M1', billing_plan_id: 'plan-1',
+    date_debut: '2025-12-01', date_fin: null, statut: 'actif',
+    replaces_contract_machine_id: null,
+    start_counter_bw: null, start_counter_color: null, end_counter_bw: null, end_counter_color: null,
+    price_bw_override: null, price_color_override: null, fixed_fee_override: null,
+    billing_plans: { id: 'plan-1', name: 'Par copie', type: 'per_copy', fixed_fee: null, price_bw: 10, price_color: 50, tiers: null },
+    machines: { numero_serie: 'M1', marque: 'HP', modele: 'X' },
+  }
+  const counterRows = [
+    { id: 'c-prev', machine_id: 'M1', contract_id: 'ctr-1', year: 2026, month: 1, day: 3, counter_bw: 1000, counter_color: 200, status: 'actif', is_replacement_start: false, previous_machine_id: null, annulation_reason: null, annule_at: null, notes: null, recorded_at: '2026-01-03T10:00:00Z' },
+    { id: 'c-fin',  machine_id: 'M1', contract_id: 'ctr-1', year: 2026, month: 2, day: 3, counter_bw: 1500, counter_color: 260, status: 'actif', is_replacement_start: false, previous_machine_id: null, annulation_reason: null, annule_at: null, notes: null, recorded_at: '2026-02-03T10:00:00Z' },
+  ]
+
+  it('deriva el ciclo del billing_day y factura consumo = fin − base del ciclo', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(
+      makeAdmin({
+        contracts:         { data: contractRow,   error: null },
+        contract_machines: { data: [lineRow],     error: null },
+        machine_counters:  { data: counterRows,   error: null },
+      }),
+    )
+    const draft = await buildContractInvoiceDraft('ctr-1', 2026, 1)
+    expect(draft).not.toBeNull()
+    expect(draft!.period_start).toBe('2026-01-04')
+    expect(draft!.period_end).toBe('2026-02-03')
+    expect(draft!.lines).toHaveLength(1)
+    expect(draft!.lines[0].delta_bw).toBe(500)        // 1500 − 1000
+    expect(draft!.lines[0].delta_color).toBe(60)      // 260 − 200
+    expect(draft!.lines[0].amount_total).toBe(500 * 10 + 60 * 50)   // 8000
+    expect(draft!.total_amount).toBe(8000)
+    expect(draft!.has_estimated).toBe(false)
+  })
+
+  it('contrato inexistente → null (no error técnico)', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(makeAdmin({ contracts: { data: null, error: null } }))
+    await expect(buildContractInvoiceDraft('nope', 2026, 1)).resolves.toBeNull()
+  })
+
+  it('error técnico al leer el contrato → BillingDataError', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(makeAdmin({ contracts: { data: null, error: { message: 'boom' } } }))
+    await expect(buildContractInvoiceDraft('ctr-1', 2026, 1)).rejects.toBeInstanceOf(BillingDataError)
   })
 })
