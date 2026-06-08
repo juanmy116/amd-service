@@ -32,6 +32,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS invoices_contract_cycle_emise_unique
   ON public.invoices (contract_id, period_start)
   WHERE status = 'emise' AND contract_id IS NOT NULL;
 
+-- 2b) Restringir el índice legacy por (client_id, period_year, period_month) a SOLO facturas
+--     legacy por cliente (contract_id IS NULL). Sin esto, como period_year/month se derivan del
+--     mes-ancla del ciclo, dos contratos del MISMO cliente anclados al mismo mes producirían la
+--     misma terna → unique_violation al emitir el segundo (cliente con varios contratos es normal
+--     en B2B → rompería la regla 9). El no-duplicado por contrato lo cubre el índice 2) + el
+--     EXISTS de la RPC; el legacy solo debe gobernar las facturas viejas por cliente/mes.
+DROP INDEX IF EXISTS public.invoices_client_period_emise_unique;
+CREATE UNIQUE INDEX invoices_client_period_emise_unique
+  ON public.invoices (client_id, period_year, period_month)
+  WHERE status = 'emise' AND contract_id IS NULL;
+
 -- 3) RPC de emisión por contrato/ciclo. Nace con validación de coherencia contable (P1-1).
 --    p_payload: { contract_id, client_id, client_name, numero_contrat,
 --                 period_start, period_end, period_year, period_month,
