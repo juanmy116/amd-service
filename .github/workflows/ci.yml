@@ -1,0 +1,43 @@
+name: CI
+
+# Corre la misma verificación que hacemos en local antes de mergear:
+# typecheck (tsc) + tests (vitest) + build (next). En cada PR y en push a main.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancela ejecuciones anteriores del mismo PR/rama si llega un push nuevo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck · test · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        # Valores placeholder: las rutas son dinámicas, no se conecta a Supabase en build.
+        # Solo existen para que Next encuentre las vars y no falle el bundling.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          SUPABASE_SECRET_KEY: placeholder-secret-key
