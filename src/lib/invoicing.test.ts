@@ -128,3 +128,110 @@ describe('H-D7 — cierre por reemplazo exige AMBOS contadores', () => {
     expect(r.delta_color).toBe(50)
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BLOQUE A — Ciclo de vida parque/stock a nivel de motor.
+// Las RPC return_machine_to_stock / assign_machine_from_stock graban los puntos de corte
+// (end_counter / start_counter) en la propia línea contract_machines. Estos tests verifican
+// que computeLineConsumption produce el importe correcto para cada lado del corte, incluso
+// cuando ambas líneas comparten el mismo array de relevés de la máquina (mismo numero_serie).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Bloque A — retirada a stock (return_machine_to_stock)', () => {
+  // El relevé normal de junio (1800/400) pertenece YA al cliente siguiente (la máquina se
+  // reasignó dentro del mes). El cliente saliente NO debe pagar ese consumo: como su retirada
+  // capturó end_counter real, factura solo hasta ahí. (Demuestra el fix de P1-3.)
+  const counters: Counter[] = [
+    mkCounter({ id: 'c-may', year: 2026, month: 5, counter_bw: 1000, counter_color: 200 }),
+    mkCounter({ id: 'c-jun', year: 2026, month: 6, counter_bw: 1800, counter_color: 400 }),
+  ]
+
+  it('factura hasta el end_counter de la retirada, NO el relevé del mes (que es del cliente siguiente)', () => {
+    const retiredLine: LineCounters = {
+      date_debut: '2026-04-01',
+      date_fin: '2026-06-10',
+      start_counter_bw: null,
+      start_counter_color: null,
+      end_counter_bw: 1200,    // lectura real al retirar
+      end_counter_color: 220,
+    }
+    const r = computeLineConsumption(retiredLine, counters, 2026, 6, PERIOD_START, PERIOD_END)
+    expect(r.is_estimated).toBe(false)
+    expect(r.delta_bw).toBe(200)     // 1200 − 1000 (relevé de mayo), NO 1800
+    expect(r.delta_color).toBe(20)   // 220 − 200
+  })
+})
+
+describe('Bloque A — asignar desde stock (assign_machine_from_stock)', () => {
+  it('primer mes de máquina usada: factura lectura − start_counter (copias de prueba del taller)', () => {
+    // La máquina salió del stock con 15/5 copias de prueba; al asignarla se capturó esa lectura
+    // como start_counter. A fin de mes el relevé normal es 200/40.
+    const counters: Counter[] = [
+      mkCounter({ id: 'c-jun', year: 2026, month: 6, counter_bw: 200, counter_color: 40 }),
+    ]
+    const newLine: LineCounters = {
+      date_debut: '2026-06-11',
+      date_fin: null,
+      start_counter_bw: 15,
+      start_counter_color: 5,
+      end_counter_bw: null,
+      end_counter_color: null,
+    }
+    const r = computeLineConsumption(newLine, counters, 2026, 6, PERIOD_START, PERIOD_END)
+    expect(r.is_estimated).toBe(false)
+    expect(r.delta_bw).toBe(185)     // 200 − 15
+    expect(r.delta_color).toBe(35)   // 40 − 5
+  })
+
+  it('por qué la RPC exige la lectura: una línea nueva SIN start_counter en su primer mes queda estimada (consumo perdido)', () => {
+    const counters: Counter[] = [
+      mkCounter({ id: 'c-jun', year: 2026, month: 6, counter_bw: 200, counter_color: 40 }),
+    ]
+    const lineNoStart: LineCounters = {
+      date_debut: '2026-06-11',
+      date_fin: null,
+      start_counter_bw: null,   // sin punto inicial → no se puede calcular el consumo real
+      start_counter_color: null,
+      end_counter_bw: null,
+      end_counter_color: null,
+    }
+    const r = computeLineConsumption(lineNoStart, counters, 2026, 6, PERIOD_START, PERIOD_END)
+    expect(r.is_estimated).toBe(true)   // por eso assign_machine_from_stock lo hace obligatorio
+    expect(r.delta_bw).toBe(0)
+  })
+})
+
+describe('Bloque A — escenario del dueño: máquina reseteada A → stock → B en el mismo mes', () => {
+  // Ambas líneas comparten el MISMO array de relevés de la máquina física (mismo numero_serie):
+  //   mayo 1000/200 (registrado bajo A)  ·  junio 200/40 (registrado bajo B tras el reset a 15/5).
+  // Cada línea factura su parte correctamente sin cruzar el historial del otro cliente.
+  const sharedCounters: Counter[] = [
+    mkCounter({ id: 'c-may', year: 2026, month: 5, counter_bw: 1000, counter_color: 200 }),
+    mkCounter({ id: 'c-jun', year: 2026, month: 6, counter_bw: 200,  counter_color: 40 }),
+  ]
+
+  it('A factura hasta su end_counter; B factura desde su start_counter real — sin negativos ni cruces', () => {
+    const lineA: LineCounters = {
+      date_debut: '2026-04-01', date_fin: '2026-06-10',
+      start_counter_bw: null, start_counter_color: null,
+      end_counter_bw: 1200, end_counter_color: 220,   // lectura real al devolver a stock
+    }
+    const lineB: LineCounters = {
+      date_debut: '2026-06-11', date_fin: null,
+      start_counter_bw: 15, start_counter_color: 5,    // copias de prueba del taller
+      end_counter_bw: null, end_counter_color: null,
+    }
+
+    const a = computeLineConsumption(lineA, sharedCounters, 2026, 6, PERIOD_START, PERIOD_END)
+    const b = computeLineConsumption(lineB, sharedCounters, 2026, 6, PERIOD_START, PERIOD_END)
+
+    // A: 1200 (end_counter) − 1000 (mayo) = 200/20. Ignora el relevé 200/40 de junio (es de B).
+    expect(a.is_estimated).toBe(false)
+    expect(a.delta_bw).toBe(200)
+    expect(a.delta_color).toBe(20)
+
+    // B: 200 (relevé de junio) − 15 (start_counter) = 185/35. Ignora el 1000 de mayo (es de A).
+    expect(b.is_estimated).toBe(false)
+    expect(b.delta_bw).toBe(185)
+    expect(b.delta_color).toBe(35)
+  })
+})

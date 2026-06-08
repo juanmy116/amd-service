@@ -313,6 +313,24 @@ Un contrato puede tener varias máquinas. La vinculación se gestiona mediante l
 > 3. Crear contrato (`/admin/contracts/new`) — une cliente + N máquinas (solo muestra máquinas sin línea abierta en otro contrato); cada máquina se puede configurar con overrides de facturación y mantenimiento
 > 4. Crear plan de mantenimiento (`/admin/maintenance/new`) — enlazado al contrato
 
+### Parque y stock — estado DERIVADO (Bloque A del core de facturación, 2026-06-08)
+
+El estado **alquilada / en stock** de una máquina **no se materializa** en ninguna columna: se **deriva** de `contract_machines` (única fuente de verdad, ya garantizada por `contract_machines_one_open_per_machine`):
+
+- **alquilada** ⟺ existe una línea con `date_fin IS NULL`.
+- **en stock** ⟺ no existe ninguna línea abierta.
+
+Decisión del dueño (evitar desincronización en dinero). `machines.active`/`localisation` quedan como metadatos descriptivos, no rigen facturación. Un futuro "en taller vs disponible" sería un dato informativo aparte.
+
+- **Vista `v_machine_park`** (`security_invoker=true`): expone por máquina `louee` (bool), su línea abierta (`open_line_id`, `open_contract_id`, `open_date_debut`), `numero_contrat` y `client_id`. SELECT solo para `authenticated`/`service_role`.
+
+**El stock es la frontera entre clientes** (regla de negocio): una máquina nunca pasa directa de un cliente a otro; siempre Cliente A → stock → Cliente B. Dos eventos del ciclo de vida, vía RPC atómica (`SECURITY DEFINER`, `service_role`), con Server Actions en `src/app/admin/contracts/[id]/stock-actions.ts`:
+
+- **`return_machine_to_stock(p_payload)`** — motivo (a) resiliación: cierra la línea con su `end_counter_bw/color` **real** (lectura al retirar) + `date_fin` + `statut='terminé'`. La máquina queda en stock; no factura mientras lo está. Valida que el cierre no sea inferior a la mayor lectura conocida. **No encadena** (`replaces_contract_machine_id` queda NULL en cualquier futura asignación).
+- **`assign_machine_from_stock(p_payload)`** — rotación de parque (cliente nuevo): la máquina debe estar en stock; **exige `start_counter_bw/color` real** (puede no ser 0: copias de prueba del taller) y abre una línea **nueva NO encadenada**. Es un alquiler independiente, no un reemplazo.
+
+Diferencia clave con el **reemplazo** (`replace_contract_machine`, motivo (b) reparación en taller): el reemplazo **sí encadena** el puesto (`replaces_contract_machine_id`) y consolida en una sola línea de factura; la rotación de parque **no**. Como los puntos de corte (`start_counter`/`end_counter`) viven en `contract_machines` y no en `machine_counters`, una rotación A→stock→B **dentro del mismo mes** no colisiona con el índice `machine_counters_one_active_per_month`, y cada cliente factura su tramo sin cruzar el historial del otro (tests en `src/lib/invoicing.test.ts`, describe «Bloque A»).
+
 ### Importador CSV de máquinas (`/admin/machines/import`) — sesión 23
 
 Para dar de alta en bloque las máquinas que **no están en Princity**:
