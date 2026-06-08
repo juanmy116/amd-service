@@ -367,6 +367,10 @@ Cambia el periodo de facturación de **mes natural** a **ciclo de aniversario po
 
 > **Limpieza pendiente (cuando #39 y el Bloque C estén en main):** retirar `buildClientInvoiceDraft`, `emitInvoiceAction` y `FacturationPreview` (flujo legacy por cliente, ya sin uso); valorar converger `emit_invoice`/`emit_contract_invoice`.
 
+### Gate final (antes de habilitar facturación real)
+
+Especificación ejecutable del E2E que valida todo el core sobre datos sintéticos en prod: **`docs/gate-final-facturacion-2026-06-08.md`**. Sigue el estilo del gate previo (PR #36): código TS real, RPC reales, limpieza verificada por SELECT. 26 escenarios (consumo/consolidación, reglas temporales, ciclo de aniversario, forzar/fallo técnico/integridad, reconstrucción de migraciones). **Regla de oro: nada se factura a un cliente real hasta GO.** Precondiciones: A/B/D/E (✅ en main) + Bloque 0/#39 + Bloque C + P1-5 + limpieza legacy.
+
 > **Coordinación (fix-forward):** `update_contract_with_lines` es función compartida — el Bloque C (soporte, P0-6 pertenencia de líneas) debe reescribirse SOBRE la versión `20260608140100` (incluyendo el guard P1-4), no machacarla. Migraciones del motor en banda `20260608_12xxxx`–`15xxxx`.
 
 ### Importador CSV de máquinas (`/admin/machines/import`) — sesión 23
