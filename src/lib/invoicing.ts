@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { type Counter } from '@/lib/counters'
+import { counterDelta, type Counter } from '@/lib/counters'
 import {
   resolveEffectiveTariff,
   calculateMonthlyAmount,
@@ -43,7 +43,7 @@ export type ClientDraft = {
   has_replacement: boolean
 }
 
-type LineCounters = {
+export type LineCounters = {
   date_debut: string
   date_fin: string | null
   start_counter_bw: number | null
@@ -63,7 +63,7 @@ type LineCounters = {
  *    venía de antes → el relevé normal de la máquina del mes anterior más reciente.
  * Si falta algún punto → línea estimada (consumo 0, solo forfait).
  */
-function computeLineConsumption(
+export function computeLineConsumption(
   line: LineCounters,
   counters: Counter[],
   year: number,
@@ -81,7 +81,9 @@ function computeLineConsumption(
   let finalBw: number | null = null
   let finalColor: number | null = null
   const closedByReplacementInMonth =
-    line.date_fin !== null && inMonth(line.date_fin) && line.end_counter_bw !== null
+    line.date_fin !== null && inMonth(line.date_fin) &&
+    line.end_counter_bw !== null && line.end_counter_color !== null   // H-D7: ambos puntos
+
   if (closedByReplacementInMonth) {
     finalBw    = line.end_counter_bw
     finalColor = line.end_counter_color
@@ -118,10 +120,12 @@ function computeLineConsumption(
     }
   }
 
-  if (finalBw === null || finalColor === null || initBw === null || initColor === null) return ESTIMATED
-  const delta_bw    = finalBw    - initBw
-  const delta_color = finalColor - initColor
-  if (delta_bw < 0 || delta_color < 0) return ESTIMATED   // incoherencia → no facturar negativo
+  // Aritmética vía la primitiva compartida con Contadores (counterDelta). La POLÍTICA es
+  // propia de facturación: falta de punto o delta negativo → línea estimada (solo forfait).
+  const delta_bw    = counterDelta(finalBw, initBw)
+  const delta_color = counterDelta(finalColor, initColor)
+  if (delta_bw === null || delta_color === null) return ESTIMATED  // falta un punto → estimado
+  if (delta_bw < 0 || delta_color < 0) return ESTIMATED           // incoherencia → no facturar negativo
   return { delta_bw, delta_color, is_estimated: false }
 }
 

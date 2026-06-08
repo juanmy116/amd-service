@@ -22,6 +22,22 @@ export interface CounterDelta {
 }
 
 /**
+ * Primitiva ÚNICA del consumo de copias: resta `final − inicial` con guard de null.
+ * Devuelve `null` si falta cualquiera de los dos puntos.
+ *
+ * Decisión consciente (ver architecture.md §Facturación): aquí vive SOLO la aritmética,
+ * que es idéntica para Contadores y facturación. La POLÍTICA sobre el resultado diverge a
+ * propósito y se queda en cada caller:
+ *   - Contadores muestra el delta tal cual, negativos incluidos (anomalía visible al humano).
+ *   - Facturación trata null/negativo como "estimado" (factura solo el forfait).
+ * Para una línea normal (sin reemplazo) ambos caminos DEBEN dar el mismo número.
+ */
+export function counterDelta(finalVal: number | null, initialVal: number | null): number | null {
+  if (finalVal === null || initialVal === null) return null
+  return finalVal - initialVal
+}
+
+/**
  * Calcula el delta de cada relevé respecto al relevé activo inmediatamente anterior.
  * - Solo relevés con status 'actif'.
  * - Orden: year, month y `recorded_at` como desempate determinista (fix #4: no hay UNIQUE).
@@ -43,8 +59,8 @@ export function calcDeltas(counters: Counter[]): Map<string, CounterDelta> {
     } else {
       const prev = active[i - 1]
       deltaMap.set(c.id, {
-        delta_bw:    c.counter_bw    - prev.counter_bw,
-        delta_color: c.counter_color - prev.counter_color,
+        delta_bw:    counterDelta(c.counter_bw,    prev.counter_bw),
+        delta_color: counterDelta(c.counter_color, prev.counter_color),
       })
     }
   })
