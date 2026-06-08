@@ -331,6 +331,16 @@ Decisión del dueño (evitar desincronización en dinero). `machines.active`/`lo
 
 Diferencia clave con el **reemplazo** (`replace_contract_machine`, motivo (b) reparación en taller): el reemplazo **sí encadena** el puesto (`replaces_contract_machine_id`) y consolida en una sola línea de factura; la rotación de parque **no**. Como los puntos de corte (`start_counter`/`end_counter`) viven en `contract_machines` y no en `machine_counters`, una rotación A→stock→B **dentro del mismo mes** no colisiona con el índice `machine_counters_one_active_per_month`, y cada cliente factura su tramo sin cruzar el historial del otro (tests en `src/lib/invoicing.test.ts`, describe «Bloque A»).
 
+### Motor de facturación por línea (Bloque B del core, 2026-06-08)
+
+`buildClientInvoiceDraft` (`src/lib/invoicing.ts`) factura **por línea/contrato**, no por máquina física:
+
+- **Atribución por contrato (P0-3)**: los relevés de `machine_counters` se cargan con su `contract_id` y se reparten a cada línea con `countersForLine()`: una línea solo ve los relevés de **su** `contract_id` (o heredados sin atribuir cuyo día cae en su intervalo de vigencia). Una misma máquina que rotó por varios contratos ya no mezcla consumos. Tanto Princity como la entrada manual de contadores rellenan `contract_id`/`client_id` desde la línea abierta.
+- **Bloqueo por fallo técnico (P0-7)**: cada query comprueba su `error`; un fallo de lectura lanza `BillingDataError` y **bloquea preview y emisión** (la página muestra un «Blocage technique»), en vez de degradar a líneas estimadas con consumo 0. Es un estado **distinto** de "falta el dato real".
+- **Punto inicial explícito (P0-4)**: `create_contract_with_lines` persiste `start_counter_bw/color` por línea (migración `20260608130000`), para que el primer mes de una máquina nueva facture desde su lectura inicial y no se pierda el consumo. Añadir una máquina a un contrato existente desde stock usa `assign_machine_from_stock` (Bloque A), que ya exige la lectura. La captura en `ContractForm` se cablea coordinada con el Bloque 0/UI; sin `start_counter` el primer mes queda estimado (visible), nunca pérdida silenciosa.
+- **«Forcer la facturation» (regla 8)**: cuando falta legítimamente el relevé de algún equipo, el admin puede forzar la emisión (`confirm_estimated`); esas líneas se facturan al forfait, marcadas `is_estimated` (traza en la factura). Es una acción **intencional de admin**, distinta del bloqueo técnico (P0-7), que no se puede forzar.
+- **Reasignación intra-mes (P1-3)**: resuelta por los cortes en la línea (Bloque A) + la atribución por contrato; el índice `machine_counters_one_active_per_month` se mantiene a propósito (los cortes no son filas de `machine_counters`).
+
 ### Importador CSV de máquinas (`/admin/machines/import`) — sesión 23
 
 Para dar de alta en bloque las máquinas que **no están en Princity**:
