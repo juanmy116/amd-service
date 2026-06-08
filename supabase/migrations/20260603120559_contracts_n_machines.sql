@@ -42,8 +42,18 @@ ALTER TABLE public.contracts
 -- 4. Migrar datos del contrato existente
 -- Cast explícito porque contracts.statut es contract_status y contract_machines.statut es contract_machine_status
 -- (mismos valores de enum, pero PostgreSQL requiere cast explícito entre tipos distintos)
-INSERT INTO public.contract_machines (contract_id, machine_id, date_debut, statut)
-SELECT id, machine_id, date_debut, statut::text::contract_machine_status
+-- P1-9: un contrato 'terminé' DEBE llevar date_fin para no violar el CHECK
+-- contract_machines_termine_has_date_fin. La tabla contracts no tiene date_fin,
+-- así que derivamos una fecha de cierre válida: date_renouvellement si es >= date_debut,
+-- en su defecto date_debut. GREATEST garantiza date_fin >= date_debut (otro CHECK).
+-- Para los datos reales que migró prod (sin contratos terminé en máquina) el resultado
+-- es idéntico (date_fin queda NULL). Solo afecta a reconstrucciones limpias con datos.
+INSERT INTO public.contract_machines (contract_id, machine_id, date_debut, date_fin, statut)
+SELECT id, machine_id, date_debut,
+       CASE WHEN statut = 'terminé'
+            THEN GREATEST(date_debut, COALESCE(date_renouvellement, date_debut))
+            ELSE NULL END,
+       statut::text::contract_machine_status
 FROM public.contracts
 WHERE machine_id IS NOT NULL;
 

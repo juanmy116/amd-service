@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, ArrowLeft, Trash2, AlertTriangle, Plus, X, RefreshCw } from 'lucide-react'
+import { Loader2, ArrowLeft, Trash2, AlertTriangle, Plus, X } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import MachineCombobox from '@/components/admin/MachineCombobox'
 import type { BillingType } from '@/lib/billing'
@@ -137,12 +137,6 @@ export default function ContractForm({
       }
       return prev.filter((_, i) => i !== idx)
     })
-  }
-
-  // "Remplacer": retira la línea existente (con fecha) y añade una nueva vacía.
-  function replaceLine(idx: number) {
-    removeLine(idx)
-    addLine()
   }
 
   function updateLine<K extends keyof LineInput>(idx: number, key: K, value: LineInput[K]) {
@@ -438,19 +432,8 @@ export default function ContractForm({
                         Numéro de série <span className="text-accent">*</span>
                       </label>
                       {line.id ? (
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 px-3 py-2 rounded-lg border border-line bg-neutral-soft text-sm text-ink-soft font-mono">
-                            {line.machine_id}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => replaceLine(idx)}
-                            title="Remplacer la machine (clôture cette ligne et en ouvre une nouvelle)"
-                            className="flex items-center gap-1 px-2.5 py-2 rounded-lg border border-line text-xs text-ink-soft hover:bg-neutral-soft transition-colors shrink-0"
-                          >
-                            <RefreshCw size={13} />
-                            Remplacer
-                          </button>
+                        <div className="px-3 py-2 rounded-lg border border-line bg-neutral-soft text-sm text-ink-soft font-mono">
+                          {line.machine_id}
                         </div>
                       ) : (
                         <MachineCombobox
