@@ -281,6 +281,22 @@ describe('Bloque B — countersForLine (P0-3): cada línea solo ve los relevés 
     expect(forA.map(c => c.id).sort()).toEqual(['a-may', 'legacy-jun'])
     expect(forB.map(c => c.id)).toEqual(['b-jun'])
   })
+
+  it('invariante de no-solapamiento: un relevé legacy en el día-frontera (date_fin=X=date_debut) cuenta en UNA sola línea', () => {
+    const X = '2026-06-10'
+    // Misma máquina: línea A cierra en X, línea B abre en X. Relevé heredado fechado exactamente en X.
+    const onFrontier = [
+      mkRow({ id: 'legacy-X', year: 2026, month: 6, day: 10, counter_bw: 500, counter_color: 100 }, 'M1', null),
+    ]
+    const forA = countersForLine('cA', '2026-04-01', X,   onFrontier)  // (date_debut, date_fin=X]
+    const forB = countersForLine('cB', X,          null, onFrontier)  // (date_debut=X, …]
+
+    // Se atribuye SOLO a la línea que cierra (X <= date_fin), nunca a la que abre (X no es > date_debut).
+    expect(forA.map(c => c.id)).toEqual(['legacy-X'])
+    expect(forB).toEqual([])
+    // Y nunca en ambas (sin doble cobro).
+    expect(forA.length + forB.length).toBe(1)
+  })
 })
 
 // Query builder encadenable y "awaitable" que devuelve un resultado fijo {data,error}.

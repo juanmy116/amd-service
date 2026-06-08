@@ -36,8 +36,13 @@ function counterDate(c: { year: number; month: number; day: number | null }): st
  * Una línea solo debe ver los relevés de SU contrato:
  *   - contract_id === el de la línea  → siempre.
  *   - contract_id NULL (relevé heredado, sin atribución) → solo si su fecha cae dentro del
- *     intervalo de vigencia de la línea [date_debut, date_fin]. Evita que dos contratos que
+ *     intervalo de vigencia de la línea (lineDebut, lineFin]. Evita que dos contratos que
  *     compartieron la máquina se roben relevés antiguos sin atribuir.
+ *
+ * Límite INFERIOR exclusivo (d > lineDebut), superior inclusivo (d <= lineFin): es dinero, así
+ * que en el día-frontera entre una línea que cierra (date_fin=X) y otra que abre (date_debut=X)
+ * de la misma máquina, un relevé legacy fechado exactamente en X se atribuye SOLO a la línea que
+ * cierra (X <= date_fin), nunca a ambas. Invariante de no-solapamiento (ver test).
  */
 export function countersForLine(
   lineContractId: string,
@@ -49,7 +54,7 @@ export function countersForLine(
     if (c.contract_id === lineContractId) return true
     if (c.contract_id == null) {
       const d = counterDate(c)
-      return d >= lineDebut && (lineFin === null || d <= lineFin)
+      return d > lineDebut && (lineFin === null || d <= lineFin)
     }
     return false
   })
