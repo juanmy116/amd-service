@@ -341,6 +341,16 @@ Diferencia clave con el **reemplazo** (`replace_contract_machine`, motivo (b) re
 - **«Forcer la facturation» (regla 8)**: cuando falta legítimamente el relevé de algún equipo, el admin puede forzar la emisión (`confirm_estimated`); esas líneas se facturan al forfait, marcadas `is_estimated` (traza en la factura). Es una acción **intencional de admin**, distinta del bloqueo técnico (P0-7), que no se puede forzar.
 - **Reasignación intra-mes (P1-3)**: resuelta por los cortes en la línea (Bloque A) + la atribución por contrato; el índice `machine_counters_one_active_per_month` se mantiene a propósito (los cortes no son filas de `machine_counters`).
 
+### Reglas temporales y de negocio (Bloque D del core, 2026-06-08)
+
+- **Estados contrato/línea (P1-6)** — `isLineBillable()` en `src/lib/invoicing.ts`, usado por `buildClientInvoiceDraft` y `listBillableClients`: una línea/contrato `suspendu` **no factura** (servicio pausado). `terminé` **no** se filtra por statut — lo gobierna `date_fin` (factura el mes de cierre de una retirada/reemplazo y se excluye después, preservando H-D6). Caso borde: un contrato `terminé` con una línea aún abierta (`date_fin IS NULL`) excluye esa línea huérfana para no facturar sin fin.
+- **Cambio de cliente controlado (P1-4)** — `update_contract_with_lines` (migración `20260608140100`) **bloquea** cambiar `contracts.client_id` si el contrato ya tiene historial (≥1 línea de factura emitida o ≥1 relevé): error `client_change_forbidden_history`. Para un cambio de cliente real → contrato nuevo. No reasigna el pasado.
+- **Reemplazo conserva el puesto (P1-7)** — `replace_contract_machine` (migración `20260608140000`) ahora hereda en la línea entrante también `billing_day_override`, `maintenance_frequency_override` y `notes` (antes solo precio), con override opcional por payload.
+- **Mantenimiento sigue a la máquina nueva (P1-8)** — el reemplazo migra las `maintenance_visits` futuras y no realizadas (`status <> 'fait' AND scheduled_date >= fecha`) de la línea saliente a la entrante, para no programar mantenimientos sobre la máquina retirada.
+- **Vigencia temporal de tarifas (P1-5)** — pendiente, en **PR aparte tras el Bloque D** (toca `billing.ts`; se coordina con el Bloque 0/soporte).
+
+> **Coordinación (fix-forward):** `update_contract_with_lines` es función compartida — el Bloque C (soporte, P0-6 pertenencia de líneas) debe reescribirse SOBRE la versión `20260608140100` (incluyendo el guard P1-4), no machacarla. Migraciones del motor en banda `20260608_12xxxx`–`15xxxx`.
+
 ### Importador CSV de máquinas (`/admin/machines/import`) — sesión 23
 
 Para dar de alta en bloque las máquinas que **no están en Princity**:

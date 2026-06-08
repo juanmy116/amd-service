@@ -60,6 +60,25 @@ export function countersForLine(
   })
 }
 
+/**
+ * BLOQUE D / P1-6 — una línea es facturable según el estado del contrato y de la línea.
+ *  - 'suspendu' (contrato O línea) → NO factura (servicio pausado, decisión del dueño).
+ *  - 'terminé' NO se filtra por statut: lo gobierna date_fin (el filtro de periodo factura su
+ *    mes de cierre — retirada a stock / reemplazo, H-D6 — y la excluye después). EXCEPTO el
+ *    caso borde de un contrato 'terminé' con una línea aún abierta (date_fin NULL): esa línea
+ *    huérfana se excluye para que un contrato terminado no facture sin fin.
+ */
+export function isLineBillable(
+  lineStatut: string | null,
+  contractStatut: string | null,
+  lineDateFin: string | null,
+): boolean {
+  if (contractStatut === 'suspendu') return false
+  if (lineStatut === 'suspendu') return false
+  if (contractStatut === 'terminé' && lineDateFin === null) return false
+  return true
+}
+
 export type DraftLine = {
   cm_id: string
   replaces_cm_id: string | null
@@ -207,13 +226,13 @@ export async function buildClientInvoiceDraft(
   const { data: lines, error: linesErr } = await admin
     .from('contract_machines')
     .select(`
-      id, machine_id, billing_plan_id, date_debut, date_fin,
+      id, machine_id, billing_plan_id, date_debut, date_fin, statut,
       replaces_contract_machine_id,
       start_counter_bw, start_counter_color, end_counter_bw, end_counter_color,
       price_bw_override, price_color_override, fixed_fee_override,
       billing_plans ( id, name, type, fixed_fee, price_bw, price_color, tiers ),
       machines ( numero_serie, marque, modele ),
-      contracts!inner ( id, numero_contrat, client_id )
+      contracts!inner ( id, numero_contrat, client_id, statut )
     `)
     .not('billing_plan_id', 'is', null)
     .eq('contracts.client_id', clientId)
@@ -245,10 +264,15 @@ export async function buildClientInvoiceDraft(
     const tariff = resolveEffectiveTariff(line as unknown as ContractMachineWithBilling)
     if (!tariff) continue
 
-    const contract = line.contracts as unknown as { id: string; numero_contrat: string } | null
+    const contract = line.contracts as unknown as { id: string; numero_contrat: string; statut: string | null } | null
     const machine  = line.machines  as unknown as { numero_serie: string; marque: string; modele: string } | null
     const plan     = line.billing_plans as unknown as { name: string } | null
     if (!contract || !line.machine_id) continue
+
+    // P1-6: excluir líneas/contratos suspendidos y la línea huérfana abierta de un contrato terminé.
+    const lineStatut = (line as unknown as { statut: string | null }).statut
+    const lineFin    = (line as unknown as { date_fin: string | null }).date_fin
+    if (!isLineBillable(lineStatut, contract.statut, lineFin)) continue
 
     // P0-3: de todos los relevés de la máquina, esta línea solo ve los de SU contrato
     // (o heredados sin atribuir que caen en su intervalo de vigencia).
@@ -371,7 +395,7 @@ export async function listBillableClients(year: number, month: number): Promise<
 
   const { data, error } = await admin
     .from('contract_machines')
-    .select('contracts!inner ( clients!inner ( id, nom_client ) )')
+    .select('statut, date_fin, contracts!inner ( statut, clients!inner ( id, nom_client ) )')
     .not('billing_plan_id', 'is', null)
     .lte('date_debut', periodEnd)
     .or(`date_fin.is.null,date_fin.gte.${periodStart}`)
@@ -379,7 +403,14 @@ export async function listBillableClients(year: number, month: number): Promise<
 
   const map = new Map<number, string>()
   for (const row of data ?? []) {
-    const c = (row.contracts as unknown as { clients: { id: number; nom_client: string } }).clients
+    const r = row as unknown as {
+      statut: string | null
+      date_fin: string | null
+      contracts: { statut: string | null; clients: { id: number; nom_client: string } }
+    }
+    // P1-6: mismo filtro de facturabilidad que buildClientInvoiceDraft (suspendu / terminé huérfano).
+    if (!isLineBillable(r.statut, r.contracts?.statut ?? null, r.date_fin)) continue
+    const c = r.contracts?.clients
     if (c) map.set(c.id, c.nom_client)
   }
   return [...map.entries()].map(([id, nom_client]) => ({ id, nom_client }))

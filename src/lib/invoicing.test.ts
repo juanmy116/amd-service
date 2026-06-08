@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { calcDeltas, counterDelta, type Counter } from '@/lib/counters'
 import {
-  computeLineConsumption, countersForLine, buildClientInvoiceDraft, BillingDataError,
+  computeLineConsumption, countersForLine, buildClientInvoiceDraft, BillingDataError, isLineBillable,
   type LineCounters,
 } from '@/lib/invoicing'
 
@@ -340,5 +340,29 @@ describe('Bloque B — P0-7: un fallo técnico de query bloquea (NO factura 0 es
       makeAdmin({ clients: { data: null, error: null } }),
     )
     await expect(buildClientInvoiceDraft(999, 2026, 6)).resolves.toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BLOQUE D / P1-6 — facturabilidad por estado de contrato/línea.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Bloque D — isLineBillable (P1-6): suspendu excluido; terminé gobernado por date_fin', () => {
+  it('contrato suspendu → NO factura', () => {
+    expect(isLineBillable('actif', 'suspendu', null)).toBe(false)
+  })
+  it('línea suspendu → NO factura', () => {
+    expect(isLineBillable('suspendu', 'actif', null)).toBe(false)
+  })
+  it('contrato terminé con línea aún abierta (date_fin NULL) → NO factura (huérfana, no factura sin fin)', () => {
+    expect(isLineBillable('actif', 'terminé', null)).toBe(false)
+  })
+  it('contrato terminé con línea bien cerrada (date_fin) → SÍ factura su mes de cierre', () => {
+    expect(isLineBillable('terminé', 'terminé', '2026-06-10')).toBe(true)
+  })
+  it('línea terminé por retirada/reemplazo (date_fin), contrato actif → SÍ factura (H-D6)', () => {
+    expect(isLineBillable('terminé', 'actif', '2026-06-10')).toBe(true)
+  })
+  it('todo actif → factura', () => {
+    expect(isLineBillable('actif', 'actif', null)).toBe(true)
   })
 })
