@@ -1,6 +1,13 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { calcDeltas, counterDelta, type Counter } from '@/lib/counters'
-import { computeLineConsumption, type LineCounters } from '@/lib/invoicing'
+import {
+  computeLineConsumption, countersForLine, buildClientInvoiceDraft, BillingDataError,
+  type LineCounters,
+} from '@/lib/invoicing'
+
+// Mock del admin client de Supabase para los tests de buildClientInvoiceDraft (P0-7).
+vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: vi.fn() }))
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // Helper: construye un relevé con valores por defecto razonables.
 function mkCounter(p: Partial<Counter> & { id: string; year: number; month: number }): Counter {
@@ -233,5 +240,89 @@ describe('Bloque A — escenario del dueño: máquina reseteada A → stock → 
     expect(b.is_estimated).toBe(false)
     expect(b.delta_bw).toBe(185)
     expect(b.delta_color).toBe(35)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BLOQUE B — atribución por línea/contrato (P0-3) y bloqueo por fallo técnico (P0-7).
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Relevé con las columnas de atribución (CounterRow): Counter + machine_id + contract_id.
+function mkRow(
+  p: Partial<Counter> & { id: string; year: number; month: number },
+  machine_id: string,
+  contract_id: string | null,
+) {
+  return { ...mkCounter(p), machine_id, contract_id }
+}
+
+describe('Bloque B — countersForLine (P0-3): cada línea solo ve los relevés de SU contrato', () => {
+  // Una misma máquina física rotó: contrato A (cA) y, tras pasar por stock, contrato B (cB).
+  const all = [
+    mkRow({ id: 'a-may', year: 2026, month: 5, counter_bw: 1000, counter_color: 200 }, 'M1', 'cA'),
+    mkRow({ id: 'b-jun', year: 2026, month: 6, counter_bw: 200,  counter_color: 40  }, 'M1', 'cB'),
+  ]
+
+  it('la línea de A no ve el relevé de B y viceversa', () => {
+    const forA = countersForLine('cA', '2026-04-01', '2026-06-10', all)
+    const forB = countersForLine('cB', '2026-06-11', null,        all)
+    expect(forA.map(c => c.id)).toEqual(['a-may'])
+    expect(forB.map(c => c.id)).toEqual(['b-jun'])
+  })
+
+  it('un relevé heredado sin contract_id se atribuye por el intervalo de vigencia de la línea', () => {
+    const withLegacy = [
+      ...all,
+      mkRow({ id: 'legacy-jun', year: 2026, month: 6, day: 5, counter_bw: 50, counter_color: 10 }, 'M1', null),
+    ]
+    // El relevé heredado del 2026-06-05 cae en la vigencia de A [04-01, 06-10], no en la de B [06-11, …].
+    const forA = countersForLine('cA', '2026-04-01', '2026-06-10', withLegacy)
+    const forB = countersForLine('cB', '2026-06-11', null,        withLegacy)
+    expect(forA.map(c => c.id).sort()).toEqual(['a-may', 'legacy-jun'])
+    expect(forB.map(c => c.id)).toEqual(['b-jun'])
+  })
+})
+
+// Query builder encadenable y "awaitable" que devuelve un resultado fijo {data,error}.
+function makeQb(result: { data: unknown; error: unknown }) {
+  const p: Record<string, unknown> = {}
+  const chain = () => p
+  Object.assign(p, {
+    select: chain, eq: chain, lte: chain, or: chain, in: chain, not: chain, order: chain,
+    maybeSingle: () => Promise.resolve(result),
+    single: () => Promise.resolve(result),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve(result).then(resolve, reject),
+  })
+  return p
+}
+function makeAdmin(byTable: Record<string, { data: unknown; error: unknown }>) {
+  return { from: (t: string) => makeQb(byTable[t] ?? { data: null, error: null }) } as unknown as ReturnType<typeof createAdminClient>
+}
+
+describe('Bloque B — P0-7: un fallo técnico de query bloquea (NO factura 0 estimado)', () => {
+  it('error en la query de clientes → lanza BillingDataError', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(
+      makeAdmin({ clients: { data: null, error: { message: 'boom' } } }),
+    )
+    await expect(buildClientInvoiceDraft(5, 2026, 6)).rejects.toBeInstanceOf(BillingDataError)
+  })
+
+  it('error en la query de contadores (clientes y líneas OK) → lanza BillingDataError', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(
+      makeAdmin({
+        clients:           { data: { id: 5, nom_client: 'ACME' }, error: null },
+        contract_machines: { data: [{ machine_id: 'M1' }],        error: null },
+        machine_counters:  { data: null, error: { message: 'boom' } },
+      }),
+    )
+    await expect(buildClientInvoiceDraft(5, 2026, 6)).rejects.toBeInstanceOf(BillingDataError)
+  })
+
+  it('cliente inexistente (sin error técnico) NO lanza: devuelve null', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(
+      makeAdmin({ clients: { data: null, error: null } }),
+    )
+    await expect(buildClientInvoiceDraft(999, 2026, 6)).resolves.toBeNull()
   })
 })

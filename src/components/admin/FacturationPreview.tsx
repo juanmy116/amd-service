@@ -10,9 +10,10 @@ type Props = {
   year: number; month: number
   draft: ClientDraft | null
   alreadyIssued: string | null
+  technicalError?: boolean
 }
 
-export default function FacturationPreview({ clients, selectedClient, year, month, draft, alreadyIssued }: Props) {
+export default function FacturationPreview({ clients, selectedClient, year, month, draft, alreadyIssued, technicalError }: Props) {
   function nav(next: Partial<{ client: number; year: number; month: number }>) {
     const p = new URLSearchParams({
       client: String(next.client ?? selectedClient ?? ''),
@@ -49,7 +50,12 @@ export default function FacturationPreview({ clients, selectedClient, year, mont
         </div>
       )}
 
-      {!draft || draft.lines.length === 0 ? (
+      {technicalError ? (
+        <div className="px-4 py-4 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+          <p className="font-semibold">⛔ Blocage technique</p>
+          <p className="mt-1">Impossible de lire les données de facturation (erreur de base de données). L&apos;aperçu et l&apos;émission sont bloqués pour éviter une facture erronée. Réessayez ; si le problème persiste, prévenez un administrateur.</p>
+        </div>
+      ) : !draft || draft.lines.length === 0 ? (
         <div className="text-center py-12 text-sm text-ink-muted">Aucune ligne facturable pour {monthLabel}.</div>
       ) : (
         <>
@@ -104,10 +110,10 @@ export default function FacturationPreview({ clients, selectedClient, year, mont
               <input type="hidden" name="month" value={month} />
               {draft.has_estimated ? (
                 <>
-                  <p className="text-sm text-warning mr-auto">⚠️ Des machines n&apos;ont pas de relevé pour {monthLabel}.</p>
+                  <p className="text-sm text-warning mr-auto">⚠️ Des machines n&apos;ont pas de relevé pour {monthLabel}. En forçant, ces lignes seront facturées au forfait (estimées).</p>
                   <button name="confirm_estimated" value="true" type="submit"
                     className="rounded-input bg-warning px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
-                    Émettre malgré tout (lignes estimées)
+                    Forcer la facturation (lignes estimées)
                   </button>
                 </>
               ) : (

@@ -9,6 +9,52 @@ import {
   type BillingTier,
 } from '@/lib/billing'
 
+/**
+ * BLOQUE B / P0-7 — error TÉCNICO de lectura (la query de Supabase devolvió `error`).
+ * Es un estado DISTINTO de "falta el dato real" (eso → línea estimada / botón Forzar).
+ * Un fallo técnico debe BLOQUEAR preview y emisión, nunca convertirse en consumo 0.
+ */
+export class BillingDataError extends Error {
+  constructor(public readonly source: string) {
+    super('Blocage technique : impossible de lire les données de facturation. Réessayez.')
+    this.name = 'BillingDataError'
+  }
+}
+
+/** Tipo de relevé tal y como se carga aquí: Counter + las columnas de atribución. */
+type CounterRow = Counter & { machine_id: string; contract_id: string | null }
+
+/** Fecha ISO (YYYY-MM-DD) de un relevé, usando day si existe (día 01 si no). */
+function counterDate(c: { year: number; month: number; day: number | null }): string {
+  return `${c.year}-${String(c.month).padStart(2, '0')}-${String(c.day ?? 1).padStart(2, '0')}`
+}
+
+/**
+ * BLOQUE B / P0-3 — atribución del consumo por LÍNEA/CONTRATO, no por máquina física.
+ * Una misma máquina (numero_serie) rota por varios contratos a lo largo del tiempo; cada
+ * relevé queda ligado a su `contract_id` (lo rellenan tanto Princity como la entrada manual).
+ * Una línea solo debe ver los relevés de SU contrato:
+ *   - contract_id === el de la línea  → siempre.
+ *   - contract_id NULL (relevé heredado, sin atribución) → solo si su fecha cae dentro del
+ *     intervalo de vigencia de la línea [date_debut, date_fin]. Evita que dos contratos que
+ *     compartieron la máquina se roben relevés antiguos sin atribuir.
+ */
+export function countersForLine(
+  lineContractId: string,
+  lineDebut: string,
+  lineFin: string | null,
+  counters: CounterRow[],
+): Counter[] {
+  return counters.filter(c => {
+    if (c.contract_id === lineContractId) return true
+    if (c.contract_id == null) {
+      const d = counterDate(c)
+      return d >= lineDebut && (lineFin === null || d <= lineFin)
+    }
+    return false
+  })
+}
+
 export type DraftLine = {
   cm_id: string
   replaces_cm_id: string | null
@@ -144,15 +190,16 @@ export async function buildClientInvoiceDraft(
 ): Promise<ClientDraft | null> {
   const admin = createAdminClient()
 
-  const { data: client } = await admin
-    .from('clients').select('id, nom_client').eq('id', clientId).single()
-  if (!client) return null
+  const { data: client, error: clientErr } = await admin
+    .from('clients').select('id, nom_client').eq('id', clientId).maybeSingle()
+  if (clientErr) throw new BillingDataError('clients')   // P0-7: fallo técnico → bloquear
+  if (!client) return null                               // no existe → no es error técnico
 
   const mm = String(month).padStart(2, '0')
   const periodStart = `${year}-${mm}-01`
   const periodEnd   = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
 
-  const { data: lines } = await admin
+  const { data: lines, error: linesErr } = await admin
     .from('contract_machines')
     .select(`
       id, machine_id, billing_plan_id, date_debut, date_fin,
@@ -167,18 +214,21 @@ export async function buildClientInvoiceDraft(
     .eq('contracts.client_id', clientId)
     .lte('date_debut', periodEnd)
     .or(`date_fin.is.null,date_fin.gte.${periodStart}`)
+  if (linesErr) throw new BillingDataError('contract_machines')   // P0-7
 
-  // N6 — cargar TODOS los relevés de las máquinas implicadas en UNA query (evita N+1)
+  // N6 — cargar TODOS los relevés de las máquinas implicadas en UNA query (evita N+1).
+  // P0-3: traemos contract_id para atribuir cada relevé a su línea/contrato (no por máquina).
   const machineIds = [...new Set((lines ?? []).map(l => l.machine_id).filter((id): id is string => !!id))]
-  const { data: allCounters } = machineIds.length
+  const { data: allCounters, error: countersErr } = machineIds.length
     ? await admin
         .from('machine_counters')
-        .select('id, machine_id, year, month, day, counter_bw, counter_color, status, is_replacement_start, previous_machine_id, annulation_reason, annule_at, notes, recorded_at')
+        .select('id, machine_id, contract_id, year, month, day, counter_bw, counter_color, status, is_replacement_start, previous_machine_id, annulation_reason, annule_at, notes, recorded_at')
         .in('machine_id', machineIds)
-    : { data: [] as (Counter & { machine_id: string })[] }
+    : { data: [] as CounterRow[], error: null }
+  if (countersErr) throw new BillingDataError('machine_counters')   // P0-7
 
-  const countersByMachine = new Map<string, Counter[]>()
-  for (const c of (allCounters ?? []) as (Counter & { machine_id: string })[]) {
+  const countersByMachine = new Map<string, CounterRow[]>()
+  for (const c of (allCounters ?? []) as CounterRow[]) {
     const arr = countersByMachine.get(c.machine_id) ?? []
     arr.push(c)
     countersByMachine.set(c.machine_id, arr)
@@ -195,9 +245,13 @@ export async function buildClientInvoiceDraft(
     const plan     = line.billing_plans as unknown as { name: string } | null
     if (!contract || !line.machine_id) continue
 
-    const counters = countersByMachine.get(line.machine_id) ?? []
+    // P0-3: de todos los relevés de la máquina, esta línea solo ve los de SU contrato
+    // (o heredados sin atribuir que caen en su intervalo de vigencia).
+    const machineCounters = countersByMachine.get(line.machine_id) ?? []
+    const lc = line as unknown as LineCounters
+    const counters = countersForLine(contract.id, lc.date_debut, lc.date_fin, machineCounters)
     const { delta_bw, delta_color, is_estimated } = computeLineConsumption(
-      line as unknown as LineCounters, counters, year, month, periodStart, periodEnd,
+      lc, counters, year, month, periodStart, periodEnd,
     )
 
     const amounts = calculateMonthlyAmount(tariff, delta_bw, delta_color)
@@ -310,12 +364,13 @@ export async function listBillableClients(year: number, month: number): Promise<
   const periodStart = `${year}-${mm}-01`
   const periodEnd   = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
 
-  const { data } = await admin
+  const { data, error } = await admin
     .from('contract_machines')
     .select('contracts!inner ( clients!inner ( id, nom_client ) )')
     .not('billing_plan_id', 'is', null)
     .lte('date_debut', periodEnd)
     .or(`date_fin.is.null,date_fin.gte.${periodStart}`)
+  if (error) throw new BillingDataError('contract_machines')   // P0-7: fallo técnico → bloquear
 
   const map = new Map<number, string>()
   for (const row of data ?? []) {
