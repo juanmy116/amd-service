@@ -2,6 +2,17 @@
 -- Spec: docs/superpowers/specs/2026-06-03-contracts-n-machines-design.md
 -- NO toca las columnas viejas: contracts.machine_id, contracts.lieu_installation, incidents.contract_id.
 -- Se borrarán en un PR-cleanup posterior (5-7 días después del merge).
+--
+-- ⚠️ EDICIÓN IN-SITU DE MIGRACIÓN YA APLICADA (P1-9) — excepción aprobada por el dueño (2026-06-09).
+-- El INSERT del paso 4 (sección "Migrar datos del contrato existente") fue editado DESPUÉS de
+-- haberse aplicado en prod, para que un contrato statut='terminé' reciba date_fin y no viole el
+-- CHECK contract_machines_termine_has_date_fin. Normalmente las migraciones aplicadas son
+-- inmutables (solo fix-forward), pero aquí un fix-forward es IMPOSIBLE: en una reconstrucción
+-- limpia con un contrato terminado, la migración aborta DENTRO de este mismo archivo (en el INSERT),
+-- antes de llegar a cualquier migración posterior. Editar el INSERT en sitio es la única vía.
+-- Es SEGURO: el efecto es byte-idéntico sobre los datos reales que migró prod (sin contratos
+-- 'terminé' con máquina → date_fin queda NULL igual que antes), y prod NO re-ejecuta esta migración.
+-- Registro de decisión: docs/decisiones-tecnicas.md (entrada 2026-06-09).
 
 BEGIN;
 
@@ -42,8 +53,18 @@ ALTER TABLE public.contracts
 -- 4. Migrar datos del contrato existente
 -- Cast explícito porque contracts.statut es contract_status y contract_machines.statut es contract_machine_status
 -- (mismos valores de enum, pero PostgreSQL requiere cast explícito entre tipos distintos)
-INSERT INTO public.contract_machines (contract_id, machine_id, date_debut, statut)
-SELECT id, machine_id, date_debut, statut::text::contract_machine_status
+-- P1-9: un contrato 'terminé' DEBE llevar date_fin para no violar el CHECK
+-- contract_machines_termine_has_date_fin. La tabla contracts no tiene date_fin,
+-- así que derivamos una fecha de cierre válida: date_renouvellement si es >= date_debut,
+-- en su defecto date_debut. GREATEST garantiza date_fin >= date_debut (otro CHECK).
+-- Para los datos reales que migró prod (sin contratos terminé en máquina) el resultado
+-- es idéntico (date_fin queda NULL). Solo afecta a reconstrucciones limpias con datos.
+INSERT INTO public.contract_machines (contract_id, machine_id, date_debut, date_fin, statut)
+SELECT id, machine_id, date_debut,
+       CASE WHEN statut = 'terminé'
+            THEN GREATEST(date_debut, COALESCE(date_renouvellement, date_debut))
+            ELSE NULL END,
+       statut::text::contract_machine_status
 FROM public.contracts
 WHERE machine_id IS NOT NULL;
 

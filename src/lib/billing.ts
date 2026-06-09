@@ -128,22 +128,33 @@ function applyTiers(
 
 /**
  * Valida un array de tramos: ≥2 tramos, último ilimitado (up_to null),
- * up_to estrictamente crecientes, precios no negativos (fix #4 de la reflexión).
+ * up_to enteros estrictamente crecientes, precios numéricos finitos no negativos.
+ * Acepta `unknown` porque la entrada viene de JSON.parse de datos no confiables
+ * (P2-2): valida la existencia, el tipo y la finitud de cada campo antes de usarlo.
  * Devuelve null si OK, o un mensaje de error.
  */
-export function validateTiers(tiers: BillingTier[]): string | null {
+export function validateTiers(tiers: unknown): string | null {
   if (!Array.isArray(tiers) || tiers.length < 2) return 'Au moins 2 tranches requises.'
   let prev = 0
   for (let i = 0; i < tiers.length; i++) {
     const t = tiers[i]
     const isLast = i === tiers.length - 1
-    if (t.price_bw < 0 || t.price_color < 0) return 'Les prix ne peuvent pas être négatifs.'
+
+    if (t === null || typeof t !== 'object') return 'Tranche invalide.'
+    const { up_to, price_bw, price_color } = t as Record<string, unknown>
+
+    // Precios: deben existir, ser números finitos y no negativos.
+    if (typeof price_bw !== 'number' || !Number.isFinite(price_bw)) return 'Prix B&N invalide.'
+    if (typeof price_color !== 'number' || !Number.isFinite(price_color)) return 'Prix couleur invalide.'
+    if (price_bw < 0 || price_color < 0) return 'Les prix ne peuvent pas être négatifs.'
+
     if (isLast) {
-      if (t.up_to !== null) return 'La dernière tranche doit être illimitée.'
+      if (up_to !== null) return 'La dernière tranche doit être illimitée.'
     } else {
-      if (t.up_to === null) return 'Seule la dernière tranche peut être illimitée.'
-      if (t.up_to <= prev) return 'Les seuils des tranches doivent être strictement croissants.'
-      prev = t.up_to
+      // Seuils intermedios: entero finito > 0, estrictamente creciente.
+      if (typeof up_to !== 'number' || !Number.isInteger(up_to)) return 'Seuil de tranche invalide.'
+      if (up_to <= prev) return 'Les seuils des tranches doivent être strictement croissants.'
+      prev = up_to
     }
   }
   return null

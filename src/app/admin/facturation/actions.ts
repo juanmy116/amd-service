@@ -17,6 +17,12 @@ export async function emitInvoiceAction(fd: FormData): Promise<void> {
   const month = Number(fd.get('month'))
   const confirmEstimated = fd.get('confirm_estimated') === 'true'
 
+  // P2-3: validar enteros y rango antes de calcular/emitir. Evita periodos absurdos
+  // o IDs no válidos vía solicitudes manipuladas. La BD también lo refuerza (CHECK).
+  if (!Number.isInteger(client_id) || client_id <= 0) throw new Error('Client invalide.')
+  if (!Number.isInteger(year) || year < 2020 || year > 2100) throw new Error('Année invalide.')
+  if (!Number.isInteger(month) || month < 1 || month > 12) throw new Error('Mois invalide.')
+
   const draft = await buildClientInvoiceDraft(client_id, year, month)
   if (!draft || draft.lines.length === 0) throw new Error('Aucune ligne à facturer.')
   if (draft.has_estimated && !confirmEstimated) throw new Error('Relevés manquants non confirmés.')
