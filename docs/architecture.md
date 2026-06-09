@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-06-06 (sesión 28-29 — Sistema de Facturación: catálogo de planes, asignación por máquina, preview mensual, emisión inmutable vía RPC, export xlsx + email. Núcleo Tasks 1-11 en rama `feat/billing-plans`, sin mergear)
+> Última actualización: 2026-06-09 — **core de facturación reconstruido, desplegado en prod y validado por gate E2E (GO)**. PRs #39–#50. Ver §Gate final y `docs/gate-final-facturacion-2026-06-08.md`.
 
 ---
 
@@ -250,7 +250,7 @@ Emisor de **facturas inmutables**, a partir del consumo real de contadores. Tres
 - **Moneda:** FCFA (`XOF`), redondeo a entero por línea. **`clients.id` es BIGINT** → `invoices.client_id` es BIGINT.
 - **Reemplazo de máquina a mitad de mes** ("puesto de servicio"): botón "Remplacer la machine" en el contrato → RPC transaccional `replace_contract_machine(p_payload jsonb)` (SECURITY DEFINER, service_role). Cierra la línea saliente (`date_fin` + `end_counter_bw/color`), abre la entrante encadenada vía `replaces_contract_machine_id` (con `start_counter_bw/color`, heredando plan + overrides del puesto). **Los contadores de inicio/cierre del reemplazo viven en columnas de `contract_machines`** (`start_counter_*`/`end_counter_*`), NO como filas de `machine_counters` — para no violar el índice único parcial `machine_counters_one_active_per_month`. La factura **consolida las líneas encadenadas (A→B→C…) en un único puesto**: un solo forfait, tramos sobre el consumo combinado, con `breakdown` por máquina y `has_replacement=true`.
 
-> Estado: **núcleo de facturación 100% mergeado en `main`** (PR #34/#35/#36) y **rediseño del core completo** (Bloques A–E del motor: PRs #40–45; Bloque 0 soporte: #39; Bloque C soporte: #46). Falta el **gate E2E final** sobre datos sintéticos antes de habilitar facturación real (ver §Gate final) y el PR de P1-5 (vigencia temporal de tarifas). Acción manual pendiente: definir `BILLING_NOTIFY_EMAILS` en `.env.local` y Vercel (sin ella el botón "Envoyer par email" falla de forma controlada; el resto funciona).
+> Estado: **core de facturación reconstruido, desplegado en prod y validado (2026-06-09)**. Núcleo (PR #34/#35/#36) + rediseño completo: Bloques A–E del motor (PRs #40–45), Bloque 0 soporte (#39), Bloque C soporte (#46), **P1-5 vigencia de tarifas (#48)**. Las **11 migraciones desplegadas a la BD viva** (reconciliación previa del historial git↔BD vía `supabase migration repair` + `db push`). **Gate final E2E PASADO (GO)** — ver §Gate final. ⚠️ **Pendiente operativo (no código):** hoy hay **0 contratos reales**; cargar los contratos reales (máquinas desde stock con su lectura, plan, `billing_day`) antes de emitir la primera factura real. Acción manual aparte: definir `BILLING_NOTIFY_EMAILS` en `.env.local` y Vercel (sin ella el botón "Envoyer par email" falla de forma controlada; el resto funciona).
 
 ---
 
@@ -389,9 +389,9 @@ Correcciones de bajo riesgo, fuera del motor de cálculo:
 - **Validaciones de entrada (P2-2, P2-3)** — `validateTiers` (`billing.ts`) valida tipo/finitud de `up_to`/`price_bw`/`price_color`; `facturation/actions.ts` valida `client_id`/`year`/`month`; CHECK de rango `invoices.period_year` (`20260608080000`). Tests vitest en `src/lib/billing.test.ts`.
 - **P0-7 (fallo técnico ≠ dato ausente)** lo asumió el owner del motor por tocar `invoicing.ts` (documentado en Bloque B).
 
-### Gate final (antes de habilitar facturación real)
+### Gate final — ✅ PASADO (GO, 2026-06-09)
 
-Especificación ejecutable del E2E que valida todo el core sobre datos sintéticos en prod: **`docs/gate-final-facturacion-2026-06-08.md`**. Sigue el estilo del gate previo (PR #36): código TS real, RPC reales, limpieza verificada por SELECT. 26 escenarios (consumo/consolidación, reglas temporales, ciclo de aniversario, forzar/fallo técnico/integridad, reconstrucción de migraciones). **Regla de oro: nada se factura a un cliente real hasta GO.** Precondiciones: A/B/D/E (✅ en main) + Bloque 0/#39 + Bloque C + P1-5 + limpieza legacy.
+E2E que valida todo el core sobre datos sintéticos en prod: **`docs/gate-final-facturacion-2026-06-08.md`** (resultado completo en su §RESULTADO). Estilo del gate previo (PR #36): **código TS real** + **RPC reales** en DO blocks con `service_role`, datos `GATEF`/2027, **limpieza verificada por SELECT**. Resultado: **A 10/10 · B 6/6 · C 4/4 · D · E**, 5 facturas emitidas (cabecera = Σ líneas), **inmutabilidad probada** (UPDATE/DELETE sobre factura emitida → bloqueados), y **prod restaurada a su foto inicial** (66 clients · 108 machines · 0 contracts · 0 invoices, 0 residuos). Veredicto **GO** (verificación SQL independiente del supervisor). El esquema quedó **desplegado** y limpio de datos de prueba. **Regla de oro cumplida: no se facturó a ningún cliente real.**
 
 > **Coordinación (fix-forward) — ✅ resuelta:** `update_contract_with_lines` (función compartida) la reescribió el Bloque C SOBRE la versión `20260608140100` conservando el guard P1-4 (migración `20260609082000`, P0-6). Migraciones del motor en banda `20260608_12xxxx`–`15xxxx`; las de soporte en `20260608_08xxxx` (Bloque 0) y `20260609_08xxxx` (Bloque C) → orden global sin dependencias rotas.
 
