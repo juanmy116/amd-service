@@ -2,11 +2,14 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { counterDelta, type Counter } from '@/lib/counters'
 import {
   resolveEffectiveTariff,
+  resolveEffectiveTariffAsOf,
   calculateMonthlyAmount,
   type ContractMachineWithBilling,
   type EffectiveTariff,
   type BillingType,
   type BillingTier,
+  type TariffVersion,
+  type OverrideVersion,
 } from '@/lib/billing'
 
 /**
@@ -603,11 +606,51 @@ export async function buildContractInvoiceDraft(
     countersByMachine.set(c.machine_id, arr)
   }
 
+  // P1-5: cargar el historial de tarifas (plan + overrides) para resolver los precios VIGENTES
+  // al inicio del ciclo facturado, no los actuales. (Las facturas emitidas ya son snapshot.)
+  const planIds = [...new Set((lines ?? []).map(l => l.billing_plan_id).filter((id): id is string => !!id))]
+  const cmIds   = (lines ?? []).map(l => l.id)
+
+  const { data: planVersionsRaw, error: pvErr } = planIds.length
+    ? await admin
+        .from('billing_plan_versions')
+        .select('plan_id, effective_from, type, fixed_fee, price_bw, price_color, tiers')
+        .in('plan_id', planIds)
+    : { data: [] as (TariffVersion & { plan_id: string })[], error: null }
+  if (pvErr) throw new BillingDataError('billing_plan_versions')   // P0-7
+
+  const { data: ovVersionsRaw, error: ovErr } = cmIds.length
+    ? await admin
+        .from('contract_machine_override_versions')
+        .select('contract_machine_id, effective_from, price_bw_override, price_color_override, fixed_fee_override')
+        .in('contract_machine_id', cmIds)
+    : { data: [] as (OverrideVersion & { contract_machine_id: string })[], error: null }
+  if (ovErr) throw new BillingDataError('contract_machine_override_versions')   // P0-7
+
+  const planVersionsByPlan = new Map<string, TariffVersion[]>()
+  for (const v of (planVersionsRaw ?? []) as (TariffVersion & { plan_id: string })[]) {
+    const arr = planVersionsByPlan.get(v.plan_id) ?? []
+    arr.push(v)
+    planVersionsByPlan.set(v.plan_id, arr)
+  }
+  const ovVersionsByCm = new Map<string, OverrideVersion[]>()
+  for (const v of (ovVersionsRaw ?? []) as (OverrideVersion & { contract_machine_id: string })[]) {
+    const arr = ovVersionsByCm.get(v.contract_machine_id) ?? []
+    arr.push(v)
+    ovVersionsByCm.set(v.contract_machine_id, arr)
+  }
+
   const contractStatut = contract.statut as string | null
   const draftLines: DraftLine[] = []
 
   for (const line of lines ?? []) {
-    const tariff = resolveEffectiveTariff(line as unknown as ContractMachineWithBilling)
+    // P1-5: tarifa vigente al inicio del ciclo (period_start). Fallback al precio actual del
+    // plan embebido si, por lo que sea, no hubiera historial (no debería tras el backfill).
+    const planVersions = line.billing_plan_id ? (planVersionsByPlan.get(line.billing_plan_id) ?? []) : []
+    const ovVersions   = ovVersionsByCm.get(line.id) ?? []
+    const tariff =
+      resolveEffectiveTariffAsOf(planVersions, ovVersions, periodStart)
+      ?? resolveEffectiveTariff(line as unknown as ContractMachineWithBilling)
     if (!tariff) continue
 
     const machine = line.machines as unknown as { numero_serie: string; marque: string; modele: string } | null

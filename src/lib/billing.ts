@@ -75,6 +75,90 @@ export function resolveEffectiveTariff(
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// P1-5 — Vigencia temporal de tarifas. Una versión = snapshot de los precios de un plan
+// (o de los overrides de una línea) con la fecha desde la que rigen. La facturación de un
+// ciclo pasado debe usar los precios que regían en ese ciclo, no los actuales.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Versión de precios de un plan, vigente desde `effective_from` (fecha ISO YYYY-MM-DD). */
+export type TariffVersion = {
+  effective_from: string
+  type: BillingType
+  fixed_fee: number | string | null
+  price_bw: number | string | null
+  price_color: number | string | null
+  tiers: BillingTier[] | null
+}
+
+/** Versión de los overrides de una línea, vigente desde `effective_from`. */
+export type OverrideVersion = {
+  effective_from: string
+  price_bw_override: number | string | null
+  price_color_override: number | string | null
+  fixed_fee_override: number | string | null
+}
+
+/**
+ * Elige la versión vigente en `asOf`: la de mayor `effective_from` que sea <= asOf.
+ * Comparación lexicográfica de fechas ISO (correcta para YYYY-MM-DD).
+ *
+ * `fallbackToEarliest` (default true): si ninguna versión es <= asOf, devuelve la más antigua.
+ *  - PLANES → true: el precio del plan siempre existió en alguna forma (el backfill lo data en
+ *    created_at; un ciclo anterior a esa fecha usa con seguridad el precio más antiguo conocido).
+ *  - OVERRIDES → false: antes de que se creara un override, la línea NO tenía override (usaba el
+ *    precio del plan). Un override futuro NO debe aplicarse a un ciclo anterior → devolver null.
+ */
+export function pickVersionAsOf<T extends { effective_from: string }>(
+  versions: T[],
+  asOf: string,
+  fallbackToEarliest = true,
+): T | null {
+  if (!versions.length) return null
+  let best: T | null = null
+  for (const v of versions) {
+    if (v.effective_from <= asOf && (best === null || v.effective_from > best.effective_from)) best = v
+  }
+  if (best) return best
+  if (!fallbackToEarliest) return null
+  return versions.reduce((a, b) => (b.effective_from < a.effective_from ? b : a))
+}
+
+/**
+ * P1-5 — tarifa efectiva VIGENTE en `asOf`, combinando el historial de versiones del plan y de
+ * los overrides de la línea. Reproduce exactamente la política de `resolveEffectiveTariff`
+ * (override → plan base, según el tipo) pero con los valores que regían en `asOf`.
+ * Devuelve null si no hay ninguna versión de plan (el caller decide el fallback).
+ */
+export function resolveEffectiveTariffAsOf(
+  planVersions: TariffVersion[],
+  overrideVersions: OverrideVersion[],
+  asOf: string,
+): EffectiveTariff | null {
+  const plan = pickVersionAsOf(planVersions, asOf)
+  if (!plan) return null
+  // Override en modo ESTRICTO: si no había override vigente en asOf, no se aplica uno futuro.
+  const ov = pickVersionAsOf(overrideVersions, asOf, false)
+
+  const planFixed = num(plan.fixed_fee)
+  const planBw    = num(plan.price_bw)
+  const planColor = num(plan.price_color)
+  const ovFixed   = ov ? num(ov.fixed_fee_override) : null
+  const ovBw      = ov ? num(ov.price_bw_override) : null
+  const ovColor   = ov ? num(ov.price_color_override) : null
+
+  const hasFixed = plan.type === 'hybrid' || plan.type === 'hybrid_tiered'
+  const hasFlat  = plan.type === 'per_copy' || plan.type === 'hybrid'
+
+  return {
+    type:        plan.type,
+    fixed_fee:   hasFixed ? (ovFixed ?? planFixed ?? 0) : 0,
+    price_bw:    hasFlat  ? (ovBw    ?? planBw)          : null,
+    price_color: hasFlat  ? (ovColor ?? planColor)       : null,
+    tiers:       plan.type === 'hybrid_tiered' ? (plan.tiers ?? null) : null,
+  }
+}
+
 /** Calcula el importe mensual. Redondea cada componente a entero (FCFA sin decimales). */
 export function calculateMonthlyAmount(
   tariff: EffectiveTariff,
