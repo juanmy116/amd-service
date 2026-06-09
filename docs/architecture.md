@@ -234,7 +234,7 @@ Route handler que recibe el formulario de contacto del sitio web público y capt
 
 ### 12. Sistema de Facturación (`/admin/billing-plans`, `/admin/facturation`, `/admin/factures`) ✅ — sesión 28-29 (núcleo Tasks 1-11)
 
-Emisor de **facturas inmutables** por cliente y mes, a partir del consumo real de contadores. Tres pantallas + un export.
+Emisor de **facturas inmutables**, a partir del consumo real de contadores. Tres pantallas + un export. Tras el rediseño del core (Bloques A–E + 0/C, 2026-06-09), el flujo activo factura **por contrato y ciclo de aniversario** (regla 9); el detalle por bloque está en §Jerarquía de Datos (Bloques A/B/D/E/C/0). Esta sección resume la capa de aplicación.
 
 - **Catálogo de planes** (`/admin/billing-plans`): CRUD de `billing_plans`. 3 tipos:
   - `per_copy` — solo precio por copia B&N + color.
@@ -244,13 +244,13 @@ Emisor de **facturas inmutables** por cliente y mes, a partir del consumo real d
 - **Asignación por máquina**: cada línea `contract_machines` referencia un `billing_plan_id` + overrides opcionales (`price_bw_override`, `price_color_override`, `fixed_fee_override`). Se editan en `ContractForm` (selector + campos filtrados por tipo de plan) y se persisten vía las RPC `create/update_contract_with_lines` (que ahora incluyen estos campos).
 - **Preview mensual** (`/admin/facturation`): selector cliente/mes/año. `buildClientInvoiceDraft` (en `src/lib/invoicing.ts`) calcula el consumo de cada línea con `computeLineConsumption` y lo cruza con la tarifa efectiva (`resolveEffectiveTariff`). La lectura final del mes es el `end_counter` de la línea (si se cerró por reemplazo en el mes) o el relevé mensual normal de `machine_counters`; la inicial es el `start_counter` (si la línea nació en el mes por reemplazo) o el relevé previo más reciente. Máquinas sin punto de lectura → línea `is_estimated` (forfait sí, consumo 0). Filtro de periodo incluye líneas activas **y** cerradas dentro del mes (no infrafactura la saliente de un reemplazo).
 - **Aritmética del consumo — fuente única, política por caller (decisión consciente).** La resta `final − inicial` (con guard de null) vive en una sola primitiva `counterDelta(final, initial)` de `src/lib/counters.ts`, usada **tanto** por la facturación (`computeLineConsumption`) **como** por la pantalla de Contadores (`calcDeltas`). Lo que diverge a propósito es la **selección de puntos** (Contadores empareja relevés consecutivos por máquina; facturación combina relevés normales con `start_counter`/`end_counter` de la línea) y la **política sobre el resultado** (Contadores muestra el delta tal cual, negativos incluidos, como anomalía visible; facturación trata null/negativo como `is_estimated` → solo forfait). **Invariante: para una línea sin reemplazo ambos caminos deben dar el mismo número** — protegido por `src/lib/invoicing.test.ts` (vitest, `npm test`).
-- **Emisión** (RPC transaccional `emit_invoice(p_payload jsonb)`, SECURITY DEFINER): numera (`FACT-YYYY-NNNN` vía `next_invoice_number()`/`invoice_counters`), inserta cabecera + líneas en una sola transacción. Bloquea doble emisión (índice único parcial `WHERE status='emise'`). Si hay líneas estimadas, exige confirmación explícita del admin ("Émettre malgré tout"). El snapshot congela plan, tarifas y deltas → inmutable.
+- **Emisión** (RPC transaccional SECURITY DEFINER): flujo activo `emit_contract_invoice` (por contrato/ciclo); `emit_invoice` legacy por cliente/mes conservada sin uso en UI. Numera (`FACT-YYYY-NNNN` vía `next_invoice_number()`/`invoice_counters`), inserta cabecera + líneas en una transacción. Bloquea doble emisión (índices únicos parciales `WHERE status='emise'`). Líneas estimadas → confirmación explícita del admin. **Coherencia contable validada en BD antes de insertar (P1-1)** y **factura inmutable por trigger** (Bloque C): el snapshot de plan/tarifas/deltas no se puede alterar ni borrar, solo anular (`emise → annulee`).
 - **Vista de facturas** (`/admin/factures` + `/admin/factures/[id]`): lista + detalle de solo lectura. Acciones: descargar hoja `.xlsx`, enviar por email a los admins, anular (con motivo; no se edita, se anula y se reemite).
 - **Export `.xlsx`** (`src/lib/invoice-xlsx.ts`, ExcelJS): hoja interna AMD con fórmulas verificables (`D+ROUND(E*F,0)+ROUND(G*H,0)` para planos; literal para tiered). Route handler `/admin/factures/[id]/xlsx` (`runtime='nodejs'`) para descarga; `emailInvoiceAction` la adjunta vía `send-email` a `BILLING_NOTIFY_EMAILS`.
 - **Moneda:** FCFA (`XOF`), redondeo a entero por línea. **`clients.id` es BIGINT** → `invoices.client_id` es BIGINT.
 - **Reemplazo de máquina a mitad de mes** ("puesto de servicio"): botón "Remplacer la machine" en el contrato → RPC transaccional `replace_contract_machine(p_payload jsonb)` (SECURITY DEFINER, service_role). Cierra la línea saliente (`date_fin` + `end_counter_bw/color`), abre la entrante encadenada vía `replaces_contract_machine_id` (con `start_counter_bw/color`, heredando plan + overrides del puesto). **Los contadores de inicio/cierre del reemplazo viven en columnas de `contract_machines`** (`start_counter_*`/`end_counter_*`), NO como filas de `machine_counters` — para no violar el índice único parcial `machine_counters_one_active_per_month`. La factura **consolida las líneas encadenadas (A→B→C…) en un único puesto**: un solo forfait, tramos sobre el consumo combinado, con `breakdown` por máquina y `has_replacement=true`.
 
-> Estado: **sistema de facturación 100% completo y mergeado en `main`** (núcleo PR #34, FASE D PR #35, fix reemplazo PR #36 — gate E2E validado: cadena A→B→C, total 159 700 FCFA, snapshot cuadra). Acción manual pendiente: definir `BILLING_NOTIFY_EMAILS` en `.env.local` y Vercel (sin ella el botón "Envoyer par email" falla de forma controlada; el resto funciona).
+> Estado: **núcleo de facturación 100% mergeado en `main`** (PR #34/#35/#36) y **rediseño del core completo** (Bloques A–E del motor: PRs #40–45; Bloque 0 soporte: #39; Bloque C soporte: #46). Falta el **gate E2E final** sobre datos sintéticos antes de habilitar facturación real (ver §Gate final) y el PR de P1-5 (vigencia temporal de tarifas). Acción manual pendiente: definir `BILLING_NOTIFY_EMAILS` en `.env.local` y Vercel (sin ella el botón "Envoyer par email" falla de forma controlada; el resto funciona).
 
 ---
 
@@ -337,7 +337,7 @@ Diferencia clave con el **reemplazo** (`replace_contract_machine`, motivo (b) re
 
 - **Atribución por contrato (P0-3)**: los relevés de `machine_counters` se cargan con su `contract_id` y se reparten a cada línea con `countersForLine()`: una línea solo ve los relevés de **su** `contract_id` (o heredados sin atribuir cuyo día cae en su intervalo de vigencia). Una misma máquina que rotó por varios contratos ya no mezcla consumos. Tanto Princity como la entrada manual de contadores rellenan `contract_id`/`client_id` desde la línea abierta.
 - **Bloqueo por fallo técnico (P0-7)**: cada query comprueba su `error`; un fallo de lectura lanza `BillingDataError` y **bloquea preview y emisión** (la página muestra un «Blocage technique»), en vez de degradar a líneas estimadas con consumo 0. Es un estado **distinto** de "falta el dato real".
-- **Punto inicial explícito (P0-4)**: `create_contract_with_lines` persiste `start_counter_bw/color` por línea (migración `20260608130000`), para que el primer mes de una máquina nueva facture desde su lectura inicial y no se pierda el consumo. Añadir una máquina a un contrato existente desde stock usa `assign_machine_from_stock` (Bloque A), que ya exige la lectura. La captura en `ContractForm` se cablea coordinada con el Bloque 0/UI; sin `start_counter` el primer mes queda estimado (visible), nunca pérdida silenciosa.
+- **Punto inicial explícito (P0-4)**: `create_contract_with_lines` persiste `start_counter_bw/color` por línea (migración `20260608130000`), para que el primer mes de una máquina nueva facture desde su lectura inicial y no se pierda el consumo. Añadir una máquina a un contrato existente desde stock usa `assign_machine_from_stock` (Bloque A), que ya exige la lectura. `ContractForm` por sí solo no captura `start_counter` al crear una línea nueva; sin él, el primer mes queda estimado (visible), nunca pérdida silenciosa.
 - **«Forcer la facturation» (regla 8)**: cuando falta legítimamente el relevé de algún equipo, el admin puede forzar la emisión (`confirm_estimated`); esas líneas se facturan al forfait, marcadas `is_estimated` (traza en la factura). Es una acción **intencional de admin**, distinta del bloqueo técnico (P0-7), que no se puede forzar.
 - **Reasignación intra-mes (P1-3)**: resuelta por los cortes en la línea (Bloque A) + la atribución por contrato; el índice `machine_counters_one_active_per_month` se mantiene a propósito (los cortes no son filas de `machine_counters`).
 
@@ -347,9 +347,9 @@ Diferencia clave con el **reemplazo** (`replace_contract_machine`, motivo (b) re
 - **Cambio de cliente controlado (P1-4)** — `update_contract_with_lines` (migración `20260608140100`) **bloquea** cambiar `contracts.client_id` si el contrato ya tiene historial (≥1 línea de factura emitida o ≥1 relevé): error `client_change_forbidden_history`. Para un cambio de cliente real → contrato nuevo. No reasigna el pasado.
 - **Reemplazo conserva el puesto (P1-7)** — `replace_contract_machine` (migración `20260608140000`) ahora hereda en la línea entrante también `billing_day_override`, `maintenance_frequency_override` y `notes` (antes solo precio), con override opcional por payload.
 - **Mantenimiento sigue a la máquina nueva (P1-8)** — el reemplazo migra las `maintenance_visits` futuras y no realizadas (`status <> 'fait' AND scheduled_date >= fecha`) de la línea saliente a la entrante, para no programar mantenimientos sobre la máquina retirada.
-- **Vigencia temporal de tarifas (P1-5)** — pendiente, en **PR aparte tras el Bloque D** (toca `billing.ts`; se coordina con el Bloque 0/soporte).
+- **Vigencia temporal de tarifas (P1-5)** — **pendiente** (único hallazgo del core sin cerrar): versionar planes/overrides con fecha de vigencia para que facturar un mes pasado use los precios de ese mes. PR aparte; toca `billing.ts`/`invoicing.ts`. Precondición del gate final.
 
-### Ciclo de facturación por aniversario (Bloque E del core, regla 9) — EN CURSO
+### Ciclo de facturación por aniversario (Bloque E del core, regla 9) — ✅ COMPLETO (E1+E2 en `main`, PRs #43/#44)
 
 Cambia el periodo de facturación de **mes natural** a **ciclo de aniversario por contrato**: del `billing_day` del contrato al día anterior del mismo día del mes siguiente. **Día único por contrato → una sola factura por contrato/ciclo** con todas sus máquinas. Entrega **por fases**:
 
@@ -360,18 +360,40 @@ Cambia el periodo de facturación de **mes natural** a **ciclo de aniversario po
   - El draft mensual por cliente (`buildClientInvoiceDraft`) **sigue intacto** (función legacy; la UI ya no la usa tras E2).
 - **E2 (persistencia + UI):**
   - Migración `20260608150000`: `invoices` gana `contract_id`, `period_start`, `period_end` (DATE, **aditivos**, no rompen facturas legacy ni el flujo viejo) + índice único `(contract_id, period_start) WHERE emise`. RPC **nueva** `emit_contract_invoice` (paralela a `emit_invoice`, **no lo toca** → cero colisión con el Bloque C), que **nace con la validación de coherencia contable (P1-1)**: contrato existe y cliente coincide, ≥1 línea, `amount_total = componentes` por línea, cabecera = suma de líneas, sin negativos, no-duplicado por contrato/ciclo.
-  - Server Action **nueva** `src/app/admin/facturation/contract-actions.ts` (`emitContractInvoiceAction`) — archivo aparte para no colisionar con `actions.ts` (que el PR #39 edita). Incluye validación P2-3 de entrada.
+  - Server Action **nueva** `src/app/admin/facturation/contract-actions.ts` (`emitContractInvoiceAction`) — archivo aparte para no colisionar con `actions.ts` (editado por el Bloque 0, PR #39). Incluye validación P2-3 de entrada.
   - UI: `facturation/page.tsx` migrada a **selector de contrato** (`listBillableContracts` + `buildContractInvoiceDraft`); nuevo componente `ContractInvoicePreview` (muestra el rango del ciclo + jour de facturation, botón «Forcer la facturation», bloqueo técnico P0-7). El detalle de factura muestra el rango del ciclo si existe.
   - `billing_day_override` por máquina **deja de regir el ciclo** (el ciclo es por contrato vía `contracts.billing_day`): queda como día de captura, no de ciclo.
   - **Índice legacy restringido**: `invoices_client_period_emise_unique` se recrea con `WHERE status='emise' AND contract_id IS NULL`. Sin esto, dos contratos del mismo cliente anclados al mismo mes compartirían la terna `(client_id, period_year, period_month)` → `unique_violation` al emitir el segundo (B2B con varios contratos por cliente). El no-duplicado por contrato lo cubre `invoices_contract_cycle_emise_unique (contract_id, period_start)` + el `EXISTS` de la RPC. **Gate final debe cubrir:** «cliente con 2 contratos, mismo mes-ancla, ambos emitidos → sin colisión».
 
-> **Limpieza pendiente (cuando #39 y el Bloque C estén en main):** retirar `buildClientInvoiceDraft`, `emitInvoiceAction` y `FacturationPreview` (flujo legacy por cliente, ya sin uso); valorar converger `emit_invoice`/`emit_contract_invoice`.
+> **Limpieza pendiente (#39 y Bloque C ya en main):** retirar el flujo legacy por cliente —`buildClientInvoiceDraft`, `emitInvoiceAction`, `FacturationPreview` y la RPC `emit_invoice`— (ya sin uso en UI); valorar converger `emit_invoice`/`emit_contract_invoice` en una sola RPC.
+
+### Bloque C del core — blindaje contable en BD (✅ en `main`, PR #46, 2026-06-09)
+
+Capa de integridad **en base de datos** (migraciones/RPC, banda `20260609 08:xx` → ordena tras el motor). No toca el motor de cálculo (`invoicing.ts`/`counters.ts`). Construida **sobre** las piezas del motor sin machacarlas:
+
+- **Facturas inmutables (P0-5, `20260609080000`)** — triggers `trg_invoices_immutable` y `trg_invoice_lines_immutable` (ver tablas `invoices`/`invoice_lines`). FK `invoice_lines → invoices` pasa a `ON DELETE RESTRICT`. La promesa de snapshot inmutable deja de depender solo de la RLS/UI: la BD la garantiza ante cualquier `UPDATE`/`DELETE`, incluido `service_role`.
+- **Coherencia contable (P1-1, `20260609081000`)** — validación de cuadre del snapshot **antes** de insertar, en ambas RPC de emisión (`emit_contract_invoice` ya la traía del motor; se añadió a `emit_invoice` legacy).
+- **Desglose persistido (P2-6, `20260609081000`)** — columna `invoice_lines.breakdown`; ambas RPC la persisten (el draft ya la calculaba; antes se descartaba). Trazabilidad del consumo consolidado por reemplazo.
+- **Pertenencia de líneas (P0-6, `20260609082000`)** — `update_contract_with_lines` exige `contract_id = p_contract_id` en toda operación por `id` de línea (inmutabilidad de máquina, edición, retirada). Un `id` de otro contrato → `line_not_in_contract`. Conserva el guard P1-4 del motor.
+- **Invariantes de la cadena de reemplazos (P2-5, `20260609083000`)** sobre `contract_machines.replaces_contract_machine_id`: `CHECK` no autorreferencia; índice único parcial (una saliente no puede ser reemplazada por dos entrantes); trigger `trg_cm_replacement_invariants` (enlace dentro del **mismo contrato** + **sin ciclos**). Protege al motor que recorre la cadena para consolidar.
+
+> Validación SQL real (inmutabilidad, payload descuadrado/IDs cruzados rechazados, breakdown persistido, anulación funcionando) → diferida al **gate E2E final** sobre BD real (plan Supabase FREE no permite ramas de BD).
+
+### Bloque 0 del core — arreglos aislados (✅ en `main`, PR #39, 2026-06-09)
+
+Correcciones de bajo riesgo, fuera del motor de cálculo:
+
+- **Rollback fuera del camino de migraciones (P0-1)** — `20260603120856_..._rollback.sql` movido de `supabase/migrations/` a `supabase/rollbacks/` (+ README). Ya no se ejecuta en una reconstrucción limpia / `db reset`.
+- **Fix migración `terminé` (P1-9)** — el INSERT de datos de `20260603120559` deriva `date_fin` para contratos `terminé` (`GREATEST(date_debut, COALESCE(date_renouvellement, date_debut))`), respetando el CHECK `contract_machines_termine_has_date_fin`. **Excepción de edición in-situ de migración aplicada**, aprobada por el dueño y documentada en `docs/decisiones-tecnicas.md` (el fix-forward es imposible: la reconstrucción aborta dentro de esa misma migración).
+- **Cierre del flujo de reemplazo defectuoso (P0-2)** — eliminado `replaceLine()` (`removeLine()+addLine()`) de `ContractForm`. El único flujo de reemplazo es el atómico `ReplaceMachineModal → replace_contract_machine`.
+- **Validaciones de entrada (P2-2, P2-3)** — `validateTiers` (`billing.ts`) valida tipo/finitud de `up_to`/`price_bw`/`price_color`; `facturation/actions.ts` valida `client_id`/`year`/`month`; CHECK de rango `invoices.period_year` (`20260608080000`). Tests vitest en `src/lib/billing.test.ts`.
+- **P0-7 (fallo técnico ≠ dato ausente)** lo asumió el owner del motor por tocar `invoicing.ts` (documentado en Bloque B).
 
 ### Gate final (antes de habilitar facturación real)
 
 Especificación ejecutable del E2E que valida todo el core sobre datos sintéticos en prod: **`docs/gate-final-facturacion-2026-06-08.md`**. Sigue el estilo del gate previo (PR #36): código TS real, RPC reales, limpieza verificada por SELECT. 26 escenarios (consumo/consolidación, reglas temporales, ciclo de aniversario, forzar/fallo técnico/integridad, reconstrucción de migraciones). **Regla de oro: nada se factura a un cliente real hasta GO.** Precondiciones: A/B/D/E (✅ en main) + Bloque 0/#39 + Bloque C + P1-5 + limpieza legacy.
 
-> **Coordinación (fix-forward):** `update_contract_with_lines` es función compartida — el Bloque C (soporte, P0-6 pertenencia de líneas) debe reescribirse SOBRE la versión `20260608140100` (incluyendo el guard P1-4), no machacarla. Migraciones del motor en banda `20260608_12xxxx`–`15xxxx`.
+> **Coordinación (fix-forward) — ✅ resuelta:** `update_contract_with_lines` (función compartida) la reescribió el Bloque C SOBRE la versión `20260608140100` conservando el guard P1-4 (migración `20260609082000`, P0-6). Migraciones del motor en banda `20260608_12xxxx`–`15xxxx`; las de soporte en `20260608_08xxxx` (Bloque 0) y `20260609_08xxxx` (Bloque C) → orden global sin dependencias rotas.
 
 ### Importador CSV de máquinas (`/admin/machines/import`) — sesión 23
 
@@ -937,8 +959,8 @@ Catálogo de tipos de facturación AMD. Migración `20260606000000_billing_plans
 > CHECK por tipo (coherencia de campos) + `CHECK >= 0` de no-negatividad. RLS `billing_plans_admin_all` (`USING + WITH CHECK` vía `is_admin()`).
 > La misma migración añade a `contract_machines`: `billing_plan_id` (FK), `price_bw_override`, `price_color_override`, `fixed_fee_override` (todos nullable, con CHECK ≥ 0).
 
-### Tabla: `invoices` (facturación, sesión 28-29)
-Cabecera de factura emitida, una por cliente y mes. Migración `20260606000100_invoices.sql`. **Inmutable** salvo anulación.
+### Tabla: `invoices` (facturación, sesión 28-29 + Bloques E/C del core)
+Cabecera de factura emitida. Migración base `20260606000100_invoices.sql`; columnas de ciclo añadidas por el Bloque E (`20260608150000`). **Inmutable en BD** salvo anulación auditada (Bloque C).
 
 | Campo | Tipo | Notas |
 |---|---|---|
@@ -946,15 +968,19 @@ Cabecera de factura emitida, una por cliente y mes. Migración `20260606000100_i
 | `numero_facture` | text | UNIQUE, `FACT-YYYY-NNNN` (vía `next_invoice_number()` + tabla `invoice_counters`) |
 | `client_id` | **bigint** | FK → clients.id (que es BIGINT) |
 | `client_name` | text | snapshot |
-| `period_year` / `period_month` | int | |
+| `contract_id` | UUID | **Bloque E**, FK → contracts ON DELETE RESTRICT. Factura por contrato/ciclo. **NULL en facturas legacy por cliente/mes** |
+| `period_year` / `period_month` | int | en facturas por ciclo, el **mes-ancla** del ciclo |
+| `period_start` / `period_end` | date | **Bloque E**, periodo real del ciclo de aniversario (NULL en legacy) |
 | `status` | text | CHECK `emise` / `annulee` |
 | `has_estimated` | boolean | true si contiene líneas sin relevé |
+| `has_replacement` | boolean | true si algún puesto consolidó un reemplazo en el periodo |
 | `currency` | text | default `XOF` |
 | `total_amount` | numeric(14,2) | |
 | `issued_by` / `annulled_by` | UUID | FK → profiles |
 | `annulation_reason` | text | nullable |
 
-> Índice único parcial `invoices_client_period_emise_unique (client_id, period_year, period_month) WHERE status='emise'` → evita doble emisión; permite reemitir tras anular.
+> **Índices únicos parciales:** `invoices_contract_cycle_emise_unique (contract_id, period_start) WHERE status='emise' AND contract_id IS NOT NULL` (no-duplicado por contrato/ciclo, Bloque E) y `invoices_client_period_emise_unique (client_id, period_year, period_month) WHERE status='emise' AND contract_id IS NULL` (restringido al flujo legacy por cliente — Bloque E; sin esta restricción dos contratos del mismo cliente anclados al mismo mes colisionarían).
+> **Inmutabilidad en BD (Bloque C, `20260609080000`):** trigger `trg_invoices_immutable` (`BEFORE UPDATE OR DELETE`, todos los roles incl. `service_role`) que **solo** permite la transición auditada `emise → annulee` tocando exclusivamente los campos de anulación; bloquea cualquier otro `UPDATE` y todo `DELETE`. La comparación OLD/NEW se hace por **diff jsonb** quitando solo `status` + campos de anulación → protege automáticamente columnas nuevas/futuras. La acción de anulación (`factures/[id]/actions.ts`) hace exactamente esa transición.
 
 ### Tabla: `invoice_lines` (facturación, sesión 28-29)
 Snapshot inmutable por máquina: plan, tarifa efectiva y consumo congelados al emitir.
@@ -962,16 +988,22 @@ Snapshot inmutable por máquina: plan, tarifa efectiva y consumo congelados al e
 | Campo | Tipo | Notas |
 |---|---|---|
 | `id` | UUID PK | |
-| `invoice_id` | UUID | FK → invoices ON DELETE CASCADE |
+| `invoice_id` | UUID | FK → invoices **ON DELETE RESTRICT** (Bloque C; antes CASCADE — ya no se borra una factura) |
 | `contract_id` / `numero_contrat` / `machine_id` / `machine_label` | — | refs + snapshots |
 | `plan_name` / `billing_type` | text | snapshot |
 | `fixed_fee` / `price_bw` / `price_color` / `tiers` | — | snapshot tarifa efectiva |
 | `delta_bw` / `delta_color` | int | consumo facturado |
 | `is_estimated` | boolean | true si faltaba relevé |
 | `amount_fixed` / `amount_bw` / `amount_color` / `amount_total` | numeric(14,2) | redondeados a entero |
+| `breakdown` | jsonb | **Bloque C** (`20260609081000`): desglose por máquina del consumo consolidado cuando la línea agrupa un reemplazo (A→B→C…). NULL si no aplica |
 
-> **RPC `emit_invoice(p_payload jsonb)`** (SECURITY DEFINER, guard `service_role`): numera + inserta cabecera + líneas en una transacción. Invocada con `admin.rpc` (la función revoca EXECUTE de `authenticated`). El draft lo calcula `src/lib/invoicing.ts` (compartido con el preview).
-> Migración `20260606000300_billing_in_contract_rpcs.sql`: `CREATE OR REPLACE` de `create/update_contract_with_lines` para persistir los campos billing por línea.
+> **Dos RPC de emisión** (ambas SECURITY DEFINER, guard `service_role`, invocadas con `admin.rpc`; el draft lo calcula `src/lib/invoicing.ts`, compartido con el preview):
+> - **`emit_contract_invoice(p_payload)`** — flujo **activo** (Bloque E, por contrato/ciclo). La llama `facturation/contract-actions.ts`.
+> - **`emit_invoice(p_payload)`** — flujo **legacy** por cliente/mes (sin uso en UI tras E2; conservado).
+>
+> **Coherencia contable en BD (P1-1):** ambas validan **antes** de insertar — ≥1 línea, cliente/contrato existe y coincide, importes no negativos, `amount_total = fixed+bw+color` por línea, cabecera = suma de líneas. `emit_contract_invoice` nació con ello (Bloque E); el Bloque C (`20260609081000`) lo añadió a `emit_invoice` legacy y persiste `breakdown` en **ambas**.
+> **Inmutabilidad (Bloque C):** trigger `trg_invoice_lines_immutable` → snapshot puro, ni `UPDATE` ni `DELETE`.
+> Migración `20260606000300_billing_in_contract_rpcs.sql`: `create/update_contract_with_lines` persisten los campos billing por línea. `update_contract_with_lines` reescrita por el Bloque D (`20260608140100`, guard P1-4 cambio de cliente) y el Bloque C (`20260609082000`, P0-6 pertenencia de líneas al contrato).
 
 ---
 
