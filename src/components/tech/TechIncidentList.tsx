@@ -34,6 +34,7 @@ export type TechIncident = {
   status: string
   priority: string
   created_at: string
+  machine_id: string | null
   clients: { nom_client: string } | null
 }
 
@@ -104,7 +105,7 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
                   {inc.numero_incident}
                 </p>
                 <p className="text-sm font-semibold text-ink truncate">
-                  {inc.clients?.nom_client ?? inc.title}
+                  {inc.clients?.nom_client ?? inc.machine_id ?? inc.title}
                 </p>
                 <p className="text-xs text-ink-muted truncate mt-0.5">{inc.title}</p>
                 <div className="flex items-center gap-2 mt-1.5">

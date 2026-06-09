@@ -29,6 +29,7 @@ type HomeIncident = {
   status: string
   priority: string
   created_at: string
+  machine_id: string | null
   clients: { nom_client: string } | null
 }
 
@@ -44,12 +45,28 @@ export default async function TechPage() {
     supabase.from('profiles').select('full_name').eq('id', user.id).single(),
     supabase
       .from('incidents')
-      .select('id, title, status, priority, created_at, clients!client_id(nom_client)')
+      .select('id, title, status, priority, created_at, machine_id, contract_machines(contracts(clients(nom_client)))')
       .eq('assigned_to', user.id)
       .order('created_at', { ascending: false }),
   ])
 
-  const incidents = (incidentsRes.data ?? []) as unknown as HomeIncident[]
+  // Cliente vía contract_machine_id; las públicas (machine_id directo) no tienen cliente.
+  const incidents: HomeIncident[] = (incidentsRes.data ?? []).map((row) => {
+    const r = row as unknown as {
+      id: string; title: string; status: string; priority: string
+      created_at: string; machine_id: string | null
+      contract_machines: { contracts: { clients: { nom_client: string } | null } | null } | null
+    }
+    return {
+      id: r.id,
+      title: r.title,
+      status: r.status,
+      priority: r.priority,
+      created_at: r.created_at,
+      machine_id: r.machine_id,
+      clients: r.contract_machines?.contracts?.clients ?? null,
+    }
+  })
   const firstName  = profileRes.data?.full_name?.split(' ')[0] ?? 'Technicien'
 
   const openCount          = incidents.filter(i => !['résolu', 'fermé'].includes(i.status)).length
@@ -133,7 +150,7 @@ export default async function TechPage() {
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-ink truncate">
-                {nextIntervention.clients?.nom_client ?? '—'}
+                {nextIntervention.clients?.nom_client ?? nextIntervention.machine_id ?? '—'}
               </p>
               <p className="text-xs text-ink-muted mt-0.5 truncate">{nextIntervention.title}</p>
               <div className="mt-2">
@@ -174,7 +191,7 @@ export default async function TechPage() {
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-ink-muted">{inc.clients?.nom_client ?? '—'}</p>
+                    <p className="text-xs text-ink-muted">{inc.clients?.nom_client ?? inc.machine_id ?? '—'}</p>
                     <Badge variant={STATUS_BADGE[inc.status] ?? 'neutral'}>
                       {STATUS_LABEL[inc.status] ?? inc.status}
                     </Badge>
@@ -205,7 +222,7 @@ export default async function TechPage() {
               {activeIncidents.map((inc) => (
                 <tr key={inc.id} className="hover:bg-neutral-soft transition-colors">
                   <td className="px-5 py-4 font-medium text-ink">{inc.title}</td>
-                  <td className="px-5 py-4 text-ink-muted text-xs">{inc.clients?.nom_client ?? '—'}</td>
+                  <td className="px-5 py-4 text-ink-muted text-xs">{inc.clients?.nom_client ?? inc.machine_id ?? '—'}</td>
                   <td className="px-5 py-4">
                     <Badge variant={PRIORITY_BADGE[inc.priority] ?? 'neutral'}>
                       {PRIORITY_LABEL[inc.priority] ?? inc.priority}
