@@ -19,13 +19,21 @@ export default function QrScanner() {
     reader.decodeFromVideoDevice(undefined, videoRef.current!, (result, err) => {
       if (result && !scanned) {
         setScanned(true)
-        const text = result.getText()
+        const text = result.getText().trim()
 
-        // Extrae el número de serie de la URL del QR o lo usa directamente
-        const match = text.match(/\/maquina\/([^/?#]+)/) ?? text.match(/\/tech\/scan\/([^/?#]+)/)
-        const serie = match ? match[1] : text.trim()
+        // El QR codifica la URL del gateway (.../m/<serie>). Navegamos a su PATH para que
+        // /m/[serie] aplique su redirección por rol — igual que al escanear con la cámara
+        // nativa del móvil. Usar solo el path nos hace robustos aunque el QR lleve otro
+        // dominio. Fallback: QR antiguos (/maquina/, /tech/scan/) o un nº de serie suelto.
+        let target: string
+        try {
+          target = new URL(text).pathname
+        } catch {
+          const m = text.match(/\/(?:m|maquina|tech\/scan)\/([^/?#]+)/)
+          target = m ? `/m/${m[1]}` : `/m/${encodeURIComponent(text)}`
+        }
 
-        router.push(`/tech/scan/${encodeURIComponent(serie)}`)
+        router.push(target)
       }
       if (err && !(err instanceof Error && err.message.includes('No MultiFormat'))) {
         // Ignorar errores de "no QR en frame" — son normales
