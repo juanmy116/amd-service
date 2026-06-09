@@ -535,3 +535,70 @@ describe('Bloque E — buildContractInvoiceDraft: factura por contrato y ciclo',
     expect(dA!.contract_id).not.toBe(dB!.contract_id)
   })
 })
+
+describe('P1-5 — buildContractInvoiceDraft usa la tarifa VIGENTE al inicio del ciclo', () => {
+  // contrato day=4. Plan per_copy: 10/50 desde ene; SUBIDO a 20/100 desde el 15-jun.
+  const contractRow = {
+    id: 'ctr-1', numero_contrat: 'CT-2026-001', client_id: 7, billing_day: 4, statut: 'actif',
+    clients: { id: 7, nom_client: 'ACME' },
+  }
+  const lineRow = {
+    id: 'cm-1', machine_id: 'M1', billing_plan_id: 'plan-1',
+    date_debut: '2025-12-01', date_fin: null, statut: 'actif', replaces_contract_machine_id: null,
+    start_counter_bw: null, start_counter_color: null, end_counter_bw: null, end_counter_color: null,
+    price_bw_override: null, price_color_override: null, fixed_fee_override: null,
+    // El plan embebido refleja el precio ACTUAL (nuevo); el historial es la fuente de verdad temporal.
+    billing_plans: { id: 'plan-1', name: 'Par copie', type: 'per_copy', fixed_fee: null, price_bw: 20, price_color: 100, tiers: null },
+    machines: { numero_serie: 'M1', marque: 'HP', modele: 'X' },
+  }
+  const planVersions = [
+    { plan_id: 'plan-1', effective_from: '2026-01-01', type: 'per_copy', fixed_fee: null, price_bw: 10, price_color: 50, tiers: null },
+    { plan_id: 'plan-1', effective_from: '2026-06-15', type: 'per_copy', fixed_fee: null, price_bw: 20, price_color: 100, tiers: null },
+  ]
+  const mk = (year: number, month: number, day: number, bw: number, color: number) => ({
+    id: `c-${year}-${month}-${day}`, machine_id: 'M1', contract_id: 'ctr-1', year, month, day,
+    counter_bw: bw, counter_color: color, status: 'actif', is_replacement_start: false,
+    previous_machine_id: null, annulation_reason: null, annule_at: null, notes: null,
+    recorded_at: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T10:00:00Z`,
+  })
+  const counterRows = [
+    mk(2026, 5, 3, 1000, 200), mk(2026, 6, 3, 1500, 260),   // ciclo mayo: base 05-03, fin 06-03
+    mk(2026, 7, 3, 2000, 300), mk(2026, 8, 3, 2500, 360),   // ciclo julio: base 07-03, fin 08-03
+  ]
+  const admin = () => makeAdmin({
+    contracts:             { data: contractRow,  error: null },
+    contract_machines:     { data: [lineRow],    error: null },
+    machine_counters:      { data: counterRows,  error: null },
+    billing_plan_versions: { data: planVersions, error: null },
+    contract_machine_override_versions: { data: [], error: null },
+  })
+
+  it('ciclo de MAYO (antes de la subida) factura con el precio viejo 10/50', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(admin())
+    const draft = await buildContractInvoiceDraft('ctr-1', 2026, 5)   // [2026-05-04, 2026-06-03]
+    expect(draft!.period_start).toBe('2026-05-04')
+    expect(draft!.lines[0].delta_bw).toBe(500)
+    expect(draft!.lines[0].price_bw).toBe(10)                          // precio vigente en mayo
+    expect(draft!.lines[0].amount_total).toBe(500 * 10 + 60 * 50)      // 8 000
+  })
+
+  it('ciclo de JULIO (tras la subida) factura con el precio nuevo 20/100', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(admin())
+    const draft = await buildContractInvoiceDraft('ctr-1', 2026, 7)   // [2026-07-04, 2026-08-03]
+    expect(draft!.period_start).toBe('2026-07-04')
+    expect(draft!.lines[0].delta_bw).toBe(500)
+    expect(draft!.lines[0].price_bw).toBe(20)                          // precio vigente en julio
+    expect(draft!.lines[0].amount_total).toBe(500 * 20 + 60 * 100)     // 16 000
+  })
+
+  it('sin historial (tablas vacías) cae al precio actual del plan embebido (robustez)', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(makeAdmin({
+      contracts:         { data: contractRow,  error: null },
+      contract_machines: { data: [lineRow],    error: null },
+      machine_counters:  { data: counterRows,  error: null },
+      // billing_plan_versions sin entrada → fallback a resolveEffectiveTariff(line) (precio actual 20/100)
+    }))
+    const draft = await buildContractInvoiceDraft('ctr-1', 2026, 5)
+    expect(draft!.lines[0].price_bw).toBe(20)
+  })
+})

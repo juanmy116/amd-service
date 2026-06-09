@@ -29,7 +29,7 @@ El gate final cubre TODO el core integrado. Antes de ejecutarlo deben estar merg
 - [x] **Bloque E2** persistencia + UI del ciclo (PR #44)
 - [ ] **Bloque 0** arreglos aislados (soporte, PR #39) — incluye P0-7 vía UI, validaciones, rollback fuera de migraciones, fix `terminé`
 - [ ] **Bloque C** blindaje contable BD (soporte) — P0-5 inmutabilidad, P1-1 validación `emit_invoice`, P0-6 pertenencia de líneas, P2-5/P2-6
-- [ ] **P1-5** vigencia temporal de tarifas (PR aparte del motor, tras #39)
+- [x] **P1-5** vigencia temporal de tarifas (PR aparte del motor) — historial `billing_plan_versions`/`contract_machine_override_versions`, resolución `asOf=period_start`
 - [ ] **Limpieza legacy** facturación por cliente (`buildClientInvoiceDraft`/`emitInvoiceAction`/`FacturationPreview`) y, si se decide, convergencia `emit_invoice`/`emit_contract_invoice`
 
 > Mientras falten piezas, el gate puede ejecutarse **parcialmente** (solo los escenarios del motor A/B/D/E ya integrado) como ensayo, pero el **veredicto GO** solo es válido con todas las precondiciones en verde.
@@ -71,6 +71,7 @@ El gate final cubre TODO el core integrado. Antes de ejecutarlo deben estar merg
 | B3 | Contrato **terminé con línea huérfana** (date_fin NULL) | P1-6: línea huérfana excluida | no factura sin fin |
 | B4 | **Cambio de cliente con historial** | P1-4: `update_contract_with_lines` lo bloquea | error `client_change_forbidden_history` |
 | B5 | **Reemplazo hereda overrides + visitas futuras** | P1-7/P1-8: línea entrante hereda `billing_day_override`/`maintenance_frequency_override`/`notes`; visitas futuras migran | overrides heredados; `maintenance_visits` futuras apuntan a la entrante |
+| B6 | **Vigencia temporal de tarifas** | P1-5: subir el precio de un plan hoy y facturar un **ciclo pasado** | el ciclo pasado usa el **precio viejo**; un ciclo posterior, el nuevo. Override futuro NO aplica a ciclo anterior |
 
 ### C. Ciclo de aniversario (regla 9, Bloque E)
 
