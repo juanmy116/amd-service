@@ -5,9 +5,29 @@ import { useRouter } from 'next/navigation'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { Camera, AlertCircle } from 'lucide-react'
 
+// Extrae el nº de serie del contenido del QR. El QR codifica la URL del gateway
+// (.../m/<serie>), pero toleramos también rutas antiguas (/maquina/, /tech/scan/)
+// y un nº de serie suelto.
+function extractSerie(raw: string): string {
+  const t = raw.trim()
+  try {
+    const segs = new URL(t).pathname.split('/').filter(Boolean)
+    return decodeURIComponent(segs.at(-1) ?? t)
+  } catch {
+    const m = t.match(/\/(?:m|maquina|tech\/scan)\/([^/?#]+)/)
+    if (m) return decodeURIComponent(m[1])
+    if (t.startsWith('/')) {
+      const segs = t.split('/').filter(Boolean)
+      return decodeURIComponent(segs.at(-1) ?? t)
+    }
+    return t
+  }
+}
+
 export default function QrScanner() {
   const videoRef    = useRef<HTMLVideoElement>(null)
   const readerRef   = useRef<BrowserMultiFormatReader | null>(null)
+  const scannedRef  = useRef(false)
   const router      = useRouter()
   const [error, setError]   = useState<string | null>(null)
   const [scanned, setScanned] = useState(false)
@@ -16,27 +36,21 @@ export default function QrScanner() {
     const reader = new BrowserMultiFormatReader()
     readerRef.current = reader
 
-    reader.decodeFromVideoDevice(undefined, videoRef.current!, (result, err) => {
-      if (result && !scanned) {
+    reader.decodeFromVideoDevice(undefined, videoRef.current!, (result) => {
+      if (result && !scannedRef.current) {
+        scannedRef.current = true
         setScanned(true)
-        const text = result.getText().trim()
 
-        // El QR codifica la URL del gateway (.../m/<serie>). Navegamos a su PATH para que
-        // /m/[serie] aplique su redirección por rol — igual que al escanear con la cámara
-        // nativa del móvil. Usar solo el path nos hace robustos aunque el QR lleve otro
-        // dominio. Fallback: QR antiguos (/maquina/, /tech/scan/) o un nº de serie suelto.
-        let target: string
-        try {
-          target = new URL(text).pathname
-        } catch {
-          const m = text.match(/\/(?:m|maquina|tech\/scan)\/([^/?#]+)/)
-          target = m ? `/m/${m[1]}` : `/m/${encodeURIComponent(text)}`
-        }
+        const serie = extractSerie(result.getText())
 
-        router.push(target)
-      }
-      if (err && !(err instanceof Error && err.message.includes('No MultiFormat'))) {
-        // Ignorar errores de "no QR en frame" — son normales
+        // Detener la cámara ANTES de navegar: libera el stream y evita que la
+        // transición de cliente quede en blanco.
+        try { BrowserMultiFormatReader.releaseAllStreams() } catch { /* noop */ }
+
+        // Navegación DIRECTA a la ficha. Ya estamos dentro de la PWA técnico, así que
+        // no pasamos por el gateway /m (cuyo redirect server-side dejaba la página en
+        // blanco hasta recargar).
+        router.push(`/tech/scan/${encodeURIComponent(serie)}`)
       }
     }).catch(() => {
       setError('Impossible d\'accéder à la caméra. Vérifiez les permissions.')
@@ -45,7 +59,7 @@ export default function QrScanner() {
     return () => {
       BrowserMultiFormatReader.releaseAllStreams()
     }
-  }, [router, scanned])
+  }, [router])
 
   if (error) {
     return (
