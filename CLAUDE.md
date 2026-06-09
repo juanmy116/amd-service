@@ -13,7 +13,9 @@ Aplicación web para la gestión de incidencias (SAV) de AMD Service, empresa de
 
 ## Estado actual del desarrollo
 
-La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). Último merge: PR #23 (`89ac2e8`) el 2026-06-03 — refactor de contratos a modelo N máquinas.
+La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). Último merge: PR #49 (`8631f11`) el 2026-06-09 — resultado del gate final de facturación.
+
+> **Core de facturación reconstruido, desplegado y validado (2026-06-09).** Tras la auditoría preproducción (Codex, NO-GO), se rediseñó el core completo en 9 PRs (#39–#49): modelo parque/stock (estado alquilada/stock derivado, RPCs `assign/return_machine_from/to_stock`), cálculo de consumo por línea/cliente, ciclo de facturación por **aniversario del contrato** (`billing_day`→día anterior del mes siguiente, clamp día 31), facturas **inmutables** en BD (trigger), coherencia contable en emisión, y **vigencia temporal de tarifas**. Las 11 migraciones se desplegaron a prod (con reconciliación previa del historial git↔BD vía `migration repair`). **Gate final E2E PASADO (GO):** suite completa sobre datos sintéticos + inmutabilidad probada por SQL directo + limpieza verificada. Detalle: `docs/gate-final-facturacion-2026-06-08.md` y `docs/architecture.md`. ⚠️ **Pendiente operativo (no código):** cargar los contratos reales (máquinas desde stock con su lectura, plan, `billing_day`) antes de emitir la primera factura real — hoy hay 0 contratos.
 
 ### ✅ Completado
 - Sitio web público AMD + página `/location` (SEO Dakar)
