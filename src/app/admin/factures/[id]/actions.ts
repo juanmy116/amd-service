@@ -20,12 +20,18 @@ export async function emailInvoiceAction(id: string): Promise<void> {
   const recipients = (process.env.BILLING_NOTIFY_EMAILS ?? '').split(',').map(s => s.trim()).filter(Boolean)
   if (recipients.length === 0) throw new Error('BILLING_NOTIFY_EMAILS non configurée.')
 
-  const { data: inv } = await supabase.from('invoices').select('*').eq('id', id).single()
+  const { data: inv, error: invErr } = await supabase.from('invoices').select('*').eq('id', id).single()
+  // PGRST116 = sin filas (factura inexistente) → mensaje claro; el resto = fallo técnico.
+  if (invErr && invErr.code !== 'PGRST116') { console.error('[emailInvoice] invoices', invErr); throw new Error('Erreur technique : envoi annulé.') }
   if (!inv) throw new Error('Facture introuvable.')
   if (inv.status !== 'emise') throw new Error('Facture annulée : envoi impossible.')
-  const { data: lines } = await supabase.from('invoice_lines').select('*').eq('invoice_id', id).order('numero_contrat')
 
-  const buf = await buildInvoiceWorkbook(inv as InvoiceHeader, (lines ?? []) as InvoiceLineRow[])
+  const { data: lines, error: linesErr } = await supabase.from('invoice_lines').select('*').eq('invoice_id', id).order('numero_contrat')
+  // P2-1: un fallo técnico de lectura NO debe degradar a "factura sin líneas" — abortar el envío.
+  if (linesErr) { console.error('[emailInvoice] invoice_lines', linesErr); throw new Error('Erreur technique : envoi annulé.') }
+  if (!lines || lines.length === 0) throw new Error('Facture sans lignes : envoi annulé.')
+
+  const buf = await buildInvoiceWorkbook(inv as InvoiceHeader, lines as InvoiceLineRow[])
   const base64 = buf.toString('base64')
 
   const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-email`, {
