@@ -841,6 +841,8 @@ Si `last_success_at` supera el umbral y `alert_sent = false`, envía email a `in
 
 Usa `TRUNCATE TABLE ... RESTART IDENTITY CASCADE` (no `DELETE` — PostgREST bloquea DELETE sin WHERE vía RPC). Limpia en orden FK: `maintenance_parts → maintenance_visits → maintenance_plans → incident_parts → incident_photos → incident_history → csat_responses → incidents → machine_counters → princity_alerts → client_profiles → contracts → machines → clients`.
 
+> **Guard de facturación (migración `wipe_guard_invoices`, 2026-06-10):** la función aborta con excepción si existe **cualquier** factura en `invoices` (emitida o anulada). Motivo: el `TRUNCATE ... CASCADE` arrastra `invoices → invoice_lines` por FK y **no dispara** los triggers de inmutabilidad, por lo que sin el guard podría borrar facturas (documentos contables inmutables) de forma silenciosa. El `EXISTS` sin filtro por `status` es deliberado (postura conservadora).
+
 Invocada **solo** desde `princity-sync` en `mode: 'initial'` (botón rojo manual en `/admin/princity` con confirmación JavaScript).
 
 ---
@@ -1090,9 +1092,21 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
   - `can_delete_contract(p_contract_id uuid)` — comprueba si un contrato puede borrarse (sin dependencias)
   - `close_maintenance_visit(...)` — cierre atómico e idempotente de visita (marca `fait`, inserta piezas, programa siguiente)
   - **Eliminadas (Fase 4, modelo viejo, 0 usos):** `create_client_with_contract`, `create_machine_with_contract`
+- **`profiles` — protección de columnas privilegiadas (2026-06-10):** `authenticated` solo puede hacer `UPDATE` de `(full_name, phone)`; el `GRANT UPDATE` a nivel tabla está revocado y un trigger `BEFORE UPDATE` rechaza cualquier cambio de `role`/`is_dispatcher` salvo `service_role`. Cierra la escalada a admin vía `PATCH /rest/v1/profiles`.
+- **`client_profiles` — sin auto-vinculación (2026-06-10):** revocado el `INSERT` directo a `authenticated` y eliminada la policy `client_own_profile_insert`. La única vía de vincular un usuario a un cliente es la verificación de contrato+email (`portal/verify`), que hace el upsert con `service_role`. Cierra el acceso cross-tenant.
 - **`service_role`** solo en servidor (Edge Functions, Server Actions) — nunca expuesto al cliente
 - **`machine_counters`** accesible únicamente por admins — datos de facturación
 - **Rate limiting** con Upstash Redis (sliding window) en endpoints públicos: login (5/15m por IP+email), signup (3/h por IP), verify contrato (10/h por IP+user), CSAT (5/h por IP+token), contact API (3/h por IP), **formulario público QR (2/h · 5/24h por `IP:serie`)**. Helper centralizado en `src/lib/rate-limit.ts`. Fail-open con `console.error` si faltan credenciales en producción
+
+### Auditoría de seguridad — Infra/RLS (2026-06-10) — WP-1
+
+Hallazgos P0 confirmados con SQL real contra producción y corregidos en el PR WP-1 (migraciones aún por aplicar en el momento de redactar).
+
+| # | Severidad | Descripción | Fix |
+|---|---|---|---|
+| 1 | P0 CRÍTICO | Escalada a admin: `authenticated` tenía `GRANT UPDATE` sobre todas las columnas de `profiles` (incl. `role`, `is_dispatcher`); la policy solo restringía la fila. Un usuario podía `PATCH /rest/v1/profiles` con `{"role":"admin"}`. | `REVOKE UPDATE` + `GRANT UPDATE (full_name, phone)` + trigger anti-escalada. Migración `secure_profiles_role` |
+| 2 | P0 CRÍTICO | Cross-tenant: la policy de INSERT de `client_profiles` solo validaba `profile_id`, no `client_id` → auto-vinculación a cualquier empresa saltándose `verifyContractAction`. | DROP policy INSERT + REVOKE; vinculación solo vía `service_role` en `portal/verify`. Migración `secure_client_profiles_insert` |
+| 3 | P0 CRÍTICO | `wipe_data_tables` borraba facturas vía `TRUNCATE … CASCADE` (no dispara triggers de inmutabilidad). | Guard que aborta si existe cualquier factura. Migración `wipe_guard_invoices` |
 
 ### Auditoría de seguridad — Princity (2026-05-13, sesión 5)
 
