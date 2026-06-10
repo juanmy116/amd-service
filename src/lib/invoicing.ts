@@ -321,8 +321,9 @@ export function computeLineConsumptionCycle(
 /**
  * Consolidación del PUESTO DE SERVICIO: fusiona las líneas encadenadas por reemplazo (A→B→C…)
  * en una sola línea (un único forfait, tramos sobre el consumo consolidado), de forma
- * determinista e independiente del orden del array. Helper compartido por el draft mensual
- * (cliente) y el draft por ciclo (contrato) — una sola implementación para no divergir (P2-8).
+ * determinista e independiente del orden del array. Usado por el draft por ciclo
+ * (`buildContractInvoiceDraft`). (El draft mensual por cliente que también lo usaba fue
+ * eliminado en WP-3.)
  */
 function consolidateReplacements(draftLines: DraftLine[]): { lines: DraftLine[]; has_replacement: boolean } {
   const lineById = new Map<string, DraftLine>()

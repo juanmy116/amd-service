@@ -472,6 +472,17 @@ describe('Bloque E — buildContractInvoiceDraft: factura por contrato y ciclo',
     await expect(buildContractInvoiceDraft('ctr-1', 2026, 1)).rejects.toBeInstanceOf(BillingDataError)
   })
 
+  it('error técnico al leer los contadores (contrato y líneas OK) → BillingDataError (P0-7: nunca factura 0)', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(
+      makeAdmin({
+        contracts:         { data: contractRow, error: null },
+        contract_machines: { data: [lineRow],   error: null },
+        machine_counters:  { data: null, error: { message: 'boom' } },
+      }),
+    )
+    await expect(buildContractInvoiceDraft('ctr-1', 2026, 1)).rejects.toBeInstanceOf(BillingDataError)
+  })
+
   it('dos contratos del MISMO cliente y mes-ancla: misma terna (client_id, year, month) pero distinto contract_id', async () => {
     // Invariante que motiva restringir el índice legacy a contract_id IS NULL (fix migración 150000):
     // la unicidad de factura emise NO puede ir por (client_id, period_year, period_month) — dos
