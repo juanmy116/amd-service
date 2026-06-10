@@ -64,15 +64,19 @@ export default async function MachineQrPage({
           font-size: 7pt; letter-spacing: .06em; text-transform: uppercase;
           color: #A1A1AA; margin: 0 0 .4mm;
         }
-        .etq-v { font-size: 11pt; font-weight: 700; color: #18181B; margin: 0; }
+        .etq-v {
+          font-size: 11pt; font-weight: 700; color: #18181B; margin: 0;
+          overflow-wrap: break-word; word-break: break-word;
+        }
         .etq-v-mono {
           font-family: ui-monospace, Menlo, monospace; font-size: 8.5pt;
           font-weight: 700; color: #18181B; margin: 0;
+          overflow-wrap: anywhere; word-break: break-all;
         }
         .etq-qr {
           background: #FFFFFF;
           display: flex; flex-direction: column; align-items: center; justify-content: center;
-          flex: 1 1 auto; padding: 2mm 4mm 4mm;
+          flex: 1 1 auto; flex-shrink: 0; padding: 2mm 4mm 4mm;
         }
         .etq-qr svg { width: 44mm; height: 44mm; display: block; }
         .etq-qr p {
