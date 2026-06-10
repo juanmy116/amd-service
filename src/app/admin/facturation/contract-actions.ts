@@ -24,7 +24,12 @@ const EMIT_ERROR_LABEL: Record<string, string> = {
   forbidden:               'Action non autorisée.',
 }
 
-export async function emitContractInvoiceAction(fd: FormData): Promise<void> {
+// Estado del formulario de emisión (patrón useActionState). En éxito la acción hace redirect()
+// (no devuelve estado). En error devuelve { error } para que la UI lo muestre — los `throw` en
+// una Server Action invocada por <form> quedan ENMASCARADOS por Next.js en producción (P1-2).
+export type EmitState = { error: string } | null
+
+export async function emitContractInvoiceAction(_prev: EmitState, fd: FormData): Promise<EmitState> {
   const { user } = await requireAdmin()
   const contract_id = ((fd.get('contract_id') as string) ?? '').trim()
   const year  = Number(fd.get('year'))
@@ -32,13 +37,20 @@ export async function emitContractInvoiceAction(fd: FormData): Promise<void> {
   const confirmEstimated = fd.get('confirm_estimated') === 'true'
 
   // P2-3: validar enteros y rango antes de calcular/emitir.
-  if (!contract_id) throw new Error('Contrat invalide.')
-  if (!Number.isInteger(year) || year < 2020 || year > 2100) throw new Error('Année invalide.')
-  if (!Number.isInteger(month) || month < 1 || month > 12) throw new Error('Mois invalide.')
+  if (!contract_id) return { error: 'Contrat invalide.' }
+  if (!Number.isInteger(year) || year < 2020 || year > 2100) return { error: 'Année invalide.' }
+  if (!Number.isInteger(month) || month < 1 || month > 12) return { error: 'Mois invalide.' }
 
-  const draft = await buildContractInvoiceDraft(contract_id, year, month)
-  if (!draft || draft.lines.length === 0) throw new Error('Aucune ligne à facturer.')
-  if (draft.has_estimated && !confirmEstimated) throw new Error('Relevés manquants non confirmés.')
+  let draft
+  try {
+    draft = await buildContractInvoiceDraft(contract_id, year, month)
+  } catch (e) {
+    // BillingDataError u otro fallo técnico de lectura → bloquear con mensaje claro (nunca facturar 0).
+    console.error('[emitContractInvoice] draft', e)
+    return { error: 'Blocage technique : impossible de lire les données de facturation. Réessayez.' }
+  }
+  if (!draft || draft.lines.length === 0) return { error: 'Aucune ligne à facturer.' }
+  if (draft.has_estimated && !confirmEstimated) return { error: 'Relevés manquants non confirmés.' }
 
   const admin = createAdminClient()
   const { data: invoiceId, error } = await admin.rpc('emit_contract_invoice', {
@@ -64,8 +76,9 @@ export async function emitContractInvoiceAction(fd: FormData): Promise<void> {
     console.error('[emitContractInvoice]', error)
     const msg = error?.message ?? ''
     const key = Object.keys(EMIT_ERROR_LABEL).find(k => msg.includes(k))
-    throw new Error(key ? EMIT_ERROR_LABEL[key] : 'Émission impossible.')
+    return { error: key ? EMIT_ERROR_LABEL[key] : 'Émission impossible.' }
   }
 
+  // Éxito: redirect() lanza la señal NEXT_REDIRECT (fuera de cualquier try/catch) — Next la maneja.
   redirect(`/admin/factures/${invoiceId}`)
 }
