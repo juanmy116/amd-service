@@ -146,7 +146,7 @@ Ruta pública **sin autenticación** para que cualquier persona abra un incident
    - Si superado → estado `rateLimited` con mensaje "Il y a déjà un incident en attente…"
    - Lookup `machines` (verifica existencia)
    - INSERT en `incidents` con `opened_by=null`, `source='public'`, `machine_id` directo, campos de contacto
-   - Email de notificación a `savamdservice@gmail.com` (template `raw` via Resend, contenido HTML escapado)
+   - Email de notificación al equipo SAV (destino en la env var `SAV_NOTIFY_EMAIL`, fallback `savamdservice@gmail.com`; template `raw` via Resend, contenido HTML escapado)
 5. Estado de éxito: mensaje de agradecimiento + número de referencia `SAV-YYYY-NNNN`
 
 **Seguridad:** datos del reporter anónimo (`contact_name/phone/email`) son visibles solo en el detalle de admin. El portal del cliente los excluye con filtro `.or('source.is.null,source.neq.public')` en listado y detalle. Las incidencias públicas se vinculan por `machine_id` directo (sin `contract_machine_id`).
@@ -1097,7 +1097,17 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - **`client_profiles` — sin auto-vinculación (2026-06-10):** revocado el `INSERT` directo a `authenticated` y eliminada la policy `client_own_profile_insert`. La única vía de vincular un usuario a un cliente es la verificación de contrato+email (`portal/verify`), que hace el upsert con `service_role`. Cierra el acceso cross-tenant.
 - **`service_role`** solo en servidor (Edge Functions, Server Actions) — nunca expuesto al cliente
 - **`machine_counters`** accesible únicamente por admins — datos de facturación
-- **Rate limiting** con Upstash Redis (sliding window) en endpoints públicos: login (5/15m por IP+email), signup (3/h por IP), verify contrato (10/h por IP+user), CSAT (5/h por IP+token), contact API (3/h por IP), **formulario público QR (2/h · 5/24h por `IP:serie`)**. Helper centralizado en `src/lib/rate-limit.ts`. Fail-open con `console.error` si faltan credenciales en producción
+- **Rate limiting** con Upstash Redis (sliding window) en endpoints públicos: login (5/15m por IP+email), signup (3/h por IP), verify contrato (10/h por IP+user), CSAT (5/h por IP+token), contact API (3/h por IP), **formulario público QR (2/h · 5/24h por `IP:serie`)**. Helper centralizado en `src/lib/rate-limit.ts`. **Fail-CLOSED en producción real** (WP-7): si faltan las credenciales de Upstash, deniega (no deja pasar todo en silencio). Se evalúa con `VERCEL_ENV === 'production'` (no `NODE_ENV`, que vale `'production'` también en los previews de Vercel) → previews/dev quedan permisivos.
+
+### Auditoría de seguridad — Higiene de config (2026-06-10) — WP-7
+
+| # | Severidad | Descripción | Fix |
+|---|---|---|---|
+| 1 | P2 | Rate limiting *fail-open*: si faltaban las credenciales de Upstash en producción, `checkRateLimit` dejaba pasar todo en silencio. | Fail-closed en producción real (`VERCEL_ENV === 'production'`, no `NODE_ENV` — que también es `'production'` en previews); permisivo en preview/dev. `src/lib/rate-limit.ts` |
+| 2 | P2 | `gate-backup-*.json` con PII (clientes, NINEA, teléfonos) no estaba en `.gitignore`. | `.gitignore`: `gate-backup-*.json` / `*backup*.json` + `.claude/worktrees/`; el backup se movió fuera del árbol del repo. |
+| 3 | P2 | CSRF de `/api/contact` eludible (`origin.includes(host)`, y sin `Origin` se saltaba). | Exige `Origin` y `new URL(origin).host === host`. |
+| 4 | P3 | Email de notificación SAV hardcodeado (`savamdservice@gmail.com`) en `signaler/[serie]/actions.ts`. | Variable de entorno `SAV_NOTIFY_EMAIL` (con fallback al valor anterior). |
+| 5 | P3 | Dependencia `resend` en `package.json` sin uso (los emails van por Edge Function). | Eliminada de `package.json` + lock. |
 
 ### Auditoría de seguridad — Infra/RLS (2026-06-10) — WP-1
 
@@ -1158,8 +1168,10 @@ Hallazgos P0 confirmados con SQL real contra producción y corregidos en el PR W
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anon para el cliente |
 | `SUPABASE_SECRET_KEY` | Nueva generación (`sb_secret_*`) — usada por `createAdminClient()` para acceso a BD (bypassa RLS) **y** como Bearer hacia la Edge Function `send-email`. |
 | `NEXT_PUBLIC_APP_URL` | `https://amd-service.vercel.app` |
-| `UPSTASH_REDIS_REST_URL` | URL REST de la base Upstash Redis para rate limiting |
-| `UPSTASH_REDIS_REST_TOKEN` | Token REST de la base Upstash Redis para rate limiting |
+| `UPSTASH_REDIS_REST_URL` | URL REST de la base Upstash Redis para rate limiting. ⚠️ Definir en **Production y Preview** (con fail-closed por `VERCEL_ENV`, en prod real su ausencia deniega los endpoints públicos). |
+| `UPSTASH_REDIS_REST_TOKEN` | Token REST de la base Upstash Redis para rate limiting (ver nota arriba). |
+| `SAV_NOTIFY_EMAIL` | Destino de la notificación de incidencia pública (`/signaler`). Fallback `savamdservice@gmail.com` si no se define. (WP-7) |
+| `COMMERCIAL_EMAIL` | Destino de la notificación de lead del formulario de contacto. |
 
 > Resend (`RESEND_API_KEY`, `RESEND_FROM`) vive como secret de Supabase Edge Functions, no en Vercel — la app Next.js delega el envío de emails a la Edge Function `send-email`. La `SUPABASE_SERVICE_ROLE_KEY` legacy ha sido eliminada del entorno (PR #8).
 

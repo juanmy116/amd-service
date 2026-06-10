@@ -112,7 +112,7 @@ export async function submitPublicIncident(
 
   await sendEmail({
     template: 'raw',
-    to: 'savamdservice@gmail.com',
+    to: process.env.SAV_NOTIFY_EMAIL ?? 'savamdservice@gmail.com',
     data: {
       subject: `[SAV] Nouvel incident public — ${incident.numero_incident}`,
       html: `
