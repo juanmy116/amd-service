@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
 import { calcDeltas, counterDelta, type Counter } from '@/lib/counters'
 import {
-  computeLineConsumption, countersForLine, buildClientInvoiceDraft, BillingDataError, isLineBillable,
+  computeLineConsumption, countersForLine, BillingDataError, isLineBillable,
   computeBillingCycle, computeLineConsumptionCycle, buildContractInvoiceDraft,
   type LineCounters,
 } from '@/lib/invoicing'
 
-// Mock del admin client de Supabase para los tests de buildClientInvoiceDraft (P0-7).
+// Mock del admin client de Supabase para los tests de buildContractInvoiceDraft (P0-7).
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: vi.fn() }))
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -317,33 +317,6 @@ function makeAdmin(byTable: Record<string, { data: unknown; error: unknown }>) {
   return { from: (t: string) => makeQb(byTable[t] ?? { data: null, error: null }) } as unknown as ReturnType<typeof createAdminClient>
 }
 
-describe('Bloque B — P0-7: un fallo técnico de query bloquea (NO factura 0 estimado)', () => {
-  it('error en la query de clientes → lanza BillingDataError', async () => {
-    vi.mocked(createAdminClient).mockReturnValue(
-      makeAdmin({ clients: { data: null, error: { message: 'boom' } } }),
-    )
-    await expect(buildClientInvoiceDraft(5, 2026, 6)).rejects.toBeInstanceOf(BillingDataError)
-  })
-
-  it('error en la query de contadores (clientes y líneas OK) → lanza BillingDataError', async () => {
-    vi.mocked(createAdminClient).mockReturnValue(
-      makeAdmin({
-        clients:           { data: { id: 5, nom_client: 'ACME' }, error: null },
-        contract_machines: { data: [{ machine_id: 'M1' }],        error: null },
-        machine_counters:  { data: null, error: { message: 'boom' } },
-      }),
-    )
-    await expect(buildClientInvoiceDraft(5, 2026, 6)).rejects.toBeInstanceOf(BillingDataError)
-  })
-
-  it('cliente inexistente (sin error técnico) NO lanza: devuelve null', async () => {
-    vi.mocked(createAdminClient).mockReturnValue(
-      makeAdmin({ clients: { data: null, error: null } }),
-    )
-    await expect(buildClientInvoiceDraft(999, 2026, 6)).resolves.toBeNull()
-  })
-})
-
 // ─────────────────────────────────────────────────────────────────────────────
 // BLOQUE D / P1-6 — facturabilidad por estado de contrato/línea.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -496,6 +469,17 @@ describe('Bloque E — buildContractInvoiceDraft: factura por contrato y ciclo',
 
   it('error técnico al leer el contrato → BillingDataError', async () => {
     vi.mocked(createAdminClient).mockReturnValue(makeAdmin({ contracts: { data: null, error: { message: 'boom' } } }))
+    await expect(buildContractInvoiceDraft('ctr-1', 2026, 1)).rejects.toBeInstanceOf(BillingDataError)
+  })
+
+  it('error técnico al leer los contadores (contrato y líneas OK) → BillingDataError (P0-7: nunca factura 0)', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(
+      makeAdmin({
+        contracts:         { data: contractRow, error: null },
+        contract_machines: { data: [lineRow],   error: null },
+        machine_counters:  { data: null, error: { message: 'boom' } },
+      }),
+    )
     await expect(buildContractInvoiceDraft('ctr-1', 2026, 1)).rejects.toBeInstanceOf(BillingDataError)
   })
 

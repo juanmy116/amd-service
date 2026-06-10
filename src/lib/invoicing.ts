@@ -138,17 +138,6 @@ export type DraftLine = {
   breakdown?: { machine_label: string; delta_bw: number; delta_color: number }[]
 }
 
-export type ClientDraft = {
-  client_id: number          // clients.id es BIGINT → number en JS
-  client_name: string
-  period_year: number
-  period_month: number
-  lines: DraftLine[]
-  total_amount: number
-  has_estimated: boolean
-  has_replacement: boolean
-}
-
 /**
  * BLOQUE E — borrador de factura por CONTRATO y CICLO de aniversario (regla 9).
  * Todas las máquinas del contrato van en una sola factura del ciclo [period_start, period_end].
@@ -181,6 +170,12 @@ export type LineCounters = {
 }
 
 /**
+ * ⚠️ LEGACY (WP-3, 2026-06-10): variante MENSUAL ya sin uso en producción tras retirar
+ * la emisión por cliente/mes. Se conserva SOLO porque sus tests cubren escenarios de negocio
+ * (retirada a stock, asignación desde stock, máquina reseteada A→stock→B, H-D7) que la versión
+ * viva computeLineConsumptionCycle aún no replica test a test. Retirarla está agendado (WP-3b)
+ * junto con portar esa cobertura al cálculo por ciclo. No añadir nuevos usos.
+ *
  * Consumo facturable de UNA línea (puesto-máquina) en el mes (year, month).
  * Modelo H-D5: los puntos de inicio/cierre de un reemplazo viven en la propia línea
  * (start_counter / end_counter), no como filas de machine_counters. El consumo del mes es
@@ -324,128 +319,11 @@ export function computeLineConsumptionCycle(
 }
 
 /**
- * Construye el borrador de factura de un cliente para (year, month).
- * Filtro de periodo (cubre activas, reemplazadas y terminadas dentro del mes):
- *   date_debut <= fin_periodo AND (date_fin IS NULL OR date_fin >= inicio_periodo)
- * Para cada línea con plan calcula su consumo del mes vía computeLineConsumption (relevés
- * normales + puntos start/end de la línea); si falta algún punto → línea estimada (consumo 0).
- * Luego consolida las líneas encadenadas por reemplazo en un único puesto de servicio.
- */
-export async function buildClientInvoiceDraft(
-  clientId: number,
-  year: number,
-  month: number,
-): Promise<ClientDraft | null> {
-  const admin = createAdminClient()
-
-  const { data: client, error: clientErr } = await admin
-    .from('clients').select('id, nom_client').eq('id', clientId).maybeSingle()
-  if (clientErr) throw new BillingDataError('clients')   // P0-7: fallo técnico → bloquear
-  if (!client) return null                               // no existe → no es error técnico
-
-  const mm = String(month).padStart(2, '0')
-  const periodStart = `${year}-${mm}-01`
-  const periodEnd   = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
-
-  const { data: lines, error: linesErr } = await admin
-    .from('contract_machines')
-    .select(`
-      id, machine_id, billing_plan_id, date_debut, date_fin, statut,
-      replaces_contract_machine_id,
-      start_counter_bw, start_counter_color, end_counter_bw, end_counter_color,
-      price_bw_override, price_color_override, fixed_fee_override,
-      billing_plans ( id, name, type, fixed_fee, price_bw, price_color, tiers ),
-      machines ( numero_serie, marque, modele ),
-      contracts!inner ( id, numero_contrat, client_id, statut )
-    `)
-    .not('billing_plan_id', 'is', null)
-    .eq('contracts.client_id', clientId)
-    .lte('date_debut', periodEnd)
-    .or(`date_fin.is.null,date_fin.gte.${periodStart}`)
-  if (linesErr) throw new BillingDataError('contract_machines')   // P0-7
-
-  // N6 — cargar TODOS los relevés de las máquinas implicadas en UNA query (evita N+1).
-  // P0-3: traemos contract_id para atribuir cada relevé a su línea/contrato (no por máquina).
-  const machineIds = [...new Set((lines ?? []).map(l => l.machine_id).filter((id): id is string => !!id))]
-  const { data: allCounters, error: countersErr } = machineIds.length
-    ? await admin
-        .from('machine_counters')
-        .select('id, machine_id, contract_id, year, month, day, counter_bw, counter_color, status, is_replacement_start, previous_machine_id, annulation_reason, annule_at, notes, recorded_at')
-        .in('machine_id', machineIds)
-    : { data: [] as CounterRow[], error: null }
-  if (countersErr) throw new BillingDataError('machine_counters')   // P0-7
-
-  const countersByMachine = new Map<string, CounterRow[]>()
-  for (const c of (allCounters ?? []) as CounterRow[]) {
-    const arr = countersByMachine.get(c.machine_id) ?? []
-    arr.push(c)
-    countersByMachine.set(c.machine_id, arr)
-  }
-
-  const draftLines: DraftLine[] = []
-
-  for (const line of lines ?? []) {
-    const tariff = resolveEffectiveTariff(line as unknown as ContractMachineWithBilling)
-    if (!tariff) continue
-
-    const contract = line.contracts as unknown as { id: string; numero_contrat: string; statut: string | null } | null
-    const machine  = line.machines  as unknown as { numero_serie: string; marque: string; modele: string } | null
-    const plan     = line.billing_plans as unknown as { name: string } | null
-    if (!contract || !line.machine_id) continue
-
-    // P1-6: excluir líneas/contratos suspendidos y la línea huérfana abierta de un contrato terminé.
-    const lineStatut = (line as unknown as { statut: string | null }).statut
-    const lineFin    = (line as unknown as { date_fin: string | null }).date_fin
-    if (!isLineBillable(lineStatut, contract.statut, lineFin)) continue
-
-    // P0-3: de todos los relevés de la máquina, esta línea solo ve los de SU contrato
-    // (o heredados sin atribuir que caen en su intervalo de vigencia).
-    const machineCounters = countersByMachine.get(line.machine_id) ?? []
-    const lc = line as unknown as LineCounters
-    const counters = countersForLine(contract.id, lc.date_debut, lc.date_fin, machineCounters)
-    const { delta_bw, delta_color, is_estimated } = computeLineConsumption(
-      lc, counters, year, month, periodStart, periodEnd,
-    )
-
-    const amounts = calculateMonthlyAmount(tariff, delta_bw, delta_color)
-
-    draftLines.push({
-      cm_id:          line.id,
-      replaces_cm_id: (line as unknown as { replaces_contract_machine_id: string | null }).replaces_contract_machine_id ?? null,
-      contract_id:    contract.id,
-      numero_contrat: contract.numero_contrat,
-      machine_id:     line.machine_id,
-      machine_label:  machine ? `${machine.marque} ${machine.modele} (${machine.numero_serie})` : line.machine_id,
-      plan_name:      plan?.name ?? '—',
-      billing_type:   tariff.type,
-      fixed_fee:      tariff.fixed_fee,
-      price_bw:       tariff.price_bw,
-      price_color:    tariff.price_color,
-      tiers:          tariff.tiers,
-      delta_bw, delta_color, is_estimated,
-      ...amounts,
-    })
-  }
-
-  const { lines: mergedLines, has_replacement } = consolidateReplacements(draftLines)
-
-  return {
-    client_id:    client.id,
-    client_name:  client.nom_client,
-    period_year:  year,
-    period_month: month,
-    lines:        mergedLines,
-    total_amount: mergedLines.reduce((s, l) => s + l.amount_total, 0),
-    has_estimated: mergedLines.some(l => l.is_estimated),
-    has_replacement,
-  }
-}
-
-/**
  * Consolidación del PUESTO DE SERVICIO: fusiona las líneas encadenadas por reemplazo (A→B→C…)
  * en una sola línea (un único forfait, tramos sobre el consumo consolidado), de forma
- * determinista e independiente del orden del array. Helper compartido por el draft mensual
- * (cliente) y el draft por ciclo (contrato) — una sola implementación para no divergir (P2-8).
+ * determinista e independiente del orden del array. Usado por el draft por ciclo
+ * (`buildContractInvoiceDraft`). (El draft mensual por cliente que también lo usaba fue
+ * eliminado en WP-3.)
  */
 function consolidateReplacements(draftLines: DraftLine[]): { lines: DraftLine[]; has_replacement: boolean } {
   const lineById = new Map<string, DraftLine>()
@@ -513,40 +391,6 @@ function consolidateReplacements(draftLines: DraftLine[]): { lines: DraftLine[];
     a.numero_contrat.localeCompare(b.numero_contrat) || a.machine_label.localeCompare(b.machine_label))
 
   return { lines: mergedLines, has_replacement }
-}
-
-/**
- * Clientes con al menos una línea con plan activa O cerrada dentro del periodo (candidatos a facturar).
- * Usa el MISMO filtro de periodo que buildClientInvoiceDraft (H5).
- */
-export async function listBillableClients(year: number, month: number): Promise<{ id: number; nom_client: string }[]> {
-  const admin = createAdminClient()
-  const mm = String(month).padStart(2, '0')
-  const periodStart = `${year}-${mm}-01`
-  const periodEnd   = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
-
-  const { data, error } = await admin
-    .from('contract_machines')
-    .select('statut, date_fin, contracts!inner ( statut, clients!inner ( id, nom_client ) )')
-    .not('billing_plan_id', 'is', null)
-    .lte('date_debut', periodEnd)
-    .or(`date_fin.is.null,date_fin.gte.${periodStart}`)
-  if (error) throw new BillingDataError('contract_machines')   // P0-7: fallo técnico → bloquear
-
-  const map = new Map<number, string>()
-  for (const row of data ?? []) {
-    const r = row as unknown as {
-      statut: string | null
-      date_fin: string | null
-      contracts: { statut: string | null; clients: { id: number; nom_client: string } }
-    }
-    // P1-6: mismo filtro de facturabilidad que buildClientInvoiceDraft (suspendu / terminé huérfano).
-    if (!isLineBillable(r.statut, r.contracts?.statut ?? null, r.date_fin)) continue
-    const c = r.contracts?.clients
-    if (c) map.set(c.id, c.nom_client)
-  }
-  return [...map.entries()].map(([id, nom_client]) => ({ id, nom_client }))
-    .sort((a, b) => a.nom_client.localeCompare(b.nom_client))
 }
 
 /**

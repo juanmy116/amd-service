@@ -1,9 +1,8 @@
 'use server'
 
-// BLOQUE E2 — emisión de factura por CONTRATO y CICLO de aniversario (regla 9).
-// Archivo NUEVO y paralelo a actions.ts (emitInvoiceAction por cliente, legacy) para no
-// colisionar con el PR #39 de soporte, que también edita actions.ts. Usa la RPC
-// emit_contract_invoice (validación de coherencia en BD). El draft lo calcula el servidor.
+// Emisión de factura por CONTRATO y CICLO de aniversario (regla 9). Vía ÚNICA de emisión
+// desde WP-3 (la vía legacy por cliente/mes — actions.ts/emitInvoiceAction — fue eliminada).
+// Usa la RPC emit_contract_invoice (validación de coherencia en BD). El draft lo calcula el servidor.
 
 import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
