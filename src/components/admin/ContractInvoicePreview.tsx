@@ -1,5 +1,5 @@
 'use client'
-import { Fragment } from 'react'
+import { Fragment, useActionState } from 'react'
 import { formatPrice } from '@/lib/billing'
 import { emitContractInvoiceAction } from '@/app/admin/facturation/contract-actions'
 import type { ContractDraft } from '@/lib/invoicing'
@@ -20,6 +20,7 @@ function formatCycle(start: string, end: string): string {
 }
 
 export default function ContractInvoicePreview({ contracts, selectedContract, year, month, draft, alreadyIssued, technicalError }: Props) {
+  const [emitState, emitAction] = useActionState(emitContractInvoiceAction, null)
   function nav(next: Partial<{ contract: string; year: number; month: number }>) {
     const p = new URLSearchParams({
       contract: String(next.contract ?? selectedContract ?? ''),
@@ -114,10 +115,13 @@ export default function ContractInvoicePreview({ contracts, selectedContract, ye
           </div>
 
           {!alreadyIssued && (
-            <form action={emitContractInvoiceAction} className="flex items-center justify-end gap-3">
+            <form action={emitAction} className="flex flex-wrap items-center justify-end gap-3">
               <input type="hidden" name="contract_id" value={draft.contract_id} />
               <input type="hidden" name="year" value={year} />
               <input type="hidden" name="month" value={month} />
+              {emitState?.error && (
+                <p className="w-full text-sm text-red-600 font-medium" role="alert">⛔ {emitState.error}</p>
+              )}
               {draft.has_estimated ? (
                 <>
                   <p className="text-sm text-warning mr-auto">⚠️ Des machines n&apos;ont pas de relevé pour ce cycle. En forçant, ces lignes seront facturées au forfait (estimées).</p>
