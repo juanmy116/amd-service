@@ -73,6 +73,12 @@ export default async function ContadoresPage({ searchParams }: { searchParams: S
       .order('year',  { ascending: false })
       .order('month', { ascending: false }),
   ])
+  // WP-5b: un fallo técnico de cualquiera de las 3 queries bloquea (boundary) en vez de mostrar
+  // un parque parcial/engañoso (p.ej. todas las máquinas como "sin cliente").
+  if (activeLinesRes.error || allMachinesRes.error || allActiveCountersRes.error) {
+    console.error('[contadores]', activeLinesRes.error ?? allMachinesRes.error ?? allActiveCountersRes.error)
+    throw new Error('DATA_FETCH_ERROR')
+  }
 
   const allActiveCounters = allActiveCountersRes.data
 

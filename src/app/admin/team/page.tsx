@@ -20,7 +20,7 @@ export default async function TeamPage() {
   const supabase      = await createClient()
   const supabaseAdmin = createAdminClient()
 
-  const [{ data: profiles }, { data: { users } }] = await Promise.all([
+  const [profilesRes, usersRes] = await Promise.all([
     supabase
       .from('profiles')
       .select('id, full_name, phone, role')
@@ -28,8 +28,11 @@ export default async function TeamPage() {
       .order('full_name'),
     supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
   ])
-
-  const emailMap = new Map(users.map((u) => [u.id, u.email ?? '']))
+  // WP-5b: un fallo técnico bloquea (boundary) en vez de crashear crudo (users.map sobre undefined).
+  if (profilesRes.error) { console.error('[team] profiles', profilesRes.error); throw new Error('DATA_FETCH_ERROR') }
+  if (usersRes.error) { console.error('[team] listUsers', usersRes.error); throw new Error('DATA_FETCH_ERROR') }
+  const profiles = profilesRes.data
+  const emailMap = new Map((usersRes.data.users ?? []).map((u) => [u.id, u.email ?? '']))
 
   return (
     <div className="p-8">
