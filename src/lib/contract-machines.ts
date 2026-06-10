@@ -73,23 +73,3 @@ export async function getActiveLinesForContract(
   }
   return (data ?? []) as ContractMachineWithMachine[]
 }
-
-/**
- * billing_day efectivo: override de la línea o default del contrato.
- */
-export function resolveBillingDay(
-  line: Pick<ContractMachine, 'billing_day_override'>,
-  contract: { billing_day: number | null }
-): number | null {
-  return line.billing_day_override ?? contract.billing_day
-}
-
-/**
- * frecuencia de mantenimiento efectiva: override de la línea o default del contrato.
- */
-export function resolveMaintenanceFrequency(
-  line: Pick<ContractMachine, 'maintenance_frequency_override'>,
-  contract: { maintenance_frequency: MaintenanceFrequency | null }
-): MaintenanceFrequency | null {
-  return line.maintenance_frequency_override ?? contract.maintenance_frequency
-}

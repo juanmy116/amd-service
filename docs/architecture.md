@@ -1065,7 +1065,7 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - Radios/sombras/tipografía: `radius-card`, `shadow-card`, `shadow-raised`, `font-display` (Poppins), `font-sans` (Inter)
 
 **Componentes UI compartidos** — `src/components/ui/` (sin barrel, imports directos):
-`Card`, `PanelHeader`, `Badge` (variantes solid/danger/success/warning/info/violet/neutral), `Button` (+ `buttonClasses`), `Avatar`, `KpiCard`.
+`Card`, `PanelHeader`, `Badge` (variantes solid/danger/success/warning/info/violet/neutral), `Button` (+ `buttonClasses`), `Avatar`. (El dashboard usa su propio `KpiCard` local en `DashboardKpiStrip`.)
 
 **Componentes admin reutilizables** — `src/components/admin/`:
 `MachineCombobox` — selector buscable de máquinas (Headless UI Combobox, filtra por marque/modele/numero_serie, prop `invalid` para estado de error). Usado en `ContractForm` para líneas nuevas.
