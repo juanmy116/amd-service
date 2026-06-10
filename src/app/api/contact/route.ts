@@ -7,13 +7,19 @@ import { NEEDS_LABELS, buildLeadEmailHtml } from '@/lib/lead-email'
 const VALID_NEEDS = new Set(['rental', 'sales', 'management', 'maintenance', 'other'])
 
 export async function POST(req: NextRequest) {
-  // Block cross-origin requests (CSRF prevention)
+  // CSRF: exigir Origin y que su host coincida EXACTAMENTE con el host de la petición.
+  // (Antes: origin.includes(host) era eludible con "https://host.evil.com"; y sin Origin se
+  // saltaba el control por completo.)
   const origin = req.headers.get('origin')
-  if (origin) {
-    const host = req.headers.get('host') ?? ''
-    if (!origin.includes(host)) {
-      return NextResponse.json({ success: false, message: 'Requête non autorisée.' }, { status: 403 })
-    }
+  const host = req.headers.get('host') ?? ''
+  let originHost: string | null = null
+  try {
+    originHost = origin ? new URL(origin).host : null
+  } catch {
+    originHost = null
+  }
+  if (!originHost || originHost !== host) {
+    return NextResponse.json({ success: false, message: 'Requête non autorisée.' }, { status: 403 })
   }
 
   const ip = getClientIpFromHeaders(req.headers)

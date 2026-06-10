@@ -45,8 +45,12 @@ export function getClientIpFromHeaders(h: Headers): string {
 export async function checkRateLimit(key: RateLimiterKey, identifier: string): Promise<boolean> {
   const limiter = rateLimiters[key]
   if (!limiter) {
+    // Fail-closed en producción: si Upstash no está configurado, DENEGAR en vez de dejar pasar
+    // todo (un rate limit que silenciosamente permite todo es peor que ninguno). En desarrollo
+    // se mantiene permisivo para no estorbar el trabajo local.
     if (process.env.NODE_ENV === 'production') {
-      console.error(`[rate-limit] ${key} disabled in production — UPSTASH_REDIS_REST_URL/TOKEN missing`)
+      console.error(`[rate-limit] ${key} sin backend en producción — UPSTASH_REDIS_REST_URL/TOKEN ausentes → denegando`)
+      return false
     }
     return true
   }
