@@ -2,6 +2,8 @@
 
 > Backlog vivo. Cada entrada: qué, por qué, y pasos concretos. Al cerrar una, moverla a `docs/architecture.md` o borrarla.
 
+> 📋 **Auditoría del sistema de incidencias (2026-06-10):** `docs/auditoria-incidentes-2026-06-10.md` — valoración de escala, aislamiento RLS y mejoras priorizadas. Punto de partida para mañana.
+
 ---
 
 ## 1. 🧪 Tests de los flujos críticos — PRIORIDAD ALTA
