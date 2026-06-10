@@ -20,10 +20,11 @@ type InvoiceRow = {
 export default async function FacturesPage() {
   await requireAdmin()
   const admin = createAdminClient()
-  const { data: invoices } = await admin
+  const { data: invoices, error } = await admin
     .from('invoices')
     .select('id, numero_facture, client_name, period_year, period_month, status, total_amount, has_estimated')
     .order('issued_at', { ascending: false })
+  if (error) { console.error('[factures]', error); throw new Error('DATA_FETCH_ERROR') }
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">

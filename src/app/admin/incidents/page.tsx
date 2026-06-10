@@ -68,7 +68,8 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
     }
   }
 
-  const { data: incidents } = await query
+  const { data: incidents, error } = await query
+  if (error) { console.error('[incidents]', error); throw new Error('DATA_FETCH_ERROR') }
   const truncated = (incidents?.length ?? 0) >= RESULT_LIMIT
 
   // Transformación a filas planas para los dos renderizados.

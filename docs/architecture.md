@@ -1099,6 +1099,11 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - **`machine_counters`** accesible únicamente por admins — datos de facturación
 - **Rate limiting** con Upstash Redis (sliding window) en endpoints públicos: login (5/15m por IP+email), signup (3/h por IP), verify contrato (10/h por IP+user), CSAT (5/h por IP+token), contact API (3/h por IP), **formulario público QR (2/h · 5/24h por `IP:serie`)**. Helper centralizado en `src/lib/rate-limit.ts`. **Fail-CLOSED en producción real** (WP-7): si faltan las credenciales de Upstash, deniega (no deja pasar todo en silencio). Se evalúa con `VERCEL_ENV === 'production'` (no `NODE_ENV`, que vale `'production'` también en los previews de Vercel) → previews/dev quedan permisivos.
 
+### Robustez de errores en UI (2026-06-10) — WP-5 / WP-5b
+
+- **WP-5 (P2-1):** envío/descarga de facturas abortan ante fallo técnico de lectura de `invoice_lines` (nunca un documento sin líneas). Ver §Módulo de Facturación.
+- **WP-5b (P2-4):** las páginas de `/admin` que cargan datos comprueban el `error` de sus queries y **lanzan** (`throw new Error('DATA_FETCH_ERROR')`) ante un fallo TÉCNICO de Supabase, en vez de renderizar una tabla vacía indistinguible de "no hay registros" (o, en `team`, crashear crudo con `users.map` sobre `undefined`). Cubre los listados (clients, contracts, machines, incidents, leads, factures, billing-plans, maintenance, princity, contadores, calendrier, team) y el **detalle de contrato** (`contracts/[id]`: selects vacíos por error de BD podrían llevar a guardar el cliente/máquina/plan equivocado). Un **error boundary** de segmento (`src/app/admin/error.tsx`, `'use client'`) muestra "Erreur technique / Réessayer" conservando el chrome del back-office (el boundary re-lanza `NEXT_REDIRECT`/`notFound`, así que no interfiere con auth ni 404). El módulo de **facturación** mantiene su patrón propio `BillingDataError` (capturado inline en su page para mostrar el bloqueo sin subir al boundary).
+
 ### Auditoría de seguridad — Higiene de config (2026-06-10) — WP-7
 
 | # | Severidad | Descripción | Fix |

@@ -34,7 +34,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
   if (q) query = query.or(buildSafeOr(SEARCH_COLUMNS, q))
   if (activeFilter !== null) query = query.eq('active', activeFilter)
 
-  const { data: clients } = await query
+  const { data: clients, error } = await query
+  if (error) { console.error('[clients]', error); throw new Error('DATA_FETCH_ERROR') }
   const count = clients?.length ?? 0
   const hasFilters = q !== null || activeFilter !== null
 

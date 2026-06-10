@@ -94,7 +94,8 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
     plansQuery = plansQuery.in('contract_id', contractIdFilter)
   }
 
-  const { data: plans } = await plansQuery
+  const { data: plans, error } = await plansQuery
+  if (error) { console.error('[maintenance]', error); throw new Error('DATA_FETCH_ERROR') }
   // El statusFilter se aplica client-side después del límite, así que el aviso
   // de truncación solo es fiable y no engañoso cuando no hay filtro de status.
   const plansTruncated = !statusFilter && (plans?.length ?? 0) >= RESULT_LIMIT

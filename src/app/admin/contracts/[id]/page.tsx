@@ -13,13 +13,14 @@ export default async function EditContractPage({
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: contract } = await supabase.from('contracts').select('*').eq('id', id).single()
+  const { data: contract, error: contractErr } = await supabase.from('contracts').select('*').eq('id', id).single()
+  if (contractErr && contractErr.code !== 'PGRST116') { console.error('[contract]', contractErr); throw new Error('DATA_FETCH_ERROR') }
   if (!contract) notFound()
 
   // Clientes activos + el cliente actual del contrato aunque esté inactivo
   // (evita que el <select> muestre el primer cliente de la lista si el cliente
   // del contrato fue desactivado, lo que causaría guardar el cliente equivocado)
-  const [{ data: clients }, { data: allMachines }, { data: openLines }, { data: contractLines }, { data: billingPlans }] = await Promise.all([
+  const [clientsRes, allMachinesRes, openLinesRes, contractLinesRes, billingPlansRes] = await Promise.all([
     supabase.from('clients')
       .select('id, nom_client, princity_company_id')
       .or(`active.eq.true,id.eq.${contract.client_id}`)
@@ -34,6 +35,17 @@ export default async function EditContractPage({
       .order('date_debut', { ascending: true }),
     supabase.from('billing_plans').select('id, name, type').eq('active', true).order('name'),
   ])
+  // WP-5b: un fallo técnico bloquea (boundary). Selects vacíos por error de BD podrían llevar a
+  // guardar el cliente/máquina/plan equivocado (ver comentario arriba) — preferible bloquear.
+  if (clientsRes.error || allMachinesRes.error || openLinesRes.error || contractLinesRes.error || billingPlansRes.error) {
+    console.error('[contract edit]', clientsRes.error ?? allMachinesRes.error ?? openLinesRes.error ?? contractLinesRes.error ?? billingPlansRes.error)
+    throw new Error('DATA_FETCH_ERROR')
+  }
+  const clients = clientsRes.data
+  const allMachines = allMachinesRes.data
+  const openLines = openLinesRes.data
+  const contractLines = contractLinesRes.data
+  const billingPlans = billingPlansRes.data
 
   // availableMachines = machines with no open line on another contract
   const blockedByOther = new Set((openLines ?? []).map((l) => l.machine_id))

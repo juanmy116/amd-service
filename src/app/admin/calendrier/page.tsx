@@ -20,7 +20,7 @@ export default async function CalendrierPage() {
   const from = new Date(now.getFullYear() - 1, 0, 1).toISOString().split('T')[0]
   const to   = new Date(now.getFullYear() + 1, 11, 31).toISOString().split('T')[0]
 
-  const [{ data: visits }, { data: incidents }] = await Promise.all([
+  const [visitsRes, incidentsRes] = await Promise.all([
     supabase
       .from('maintenance_visits')
       .select(`
@@ -41,6 +41,11 @@ export default async function CalendrierPage() {
       .gte('created_at', `${from}T00:00:00`)
       .order('created_at', { ascending: false }),
   ])
+  // WP-5b: un fallo técnico bloquea (boundary) en vez de mostrar un calendario vacío engañoso.
+  if (visitsRes.error) { console.error('[calendrier] visits', visitsRes.error); throw new Error('DATA_FETCH_ERROR') }
+  if (incidentsRes.error) { console.error('[calendrier] incidents', incidentsRes.error); throw new Error('DATA_FETCH_ERROR') }
+  const visits = visitsRes.data
+  const incidents = incidentsRes.data
 
   const events: CalEvent[] = []
 

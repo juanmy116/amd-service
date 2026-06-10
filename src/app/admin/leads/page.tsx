@@ -31,7 +31,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Search
     .limit(RESULT_LIMIT)
   if (statusFilter) query = query.eq('status', statusFilter)
 
-  const { data: leads } = await query
+  const { data: leads, error } = await query
+  if (error) { console.error('[leads]', error); throw new Error('DATA_FETCH_ERROR') }
   const rows = leads ?? []
   const newCount = rows.filter((l) => l.status === 'nouveau').length
 

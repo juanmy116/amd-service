@@ -23,16 +23,18 @@ export default async function PrincityPage() {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const { data: health } = await supabase
+  const { data: health, error: healthErr } = await supabase
     .from('princity_health')
     .select('function_name, last_success_at, last_error_at, last_error_message, alert_sent')
     .order('function_name')
+  if (healthErr) { console.error('[princity:health]', healthErr); throw new Error('DATA_FETCH_ERROR') }
 
-  const { data: logs } = await supabase
+  const { data: logs, error: logsErr } = await supabase
     .from('princity_api_logs')
     .select('function_name, endpoint_called, executed_at, status, records_processed, records_created, error_message')
     .order('executed_at', { ascending: false })
     .limit(20)
+  if (logsErr) { console.error('[princity:logs]', logsErr); throw new Error('DATA_FETCH_ERROR') }
 
   return (
     <div className="p-8 max-w-5xl">
