@@ -8,7 +8,8 @@ import { Card } from '@/components/ui/Card'
 export default async function BillingPlansPage() {
   await requireAdmin()
   const admin = createAdminClient()
-  const { data: plans } = await admin.from('billing_plans').select('*').order('name')
+  const { data: plans, error } = await admin.from('billing_plans').select('*').order('name')
+  if (error) { console.error('[billing-plans]', error); throw new Error('DATA_FETCH_ERROR') }
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">

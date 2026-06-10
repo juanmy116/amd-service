@@ -73,7 +73,8 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
   }
   if (statutFilter) query = query.eq('statut', statutFilter)
 
-  const { data: contracts } = await query
+  const { data: contracts, error } = await query
+  if (error) { console.error('[contracts]', error); throw new Error('DATA_FETCH_ERROR') }
   const hasFilters = q !== null || statutFilter !== null
 
   return (

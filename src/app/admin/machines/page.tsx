@@ -40,7 +40,8 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
   if (typeFilter) query = query.eq('type', typeFilter)
   if (activeFilter !== null) query = query.eq('active', activeFilter)
 
-  const { data: machines } = await query
+  const { data: machines, error } = await query
+  if (error) { console.error('[machines]', error); throw new Error('DATA_FETCH_ERROR') }
   const hasFilters = q !== null || typeFilter !== null || activeFilter !== null
 
   return (
