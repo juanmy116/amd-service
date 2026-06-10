@@ -62,7 +62,7 @@ export async function verifyContractAction(
     return { error: 'Numéro de contrat introuvable.' }
   }
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('client_profiles')
     .upsert({ profile_id: user.id, client_id: contract.client_id, verified_at: new Date().toISOString() })
 
