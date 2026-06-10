@@ -7,7 +7,8 @@
 Aplicación web para la gestión de incidencias (SAV) de AMD Service, empresa de alquiler de equipos de impresión en Dakar, Senegal. Este repositorio contiene tanto el sitio web público de AMD como la aplicación SAV completa.
 
 **Documentación completa de arquitectura:** `./docs/architecture.md`  
-**Guía comercial AMD:** `../docs/amd-service-guide.md`
+**Guía comercial AMD:** `../docs/amd-service-guide.md`  
+**Tareas pendientes / backlog:** `./docs/pendientes.md`
 
 ---
 
