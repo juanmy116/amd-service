@@ -2,8 +2,6 @@ import Papa from 'papaparse'
 import { MACHINE_TYPES, type MachineType } from '@/lib/enums'
 
 export const REQUIRED_COLUMNS = ['numero_serie', 'marque', 'modele', 'type'] as const
-export const OPTIONAL_COLUMNS = ['localisation'] as const
-export const ALL_COLUMNS = [...REQUIRED_COLUMNS, ...OPTIONAL_COLUMNS] as const
 
 export const MAX_FIELD_LEN = 200
 export const MAX_ROWS = 2000

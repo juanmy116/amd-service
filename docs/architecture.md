@@ -301,7 +301,7 @@ Un contrato puede tener varias máquinas. La vinculación se gestiona mediante l
 - **`date_debut` / `date_fin`** — período de la vinculación. `date_fin IS NULL` = línea abierta (máquina actualmente asignada).
 - **`statut`** — `actif | suspendu | terminé`. Una máquina con `date_fin IS NULL` y `statut = suspendu` sigue bloqueada para otro contrato hasta que se le asigne `date_fin`.
 - **Índice único parcial** `contract_machines_one_open_per_machine (machine_id) WHERE date_fin IS NULL`: una máquina solo puede tener una línea abierta a la vez, independientemente del `statut`.
-- **Overrides por línea**: `billing_day_override` y `maintenance_frequency_override` anulan el valor por defecto del contrato para esa máquina concreta. Los helpers `resolveBillingDay()` y `resolveMaintenanceFrequency()` en `src/lib/contract-machines.ts` aplican la lógica override→fallback.
+- **Overrides por línea**: `billing_day_override` y `maintenance_frequency_override` (columnas de `contract_machines`) anulan el valor por defecto del contrato para esa máquina concreta. Nota: el motor de facturación del Bloque E rige el ciclo por `contracts.billing_day`; `billing_day_override` queda como día de captura, no de ciclo (ver §Módulo de Facturación, E2).
 - **Incidencias internas**: se vinculan **solo** por `incidents.contract_machine_id` (UUID), que referencia la línea. La columna `incidents.machine_id` queda `NULL` en incidencias internas.
 - **Incidencias públicas** (`source='public'`, vía QR): se vinculan por `incidents.machine_id` directo (sin `contract_machine_id`).
   - **RLS de máquinas para el técnico — incluye incidencias públicas** (migración `20260609130000_tech_machines_rls_include_machine_id.sql`, 2026-06-10): `auth_tech_assigned_machine_ids()` (que alimenta la policy `tech_machines_select`) hace `UNION` de las máquinas vía `contract_machine_id` **y** las de incidencias `machine_id` directas asignadas al técnico. Antes solo derivaba de `contract_machine_id`, por lo que un técnico asignado a una incidencia pública no podía ver la máquina → 404 al escanear y sección Machines vacía. La página de scan ya contemplaba ambos tipos; esto alinea la RLS.
@@ -1065,7 +1065,7 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - Radios/sombras/tipografía: `radius-card`, `shadow-card`, `shadow-raised`, `font-display` (Poppins), `font-sans` (Inter)
 
 **Componentes UI compartidos** — `src/components/ui/` (sin barrel, imports directos):
-`Card`, `PanelHeader`, `Badge` (variantes solid/danger/success/warning/info/violet/neutral), `Button` (+ `buttonClasses`), `Avatar`, `KpiCard`.
+`Card`, `PanelHeader`, `Badge` (variantes solid/danger/success/warning/info/violet/neutral), `Button` (+ `buttonClasses`), `Avatar`. (El dashboard usa su propio `KpiCard` local en `DashboardKpiStrip`.)
 
 **Componentes admin reutilizables** — `src/components/admin/`:
 `MachineCombobox` — selector buscable de máquinas (Headless UI Combobox, filtra por marque/modele/numero_serie, prop `invalid` para estado de error). Usado en `ContractForm` para líneas nuevas.
