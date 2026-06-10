@@ -21,7 +21,8 @@ export async function emailInvoiceAction(id: string): Promise<void> {
   if (recipients.length === 0) throw new Error('BILLING_NOTIFY_EMAILS non configurée.')
 
   const { data: inv, error: invErr } = await supabase.from('invoices').select('*').eq('id', id).single()
-  if (invErr) { console.error('[emailInvoice] invoices', invErr); throw new Error('Erreur technique : envoi annulé.') }
+  // PGRST116 = sin filas (factura inexistente) → mensaje claro; el resto = fallo técnico.
+  if (invErr && invErr.code !== 'PGRST116') { console.error('[emailInvoice] invoices', invErr); throw new Error('Erreur technique : envoi annulé.') }
   if (!inv) throw new Error('Facture introuvable.')
   if (inv.status !== 'emise') throw new Error('Facture annulée : envoi impossible.')
 
