@@ -73,9 +73,10 @@ Solo si se quiere blindar el camino entero de punta a punta. Playwright.
 
 ---
 
-## 3. ✅ PR-cleanup del refactor N-máquinas — COMPLETADO (cerrar)
+## 3. 🧹 PR-cleanup del refactor N-máquinas — esencialmente hecho (queda 1 función huérfana)
 
 - ✅ Columnas legacy eliminadas en prod (`contracts.machine_id`, `contracts.lieu_installation`, `incidents.contract_id`) — verificado 2026-06-11: no existen (Fase 4, PR #30).
-- ℹ️ Las funciones `auth_tech_incident_*` NO se borran: la Fase 4 las reescribió para el modelo N-máquinas y están EN USO por policies RLS del técnico. No son residuos.
+- ✅ NO tocar: `auth_tech_incident_ids()` y `auth_tech_incident_contract_ids()` están EN USO por policies RLS del técnico (verificado vía `pg_depend`).
+- ⏳ **Pendiente menor:** `DROP FUNCTION auth_tech_incident_machine_ids()` — función HUÉRFANA (su policy `tech_machines_select` se reescribió a `auth_tech_assigned_machine_ids()` en `20260603170237`; 0 usos verificados el 2026-06-11). Se dejó intacta a propósito en `20260605000000`. PR de una línea cuando se quiera limpiar.
 
-Nada pendiente aquí. (Historial: `docs/superpowers/specs/2026-06-03-contracts-n-machines-design.md` §6.)
+Historial: `docs/superpowers/specs/2026-06-03-contracts-n-machines-design.md` §6.
