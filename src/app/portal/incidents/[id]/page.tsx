@@ -64,8 +64,8 @@ export default async function PortalIncidentDetailPage({
       .eq('id', incident.contract_machine_id)
       .maybeSingle()
     if (line) {
-      machine = line.machines as unknown as { marque: string; modele: string } | null
-      contractNumero = (line.contracts as unknown as { numero_contrat: string } | null)?.numero_contrat ?? null
+      machine = line.machines
+      contractNumero = line.contracts?.numero_contrat ?? null
     }
   } else if (incident.machine_id) {
     // Incidencia pública legacy con machine_id directo
@@ -144,7 +144,7 @@ export default async function PortalIncidentDetailPage({
             {history.map((h) => (
               <div key={h.id} className="flex gap-3">
                 <div className="flex flex-col items-center pt-1">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[h.new_status] ?? 'bg-gray-400'}`} />
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[h.new_status ?? ''] ?? 'bg-gray-400'}`} />
                 </div>
                 <div className="flex-1 pb-4 border-b border-line-subtle last:border-0 last:pb-0">
                   <div className="flex flex-wrap items-center gap-x-2">
@@ -152,10 +152,10 @@ export default async function PortalIncidentDetailPage({
                       <span className="text-xs text-ink-muted">
                         {STATUS_LABEL[h.old_status] ?? h.old_status}
                         {' → '}
-                        <span className="font-medium text-ink">{STATUS_LABEL[h.new_status] ?? h.new_status}</span>
+                        <span className="font-medium text-ink">{STATUS_LABEL[h.new_status ?? ''] ?? h.new_status}</span>
                       </span>
                     ) : (
-                      <span className="text-xs font-medium text-ink">{STATUS_LABEL[h.new_status] ?? h.new_status}</span>
+                      <span className="text-xs font-medium text-ink">{STATUS_LABEL[h.new_status ?? ''] ?? h.new_status}</span>
                     )}
                     <span className="text-xs text-ink-muted">·</span>
                     <span className="text-xs text-ink-muted">{formatDateTime(h.created_at)}</span>

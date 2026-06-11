@@ -24,7 +24,7 @@ export default async function BillingPlansPage() {
         {(!plans || plans.length === 0) && (
           <p className="px-6 py-8 text-sm text-center text-ink-muted">Aucun plan créé. <Link href="/admin/billing-plans/new" className="text-accent hover:underline">Créer le premier →</Link></p>
         )}
-        {(plans ?? []).map((plan: BillingPlan) => (
+        {((plans ?? []) as BillingPlan[]).map((plan) => (
           <div key={plan.id} className="flex items-center justify-between px-6 py-4 gap-4">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-ink">{plan.name}</p>

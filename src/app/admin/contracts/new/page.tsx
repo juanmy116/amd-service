@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import ContractForm from '@/components/admin/ContractForm'
+import ContractForm, { type BillingPlanOption } from '@/components/admin/ContractForm'
 import { createContractAction } from './actions'
 
 export default async function NewContractPage() {
@@ -21,7 +21,7 @@ export default async function NewContractPage() {
       action={createContractAction}
       clients={clients ?? []}
       availableMachines={availableMachines}
-      billingPlans={billingPlans ?? []}
+      billingPlans={(billingPlans ?? []) as BillingPlanOption[]}
       title="Nouveau contrat"
     />
   )

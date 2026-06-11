@@ -102,10 +102,7 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
 
   // 3. Construir rows y aplicar filtro de status de la próxima visita (cliente).
   const allRows = (plans ?? []).map((p) => {
-    const contract = p.contracts as unknown as {
-      id: string; numero_contrat: string
-      clients: { nom_client: string }
-    }
+    const contract = p.contracts
     const visits = (p.maintenance_visits ?? []) as {
       id: string; scheduled_date: string; status: string; done_at: string | null; contract_machine_id: string
     }[]

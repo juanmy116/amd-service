@@ -52,10 +52,7 @@ export default async function MaintenancePlanDetailPage({
 
   if (!plan) notFound()
 
-  const contract = plan.contracts as unknown as {
-    id: string; numero_contrat: string
-    clients: { nom_client: string }
-  }
+  const contract = plan.contracts
 
   type Visit = {
     id: string; scheduled_date: string; done_at: string | null

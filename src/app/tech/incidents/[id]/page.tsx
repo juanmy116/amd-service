@@ -46,10 +46,7 @@ export default async function TechIncidentPage({
       .eq('id', incident.contract_machine_id)
       .maybeSingle()
     if (data) {
-      const cm = data as unknown as {
-        contracts: { numero_contrat: string; clients: { nom_client: string } | null } | null
-        machines: { marque: string; modele: string; localisation: string | null; numero_serie: string } | null
-      }
+      const cm = data
       contractInfo = {
         numero_contrat: cm.contracts?.numero_contrat ?? null,
         clients: cm.contracts?.clients ?? null,

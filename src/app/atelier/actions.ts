@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import type { TablesUpdate } from '@/lib/supabase/types'
 
 async function requireDispatcherActor(): Promise<{ userId: string } | null> {
   const supabase = await createClient()
@@ -32,7 +33,7 @@ export async function assignIncidentAction(
     .single()
   if (!incident) return { error: 'Incident introuvable' }
 
-  const updates: Record<string, unknown> = { assigned_to: technicianId }
+  const updates: TablesUpdate<'incidents'> = { assigned_to: technicianId }
   const autoAssign = technicianId !== null && incident.status === 'nouveau'
   if (autoAssign) updates.status = 'assigné'
 

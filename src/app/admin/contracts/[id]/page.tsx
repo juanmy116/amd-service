@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import ContractForm from '@/components/admin/ContractForm'
+import ContractForm, { type BillingPlanOption } from '@/components/admin/ContractForm'
 import ReplaceMachineModal from '@/components/admin/ReplaceMachineModal'
 import { updateContractAction, deleteContractAction } from './actions'
 import { replaceMachineAction } from './replace-actions'
@@ -81,7 +81,7 @@ export default async function EditContractPage({
         initialLines={initialLines}
         clients={clients ?? []}
         availableMachines={availableMachines}
-        billingPlans={billingPlans ?? []}
+        billingPlans={(billingPlans ?? []) as BillingPlanOption[]}
         title={contract.numero_contrat}
         isEdit
         contractId={contract.id}

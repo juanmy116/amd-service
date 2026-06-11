@@ -414,8 +414,8 @@ export async function buildContractInvoiceDraft(
   if (contractErr) throw new BillingDataError('contracts')   // P0-7
   if (!contract) return null
 
-  const client = contract.clients as unknown as { id: number; nom_client: string }
-  const billingDay = (contract.billing_day as number | null) ?? 1
+  const client = contract.clients
+  const billingDay = contract.billing_day ?? 1
   const { start: periodStart, end: periodEnd } = computeBillingCycle(billingDay, anchorYear, anchorMonth)
 
   const { data: lines, error: linesErr } = await admin
@@ -494,16 +494,16 @@ export async function buildContractInvoiceDraft(
     const ovVersions   = ovVersionsByCm.get(line.id) ?? []
     const tariff =
       resolveEffectiveTariffAsOf(planVersions, ovVersions, periodStart)
-      ?? resolveEffectiveTariff(line as unknown as ContractMachineWithBilling)
+      ?? resolveEffectiveTariff(line as ContractMachineWithBilling)
     if (!tariff) continue
 
-    const machine = line.machines as unknown as { numero_serie: string; marque: string; modele: string } | null
-    const plan    = line.billing_plans as unknown as { name: string } | null
+    const machine = line.machines
+    const plan    = line.billing_plans
     if (!line.machine_id) continue
 
     // P1-6: excluir líneas suspendidas / huérfanas de contrato terminé.
-    const lineStatut = (line as unknown as { statut: string | null }).statut
-    const lc = line as unknown as LineCounters
+    const lineStatut = line.statut
+    const lc = line
     if (!isLineBillable(lineStatut, contractStatut, lc.date_fin)) continue
 
     // P0-3: atribución por contrato. Consumo del CICLO (no del mes natural).
@@ -517,7 +517,7 @@ export async function buildContractInvoiceDraft(
 
     draftLines.push({
       cm_id:          line.id,
-      replaces_cm_id: (line as unknown as { replaces_contract_machine_id: string | null }).replaces_contract_machine_id ?? null,
+      replaces_cm_id: line.replaces_contract_machine_id ?? null,
       contract_id:    contractId,
       numero_contrat: contract.numero_contrat,
       machine_id:     line.machine_id,
@@ -580,13 +580,8 @@ export async function listBillableContracts(
 
   const map = new Map<string, { id: string; numero_contrat: string; client_name: string }>()
   for (const row of data ?? []) {
-    const r = row as unknown as {
-      statut: string | null
-      date_fin: string | null
-      contracts: { id: string; numero_contrat: string; statut: string | null; clients: { nom_client: string } }
-    }
-    if (!isLineBillable(r.statut, r.contracts?.statut ?? null, r.date_fin)) continue
-    const c = r.contracts
+    if (!isLineBillable(row.statut, row.contracts?.statut ?? null, row.date_fin)) continue
+    const c = row.contracts
     if (c) map.set(c.id, { id: c.id, numero_contrat: c.numero_contrat, client_name: c.clients?.nom_client ?? '—' })
   }
   return [...map.values()].sort((a, b) => a.numero_contrat.localeCompare(b.numero_contrat))

@@ -42,7 +42,7 @@ export default async function FacturesPage() {
         {(!invoices || invoices.length === 0) && (
           <p className="px-6 py-8 text-sm text-center text-ink-muted">Aucune facture émise.</p>
         )}
-        {(invoices ?? []).map((inv: InvoiceRow) => {
+        {((invoices ?? []) as InvoiceRow[]).map((inv) => {
           const monthLabel = new Date(inv.period_year, inv.period_month - 1)
             .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
           return (

@@ -27,7 +27,7 @@ export default async function PortalPage() {
 
   if (!clientProfile) redirect('/portal/verify')
 
-  const clientName = (clientProfile.clients as unknown as { nom_client: string } | null)?.nom_client ?? ''
+  const clientName = clientProfile.clients?.nom_client ?? ''
 
   // Contratos activos del cliente
   const { data: contracts } = await supabase

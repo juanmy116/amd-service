@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
+import type { TablesUpdate } from '@/lib/supabase/types'
 import { sendCsatForIncident } from '@/lib/csat'
 
 export async function updateIncidentStatusAction(
@@ -22,9 +24,12 @@ export async function updateIncidentStatusAction(
     return { error: 'Non autorisé' }
   }
 
+  const status = parseEnum(newStatus, INCIDENT_STATUSES)
+  if (!status) return { error: 'Statut invalide' }
+
   const admin = createAdminClient()
 
-  const updates: Record<string, unknown> = { status: newStatus }
+  const updates: TablesUpdate<'incidents'> = { status }
   if (newStatus === 'résolu' && oldStatus !== 'résolu') updates.resolved_at = new Date().toISOString()
   if (newStatus === 'fermé'  && oldStatus !== 'fermé')  updates.closed_at   = new Date().toISOString()
 

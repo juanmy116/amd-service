@@ -18,24 +18,10 @@ export default async function NewMaintenancePlanPage() {
       .select('contract_id'),
   ])
 
-  type RawContractMachineLine = {
-    id: string
-    statut: string
-    date_fin: string | null
-    machines: { marque: string; modele: string } | null
-  }
-
-  type RawContract = {
-    id: string
-    numero_contrat: string
-    clients: { nom_client: string } | null
-    contract_machines: RawContractMachineLine[]
-  }
-
   const plannedIds = new Set((existingPlans ?? []).map(p => p.contract_id))
 
   // Build a display label per contract using the first active machine
-  const availableContracts = ((allContracts ?? []) as unknown as RawContract[])
+  const availableContracts = (allContracts ?? [])
     .filter(c => !plannedIds.has(c.id))
     .map(c => {
       const firstActiveMachine = (c.contract_machines ?? [])

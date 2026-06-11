@@ -50,11 +50,8 @@ export default async function CalendrierPage() {
   const events: CalEvent[] = []
 
   for (const v of visits ?? []) {
-    const plan     = v.maintenance_plans as unknown as { id: string } | null
-    const line     = v.contract_machines as unknown as {
-      machines: { marque: string; modele: string } | null
-      contracts: { clients: { nom_client: string } | null } | null
-    } | null
+    const plan     = v.maintenance_plans
+    const line     = v.contract_machines
     const client   = line?.contracts?.clients?.nom_client ?? '—'
     const machine  = `${line?.machines?.marque ?? ''} ${line?.machines?.modele ?? ''}`.trim()
     const cfg      = VISIT_COLOR[v.status] ?? VISIT_COLOR.planifié

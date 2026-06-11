@@ -14,6 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
+      billing_plan_versions: {
+        Row: {
+          created_at: string
+          effective_from: string
+          fixed_fee: number | null
+          id: string
+          plan_id: string
+          price_bw: number | null
+          price_color: number | null
+          tiers: Json | null
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          effective_from: string
+          fixed_fee?: number | null
+          id?: string
+          plan_id: string
+          price_bw?: number | null
+          price_color?: number | null
+          tiers?: Json | null
+          type: string
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string
+          fixed_fee?: number | null
+          id?: string
+          plan_id?: string
+          price_bw?: number | null
+          price_color?: number | null
+          tiers?: Json | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_plan_versions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "billing_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_plans: {
+        Row: {
+          active: boolean
+          created_at: string
+          fixed_fee: number | null
+          id: string
+          name: string
+          price_bw: number | null
+          price_color: number | null
+          tiers: Json | null
+          type: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          fixed_fee?: number | null
+          id?: string
+          name: string
+          price_bw?: number | null
+          price_color?: number | null
+          tiers?: Json | null
+          type: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          fixed_fee?: number | null
+          id?: string
+          name?: string
+          price_bw?: number | null
+          price_color?: number | null
+          tiers?: Json | null
+          type?: string
+        }
+        Relationships: []
+      }
       client_profiles: {
         Row: {
           client_id: number
@@ -89,44 +169,123 @@ export type Database = {
         }
         Relationships: []
       }
+      contract_machine_override_versions: {
+        Row: {
+          contract_machine_id: string
+          created_at: string
+          effective_from: string
+          fixed_fee_override: number | null
+          id: string
+          price_bw_override: number | null
+          price_color_override: number | null
+        }
+        Insert: {
+          contract_machine_id: string
+          created_at?: string
+          effective_from: string
+          fixed_fee_override?: number | null
+          id?: string
+          price_bw_override?: number | null
+          price_color_override?: number | null
+        }
+        Update: {
+          contract_machine_id?: string
+          created_at?: string
+          effective_from?: string
+          fixed_fee_override?: number | null
+          id?: string
+          price_bw_override?: number | null
+          price_color_override?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_machine_override_versions_contract_machine_id_fkey"
+            columns: ["contract_machine_id"]
+            isOneToOne: false
+            referencedRelation: "contract_machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_machine_override_versions_contract_machine_id_fkey"
+            columns: ["contract_machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machine_park"
+            referencedColumns: ["open_line_id"]
+          },
+        ]
+      }
       contract_machines: {
         Row: {
           billing_day_override: number | null
+          billing_plan_id: string | null
           contract_id: string
           created_at: string
           date_debut: string
           date_fin: string | null
+          end_counter_bw: number | null
+          end_counter_color: number | null
+          fixed_fee_override: number | null
           id: string
           machine_id: string
           maintenance_frequency_override: string | null
           notes: string | null
+          price_bw_override: number | null
+          price_color_override: number | null
+          replaces_contract_machine_id: string | null
+          start_counter_bw: number | null
+          start_counter_color: number | null
           statut: Database["public"]["Enums"]["contract_machine_status"]
         }
         Insert: {
           billing_day_override?: number | null
+          billing_plan_id?: string | null
           contract_id: string
           created_at?: string
           date_debut: string
           date_fin?: string | null
+          end_counter_bw?: number | null
+          end_counter_color?: number | null
+          fixed_fee_override?: number | null
           id?: string
           machine_id: string
           maintenance_frequency_override?: string | null
           notes?: string | null
+          price_bw_override?: number | null
+          price_color_override?: number | null
+          replaces_contract_machine_id?: string | null
+          start_counter_bw?: number | null
+          start_counter_color?: number | null
           statut?: Database["public"]["Enums"]["contract_machine_status"]
         }
         Update: {
           billing_day_override?: number | null
+          billing_plan_id?: string | null
           contract_id?: string
           created_at?: string
           date_debut?: string
           date_fin?: string | null
+          end_counter_bw?: number | null
+          end_counter_color?: number | null
+          fixed_fee_override?: number | null
           id?: string
           machine_id?: string
           maintenance_frequency_override?: string | null
           notes?: string | null
+          price_bw_override?: number | null
+          price_color_override?: number | null
+          replaces_contract_machine_id?: string | null
+          start_counter_bw?: number | null
+          start_counter_color?: number | null
           statut?: Database["public"]["Enums"]["contract_machine_status"]
         }
         Relationships: [
+          {
+            foreignKeyName: "contract_machines_billing_plan_id_fkey"
+            columns: ["billing_plan_id"]
+            isOneToOne: false
+            referencedRelation: "billing_plans"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contract_machines_contract_id_fkey"
             columns: ["contract_id"]
@@ -140,6 +299,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "machines"
             referencedColumns: ["numero_serie"]
+          },
+          {
+            foreignKeyName: "contract_machines_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machine_park"
+            referencedColumns: ["numero_serie"]
+          },
+          {
+            foreignKeyName: "contract_machines_replaces_contract_machine_id_fkey"
+            columns: ["replaces_contract_machine_id"]
+            isOneToOne: false
+            referencedRelation: "contract_machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_machines_replaces_contract_machine_id_fkey"
+            columns: ["replaces_contract_machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machine_park"
+            referencedColumns: ["open_line_id"]
           },
         ]
       }
@@ -443,6 +623,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "incidents_contract_machine_id_fkey"
+            columns: ["contract_machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machine_park"
+            referencedColumns: ["open_line_id"]
+          },
+          {
             foreignKeyName: "incidents_machine_id_fkey"
             columns: ["machine_id"]
             isOneToOne: false
@@ -450,8 +637,208 @@ export type Database = {
             referencedColumns: ["numero_serie"]
           },
           {
+            foreignKeyName: "incidents_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machine_park"
+            referencedColumns: ["numero_serie"]
+          },
+          {
             foreignKeyName: "incidents_opened_by_fkey"
             columns: ["opened_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_counters: {
+        Row: {
+          last_number: number
+          year: number
+        }
+        Insert: {
+          last_number?: number
+          year: number
+        }
+        Update: {
+          last_number?: number
+          year?: number
+        }
+        Relationships: []
+      }
+      invoice_lines: {
+        Row: {
+          amount_bw: number
+          amount_color: number
+          amount_fixed: number
+          amount_total: number
+          billing_type: string
+          breakdown: Json | null
+          contract_id: string | null
+          created_at: string
+          delta_bw: number
+          delta_color: number
+          fixed_fee: number | null
+          id: string
+          invoice_id: string
+          is_estimated: boolean
+          machine_id: string | null
+          machine_label: string
+          numero_contrat: string
+          plan_name: string
+          price_bw: number | null
+          price_color: number | null
+          tiers: Json | null
+        }
+        Insert: {
+          amount_bw?: number
+          amount_color?: number
+          amount_fixed?: number
+          amount_total?: number
+          billing_type: string
+          breakdown?: Json | null
+          contract_id?: string | null
+          created_at?: string
+          delta_bw?: number
+          delta_color?: number
+          fixed_fee?: number | null
+          id?: string
+          invoice_id: string
+          is_estimated?: boolean
+          machine_id?: string | null
+          machine_label: string
+          numero_contrat: string
+          plan_name: string
+          price_bw?: number | null
+          price_color?: number | null
+          tiers?: Json | null
+        }
+        Update: {
+          amount_bw?: number
+          amount_color?: number
+          amount_fixed?: number
+          amount_total?: number
+          billing_type?: string
+          breakdown?: Json | null
+          contract_id?: string | null
+          created_at?: string
+          delta_bw?: number
+          delta_color?: number
+          fixed_fee?: number | null
+          id?: string
+          invoice_id?: string
+          is_estimated?: boolean
+          machine_id?: string | null
+          machine_label?: string
+          numero_contrat?: string
+          plan_name?: string
+          price_bw?: number | null
+          price_color?: number | null
+          tiers?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_lines_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          annulation_reason: string | null
+          annulled_at: string | null
+          annulled_by: string | null
+          client_id: number
+          client_name: string
+          contract_id: string | null
+          created_at: string
+          currency: string
+          has_estimated: boolean
+          has_replacement: boolean
+          id: string
+          issued_at: string
+          issued_by: string | null
+          numero_facture: string
+          period_end: string | null
+          period_month: number
+          period_start: string | null
+          period_year: number
+          status: string
+          total_amount: number
+        }
+        Insert: {
+          annulation_reason?: string | null
+          annulled_at?: string | null
+          annulled_by?: string | null
+          client_id: number
+          client_name: string
+          contract_id?: string | null
+          created_at?: string
+          currency?: string
+          has_estimated?: boolean
+          has_replacement?: boolean
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          numero_facture: string
+          period_end?: string | null
+          period_month: number
+          period_start?: string | null
+          period_year: number
+          status?: string
+          total_amount?: number
+        }
+        Update: {
+          annulation_reason?: string | null
+          annulled_at?: string | null
+          annulled_by?: string | null
+          client_id?: number
+          client_name?: string
+          contract_id?: string | null
+          created_at?: string
+          currency?: string
+          has_estimated?: boolean
+          has_replacement?: boolean
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          numero_facture?: string
+          period_end?: string | null
+          period_month?: number
+          period_start?: string | null
+          period_year?: number
+          status?: string
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_annulled_by_fkey"
+            columns: ["annulled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_issued_by_fkey"
+            columns: ["issued_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -585,10 +972,24 @@ export type Database = {
             referencedColumns: ["numero_serie"]
           },
           {
+            foreignKeyName: "machine_counters_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machine_park"
+            referencedColumns: ["numero_serie"]
+          },
+          {
             foreignKeyName: "machine_counters_previous_machine_id_fkey"
             columns: ["previous_machine_id"]
             isOneToOne: false
             referencedRelation: "machines"
+            referencedColumns: ["numero_serie"]
+          },
+          {
+            foreignKeyName: "machine_counters_previous_machine_id_fkey"
+            columns: ["previous_machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machine_park"
             referencedColumns: ["numero_serie"]
           },
           {
@@ -769,6 +1170,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "maintenance_visits_contract_machine_id_fkey"
+            columns: ["contract_machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machine_park"
+            referencedColumns: ["open_line_id"]
+          },
+          {
             foreignKeyName: "maintenance_visits_done_by_fkey"
             columns: ["done_by"]
             isOneToOne: false
@@ -882,6 +1290,13 @@ export type Database = {
             referencedRelation: "machines"
             referencedColumns: ["numero_serie"]
           },
+          {
+            foreignKeyName: "princity_alerts_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machine_park"
+            referencedColumns: ["numero_serie"]
+          },
         ]
       }
       princity_api_logs: {
@@ -970,9 +1385,41 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_machine_park: {
+        Row: {
+          active: boolean | null
+          client_id: number | null
+          localisation: string | null
+          louee: boolean | null
+          marque: string | null
+          modele: string | null
+          numero_contrat: string | null
+          numero_serie: string | null
+          open_contract_id: string | null
+          open_date_debut: string | null
+          open_line_id: string | null
+          type: Database["public"]["Enums"]["machine_type"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_machines_contract_id_fkey"
+            columns: ["open_contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      assign_machine_from_stock: { Args: { p_payload: Json }; Returns: string }
       auth_client_contract_ids: { Args: never; Returns: string[] }
       auth_client_contract_machine_ids: { Args: never; Returns: string[] }
       auth_client_machine_ids: { Args: never; Returns: string[] }
@@ -995,8 +1442,12 @@ export type Database = {
         Returns: Json
       }
       create_contract_with_lines: { Args: { payload: Json }; Returns: Json }
+      emit_contract_invoice: { Args: { p_payload: Json }; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       next_incident_number: { Args: never; Returns: string }
+      next_invoice_number: { Args: never; Returns: string }
+      replace_contract_machine: { Args: { p_payload: Json }; Returns: string }
+      return_machine_to_stock: { Args: { p_payload: Json }; Returns: string }
       update_contract_with_lines: {
         Args: { p_contract_id: string; payload: Json }
         Returns: Json

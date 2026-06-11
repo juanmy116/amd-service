@@ -28,12 +28,8 @@ export default async function MaintenanceVisitPage({
 
   if (!visit) notFound()
 
-  const plan    = visit.maintenance_plans as unknown as { notes: string | null } | null
-  const line    = visit.contract_machines as unknown as {
-    machine_id: string
-    machines: { numero_serie: string; marque: string; modele: string; localisation: string | null } | null
-    contracts: { clients: { nom_client: string } | null } | null
-  } | null
+  const plan    = visit.maintenance_plans
+  const line    = visit.contract_machines
   const machine = line?.machines
   const client  = line?.contracts?.clients
 

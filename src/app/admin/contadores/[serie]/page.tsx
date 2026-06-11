@@ -58,7 +58,7 @@ export default async function ContadoresDetailPage({
     contract = data as { id: string; numero_contrat: string; clients: { id: number; nom_client: string } | null } | null
   }
 
-  const client = contract?.clients as unknown as { id: number; nom_client: string } | null
+  const client = contract?.clients ?? null
 
   const { data: allCounters } = await supabase
     .from('machine_counters')
