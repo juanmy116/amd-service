@@ -9,6 +9,7 @@ export async function loginAs(page: Page, email: string) {
   await page.goto('/login')
   await page.fill('input[name="email"]', email)
   await page.fill('input[name="password"]', E2E.password)
-  // Hay un tab "Connexion" (type=button) y el submit del form: apuntamos al submit.
-  await page.locator('form button[type="submit"]').click()
+  // Hay un tab "Connexion" (type=button) y un submit de Google: apuntamos al
+  // submit cuyo texto es exactamente "Connexion".
+  await page.locator('button[type="submit"]:has-text("Connexion")').click()
 }
