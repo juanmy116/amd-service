@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
+import { getIncidentDisplayName } from '@/lib/incident'
 
 const PRIORITY_COLOR: Record<string, string> = {
   urgente: '#BF0D0D',
@@ -105,7 +106,7 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
                   {inc.numero_incident}
                 </p>
                 <p className="text-sm font-semibold text-ink truncate">
-                  {inc.clients?.nom_client ?? inc.machine_id ?? inc.title}
+                  {getIncidentDisplayName(inc)}
                 </p>
                 <p className="text-xs text-ink-muted truncate mt-0.5">{inc.title}</p>
                 <div className="flex items-center gap-2 mt-1.5">

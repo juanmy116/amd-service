@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import TechIncidentList from '@/components/tech/TechIncidentList'
 import type { TechIncident } from '@/components/tech/TechIncidentList'
+import { TECH_INCIDENT_SELECT } from '@/lib/incident'
 
 export default async function TechIncidentsPage() {
   const supabase = await createClient()
@@ -13,7 +14,7 @@ export default async function TechIncidentsPage() {
   // se muestran por su numéro de série.
   const { data } = await supabase
     .from('incidents')
-    .select('id, numero_incident, title, status, priority, created_at, machine_id, contract_machines(contracts(clients(nom_client)))')
+    .select(TECH_INCIDENT_SELECT)
     .eq('assigned_to', user.id)
     .order('created_at', { ascending: false })
 
