@@ -4,25 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { Camera, AlertCircle } from 'lucide-react'
-
-// Extrae el nº de serie del contenido del QR. El QR codifica la URL del gateway
-// (.../m/<serie>), pero toleramos también rutas antiguas (/maquina/, /tech/scan/)
-// y un nº de serie suelto.
-function extractSerie(raw: string): string {
-  const t = raw.trim()
-  try {
-    const segs = new URL(t).pathname.split('/').filter(Boolean)
-    return decodeURIComponent(segs.at(-1) ?? t)
-  } catch {
-    const m = t.match(/\/(?:m|maquina|tech\/scan)\/([^/?#]+)/)
-    if (m) return decodeURIComponent(m[1])
-    if (t.startsWith('/')) {
-      const segs = t.split('/').filter(Boolean)
-      return decodeURIComponent(segs.at(-1) ?? t)
-    }
-    return t
-  }
-}
+import { extractSerie } from '@/lib/qr'
 
 export default function QrScanner() {
   const videoRef    = useRef<HTMLVideoElement>(null)
