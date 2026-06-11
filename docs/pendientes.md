@@ -73,6 +73,9 @@ Solo si se quiere blindar el camino entero de punta a punta. Playwright.
 
 ---
 
-## 3. 🧹 PR-cleanup del refactor N-máquinas (ver CLAUDE.md)
+## 3. ✅ PR-cleanup del refactor N-máquinas — COMPLETADO (cerrar)
 
-DROP de columnas legacy (`contracts.machine_id`, `contracts.lieu_installation`, `incidents.contract_id`) + funciones SECURITY DEFINER legacy. Detalle en `docs/superpowers/specs/2026-06-03-contracts-n-machines-design.md` §6.
+- ✅ Columnas legacy eliminadas en prod (`contracts.machine_id`, `contracts.lieu_installation`, `incidents.contract_id`) — verificado 2026-06-11: no existen (Fase 4, PR #30).
+- ℹ️ Las funciones `auth_tech_incident_*` NO se borran: la Fase 4 las reescribió para el modelo N-máquinas y están EN USO por policies RLS del técnico. No son residuos.
+
+Nada pendiente aquí. (Historial: `docs/superpowers/specs/2026-06-03-contracts-n-machines-design.md` §6.)

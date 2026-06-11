@@ -14,7 +14,7 @@ Aplicación web para la gestión de incidencias (SAV) de AMD Service, empresa de
 
 ## Estado actual del desarrollo
 
-La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). Último merge: PR #49 (`8631f11`) el 2026-06-09 — resultado del gate final de facturación.
+La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). Último merge: PR #70 (`ebdef89`) el 2026-06-11 — cierre de la **auditoría de infraestructura y seguridad** (PRs #58–#70: 2 P0 de RLS, P1 de integridad, tipado Supabase `<Database>` (47→7 casts, `types.ts` regenerado), higiene/limpieza de código muerto, retirada del cálculo legacy de facturación + índice huérfano, banner de error en email/anulación de factura, y limpieza del token `rounded-input`). Detalle en la memoria `project_auditoria_infra_seguridad_2026_06_10` y `docs/architecture.md`.
 
 > **Core de facturación reconstruido, desplegado y validado (2026-06-09).** Tras la auditoría preproducción (Codex, NO-GO), se rediseñó el core completo en 9 PRs (#39–#49): modelo parque/stock (estado alquilada/stock derivado, RPCs `assign/return_machine_from/to_stock`), cálculo de consumo por línea/cliente, ciclo de facturación por **aniversario del contrato** (`billing_day`→día anterior del mes siguiente, clamp día 31), facturas **inmutables** en BD (trigger), coherencia contable en emisión, y **vigencia temporal de tarifas**. Las 11 migraciones se desplegaron a prod (con reconciliación previa del historial git↔BD vía `migration repair`). **Gate final E2E PASADO (GO):** suite completa sobre datos sintéticos + inmutabilidad probada por SQL directo + limpieza verificada. Detalle: `docs/gate-final-facturacion-2026-06-08.md` y `docs/architecture.md`. ⚠️ **Pendiente operativo (no código):** cargar los contratos reales (máquinas desde stock con su lectura, plan, `billing_day`) antes de emitir la primera factura real — hoy hay 0 contratos.
 
@@ -28,8 +28,11 @@ La app SAV está **completa y en producción** (`https://amd-service.vercel.app`
 - **Importador CSV de máquinas** (PR #22)
 - **Refactor contratos N máquinas** (PR #23): tabla `contract_machines` con date_debut/date_fin/statut por línea + overrides billing_day/maintenance_frequency. Una máquina solo puede tener una línea abierta (date_fin NULL) a la vez. Incidencias internas vía `contract_machine_id`; públicas mantienen `machine_id` directo. CHECK XOR en `incidents`. Edge functions Princity (alerts + counters) actualizadas y redeployed a v6.
 
-### ⚠️ Pendiente — PR-cleanup del refactor (ventana ≥ 2026-06-10)
-DROP columnas legacy (`contracts.machine_id`, `contracts.lieu_installation`, `incidents.contract_id`) + funciones SECURITY DEFINER legacy (`auth_tech_incident_*`). Detalles en `docs/superpowers/specs/2026-06-03-contracts-n-machines-design.md` §6 y memoria `project_contracts_refactor.md`.
+### ✅ PR-cleanup del refactor N-máquinas — completado
+- ✅ **Columnas legacy eliminadas en prod** (`contracts.machine_id`, `contracts.lieu_installation`, `incidents.contract_id`) — verificado 2026-06-11: ya no existen (cleanup de la Fase 4, PR #30).
+- ℹ️ Las funciones `auth_tech_incident_*` (`_ids`, `_contract_ids`, `_machine_ids`) **NO** se borraron: la Fase 4 las **reescribió** para el modelo N-máquinas y siguen **en uso** por policies RLS del técnico (`tech_contracts_select`, `tech_incident_history_select`, `tech_incident_parts_*`). No son residuos.
+
+Historial en `docs/superpowers/specs/2026-06-03-contracts-n-machines-design.md` §6 y memoria `project_contracts_refactor.md`.
 
 ### ✅ Rediseño UI "Híbrido" — completado
 Refresco visual de la app interna (presentación pura, sin cambios de lógica ni rutas).
