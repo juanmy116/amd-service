@@ -11,6 +11,7 @@ import {
   parseBooleanParam,
   firstParam,
   parseNonNegativeIntParam,
+  parsePositiveIntParam,
 } from '@/lib/search'
 import { parseEnum, MACHINE_TYPES } from '@/lib/enums'
 
@@ -25,13 +26,21 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
   const q = sanitizeSearchQuery(firstParam(sp.q))
   const typeFilter = parseEnum(firstParam(sp.type), MACHINE_TYPES)
   const activeFilter = parseBooleanParam(firstParam(sp.active))
+  const clientId = parsePositiveIntParam(sp.client)
   const importedCount = parseNonNegativeIntParam(firstParam(sp.imported))
   const skippedCount = parseNonNegativeIntParam(firstParam(sp.skipped))
 
   const supabase = await createClient()
 
+  // Clientes: alimentan el desplegable de filtro y resuelven el nombre de cada
+  // máquina (la vista del parque solo expone client_id).
+  const clientsRes = await supabase.from('clients').select('id, nom_client').order('nom_client')
+  const clientMap = new Map((clientsRes.data ?? []).map((c) => [c.id, c.nom_client]))
+
+  // v_machine_park = parque derivado: cada máquina con su línea de contrato abierta
+  // (cliente actual) o sin cliente si está en stock. Incluye TODAS las máquinas.
   let query = supabase
-    .from('machines')
+    .from('v_machine_park')
     .select('*')
     .order('marque')
     .limit(RESULT_LIMIT)
@@ -39,10 +48,16 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
   if (q) query = query.or(buildSafeOr(SEARCH_COLUMNS, q))
   if (typeFilter) query = query.eq('type', typeFilter)
   if (activeFilter !== null) query = query.eq('active', activeFilter)
+  if (clientId) query = query.eq('client_id', clientId)
 
   const { data: machines, error } = await query
   if (error) { console.error('[machines]', error); throw new Error('DATA_FETCH_ERROR') }
-  const hasFilters = q !== null || typeFilter !== null || activeFilter !== null
+  const hasFilters = q !== null || typeFilter !== null || activeFilter !== null || clientId !== null
+
+  const clientOptions = (clientsRes.data ?? []).map((c) => ({
+    value: String(c.id),
+    label: c.nom_client,
+  }))
 
   return (
     <div className="p-8">
@@ -82,6 +97,11 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
         placeholder="Rechercher par nº série, marque ou modèle…"
         filters={[
           {
+            param: 'client',
+            label: 'Tous les clients',
+            options: clientOptions,
+          },
+          {
             param: 'type',
             label: 'Tous les types',
             options: [
@@ -106,6 +126,7 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
             <tr className="bg-neutral-soft border-b border-line-subtle">
               <th className={TH}>Nº Série</th>
               <th className={TH}>Marque / Modèle</th>
+              <th className={TH}>Client</th>
               <th className={TH}>Type</th>
               <th className={TH}>Localisation</th>
               <th className={TH}>Statut</th>
@@ -115,18 +136,20 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
           <tbody className="divide-y divide-line-subtle">
             {(!machines || machines.length === 0) && (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-ink-muted">
+                <td colSpan={7} className="px-5 py-10 text-center text-ink-muted">
                   {hasFilters ? 'Aucune machine ne correspond aux filtres' : 'Aucune machine enregistrée'}
                 </td>
               </tr>
             )}
             {machines?.map((m) => {
-              const href = `/admin/machines/${encodeURIComponent(m.numero_serie)}`
+              const serie = m.numero_serie ?? ''
+              const href = `/admin/machines/${encodeURIComponent(serie)}`
+              const clientName = m.client_id != null ? clientMap.get(m.client_id) ?? null : null
               return (
-                <tr key={m.numero_serie} className="hover:bg-neutral-soft transition-colors">
+                <tr key={serie} className="hover:bg-neutral-soft transition-colors">
                   <td className="px-5 py-4 font-mono text-xs">
                     <Link href={href} className="text-ink-soft hover:text-accent transition-colors">
-                      {m.numero_serie}
+                      {serie}
                     </Link>
                   </td>
                   <td className="px-5 py-4">
@@ -136,6 +159,7 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
                       <span className="text-ink-soft group-hover:text-accent transition-colors">{m.modele}</span>
                     </Link>
                   </td>
+                  <td className="px-5 py-4 text-ink-soft">{clientName ?? '—'}</td>
                   <td className="px-5 py-4">
                     <Badge variant={m.type === 'color' ? 'violet' : 'neutral'}>
                       {m.type === 'color' ? 'Couleur' : 'N&B'}
