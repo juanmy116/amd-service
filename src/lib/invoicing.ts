@@ -170,92 +170,9 @@ export type LineCounters = {
 }
 
 /**
- * ⚠️ LEGACY (WP-3, 2026-06-10): variante MENSUAL ya sin uso en producción tras retirar
- * la emisión por cliente/mes. Se conserva SOLO porque sus tests cubren escenarios de negocio
- * (retirada a stock, asignación desde stock, máquina reseteada A→stock→B, H-D7) que la versión
- * viva computeLineConsumptionCycle aún no replica test a test. Retirarla está agendado (WP-3b)
- * junto con portar esa cobertura al cálculo por ciclo. No añadir nuevos usos.
- *
- * Consumo facturable de UNA línea (puesto-máquina) en el mes (year, month).
- * Modelo H-D5: los puntos de inicio/cierre de un reemplazo viven en la propia línea
- * (start_counter / end_counter), no como filas de machine_counters. El consumo del mes es
- * lectura_final − lectura_inicial, donde:
- *  - lectura_final: si la línea se cerró en el mes (reemplazo) → end_counter; si sigue
- *    abierta → el relevé normal de la máquina en el mes.
- *  - lectura_inicial: si la línea empezó en el mes con start_counter → start_counter; si
- *    venía de antes → el relevé normal de la máquina del mes anterior más reciente.
- * Si falta algún punto → línea estimada (consumo 0, solo forfait).
- */
-export function computeLineConsumption(
-  line: LineCounters,
-  counters: Counter[],
-  year: number,
-  month: number,
-  periodStart: string,
-  periodEnd: string,
-): { delta_bw: number; delta_color: number; is_estimated: boolean } {
-  const inMonth = (d: string | null): boolean => d !== null && d >= periodStart && d <= periodEnd
-  const ESTIMATED = { delta_bw: 0, delta_color: 0, is_estimated: true }
-
-  // Lectura final dentro del mes.
-  // H-D6: solo una línea cerrada POR REEMPLAZO tiene end_counter. Una línea retirada sin
-  // reemplazo (flujo "retire": date_fin sin end_counter) debe facturar su último consumo con
-  // el relevé normal del mes — si no, se infrafactura (regla R1 del núcleo).
-  let finalBw: number | null = null
-  let finalColor: number | null = null
-  const closedByReplacementInMonth =
-    line.date_fin !== null && inMonth(line.date_fin) &&
-    line.end_counter_bw !== null && line.end_counter_color !== null   // H-D7: ambos puntos
-
-  if (closedByReplacementInMonth) {
-    finalBw    = line.end_counter_bw
-    finalColor = line.end_counter_color
-  } else {
-    // Relevé normal del mes (cubre: línea abierta Y línea retirada sin end_counter).
-    const monthReading = counters
-      .filter(c => c.status === 'actif' && c.year === year && c.month === month)
-      .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at))[0]
-    if (monthReading) {
-      finalBw    = monthReading.counter_bw
-      finalColor = monthReading.counter_color
-    }
-  }
-
-  // Lectura inicial dentro del mes
-  let initBw: number | null = null
-  let initColor: number | null = null
-  if (inMonth(line.date_debut)) {
-    if (line.start_counter_bw !== null) {
-      initBw    = line.start_counter_bw
-      initColor = line.start_counter_color
-    }
-    // línea normal en su primer mes (sin start_counter) → sin base previa
-  } else {
-    const prev = counters
-      .filter(c => c.status === 'actif' && (c.year < year || (c.year === year && c.month < month)))
-      .sort((a, b) =>
-        b.year  !== a.year  ? b.year  - a.year  :
-        b.month !== a.month ? b.month - a.month :
-        b.recorded_at.localeCompare(a.recorded_at))[0]
-    if (prev) {
-      initBw    = prev.counter_bw
-      initColor = prev.counter_color
-    }
-  }
-
-  // Aritmética vía la primitiva compartida con Contadores (counterDelta). La POLÍTICA es
-  // propia de facturación: falta de punto o delta negativo → línea estimada (solo forfait).
-  const delta_bw    = counterDelta(finalBw, initBw)
-  const delta_color = counterDelta(finalColor, initColor)
-  if (delta_bw === null || delta_color === null) return ESTIMATED  // falta un punto → estimado
-  if (delta_bw < 0 || delta_color < 0) return ESTIMATED           // incoherencia → no facturar negativo
-  return { delta_bw, delta_color, is_estimated: false }
-}
-
-/**
  * BLOQUE E — consumo facturable de UNA línea en un CICLO de aniversario [periodStart, periodEnd]
- * (fechas ISO inclusivas). Variante de computeLineConsumption que filtra los relevés por su
- * FECHA real (counterDate), no por mes natural, porque un ciclo cruza dos meses.
+ * (fechas ISO inclusivas). Filtra los relevés por su FECHA real (counterDate), no por mes
+ * natural, porque un ciclo de aniversario cruza dos meses.
  *  - lectura_final: si la línea se cerró por reemplazo DENTRO del ciclo → end_counter; si no →
  *    el relevé activo más reciente cuya fecha cae dentro del ciclo (la captura del billing_day).
  *  - lectura_inicial: si la línea empezó DENTRO del ciclo con start_counter → start_counter; si
