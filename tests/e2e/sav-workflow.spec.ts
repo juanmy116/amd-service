@@ -17,13 +17,13 @@ test('recorrido: admin asigna → técnico ve → scan → en_cours', async ({ p
   await page.goto(`/admin/incidents/${ids.incidentId}`)
   await page.selectOption('select[name="assigned_to"]', ids.techId)
   await page.getByRole('button', { name: 'Enregistrer' }).click()
-  await page.waitForURL('**/admin/incidents**', { timeout: 30_000 }).catch(() => {})
 
   // Verificación independiente (service_role): la incidencia quedó assigné + asignada.
-  const afterAssign = await admin
-    .from('incidents').select('status, assigned_to').eq('id', ids.incidentId).single()
-  expect(afterAssign.data?.assigned_to).toBe(ids.techId)
-  expect(afterAssign.data?.status).toBe('assigné')
+  // Se sondea: la Server Action persiste y redirige de forma asíncrona tras el submit.
+  await expect.poll(async () => {
+    const r = await admin.from('incidents').select('status, assigned_to').eq('id', ids.incidentId).single()
+    return r.data
+  }, { timeout: 20_000 }).toEqual(expect.objectContaining({ assigned_to: ids.techId, status: 'assigné' }))
 
   // 2) El técnico la ve en su lista.
   await page.context().clearCookies()
