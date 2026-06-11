@@ -37,10 +37,16 @@ jobs:
       - name: Start Supabase (aplica las migraciones)
         run: supabase start
 
-      - name: Grants de service_role (backend) en el entorno local
+      - name: Grants estándar de Supabase en el entorno local (default privileges)
+        # En prod Supabase otorga a anon/authenticated/service_role en cada tabla
+        # del schema public (default privileges, fuera de las migraciones). El
+        # Postgres local del CLI no las reproduce → sin GRANT SELECT a authenticated,
+        # los embeddings de PostgREST (p.ej. /tech/incidents → contract_machines→
+        # contracts→clients) fallan y vacían la query. El AISLAMIENTO lo siguen
+        # garantizando las RLS policies (que filtran filas), no estos grants.
         run: |
           DB_URL=$(supabase status -o json | jq -r '.DB_URL')
-          psql "$DB_URL" -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;"
+          psql "$DB_URL" -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;"
 
       - name: Exportar env de Supabase local (tests + app)
         run: |
