@@ -20,7 +20,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Node 22+ trae WebSocket nativo, que supabase-js (realtime) necesita al
+          # construir el cliente. Con Node 20 los tests fallan en createClient().
+          node-version: '22'
           cache: 'npm'
 
       - run: npm ci
