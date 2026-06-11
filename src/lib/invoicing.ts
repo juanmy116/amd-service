@@ -503,14 +503,13 @@ export async function buildContractInvoiceDraft(
 
     // P1-6: excluir líneas suspendidas / huérfanas de contrato terminé.
     const lineStatut = line.statut
-    const lc = line
-    if (!isLineBillable(lineStatut, contractStatut, lc.date_fin)) continue
+    if (!isLineBillable(lineStatut, contractStatut, line.date_fin)) continue
 
     // P0-3: atribución por contrato. Consumo del CICLO (no del mes natural).
     const machineCounters = countersByMachine.get(line.machine_id) ?? []
-    const counters = countersForLine(contractId, lc.date_debut, lc.date_fin, machineCounters)
+    const counters = countersForLine(contractId, line.date_debut, line.date_fin, machineCounters)
     const { delta_bw, delta_color, is_estimated } = computeLineConsumptionCycle(
-      lc, counters, periodStart, periodEnd,
+      line, counters, periodStart, periodEnd,
     )
 
     const amounts = calculateMonthlyAmount(tariff, delta_bw, delta_color)

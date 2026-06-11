@@ -55,7 +55,7 @@ export default async function ContadoresDetailPage({
       .select('id, numero_contrat, clients(id, nom_client)')
       .eq('id', openLine.contract_id)
       .maybeSingle()
-    contract = data as { id: string; numero_contrat: string; clients: { id: number; nom_client: string } | null } | null
+    contract = data
   }
 
   const client = contract?.clients ?? null
