@@ -3,6 +3,14 @@ import { requireAdmin } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { buildInvoiceWorkbook, type InvoiceHeader, type InvoiceLineRow } from '@/lib/invoice-xlsx'
 
+// WP-5c: estas acciones se invocan desde <form> sin useActionState; un `throw` queda
+// ENMASCARADO por Next.js en producción (el admin no ve por qué falló). En su lugar
+// redirigimos de vuelta al detalle con ?error=… y la página lo muestra en un banner
+// (mismo patrón que el ?sent=1 del éxito).
+function failRedirect(id: string, message: string): never {
+  redirect(`/admin/factures/${id}?error=${encodeURIComponent(message)}`)
+}
+
 export async function annulInvoiceAction(id: string, fd: FormData): Promise<void> {
   const { user, supabase } = await requireAdmin()
   const reason = (fd.get('reason') as string)?.trim() || null
@@ -10,26 +18,26 @@ export async function annulInvoiceAction(id: string, fd: FormData): Promise<void
     .update({ status: 'annulee', annulled_by: user.id, annulled_at: new Date().toISOString(), annulation_reason: reason })
     .eq('id', id).eq('status', 'emise')
     .select('id')
-  if (error) { console.error('[annul]', error); throw new Error('Annulation impossible.') }
-  if (!data || data.length === 0) throw new Error('Facture déjà annulée ou introuvable.')
+  if (error) { console.error('[annul]', error); failRedirect(id, 'Annulation impossible.') }
+  if (!data || data.length === 0) failRedirect(id, 'Facture déjà annulée ou introuvable.')
   redirect(`/admin/factures/${id}`)
 }
 
 export async function emailInvoiceAction(id: string): Promise<void> {
   const { supabase } = await requireAdmin()
   const recipients = (process.env.BILLING_NOTIFY_EMAILS ?? '').split(',').map(s => s.trim()).filter(Boolean)
-  if (recipients.length === 0) throw new Error('BILLING_NOTIFY_EMAILS non configurée.')
+  if (recipients.length === 0) failRedirect(id, 'BILLING_NOTIFY_EMAILS non configurée.')
 
   const { data: inv, error: invErr } = await supabase.from('invoices').select('*').eq('id', id).single()
   // PGRST116 = sin filas (factura inexistente) → mensaje claro; el resto = fallo técnico.
-  if (invErr && invErr.code !== 'PGRST116') { console.error('[emailInvoice] invoices', invErr); throw new Error('Erreur technique : envoi annulé.') }
-  if (!inv) throw new Error('Facture introuvable.')
-  if (inv.status !== 'emise') throw new Error('Facture annulée : envoi impossible.')
+  if (invErr && invErr.code !== 'PGRST116') { console.error('[emailInvoice] invoices', invErr); failRedirect(id, 'Erreur technique : envoi annulé.') }
+  if (!inv) failRedirect(id, 'Facture introuvable.')
+  if (inv.status !== 'emise') failRedirect(id, 'Facture annulée : envoi impossible.')
 
   const { data: lines, error: linesErr } = await supabase.from('invoice_lines').select('*').eq('invoice_id', id).order('numero_contrat')
   // P2-1: un fallo técnico de lectura NO debe degradar a "factura sin líneas" — abortar el envío.
-  if (linesErr) { console.error('[emailInvoice] invoice_lines', linesErr); throw new Error('Erreur technique : envoi annulé.') }
-  if (!lines || lines.length === 0) throw new Error('Facture sans lignes : envoi annulé.')
+  if (linesErr) { console.error('[emailInvoice] invoice_lines', linesErr); failRedirect(id, 'Erreur technique : envoi annulé.') }
+  if (!lines || lines.length === 0) failRedirect(id, 'Facture sans lignes : envoi annulé.')
 
   const buf = await buildInvoiceWorkbook(inv as InvoiceHeader, lines as InvoiceLineRow[])
   const base64 = buf.toString('base64')
@@ -46,6 +54,6 @@ export async function emailInvoiceAction(id: string): Promise<void> {
       attachments: [{ filename: `${inv.numero_facture}.xlsx`, content: base64 }],
     }),
   })
-  if (!res.ok) { console.error('[emailInvoice]', await res.text()); throw new Error('Envoi email impossible.') }
+  if (!res.ok) { console.error('[emailInvoice]', await res.text()); failRedirect(id, 'Envoi email impossible.') }
   redirect(`/admin/factures/${id}?sent=1`)
 }
