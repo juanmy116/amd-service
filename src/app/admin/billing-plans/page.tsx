@@ -18,7 +18,7 @@ export default async function BillingPlansPage() {
           <h1 className="text-xl font-bold text-ink">Plans de facturation</h1>
           <p className="text-sm text-ink-muted mt-0.5">Catalogue des types de facturation AMD</p>
         </div>
-        <Link href="/admin/billing-plans/new" className="rounded-input bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90">+ Nouveau plan</Link>
+        <Link href="/admin/billing-plans/new" className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90">+ Nouveau plan</Link>
       </div>
       <Card className="divide-y divide-line">
         {(!plans || plans.length === 0) && (

@@ -100,19 +100,19 @@ export default async function FactureDetailPage({
 
       <div className="flex flex-wrap items-center gap-3">
         <a href={`/admin/factures/${id}/xlsx`}
-          className="rounded-input border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-neutral-soft transition-colors">
+          className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-neutral-soft transition-colors">
           Télécharger le tableur
         </a>
         <form action={boundEmail}>
-          <button type="submit" className="rounded-input border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-neutral-soft transition-colors">
+          <button type="submit" className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-neutral-soft transition-colors">
             Envoyer par email
           </button>
         </form>
         {!isAnnulee && (
           <form action={boundAnnul} className="flex items-center gap-2 ml-auto">
             <input name="reason" type="text" placeholder="Motif d'annulation…"
-              className="rounded-input border border-line bg-card px-3 py-2 text-sm text-ink" />
-            <button type="submit" className="rounded-input border border-accent/20 bg-accent-soft px-4 py-2 text-sm font-medium text-accent hover:bg-accent/10 transition-colors">
+              className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink" />
+            <button type="submit" className="rounded-lg border border-accent/20 bg-accent-soft px-4 py-2 text-sm font-medium text-accent hover:bg-accent/10 transition-colors">
               Annuler la facture
             </button>
           </form>

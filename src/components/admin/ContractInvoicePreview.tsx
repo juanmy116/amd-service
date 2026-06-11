@@ -35,17 +35,17 @@ export default function ContractInvoicePreview({ contracts, selectedContract, ye
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <select value={selectedContract ?? ''} onChange={e => nav({ contract: e.target.value })}
-          className="rounded-input border border-line bg-card px-3 py-2 text-sm text-ink">
+          className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink">
           {contracts.length === 0 && <option value="">Aucun contrat facturable</option>}
           {contracts.map(c => <option key={c.id} value={c.id}>{c.numero_contrat} — {c.client_name}</option>)}
         </select>
         <select value={month} onChange={e => nav({ month: Number(e.target.value) })}
-          className="rounded-input border border-line bg-card px-3 py-2 text-sm text-ink">
+          className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink">
           {Array.from({ length: 12 }, (_, i) => i + 1).map(m =>
             <option key={m} value={m}>{new Date(2000, m - 1).toLocaleDateString('fr-FR', { month: 'long' })}</option>)}
         </select>
         <select value={year} onChange={e => nav({ year: Number(e.target.value) })}
-          className="rounded-input border border-line bg-card px-3 py-2 text-sm text-ink">
+          className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink">
           {[year - 1, year, year + 1].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
         <span className="text-xs text-ink-muted">Cycle ancré sur {anchorLabel}</span>
@@ -126,12 +126,12 @@ export default function ContractInvoicePreview({ contracts, selectedContract, ye
                 <>
                   <p className="text-sm text-warning mr-auto">⚠️ Des machines n&apos;ont pas de relevé pour ce cycle. En forçant, ces lignes seront facturées au forfait (estimées).</p>
                   <button name="confirm_estimated" value="true" type="submit"
-                    className="rounded-input bg-warning px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+                    className="rounded-lg bg-warning px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
                     Forcer la facturation (lignes estimées)
                   </button>
                 </>
               ) : (
-                <button type="submit" className="rounded-input bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90">
+                <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90">
                   Émettre la facture
                 </button>
               )}

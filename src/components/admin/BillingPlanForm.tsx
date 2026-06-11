@@ -15,7 +15,7 @@ type Props = {
 }
 
 const inputClass =
-  'w-full rounded-input border border-line bg-card px-3.5 py-2.5 text-sm text-ink ' +
+  'w-full rounded-lg border border-line bg-card px-3.5 py-2.5 text-sm text-ink ' +
   'placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/40'
 
 export default function BillingPlanForm({ action, defaultValues, submitLabel = 'Enregistrer' }: Props) {
@@ -121,7 +121,7 @@ export default function BillingPlanForm({ action, defaultValues, submitLabel = '
       )}
 
       <button type="submit" disabled={pending || !!tiersError}
-        className="w-full rounded-input bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-60 transition-colors">
+        className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-60 transition-colors">
         {pending ? 'Enregistrement…' : submitLabel}
       </button>
     </form>
