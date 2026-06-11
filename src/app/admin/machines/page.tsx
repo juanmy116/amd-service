@@ -32,11 +32,6 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
 
   const supabase = await createClient()
 
-  // Clientes: alimentan el desplegable de filtro y resuelven el nombre de cada
-  // máquina (la vista del parque solo expone client_id).
-  const clientsRes = await supabase.from('clients').select('id, nom_client').order('nom_client')
-  const clientMap = new Map((clientsRes.data ?? []).map((c) => [c.id, c.nom_client]))
-
   // v_machine_park = parque derivado: cada máquina con su línea de contrato abierta
   // (cliente actual) o sin cliente si está en stock. Incluye TODAS las máquinas.
   let query = supabase
@@ -50,8 +45,15 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
   if (activeFilter !== null) query = query.eq('active', activeFilter)
   if (clientId) query = query.eq('client_id', clientId)
 
-  const { data: machines, error } = await query
+  // Las dos consultas son independientes → en paralelo. Los clientes alimentan el
+  // desplegable de filtro y resuelven el nombre de cada máquina (la vista solo
+  // expone client_id).
+  const [clientsRes, { data: machines, error }] = await Promise.all([
+    supabase.from('clients').select('id, nom_client').order('nom_client'),
+    query,
+  ])
   if (error) { console.error('[machines]', error); throw new Error('DATA_FETCH_ERROR') }
+  const clientMap = new Map((clientsRes.data ?? []).map((c) => [c.id, c.nom_client]))
   const hasFilters = q !== null || typeFilter !== null || activeFilter !== null || clientId !== null
 
   const clientOptions = (clientsRes.data ?? []).map((c) => ({
