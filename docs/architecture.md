@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-06-09 — **core de facturación reconstruido, desplegado en prod y validado por gate E2E (GO)**. PRs #39–#50. Ver §Gate final y `docs/gate-final-facturacion-2026-06-08.md`.
+> Última actualización: 2026-06-11 — **3 capas de tests montadas** (unit + aislamiento RLS + E2E Playwright, ver §Testing), endurecimiento RLS de `maintenance_visits` + `auth_rls_initplan`, borrado/terminación atómicos de contrato (`delete_contract`/`terminate_contract`), cabos de auditoría cerrados y reconstrucción limpia de la BD arreglada (P0-1). PRs #74–#85.
 
 ---
 
@@ -1087,6 +1087,8 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - **RLS activado** en todas las tablas
 - **Políticas por rol:** admin acceso total, technician acceso a sus incidencias, client acceso a sus contratos/máquinas/incidencias
 - **Recursión infinita resuelta** mediante funciones `SECURITY DEFINER`: `auth_tech_incident_ids`, `auth_tech_incident_contract_ids` (reescrita: deriva vía `contract_machine_id`), `auth_tech_incident_machine_ids`, `auth_tech_assigned_client_ids` (reescrita: deriva vía `contract_machine_id`), `auth_client_contract_ids`, `auth_client_machine_ids`. Las dos reescritas ya no usan `incidents.contract_id` (columna eliminada).
+- **Aislamiento RLS de `maintenance_visits` (2026-06-11):** antes `tech_read_visits`/`tech_update_visits` filtraban solo por rol → cualquier técnico veía/editaba las visitas de otro. Ahora un técnico ve "las suyas + las de sus máquinas" vía la función `auth_tech_visit_ids()` (`assigned_to = él` OR `contract_machine_id` de una máquina en `auth_tech_assigned_machine_ids()`). `admin_all_visits` intacta. Migración `20260611150000`.
+- **`auth_rls_initplan` + índice (2026-06-11):** las ~19 policies que llamaban `auth.uid()` por fila reescritas a `(SELECT auth.uid())` (se evalúa una vez por query) preservando la semántica exacta; advisor `auth_rls_initplan` = 0 en toda la BD. Nuevo índice `incidents_assigned_to_idx` (columna por la que filtran todas las queries del técnico y su RLS). Migración `20260611140000`.
 - **RPCs SECURITY DEFINER de contratos/mantenimiento** (todas con guard `IF auth.role() <> 'service_role' THEN RAISE EXCEPTION`):
   - `create_contract_with_lines(payload jsonb)` — crea contrato + sus N líneas `contract_machines` atómicamente
   - `update_contract_with_lines(p_contract_id uuid, payload jsonb)` — actualiza contrato y reconcilia sus líneas
@@ -1205,6 +1207,17 @@ Hallazgos P0 confirmados con SQL real contra producción y corregidos en el PR W
 - Auth check en Server Actions: `await requireAdmin()` o `await requireTechnician()` desde `@/lib/auth` — devuelven `{ user, profile, supabase }`
 - Validación de enums en Server Actions: `parseEnum(formData.get('x'), ENUM_CONST)` desde `@/lib/enums` — devuelve el valor tipado o `null`
 - Rate limiting en endpoints públicos: `checkRateLimit('login', identifier)` desde `@/lib/rate-limit` antes de cualquier procesamiento. IP del cliente: `getClientIp()` en Server Actions, `getClientIpFromHeaders(req.headers)` en route handlers
+
+---
+
+## Testing (3 capas)
+
+Montadas en 2026-06-11 (cierra el plan de tests de `docs/pendientes.md` §1). Cada capa tiene su comando y, las de integración, su propio job de CI que levanta un **Supabase local efímero (Docker)** — separados del CI normal porque éste no tiene Supabase.
+
+- **Unit (vitest)** — `npm test`. Lógica pura en `src/lib` (`billing`, `invoicing`, `counters`, `qr`, `incident`). `include: src/**/*.test.ts`. Corre en el CI normal (`ci.yml`: typecheck + test + build).
+- **Aislamiento RLS (vitest + Supabase local)** — `npm run test:rls` (config `vitest.rls.config.ts`, `tests/rls/`). Job `.github/workflows/rls.yml`: `supabase start` → grant `service_role` → tests firmando como cada rol (técnico ve solo lo suyo, cliente sus contratos, admin todo, anon nada, técnico no edita incidencia ajena). Helpers en `tests/rls/helpers.ts` (crear usuarios por rol, sign-in, fixtures, cleanup `*.test`).
+- **E2E (Playwright + app + Supabase local)** — `npm run test:e2e` (`playwright.config.ts`, `tests/e2e/`). Job `.github/workflows/e2e.yml`: `supabase start` → grants a los 3 roles → `build`+`start` → Chromium. Specs: login por rol + recorrido SAV (admin asigna → `assigné` → técnico ve en `/tech` → `/tech/scan/<serie>` → `en_cours` + `incident_history`). Reutiliza los helpers de RLS.
+- **Notas de reproducibilidad (aprendidas al montar los tests):** (1) la cadena de migraciones **ahora sí se reconstruye desde cero** — se arregló un `REVOKE` sobre funciones legacy inexistentes (`20260508182457`, con `to_regprocedure` condicional) que abortaba `db reset` (cerró de verdad el P0-1, que estaba mal dado por resuelto). (2) El Postgres local del CLI no reproduce las **default privileges** de Supabase → los jobs otorgan grants explícitos (RLS solo `service_role`; E2E los 3 roles, porque los **embeddings de PostgREST** como `/tech/incidents` necesitan `GRANT SELECT` a `authenticated`). El aislamiento lo garantizan las RLS policies, no estos grants.
 
 ---
 
