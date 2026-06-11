@@ -1,0 +1,15 @@
+-- Limpieza: retira la función SECURITY DEFINER HUÉRFANA `auth_tech_incident_machine_ids()`.
+--
+-- Se creó (migración 20260509150833) para la policy `tech_machines_select` de `machines`, pero
+-- esa policy se reescribió a `auth_tech_assigned_machine_ids()` en el refactor N-máquinas
+-- (migración 20260603170237) porque la función leía `incidents.machine_id`, que pasó a ser NULL
+-- para las incidencias internas. Desde entonces quedó sin uso: el cleanup 20260605000000 la dejó
+-- intacta a propósito. Verificado el 2026-06-11 que CERO objetos la usan (0 policies vía pg_depend,
+-- 0 funciones/vistas que la invoquen, 0 referencias en el código de la app).
+--
+-- Sus hermanas `auth_tech_incident_ids()` y `auth_tech_incident_contract_ids()` SIGUEN en uso por
+-- policies RLS del técnico y NO se tocan.
+--
+-- Sin CASCADE: si por algún motivo existiera una dependencia no detectada, el DROP debe fallar
+-- (red de seguridad) en vez de arrastrar objetos en silencio.
+DROP FUNCTION IF EXISTS public.auth_tech_incident_machine_ids();

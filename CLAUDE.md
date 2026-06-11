@@ -28,10 +28,10 @@ La app SAV está **completa y en producción** (`https://amd-service.vercel.app`
 - **Importador CSV de máquinas** (PR #22)
 - **Refactor contratos N máquinas** (PR #23): tabla `contract_machines` con date_debut/date_fin/statut por línea + overrides billing_day/maintenance_frequency. Una máquina solo puede tener una línea abierta (date_fin NULL) a la vez. Incidencias internas vía `contract_machine_id`; públicas mantienen `machine_id` directo. CHECK XOR en `incidents`. Edge functions Princity (alerts + counters) actualizadas y redeployed a v6.
 
-### 🟢 PR-cleanup del refactor N-máquinas — esencialmente completo (queda 1 función huérfana)
+### ✅ PR-cleanup del refactor N-máquinas — completado (2026-06-11)
 - ✅ **Columnas legacy eliminadas en prod** (`contracts.machine_id`, `contracts.lieu_installation`, `incidents.contract_id`) — verificado 2026-06-11: ya no existen (cleanup de la Fase 4, PR #30).
 - ✅ **EN USO, no tocar:** `auth_tech_incident_ids()` (policies `tech_incident_history_select`, `tech_incident_parts_select/insert/delete`) y `auth_tech_incident_contract_ids()` (policy `tech_contracts_select`) — verificado vía `pg_depend` 2026-06-11.
-- ⏳ **`auth_tech_incident_machine_ids()` es HUÉRFANA** (residuo legacy real): su policy `tech_machines_select` se reescribió a `auth_tech_assigned_machine_ids()` en el refactor (migración `20260603170237`); verificado 2026-06-11 que **0 policies / funciones / vistas / código la usan**. Se dejó intacta a propósito en el cleanup `20260605000000`. Candidata a `DROP FUNCTION` en un PR menor.
+- ✅ **`auth_tech_incident_machine_ids()` (huérfana) ELIMINADA** — migración `20260611110000`. Era residuo legacy sin uso (su policy `tech_machines_select` se reescribió a `auth_tech_assigned_machine_ids()` en `20260603170237`).
 
 Historial en `docs/superpowers/specs/2026-06-03-contracts-n-machines-design.md` §6 y memoria `project_contracts_refactor.md`.
 
