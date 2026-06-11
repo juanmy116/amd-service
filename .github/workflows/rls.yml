@@ -34,6 +34,16 @@ jobs:
       - name: Start Supabase (aplica las migraciones)
         run: supabase start
 
+      - name: Grants de service_role (backend) en el entorno local
+        # En prod, service_role tiene acceso total al schema public vía las default
+        # privileges que configura Supabase (fuera de las migraciones). El Postgres
+        # local del CLI no las reproduce siempre → se otorgan explícitamente. Solo
+        # afecta a service_role (backend, nunca expuesto al cliente); NO toca anon/
+        # authenticated, los roles cuyo aislamiento RLS se está probando.
+        run: |
+          DB_URL=$(supabase status -o json | jq -r '.DB_URL')
+          psql "$DB_URL" -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;"
+
       - name: Exportar claves locales al entorno
         run: |
           echo "API_URL=$(supabase status -o json | jq -r '.API_URL')" >> "$GITHUB_ENV"
