@@ -6,7 +6,15 @@
 
 ---
 
-## 1. 🧪 Tests de los flujos críticos — PRIORIDAD ALTA
+## 1. ✅ Tests de los flujos críticos — Fases 1 y 2 COMPLETADAS (2026-06-11)
+
+- ✅ **Fase 1** (PR #77): `extractSerie()` → `src/lib/qr.ts` + tests; `getIncidentDisplayName` + `TECH_INCIDENT_SELECT` en `src/lib/incident.ts` + tests.
+- ✅ **Fase 2 — aislamiento RLS** (PR #82): `tests/rls/` corre contra Supabase local efímero (Docker) en el job de CI `.github/workflows/rls.yml` (`npm run test:rls`). 6 tests: técnico ve solo lo suyo (no lo de otro técnico), cliente sus contratos, admin todo, anon nada, técnico no edita incidencia ajena. **Verificado en CI sobre base reconstruida desde cero.**
+- ⏳ **Fase 3 (E2E Playwright)** — opcional, no abordada. Sigue en backlog si se quiere blindar el recorrido completo.
+
+> ⚠️ **Hallazgo del montaje (P0-1 parcialmente reabierto y vuelto a cerrar):** la reconstrucción limpia de migraciones fallaba por un `REVOKE` sobre funciones legacy inexistentes (`20260508182457`) — arreglado con `to_regprocedure` condicional. Además, el Postgres local del CLI no reproduce las default privileges de Supabase para `service_role` → el job de CI las otorga explícitamente (solo `service_role`, backend). La cadena de migraciones **ahora sí se reconstruye desde cero** (verificado en CI).
+
+<details><summary>Contexto original (histórico)</summary>
 
 ### Por qué
 La cobertura de tests actual (`billing.test.ts`, `invoicing.test.ts` = 67 tests) cubre **solo el núcleo financiero**. Toda la experiencia de usuario —flujo de incidencias, queries dependientes de RLS, escáner QR, Server Actions— **no tiene tests**. Los 4 bugs de incidencias arreglados el 2026-06-09/10 (técnico veía 0 incidencias por un `select` roto; RLS de `machines` que ignoraba incidencias públicas; escáner que parseaba mal el QR; pantalla en blanco) vivían justo en esa zona y llegaron a producción sin que nada saltara. Esta tarea cierra ese hueco.
@@ -65,11 +73,13 @@ Solo si se quiere blindar el camino entero de punta a punta. Playwright.
 ### Orden recomendado
 **Fase 1 primero** (rápida, ya cierra el bug del escáner y fija el `select`). Luego **Fase 2** (la que más vale). Fase 3 solo si sobra tiempo. Cada fase es un PR propio.
 
+</details>
+
 ---
 
-## 2. 🔒 RLS permisiva de `maintenance_visits` (prioridad media)
+## 2. ✅ RLS de `maintenance_visits` — COMPLETADO (2026-06-11, PR #79)
 
-`supabase/migrations/20260511145143_maintenance_system.sql` (policies `tech_read_visits` / `tech_update_visits`) filtra solo por `role = 'technician'`, **sin** `assigned_to`. Cualquier técnico puede leer/editar visitas de otro. Contrasta con `incidents`, que sí restringe por `assigned_to = auth.uid()`. Endurecer con cuidado: el flujo de scan de mantenimiento (`tech/scan/[serie]/page.tsx`) lee visitas; validar que no se rompe. PR propio.
+Antes `tech_read_visits`/`tech_update_visits` filtraban solo por rol → cualquier técnico veía/editaba las visitas de otro. Ahora un técnico ve "las suyas + las de sus máquinas" vía la función `auth_tech_visit_ids()` (`assigned_to = él` OR la visita es de una máquina en `auth_tech_assigned_machine_ids()`). `admin_all_visits` intacta. Migración `20260611150000`. Verificado en prod (advisor `auth_rls_initplan` = 0 en toda la BD; smoke test) y por los tests RLS de la Fase 2.
 
 ---
 
