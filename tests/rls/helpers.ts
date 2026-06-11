@@ -63,9 +63,10 @@ export async function cleanup(admin: SupabaseClient): Promise<void> {
   if (clientIds.length) await admin.from('client_profiles').delete().in('client_id', clientIds)
   await admin.from('clients').delete().like('nom_client', 'TEST %')
 
+  // Borra usuarios de prueba de RLS (@rls.test) y E2E (@e2e.test) — dominio .test reservado.
   const { data } = await admin.auth.admin.listUsers()
   for (const u of data?.users ?? []) {
-    if (u.email?.endsWith('@rls.test')) {
+    if (u.email?.endsWith('.test')) {
       await admin.auth.admin.deleteUser(u.id)
     }
   }
