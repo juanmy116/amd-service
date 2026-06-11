@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import {
-  BILLING_TYPE_LABEL, validateTiers,
+  BILLING_TYPE_LABEL, validateTiers, TIERED_TYPES,
   type BillingPlan, type BillingTier, type BillingType,
 } from '@/lib/billing'
 
@@ -28,7 +28,8 @@ export default function BillingPlanForm({ action, defaultValues, submitLabel = '
     ]
   )
 
-  const tiersError = type === 'hybrid_tiered' ? validateTiers(tiers) : null
+  const isTiered = TIERED_TYPES.includes(type)
+  const tiersError = isTiered ? validateTiers(tiers) : null
 
   function addTier() {
     setTiers(prev => {
@@ -66,7 +67,7 @@ export default function BillingPlanForm({ action, defaultValues, submitLabel = '
         </select>
       </div>
 
-      {(type === 'hybrid' || type === 'hybrid_tiered') && (
+      {type !== 'per_copy' && (
         <div>
           <label className="block text-sm font-medium text-ink-soft mb-1.5">Forfait mensuel (FCFA) <span className="text-accent">*</span></label>
           <input name="fixed_fee" type="number" min="0" step="1" required defaultValue={defaultValues?.fixed_fee ?? ''} className={inputClass} />
@@ -86,7 +87,7 @@ export default function BillingPlanForm({ action, defaultValues, submitLabel = '
         </div>
       )}
 
-      {type === 'hybrid_tiered' && (
+      {isTiered && (
         <div>
           <input type="hidden" name="tiers" value={JSON.stringify(tiers)} />
           <div className="flex items-center justify-between mb-2">
@@ -117,6 +118,11 @@ export default function BillingPlanForm({ action, defaultValues, submitLabel = '
           </div>
           {tiersError && <p className="text-xs text-accent mt-2">{tiersError}</p>}
           <p className="text-xs text-ink-muted mt-2">La dernière tranche est toujours illimitée. Minimum 2 tranches.</p>
+          <p className="text-xs text-ink-muted mt-1">
+            {type === 'tiered_total'
+              ? 'Au volume total : le volume total du mois détermine UN seul prix, appliqué à toutes les copies.'
+              : 'Par tranche : chaque palier de copies est facturé à son propre prix (cumulatif).'}
+          </p>
         </div>
       )}
 

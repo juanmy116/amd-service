@@ -238,3 +238,71 @@ describe('calculateMonthlyAmount — redondeo por componente', () => {
     expect(r.amount_total).toBe(25000)
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// tiered_total — tarifa REAL de AMD: precio ÚNICO según el VOLUMEN TOTAL del canal.
+// El volumen total del mes determina el precio por copia, aplicado a TODAS las copias.
+// La tabla es la UNIÓN de los cortes B&N (cada 2.500) y color (cientos), con el precio
+// que toca a cada canal en cada sub-tramo → reproduce exactamente las dos escalas de AMD.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('calculateMonthlyAmount — tiered_total (volumen total, tarifa AMD)', () => {
+  // up_to INCLUSIVO; último ilimitado. Fijo 25.000 por máquina.
+  const AMD: EffectiveTariff = {
+    type: 'tiered_total', fixed_fee: 25000, price_bw: null, price_color: null,
+    tiers: [
+      { up_to: 500,   price_bw: 10,  price_color: 65 },
+      { up_to: 1500,  price_bw: 10,  price_color: 60 },
+      { up_to: 2500,  price_bw: 10,  price_color: 55 },
+      { up_to: 3000,  price_bw: 9.5, price_color: 55 },
+      { up_to: 5000,  price_bw: 9.5, price_color: 50 },
+      { up_to: 10000, price_bw: 9,   price_color: 45 },
+      { up_to: 15000, price_bw: 8.5, price_color: 40 },
+      { up_to: 20000, price_bw: 8,   price_color: 40 },
+      { up_to: null,  price_bw: 7,   price_color: 40 },
+    ],
+  }
+
+  it('B&N: el precio lo fija el volumen total y se aplica a todas las copias', () => {
+    // 6.000 copias → tramo "5.001-10.000" → 9 → 6.000×9 = 54.000
+    expect(calculateMonthlyAmount(AMD, 6000, 0).amount_bw).toBe(54000)
+    // 12.000 → "10.001-15.000" → 8,5 → 102.000
+    expect(calculateMonthlyAmount(AMD, 12000, 0).amount_bw).toBe(102000)
+  })
+
+  it('B&N: fronteras de tramo (umbral superior inclusivo)', () => {
+    expect(calculateMonthlyAmount(AMD, 2500, 0).amount_bw).toBe(25000)  // 2.500 → 10
+    expect(calculateMonthlyAmount(AMD, 2501, 0).amount_bw).toBe(23760)  // 2.501 → 9,5 → 23.759,5 → 23.760
+    expect(calculateMonthlyAmount(AMD, 20000, 0).amount_bw).toBe(160000) // 20.000 → 8
+    expect(calculateMonthlyAmount(AMD, 20001, 0).amount_bw).toBe(140007) // 20.001 → 7 (efecto salto)
+  })
+
+  it('Color: usa su propia escala aunque comparta la tabla con B&N', () => {
+    expect(calculateMonthlyAmount(AMD, 0, 2000).amount_color).toBe(110000) // 2.000 → "1.501-3.000" → 55
+    expect(calculateMonthlyAmount(AMD, 0, 500).amount_color).toBe(32500)   // 500 → 65
+    expect(calculateMonthlyAmount(AMD, 0, 501).amount_color).toBe(30060)   // 501 → 60
+    expect(calculateMonthlyAmount(AMD, 0, 3001).amount_color).toBe(150050) // 3.001 → 50
+    expect(calculateMonthlyAmount(AMD, 0, 12000).amount_color).toBe(480000) // >10.001 → 40
+  })
+
+  it('máquina color: B&N + color + un solo forfait (ejemplo de referencia)', () => {
+    // 6.000 B&N (54.000) + 2.000 color (110.000) + forfait 25.000 = 189.000
+    const r = calculateMonthlyAmount(AMD, 6000, 2000)
+    expect(r.amount_fixed).toBe(25000)
+    expect(r.amount_bw).toBe(54000)
+    expect(r.amount_color).toBe(110000)
+    expect(r.amount_total).toBe(189000)
+  })
+
+  it('máquina B&N sin copias color: solo forfait + B&N', () => {
+    const r = calculateMonthlyAmount(AMD, 6000, 0)
+    expect(r.amount_color).toBe(0)
+    expect(r.amount_total).toBe(79000) // 54.000 + 25.000
+  })
+
+  it('cero copias: solo el forfait', () => {
+    const r = calculateMonthlyAmount(AMD, 0, 0)
+    expect(r.amount_bw).toBe(0)
+    expect(r.amount_color).toBe(0)
+    expect(r.amount_total).toBe(25000)
+  })
+})
