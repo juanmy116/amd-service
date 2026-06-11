@@ -12,4 +12,7 @@ export async function loginAs(page: Page, email: string) {
   // Hay un tab "Connexion" (type=button) y un submit de Google: apuntamos al
   // submit cuyo texto es exactamente "Connexion".
   await page.locator('button[type="submit"]:has-text("Connexion")').click()
+  // Esperar a que el login complete y el dashboard redirija (fuera de /login),
+  // para que la cookie de sesión esté lista antes de navegar a rutas protegidas.
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30_000 })
 }
