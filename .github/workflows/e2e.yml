@@ -1,0 +1,90 @@
+name: E2E tests
+
+# Fase 3: recorrido SAV de punta a punta (Playwright) contra la app + un Supabase
+# LOCAL efímero (Docker). Separado del CI normal y de los tests RLS.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tests/e2e/**'
+      - 'playwright.config.ts'
+      - 'src/app/login/**'
+      - 'src/app/admin/incidents/**'
+      - 'src/app/tech/**'
+      - 'src/middleware.ts'
+      - '.github/workflows/e2e.yml'
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase (aplica las migraciones)
+        run: supabase start
+
+      - name: Grants estándar de Supabase en el entorno local (default privileges)
+        # En prod Supabase otorga a anon/authenticated/service_role en cada tabla
+        # del schema public (default privileges, fuera de las migraciones). El
+        # Postgres local del CLI no las reproduce → sin GRANT SELECT a authenticated,
+        # los embeddings de PostgREST (p.ej. /tech/incidents → contract_machines→
+        # contracts→clients) fallan y vacían la query. El AISLAMIENTO lo siguen
+        # garantizando las RLS policies (que filtran filas), no estos grants.
+        run: |
+          DB_URL=$(supabase status -o json | jq -r '.DB_URL')
+          psql "$DB_URL" -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;"
+
+      - name: Exportar env de Supabase local (tests + app)
+        run: |
+          API_URL=$(supabase status -o json | jq -r '.API_URL')
+          ANON_KEY=$(supabase status -o json | jq -r '.ANON_KEY')
+          SERVICE_ROLE_KEY=$(supabase status -o json | jq -r '.SERVICE_ROLE_KEY')
+          {
+            echo "API_URL=$API_URL"
+            echo "ANON_KEY=$ANON_KEY"
+            echo "SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SECRET_KEY=$SERVICE_ROLE_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Build de la app (rutas precompiladas → E2E estable)
+        run: npm run build
+
+      - name: Arrancar la app (next start) en segundo plano
+        run: |
+          npm run start > /tmp/next.log 2>&1 &
+          npx wait-on http://localhost:3000 --timeout 120000
+
+      - name: Tests E2E
+        run: npm run test:e2e
+
+      - name: Log de la app si falla
+        if: failure()
+        run: tail -100 /tmp/next.log || true
+
+      - name: Subir report de Playwright
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
