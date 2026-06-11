@@ -73,7 +73,11 @@ Solo si se quiere blindar el camino entero de punta a punta. Playwright.
 
 ---
 
-## 3. 🧹 Cierre automático de líneas al terminar un contrato (prioridad media)
+## 3. ✅ Cierre de líneas al terminar un contrato — COMPLETADO (2026-06-11)
+
+Implementado en PR #80: acción "Terminer le contrat" + RPC `terminate_contract` (migración `20260611160000`). Cierra todas las líneas abiertas exigiendo la lectura final del contador de cada máquina, marca el contrato `terminé`, devuelve las máquinas al stock y borra las visitas futuras no realizadas. Decisión tomada: **se exige lectura final** (coherente con `return_machine_to_stock`). Verificado E2E en prod sobre datos sintéticos con rollback. Detalle abajo (histórico).
+
+<details><summary>Especificación original (histórico)</summary>
 
 ### Por qué
 Marcar un contrato como `terminé` (vía `update_contract_with_lines`, `supabase/migrations/20260610101000_update_contract_lines_counter_guards.sql:107-114`) **NO cierra** sus líneas `contract_machines` abiertas (`date_fin IS NULL`). Consecuencias:
@@ -93,6 +97,10 @@ Hoy el único cierre desde UI es el array `retire` manual del formulario (`Contr
 El CHECK `contract_machines_termine_has_date_fin` (`statut <> 'terminé' OR date_fin IS NOT NULL`) obliga a que toda línea `terminé` tenga `date_fin`. El índice único `contract_machines_one_open_per_machine` garantiza una sola línea abierta por máquina.
 
 > Origen: nota operativa del triaje de la auditoría de facturación (2026-06-11), hallazgo asociado a P1-6. No bloquea facturar, pero conviene cerrarlo para mantener el parque coherente. PR propio.
+
+**Decisiones tomadas al implementar:** (1) se exige lectura final; (3) se cierran todas las líneas abiertas; (4) RPC nueva `terminate_contract`; (5) se borran las visitas futuras no realizadas (la máquina sale del parque). `date_fin` = fecha indicada por el admin en el modal.
+
+</details>
 
 ---
 
