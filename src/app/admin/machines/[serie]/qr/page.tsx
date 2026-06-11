@@ -1,9 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import Image from 'next/image'
-import QrCanvas from './qr-canvas'
+import QRCode from 'qrcode'
 import PrintButtons from './print-buttons'
-import { getOpenLineForMachine } from '@/lib/contract-machines'
 
 export default async function MachineQrPage({
   params,
@@ -16,128 +14,110 @@ export default async function MachineQrPage({
 
   const { data: machine } = await supabase
     .from('machines')
-    .select('*')
+    .select('marque, modele, numero_serie')
     .eq('numero_serie', numero_serie)
     .single()
 
   if (!machine) notFound()
 
-  const openLine = await getOpenLineForMachine(supabase, numero_serie)
-  let contract: { numero_contrat: string; clients: unknown } | null = null
-  if (openLine) {
-    const { data } = await supabase
-      .from('contracts')
-      .select('numero_contrat, clients(id, nom_client)')
-      .eq('id', openLine.contract_id)
-      .maybeSingle()
-    contract = data
-  }
-
-  const client = contract?.clients as unknown as { id: number; nom_client: string } | null
   const qrUrl = `${process.env.NEXT_PUBLIC_APP_URL}/m/${encodeURIComponent(numero_serie)}`
+
+  // QR vectorial (SVG) con corrección de errores alta (H): nítido a cualquier
+  // tamaño de impresión y tolerante a desgaste/suciedad de la etiqueta física.
+  const qrSvg = await QRCode.toString(qrUrl, {
+    type: 'svg',
+    errorCorrectionLevel: 'H',
+    margin: 1,
+    color: { dark: '#000000', light: '#ffffff' },
+  })
 
   return (
     <>
       <style>{`
+        .etq-label {
+          width: 68mm;
+          height: 100mm;
+          background: #FFFFFF;
+          border: 1px solid #E5E7EB;
+          border-radius: 10px;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          font-family: Helvetica, Arial, sans-serif;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .etq-head {
+          background: #BF0D0D;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 6px 12px;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .etq-head img { height: 8.1mm; width: auto; object-fit: contain; display: block; }
+        .etq-body { padding: 3mm 5mm 0; flex: 0 0 auto; }
+        .etq-field { margin-bottom: 1.6mm; }
+        .etq-k {
+          font-size: 7pt; letter-spacing: .06em; text-transform: uppercase;
+          color: #A1A1AA; margin: 0 0 .4mm;
+        }
+        .etq-v {
+          font-size: 11pt; font-weight: 700; color: #18181B; margin: 0;
+          overflow-wrap: break-word; word-break: break-word;
+        }
+        .etq-v-mono {
+          font-family: ui-monospace, Menlo, monospace; font-size: 8.5pt;
+          font-weight: 700; color: #18181B; margin: 0;
+          overflow-wrap: anywhere; word-break: break-all;
+        }
+        .etq-qr {
+          background: #FFFFFF;
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          flex: 1 1 auto; flex-shrink: 0; padding: 2mm 4mm 4mm;
+        }
+        .etq-qr svg { width: 44mm; height: 44mm; display: block; }
+        .etq-qr p {
+          margin: 1.6mm 0 0; text-align: center; font-size: 8pt; font-weight: 700;
+          color: #BF0D0D; line-height: 1.3;
+        }
         @media print {
           body { margin: 0; }
           .no-print { display: none !important; }
-          .label { box-shadow: none !important; border: 1px solid #ccc !important; }
+          .etq-label { box-shadow: none !important; border-radius: 0; }
         }
       `}</style>
 
       {/* Botones imprimir/cerrar — solo visibles en pantalla */}
       <PrintButtons />
 
-      {/* Etiqueta imprimible */}
+      {/* Etiqueta imprimible (10 cm de alto) */}
       <div className="flex justify-center px-6 pb-10">
-        <div
-          className="label bg-card rounded-card shadow-card overflow-hidden"
-          style={{ width: 320, fontFamily: 'Helvetica, Arial, sans-serif' }}
-        >
-          {/* Cabecera roja */}
-          <div className="flex items-center justify-between px-5 py-4 bg-accent">
-            <Image
-              src="/images/logos/logo-amd.png"
-              alt="AMD Service"
-              width={90}
-              height={36}
-              style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
-            />
-            <span className="text-white text-xs font-semibold tracking-wide opacity-80">
-              ÉQUIPEMENT
-            </span>
+        <div className="etq-label">
+          {/* Cabecera roja con logo centrado */}
+          <div className="etq-head">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/logos/logo-amd-blanco.svg" alt="AMD Service" />
           </div>
 
           {/* Datos máquina */}
-          <div className="px-5 pt-4 pb-2 space-y-2">
-            <div>
-              <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">Machine</p>
-              <p className="text-base font-bold text-ink">{machine.marque} {machine.modele}</p>
+          <div className="etq-body">
+            <div className="etq-field">
+              <p className="etq-k">Machine</p>
+              <p className="etq-v">{machine.marque} {machine.modele}</p>
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">N° Série</p>
-                <p className="text-xs font-mono font-semibold text-ink">{machine.numero_serie}</p>
-              </div>
-              <div>
-                <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">Type</p>
-                <p className="text-xs font-semibold text-ink">
-                  {machine.type === 'color' ? 'Couleur' : 'Noir & Blanc'}
-                </p>
-              </div>
+            <div className="etq-field">
+              <p className="etq-k">N° Série</p>
+              <p className="etq-v-mono">{machine.numero_serie}</p>
             </div>
-
-            {machine.localisation && (
-              <div>
-                <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">Localisation</p>
-                <p className="text-xs text-ink">{machine.localisation}</p>
-              </div>
-            )}
           </div>
 
-          {/* Separador */}
-          <div className="mx-5 border-t border-line-subtle my-2" />
-
-          {/* Datos cliente */}
-          <div className="px-5 pb-2 space-y-2">
-            {client ? (
-              <>
-                <div>
-                  <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">Client</p>
-                  <p className="text-sm font-semibold text-ink">{client.nom_client}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">N° Client</p>
-                    <p className="text-xs font-mono font-semibold text-ink">{client.id}</p>
-                  </div>
-                  {contract?.numero_contrat && (
-                    <div>
-                      <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">N° Contrat</p>
-                      <p className="text-xs font-mono font-semibold text-ink">{contract.numero_contrat}</p>
-                    </div>
-                  )}
-                </div>
-                {machine.localisation && (
-                  <div>
-                    <p className="text-xs text-ink-muted uppercase tracking-wide mb-0.5">Site</p>
-                    <p className="text-xs text-ink">{machine.localisation}</p>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-xs text-ink-muted italic">Aucun client associé</p>
-            )}
-          </div>
-
-          {/* QR code */}
-          <div className="flex flex-col items-center py-4 bg-neutral-soft mt-2">
-            <QrCanvas value={qrUrl} />
-            <p className="text-xs text-ink-muted mt-2 text-center px-4">
-              Scanner pour accéder à la fiche machine
-            </p>
+          {/* QR sobre fondo blanco */}
+          <div className="etq-qr">
+            <div dangerouslySetInnerHTML={{ __html: qrSvg }} />
+            <p>Un problème ? Scannez pour<br />contacter le SAV AMD</p>
           </div>
         </div>
       </div>
