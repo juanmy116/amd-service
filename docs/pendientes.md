@@ -10,7 +10,7 @@
 
 - ✅ **Fase 1** (PR #77): `extractSerie()` → `src/lib/qr.ts` + tests; `getIncidentDisplayName` + `TECH_INCIDENT_SELECT` en `src/lib/incident.ts` + tests.
 - ✅ **Fase 2 — aislamiento RLS** (PR #82): `tests/rls/` corre contra Supabase local efímero (Docker) en el job de CI `.github/workflows/rls.yml` (`npm run test:rls`). 6 tests: técnico ve solo lo suyo (no lo de otro técnico), cliente sus contratos, admin todo, anon nada, técnico no edita incidencia ajena. **Verificado en CI sobre base reconstruida desde cero.**
-- ⏳ **Fase 3 (E2E Playwright)** — opcional, no abordada. Sigue en backlog si se quiere blindar el recorrido completo.
+- ✅ **Fase 3 — E2E Playwright** (PR #84): `tests/e2e/` corre en el job de CI `.github/workflows/e2e.yml` (Supabase local + build/start de la app + Chromium). 4 tests: login por rol (admin/técnico/cliente aterrizan en su sección) + recorrido SAV completo (admin asigna → auto `assigné` → técnico la ve en /tech → abre /tech/scan/<serie> → auto `en_cours` + `incident_history`). **Verificado en CI (4 passed, estable).** Gotcha extra: sin `GRANT SELECT` table-level a `authenticated` en local, los **embeddings** de PostgREST (`/tech/incidents`) fallan → el workflow otorga las default privileges a los 3 roles.
 
 > ⚠️ **Hallazgo del montaje (P0-1 parcialmente reabierto y vuelto a cerrar):** la reconstrucción limpia de migraciones fallaba por un `REVOKE` sobre funciones legacy inexistentes (`20260508182457`) — arreglado con `to_regprocedure` condicional. Además, el Postgres local del CLI no reproduce las default privileges de Supabase para `service_role` → el job de CI las otorga explícitamente (solo `service_role`, backend). La cadena de migraciones **ahora sí se reconstruye desde cero** (verificado en CI).
 
