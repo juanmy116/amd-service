@@ -1428,7 +1428,6 @@ export type Database = {
       auth_tech_contract_machine_ids: { Args: never; Returns: string[] }
       auth_tech_incident_contract_ids: { Args: never; Returns: string[] }
       auth_tech_incident_ids: { Args: never; Returns: string[] }
-      can_delete_contract: { Args: { p_contract_id: string }; Returns: Json }
       delete_contract: { Args: { p_contract_id: string }; Returns: Json }
       close_maintenance_visit: {
         Args: {

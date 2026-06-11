@@ -1090,7 +1090,7 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - **RPCs SECURITY DEFINER de contratos/mantenimiento** (todas con guard `IF auth.role() <> 'service_role' THEN RAISE EXCEPTION`):
   - `create_contract_with_lines(payload jsonb)` — crea contrato + sus N líneas `contract_machines` atómicamente
   - `update_contract_with_lines(p_contract_id uuid, payload jsonb)` — actualiza contrato y reconcilia sus líneas
-  - `can_delete_contract(p_contract_id uuid)` — comprueba si un contrato puede borrarse (sin dependencias)
+  - `delete_contract(p_contract_id uuid)` — borrado atómico: comprueba dependencias (incidencias/relevés/mantenimiento) y borra en una sola transacción con `FOR UPDATE` (P2-4, reemplaza al antiguo `can_delete_contract` + DELETE separados que tenían ventana TOCTOU). Devuelve `{deleted}` o el desglose de dependencias. Migración `20260611120000`.
   - `close_maintenance_visit(...)` — cierre atómico e idempotente de visita (marca `fait`, inserta piezas, programa siguiente)
   - **Eliminadas (Fase 4, modelo viejo, 0 usos):** `create_client_with_contract`, `create_machine_with_contract`
 - **`profiles` — protección de columnas privilegiadas (2026-06-10):** `authenticated` solo puede hacer `UPDATE` de `(full_name, phone)`; el `GRANT UPDATE` a nivel tabla está revocado y un trigger `BEFORE UPDATE` rechaza cualquier cambio de `role`/`is_dispatcher` salvo `service_role`. Cierra la escalada a admin vía `PATCH /rest/v1/profiles`.
@@ -1212,7 +1212,7 @@ Hallazgos P0 confirmados con SQL real contra producción y corregidos en el PR W
 ### Auditoría técnica post-refactor ✅ COMPLETADA (2026-06-04/05)
 Seis entregas en producción tras el refactor de contratos N máquinas (PR #23):
 - [x] **Fase 1 — hotfixes de BD** (PR #25): índices de rendimiento. Migración `20260603210000_fase1_indices`
-- [x] **Fase 2 — RPCs atómicas de contratos** (PR #26): `create_contract_with_lines`, `update_contract_with_lines`, `can_delete_contract` (SECURITY DEFINER, guard service_role). Migración `20260604120000_fase2_rpcs_contratos`
+- [x] **Fase 2 — RPCs atómicas de contratos** (PR #26): `create_contract_with_lines`, `update_contract_with_lines` (SECURITY DEFINER, guard service_role). Migración `20260604120000_fase2_rpcs_contratos`. *(El antiguo `can_delete_contract` fue reemplazado por `delete_contract` atómico y eliminado — migración `20260611130000`.)*
 - [x] **Fase 3 — mantenimiento granular por máquina** (PR #27): `maintenance_visits.contract_machine_id`; una visita por línea activa del contrato; auto-programación por máquina con frecuencia override. Migración `20260604130000_fase3_maintenance_granular`
 - [x] **Hotfix cierre de mantenimiento** (PR #28): RPC `close_maintenance_visit` atómica e idempotente. Migración `20260604140000_close_maintenance_visit_rpc`
 - [x] **Formulario de contacto + leads** (PR #29): tabla `leads` + route handler `/api/contact` (persiste lead + notifica a `COMMERCIAL_EMAIL`) + pantalla admin `/admin/leads`. Migraciones `20260604150000_leads` y `20260604160000_leads_permissions_hardening`
