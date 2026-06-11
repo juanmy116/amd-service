@@ -40,7 +40,7 @@ Quedan solo cabos menores **no bloqueantes** (2 parciales + 3 pendientes de hard
 | **P2-2** validación de tramos JSON | ✅ RESUELTO | `validateTiers` valida tipos/finitud/enteros/precios |
 | **P2-3** validación de periodos | ✅ RESUELTO | `contract-actions.ts` valida enteros/rangos + re-valida en RPC |
 | **P2-4** borrado de contrato no atómico | 🔸 PENDIENTE (riesgo bajo) | `can_delete_contract` + `DELETE` siguen en 2 llamadas (TOCTOU) |
-| **P2-5** invariantes de cadena de reemplazo | ⚠️ PARCIAL (no bloqueante) | Triggers anti-ciclo/bifurcación/cross-contract OK; falta FK en `replaces_contract_machine_id` (puntero colgante al borrar) |
+| **P2-5** invariantes de cadena de reemplazo | ✅ RESUELTO | FK `REFERENCES contract_machines(id) ON DELETE SET NULL` ya existe (`20260606000200:8-9`) + triggers anti-ciclo/bifurcación/cross-contract (`20260609083000`). *(El primer verificador leyó mal la columna como sin FK; corregido 2026-06-11.)* |
 | **P2-6** breakdown no persistido | ✅ RESUELTO | Columna `invoice_lines.breakdown` + `has_replacement` persistidos |
 | **P2-7** `billing_day` no afectaba el cálculo | ✅ RESUELTO | `computeBillingCycle` (ciclo de aniversario) + tests |
 | **P2-8** divergencia delta contadores/factura | ✅ RESUELTO | Primitiva única `counterDelta` (`counters.ts`) compartida + test |
@@ -54,9 +54,10 @@ excluye la línea huérfana), pero el modelo parque/stock seguiría viendo esa m
 "alquilada". Conviene cerrar las líneas al terminar el contrato para mantener la coherencia
 del parque. No bloquea publicar.
 
-**Cabos no bloqueantes pendientes (para backlog, no para go-live):** P2-1 (aritmética
-entera en dinero), P2-4 (RPC atómica de borrado), P2-5 (FK en `replaces_contract_machine_id`),
-hardening (a) `server-only` y (b) tests RLS por rol.
+**Cabos no bloqueantes pendientes (para backlog, no para go-live):** hardening (b) tests
+RLS por rol (es la Fase 2 de `docs/pendientes.md`). *(Cerrados el 2026-06-11: P2-1 redondeo
+FCFA robusto, P2-4 RPC atómica de borrado `delete_contract`, hardening (a) `server-only`;
+P2-5 reclasificado a RESUELTO.)*
 
 ---
 
