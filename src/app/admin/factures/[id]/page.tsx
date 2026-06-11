@@ -23,11 +23,11 @@ export default async function FactureDetailPage({
   params, searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ sent?: string }>
+  searchParams: Promise<{ sent?: string; error?: string }>
 }) {
   await requireAdmin()
   const { id } = await params
-  const { sent } = await searchParams
+  const { sent, error } = await searchParams
   const admin = createAdminClient()
 
   const { data: inv } = await admin.from('invoices').select('*').eq('id', id).single()
@@ -55,6 +55,12 @@ export default async function FactureDetailPage({
       {sent && (
         <div className="px-4 py-3 rounded-lg bg-success-soft border border-success/20 text-sm text-success">
           Tableur envoyé par email.
+        </div>
+      )}
+
+      {error && (
+        <div className="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+          {error}
         </div>
       )}
 
