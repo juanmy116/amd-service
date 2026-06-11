@@ -1,10 +1,10 @@
 'use server'
 import { requireAdmin } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { validateTiers, type BillingType, type BillingTier } from '@/lib/billing'
+import { validateTiers, TIERED_TYPES, type BillingType, type BillingTier } from '@/lib/billing'
 
 type FormState = { error: string } | null
-const VALID: BillingType[] = ['per_copy', 'hybrid', 'hybrid_tiered']
+const VALID: BillingType[] = ['per_copy', 'hybrid', 'hybrid_tiered', 'tiered_total']
 
 export async function updateBillingPlanAction(id: string, _p: FormState, fd: FormData): Promise<FormState> {
   const { supabase } = await requireAdmin()
@@ -13,9 +13,10 @@ export async function updateBillingPlanAction(id: string, _p: FormState, fd: For
   if (!name) return { error: 'Le nom est obligatoire.' }
   if (!VALID.includes(type)) return { error: 'Type invalide.' }
 
-  const fixed_fee   = type !== 'per_copy'      ? Number(fd.get('fixed_fee'))   : null
-  const price_bw    = type !== 'hybrid_tiered' ? Number(fd.get('price_bw'))    : null
-  const price_color = type !== 'hybrid_tiered' ? Number(fd.get('price_color')) : null
+  const tiered = TIERED_TYPES.includes(type)   // hybrid_tiered | tiered_total: precios en los tramos, no planos
+  const fixed_fee   = type !== 'per_copy' ? Number(fd.get('fixed_fee'))   : null
+  const price_bw    = !tiered             ? Number(fd.get('price_bw'))    : null
+  const price_color = !tiered             ? Number(fd.get('price_color')) : null
 
   // H7: validación numérica server-side (la BD también lo atrapa, pero el mensaje es mejor aquí)
   if (fixed_fee   !== null && !Number.isFinite(fixed_fee))   return { error: 'Forfait invalide.' }
@@ -23,7 +24,7 @@ export async function updateBillingPlanAction(id: string, _p: FormState, fd: For
   if (price_color !== null && !Number.isFinite(price_color)) return { error: 'Prix couleur invalide.' }
 
   let tiers: BillingTier[] | null = null
-  if (type === 'hybrid_tiered') {
+  if (tiered) {
     try { tiers = JSON.parse(fd.get('tiers') as string) } catch { return { error: 'Format des tranches invalide.' } }
     const err = validateTiers(tiers!); if (err) return { error: err }
   }

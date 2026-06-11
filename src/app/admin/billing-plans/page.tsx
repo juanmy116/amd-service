@@ -32,7 +32,8 @@ export default async function BillingPlansPage() {
               <p className="text-xs text-ink-soft mt-1">
                 {plan.type === 'per_copy'      && `B&N: ${Number(plan.price_bw)} · Couleur: ${Number(plan.price_color)} FCFA/copie`}
                 {plan.type === 'hybrid'        && `Forfait: ${Number(plan.fixed_fee)} FCFA · B&N: ${Number(plan.price_bw)} · Couleur: ${Number(plan.price_color)}`}
-                {plan.type === 'hybrid_tiered' && `Forfait: ${Number(plan.fixed_fee)} FCFA · ${plan.tiers?.length ?? 0} tranches`}
+                {plan.type === 'hybrid_tiered' && `Forfait: ${Number(plan.fixed_fee)} FCFA · ${plan.tiers?.length ?? 0} tranches (par tranche)`}
+                {plan.type === 'tiered_total'  && `Forfait: ${Number(plan.fixed_fee)} FCFA · ${plan.tiers?.length ?? 0} tranches (au volume)`}
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">

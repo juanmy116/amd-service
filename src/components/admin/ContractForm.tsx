@@ -518,7 +518,7 @@ export default function ContractForm({
                     {(() => {
                       const plan = billingPlans.find((p) => p.id === line.billing_plan_id)
                       if (!plan) return null
-                      const showFixed = plan.type === 'hybrid' || plan.type === 'hybrid_tiered'
+                      const showFixed = plan.type !== 'per_copy'
                       const showFlat  = plan.type === 'per_copy' || plan.type === 'hybrid'
                       return (
                         <div className="grid grid-cols-3 gap-3">

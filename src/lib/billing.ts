@@ -1,6 +1,19 @@
 // src/lib/billing.ts
 
-export type BillingType = 'per_copy' | 'hybrid' | 'hybrid_tiered'
+export type BillingType = 'per_copy' | 'hybrid' | 'hybrid_tiered' | 'tiered_total'
+
+/**
+ * Los dos tipos que usan la tabla de tramos `tiers` (estructura idéntica), pero con
+ * aritmética distinta:
+ *  - `hybrid_tiered`  → tramos MARGINALES: cada bloque de copias a su propio precio (escalonado).
+ *  - `tiered_total`   → precio ÚNICO según el VOLUMEN TOTAL del canal: se busca el tramo donde
+ *                       cae el total de copias del mes y TODAS se cobran a ese precio. Es la
+ *                       tarifa real de AMD ("fixe + copie dégressive au volume").
+ */
+export const TIERED_TYPES: BillingType[] = ['hybrid_tiered', 'tiered_total']
+const usesTiers = (type: BillingType): boolean => TIERED_TYPES.includes(type)
+const usesFixed = (type: BillingType): boolean => type !== 'per_copy'
+const usesFlat  = (type: BillingType): boolean => type === 'per_copy' || type === 'hybrid'
 
 export type BillingTier = {
   up_to: number | null
@@ -63,15 +76,12 @@ export function resolveEffectiveTariff(
   const ovBw      = num(line.price_bw_override)
   const ovColor   = num(line.price_color_override)
 
-  const hasFixed = plan.type === 'hybrid' || plan.type === 'hybrid_tiered'
-  const hasFlat  = plan.type === 'per_copy' || plan.type === 'hybrid'
-
   return {
     type:        plan.type,
-    fixed_fee:   hasFixed ? (ovFixed ?? planFixed ?? 0) : 0,
-    price_bw:    hasFlat  ? (ovBw    ?? planBw)          : null,
-    price_color: hasFlat  ? (ovColor ?? planColor)       : null,
-    tiers:       plan.type === 'hybrid_tiered' ? (plan.tiers ?? null) : null,
+    fixed_fee:   usesFixed(plan.type) ? (ovFixed ?? planFixed ?? 0) : 0,
+    price_bw:    usesFlat(plan.type)  ? (ovBw    ?? planBw)          : null,
+    price_color: usesFlat(plan.type)  ? (ovColor ?? planColor)       : null,
+    tiers:       usesTiers(plan.type) ? (plan.tiers ?? null)         : null,
   }
 }
 
@@ -147,15 +157,12 @@ export function resolveEffectiveTariffAsOf(
   const ovBw      = ov ? num(ov.price_bw_override) : null
   const ovColor   = ov ? num(ov.price_color_override) : null
 
-  const hasFixed = plan.type === 'hybrid' || plan.type === 'hybrid_tiered'
-  const hasFlat  = plan.type === 'per_copy' || plan.type === 'hybrid'
-
   return {
     type:        plan.type,
-    fixed_fee:   hasFixed ? (ovFixed ?? planFixed ?? 0) : 0,
-    price_bw:    hasFlat  ? (ovBw    ?? planBw)          : null,
-    price_color: hasFlat  ? (ovColor ?? planColor)       : null,
-    tiers:       plan.type === 'hybrid_tiered' ? (plan.tiers ?? null) : null,
+    fixed_fee:   usesFixed(plan.type) ? (ovFixed ?? planFixed ?? 0) : 0,
+    price_bw:    usesFlat(plan.type)  ? (ovBw    ?? planBw)          : null,
+    price_color: usesFlat(plan.type)  ? (ovColor ?? planColor)       : null,
+    tiers:       usesTiers(plan.type) ? (plan.tiers ?? null)         : null,
   }
 }
 
@@ -191,6 +198,11 @@ export function calculateMonthlyAmount(
     amount_color = roundFcfa(applyTiers(tariff.tiers, delta_color, 'color'))
   }
 
+  if (tariff.type === 'tiered_total' && tariff.tiers) {
+    amount_bw    = roundFcfa(applyTiersTotal(tariff.tiers, delta_bw,    'bw'))
+    amount_color = roundFcfa(applyTiersTotal(tariff.tiers, delta_color, 'color'))
+  }
+
   return {
     amount_fixed,
     amount_bw,
@@ -219,6 +231,32 @@ function applyTiers(
   }
 
   return total
+}
+
+/**
+ * Tarifa "precio único al volumen total" (tipo `tiered_total`, la real de AMD): a diferencia de
+ * `applyTiers` (escalonado), aquí el VOLUMEN TOTAL del mes determina UN único precio por copia,
+ * que se aplica a TODAS las copias. Busca el primer tramo cuyo `up_to` cubre el total (umbral
+ * superior INCLUSIVO; ej. "0 a 2.500" = `up_to: 2500`) y multiplica todas las copias por su precio.
+ * El último tramo (`up_to: null`) es el ilimitado. Devuelve 0 si no hay copias.
+ *
+ * Consecuencia conocida y querida (gancho comercial): como los precios bajan al subir de tramo,
+ * cruzar un umbral puede abaratar el total (20.000×8 = 160.000 vs 20.001×7 = 140.007).
+ */
+function applyTiersTotal(
+  tiers: BillingTier[],
+  copies: number,
+  channel: 'bw' | 'color',
+): number {
+  if (copies <= 0) return 0
+  for (const tier of tiers) {
+    if (tier.up_to === null || copies <= tier.up_to) {
+      return copies * (channel === 'bw' ? tier.price_bw : tier.price_color)
+    }
+  }
+  // Salvaguarda: si ningún tramo es ilimitado (validateTiers lo impide), usa el último.
+  const last = tiers[tiers.length - 1]
+  return copies * (channel === 'bw' ? last.price_bw : last.price_color)
 }
 
 /**
@@ -267,5 +305,6 @@ export function formatPrice(amount: number): string {
 export const BILLING_TYPE_LABEL: Record<BillingType, string> = {
   per_copy:      'Coût par copie',
   hybrid:        'Forfait + copie',
-  hybrid_tiered: 'Forfait + copie dégressive',
+  hybrid_tiered: 'Forfait + copie dégressive (par tranche)',
+  tiered_total:  'Forfait + copie dégressive (au volume total)',
 }
