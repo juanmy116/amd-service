@@ -31,6 +31,7 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 ### 1. Back-office AMD (`/admin`) ✅
 - Dashboard de dirección: KPIs globales, CSAT, incidencias por técnico, distribución de estados
 - Gestión de clientes, máquinas y contratos
+- **Listado de máquinas** (`/admin/machines`): se alimenta de la vista `v_machine_park` (parque derivado) para mostrar el **cliente actual** de cada máquina (línea de contrato abierta, `date_fin IS NULL`) o «—» si está en stock. Filtros: búsqueda (nº serie/marca/modelo), **cliente** (`?client=<id>` → `.eq('client_id', …)`), tipo y estado activo. El nombre del cliente se resuelve en memoria con la lista de `clients` que ya alimenta el desplegable.
 - **Formulario de contratos** (`/admin/contracts/new` + `/admin/contracts/[id]`): selector de máquinas buscable en tiempo real (`MachineCombobox` con `@headlessui/react`) — filtra por marca, modelo o serial. Al seleccionar cliente muestra su ID Princity y el sufijo sugerido para el número de contrato (ej. `-007` para ID Princity `7`). Fix: edición de contrato con cliente inactivo siempre incluye ese cliente en la lista para no sobreescribir el `client_id`.
 - Gestión y asignación de incidencias (Kanban drag & drop)
 - Generación de QR por máquina (etiqueta imprimible con logo, datos y código QR)
