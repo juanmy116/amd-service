@@ -1,0 +1,46 @@
+name: RLS isolation tests
+
+# Fase 2 de tests: aislamiento por rol contra un Supabase LOCAL efímero (Docker).
+# Separado del CI normal (que no levanta Supabase). Corre cuando cambian las
+# migraciones o los propios tests RLS, y bajo demanda.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'supabase/migrations/**'
+      - 'tests/rls/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/rls.yml'
+
+jobs:
+  rls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase (aplica las migraciones)
+        run: supabase start
+
+      - name: Exportar claves locales al entorno
+        run: |
+          echo "API_URL=$(supabase status -o json | jq -r '.API_URL')" >> "$GITHUB_ENV"
+          echo "ANON_KEY=$(supabase status -o json | jq -r '.ANON_KEY')" >> "$GITHUB_ENV"
+          echo "SERVICE_ROLE_KEY=$(supabase status -o json | jq -r '.SERVICE_ROLE_KEY')" >> "$GITHUB_ENV"
+
+      - name: Tests de aislamiento RLS
+        run: npm run test:rls
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
