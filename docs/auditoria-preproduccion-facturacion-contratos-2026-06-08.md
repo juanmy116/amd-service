@@ -4,7 +4,59 @@
 **Alcance:** núcleo de facturación mensual, contratos N-máquinas, contadores, reemplazos, integridad de datos, seguridad y mantenibilidad.  
 **Modo de revisión:** estrictamente read-only. No se modificó código ni base de datos.  
 **Verificación ejecutada:** `npm run typecheck` pasa correctamente.  
-**Veredicto:** **NO-GO para publicar hasta resolver los bloqueantes.**
+**Veredicto original:** **NO-GO para publicar hasta resolver los bloqueantes.**
+
+---
+
+## ✅ CIERRE DEL TRIAJE — 2026-06-11
+
+> Triaje de verificación de los 24 hallazgos contra el código actual, tras la
+> reconstrucción del motor de facturación (PRs #39–#49) y la auditoría de
+> infraestructura/seguridad (PRs #58–#70). Cada veredicto tiene evidencia en
+> migración/función/trigger/test.
+
+**Resultado: los 16 bloqueantes (7 P0 + 9 P1) están RESUELTOS. El veredicto NO-GO queda LEVANTADO.**
+Quedan solo cabos menores **no bloqueantes** (2 parciales + 3 pendientes de hardening), ninguno impide publicar ni facturar.
+
+| Hallazgo | Veredicto | Evidencia clave |
+|---|---|---|
+| **P0-1** rollback destructivo en migraciones | ✅ RESUELTO | Movido a `supabase/rollbacks/` (fuera del path automático) |
+| **P0-2** doble flujo "Remplacer" | ✅ RESUELTO | `replaceLine()` eliminado; solo queda la RPC atómica `replace_contract_machine` |
+| **P0-3** contadores por máquina, no por línea | ✅ RESUELTO | `countersForLine()`/`computeLineConsumptionCycle` atribuyen por `contract_machine_id` + tests |
+| **P0-4** primer mes pierde consumo | ✅ RESUELTO | Ancla en `start_counter`; `assign_machine_from_stock` exige lectura inicial + tests |
+| **P0-5** facturas mutables (UPDATE/DELETE) | ✅ RESUELTO | Triggers `tg_invoices_immutable`/`tg_invoice_lines_immutable` (`20260609080000`), FK→RESTRICT; probado en gate |
+| **P0-6** RPC modificaba líneas de otro contrato | ✅ RESUELTO | `20260609082000_contract_lines_ownership.sql` valida `contract_id` (`line_not_in_contract`) |
+| **P0-7** errores → estimación cero | ✅ RESUELTO | `BillingDataError` corta preview/emisión + tests `invoicing.test.ts:406` |
+| **P1-1** RPC no validaba coherencia contable | ✅ RESUELTO | `emit_contract_invoice` valida cuadres/cliente/no-negativos antes de insertar (`20260609081000`) |
+| **P1-2** emisión sin snapshot consistente | ✅ RESUELTO | Recalcula draft fresco al emitir + revalida en BD (matiz: no re-deriva deltas bajo lock; robusto por inmutabilidad) |
+| **P1-3** retirada cobra consumo posterior | ✅ RESUELTO | Usa `end_counter` real de cierre de línea, no el relevé mensual + test `:301` |
+| **P1-4** cambiar cliente reasigna historial | ✅ RESUELTO | `client_change_forbidden_history` si hay facturas/contadores (`20260608140100`) |
+| **P1-5** tarifas mutables retroactivamente | ✅ RESUELTO | Versionado de tarifas + `resolveEffectiveTariffAsOf` (`20260609120000`) + tests |
+| **P1-6** contrato terminado/suspendido factura | ✅ RESUELTO | `isLineBillable` filtra estado/`date_fin` + tests *(ver nota operativa abajo)* |
+| **P1-7** reemplazo pierde props operativas | ✅ RESUELTO | Hereda billing_day/maintenance_freq/notes (`20260608140000`) |
+| **P1-8** mantenimiento ligado a máquina saliente | ✅ RESUELTO | El reemplazo migra visitas futuras a la línea entrante *(sin test automático)* |
+| **P1-9** migración falla con contratos terminados | ✅ RESUELTO | El INSERT de migración asigna `date_fin` a los `terminé` |
+| **P2-1** float + `Math.round` | ⚠️ PARCIAL (no bloqueante) | Sigue float, pero mitigado: FCFA entero, cada componente redondeado, cuadre validado en BD |
+| **P2-2** validación de tramos JSON | ✅ RESUELTO | `validateTiers` valida tipos/finitud/enteros/precios |
+| **P2-3** validación de periodos | ✅ RESUELTO | `contract-actions.ts` valida enteros/rangos + re-valida en RPC |
+| **P2-4** borrado de contrato no atómico | 🔸 PENDIENTE (riesgo bajo) | `can_delete_contract` + `DELETE` siguen en 2 llamadas (TOCTOU) |
+| **P2-5** invariantes de cadena de reemplazo | ⚠️ PARCIAL (no bloqueante) | Triggers anti-ciclo/bifurcación/cross-contract OK; falta FK en `replaces_contract_machine_id` (puntero colgante al borrar) |
+| **P2-6** breakdown no persistido | ✅ RESUELTO | Columna `invoice_lines.breakdown` + `has_replacement` persistidos |
+| **P2-7** `billing_day` no afectaba el cálculo | ✅ RESUELTO | `computeBillingCycle` (ciclo de aniversario) + tests |
+| **P2-8** divergencia delta contadores/factura | ✅ RESUELTO | Primitiva única `counterDelta` (`counters.ts`) compartida + test |
+| **Hardening (a)** barrera `server-only` | 🔸 PENDIENTE (menor) | `src/lib/supabase/admin.ts` no importa `server-only` (protección solo convencional) |
+| **Hardening (b)** tests RLS por rol | 🔸 PENDIENTE | Ya planificado como Fase 2 de tests en `docs/pendientes.md` |
+
+**Nota operativa (no de facturación) — P1-6:** marcar un contrato como `terminé` en la
+RPC de actualización **no cierra automáticamente sus líneas** (no asigna `date_fin`); el
+cierre depende del array `retire` explícito. La facturación queda protegida (`isLineBillable`
+excluye la línea huérfana), pero el modelo parque/stock seguiría viendo esa máquina como
+"alquilada". Conviene cerrar las líneas al terminar el contrato para mantener la coherencia
+del parque. No bloquea publicar.
+
+**Cabos no bloqueantes pendientes (para backlog, no para go-live):** P2-1 (aritmética
+entera en dinero), P2-4 (RPC atómica de borrado), P2-5 (FK en `replaces_contract_machine_id`),
+hardening (a) `server-only` y (b) tests RLS por rol.
 
 ---
 
