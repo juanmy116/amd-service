@@ -33,7 +33,7 @@ export default async function FacturesPage() {
           <h1 className="text-xl font-bold text-ink">Factures émises</h1>
           <p className="text-sm text-ink-muted mt-0.5">Historique des factures</p>
         </div>
-        <Link href="/admin/facturation" className="rounded-input bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90">
+        <Link href="/admin/facturation" className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90">
           Nouvelle facture →
         </Link>
       </div>

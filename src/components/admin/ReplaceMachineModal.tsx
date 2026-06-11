@@ -15,7 +15,7 @@ type Props = {
 }
 
 const inputClass =
-  'w-full rounded-input border border-line bg-card px-3.5 py-2.5 text-sm text-ink ' +
+  'w-full rounded-lg border border-line bg-card px-3.5 py-2.5 text-sm text-ink ' +
   'focus:outline-none focus:ring-2 focus:ring-accent/40'
 const labelClass = 'block text-sm font-medium text-ink-soft mb-1.5'
 
