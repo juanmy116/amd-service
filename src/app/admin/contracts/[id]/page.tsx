@@ -2,8 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import ContractForm, { type BillingPlanOption } from '@/components/admin/ContractForm'
 import ReplaceMachineModal from '@/components/admin/ReplaceMachineModal'
+import TerminateContractModal from '@/components/admin/TerminateContractModal'
 import { updateContractAction, deleteContractAction } from './actions'
 import { replaceMachineAction } from './replace-actions'
+import { terminateContractAction } from './terminate-actions'
 
 export default async function EditContractPage({
   params,
@@ -72,6 +74,8 @@ export default async function EditContractPage({
   const replacementCandidates = availableMachines.filter((m) => !busyInThisContract.has(m.numero_serie))
 
   const boundUpdateAction = updateContractAction.bind(null, contract.id)
+  const boundTerminateAction = terminateContractAction.bind(null, contract.id)
+  const canTerminate = initialLines.length > 0 && contract.statut !== 'terminé'
 
   return (
     <div className="space-y-8">
@@ -106,6 +110,24 @@ export default async function EditContractPage({
                 </div>
               )
             })}
+          </div>
+        </section>
+      )}
+
+      {canTerminate && (
+        <section className="rounded-xl bg-surface border border-line p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-semibold text-ink mb-1">Clôture du contrat</h2>
+              <p className="text-sm text-ink-muted">
+                Clôture toutes les machines ({initialLines.length}) avec leur relevé final et les
+                renvoie au stock.
+              </p>
+            </div>
+            <TerminateContractModal
+              openLines={initialLines.map((l) => ({ id: l.id, machine_id: l.machine_id }))}
+              action={boundTerminateAction}
+            />
           </div>
         </section>
       )}

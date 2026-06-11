@@ -1430,6 +1430,7 @@ export type Database = {
       auth_tech_incident_ids: { Args: never; Returns: string[] }
       auth_tech_visit_ids: { Args: never; Returns: string[] }
       delete_contract: { Args: { p_contract_id: string }; Returns: Json }
+      terminate_contract: { Args: { p_payload: Json }; Returns: Json }
       close_maintenance_visit: {
         Args: {
           p_autres_pieces: string
