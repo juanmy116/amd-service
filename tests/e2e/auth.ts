@@ -9,5 +9,6 @@ export async function loginAs(page: Page, email: string) {
   await page.goto('/login')
   await page.fill('input[name="email"]', email)
   await page.fill('input[name="password"]', E2E.password)
-  await page.getByRole('button', { name: 'Connexion' }).click()
+  // Hay un tab "Connexion" (type=button) y el submit del form: apuntamos al submit.
+  await page.locator('form button[type="submit"]').click()
 }
