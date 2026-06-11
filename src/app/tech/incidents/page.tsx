@@ -18,11 +18,7 @@ export default async function TechIncidentsPage() {
     .order('created_at', { ascending: false })
 
   const incidents: TechIncident[] = (data ?? []).map((row) => {
-    const r = row as unknown as {
-      id: string; numero_incident: string; title: string; status: string
-      priority: string; created_at: string; machine_id: string | null
-      contract_machines: { contracts: { clients: { nom_client: string } | null } | null } | null
-    }
+    const r = row
     return {
       id: r.id,
       numero_incident: r.numero_incident,

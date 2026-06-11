@@ -16,7 +16,7 @@ export default async function CsatPage({
     .eq('token', token)
     .maybeSingle()
 
-  const incidentTitle = (csat?.incidents as unknown as { title: string } | null)?.title
+  const incidentTitle = csat?.incidents?.title
 
   if (!csat) {
     return <CsatShell><InvalidState message="Ce lien est invalide ou n'existe pas." /></CsatShell>

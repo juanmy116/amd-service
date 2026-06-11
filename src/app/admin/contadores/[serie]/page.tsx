@@ -55,10 +55,10 @@ export default async function ContadoresDetailPage({
       .select('id, numero_contrat, clients(id, nom_client)')
       .eq('id', openLine.contract_id)
       .maybeSingle()
-    contract = data as { id: string; numero_contrat: string; clients: { id: number; nom_client: string } | null } | null
+    contract = data
   }
 
-  const client = contract?.clients as unknown as { id: number; nom_client: string } | null
+  const client = contract?.clients ?? null
 
   const { data: allCounters } = await supabase
     .from('machine_counters')

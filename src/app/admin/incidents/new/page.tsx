@@ -18,22 +18,8 @@ export default async function NewIncidentPage() {
       .order('full_name'),
   ])
 
-  type RawLine = {
-    id: string
-    statut: string
-    date_fin: string | null
-    machines: { numero_serie: string; marque: string; modele: string } | null
-  }
-
-  type RawContract = {
-    id: string
-    numero_contrat: string
-    client_id: number
-    contract_machines: RawLine[]
-  }
-
   // Transform to the shape IncidentForm expects, keeping only active lines
-  const contracts = ((rawContracts ?? []) as unknown as RawContract[])
+  const contracts = (rawContracts ?? [])
     .map((c) => ({
       id: c.id,
       numero_contrat: c.numero_contrat,

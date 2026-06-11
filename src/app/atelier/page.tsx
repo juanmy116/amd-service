@@ -78,7 +78,7 @@ export default async function AtelierPage() {
     contract_machines: { contracts: { clients: { nom_client: string } | null } | null } | null
     profiles: { full_name: string | null } | null
   }
-  const rawIncidents = (incidentsRes.data ?? []) as unknown as IncRow[]
+  const rawIncidents = incidentsRes.data ?? []
 
   const resolvedThisWeek = (i: IncRow) =>
     i.resolved_at !== null && new Date(i.resolved_at).getTime() >= weekStart
@@ -104,18 +104,7 @@ export default async function AtelierPage() {
     resolusSemaine: rawIncidents.filter(resolvedThisWeek).length,
   }
 
-  type VisitRow = {
-    id: string
-    scheduled_date: string
-    status: string
-    assigned_to: string | null
-    contract_machines: {
-      machines: { marque: string; modele: string } | null
-      contracts: { clients: { nom_client: string } | null } | null
-    } | null
-    profiles: { full_name: string | null } | null
-  }
-  const rawVisits = (visitsRes.data ?? []) as unknown as VisitRow[]
+  const rawVisits = visitsRes.data ?? []
   const visits: AtelierMaintenanceVisit[] = rawVisits.map((v) => {
     const line = v.contract_machines
     const contract = line?.contracts

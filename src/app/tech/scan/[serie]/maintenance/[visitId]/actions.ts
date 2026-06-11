@@ -48,9 +48,12 @@ export async function closeMaintenance(
     p_visit_id:      visitId,
     p_serie:         serie,
     p_done_by:       user.id,
-    p_notes:         notes,
+    // p_notes / p_autres_pieces son `text` nullable en la función (acepta y espera null
+    // cuando no hay datos); el generador de tipos de Supabase tipa los Args de RPC como
+    // string no-null, de ahí el cast.
+    p_notes:         notes as string,
     p_part_ids:      partIds,
-    p_autres_pieces: autresPieces,
+    p_autres_pieces: autresPieces as string,
   })
 
   if (error) {

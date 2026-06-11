@@ -6,6 +6,7 @@
 
 import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import type { Json } from '@/lib/supabase/types'
 import { buildContractInvoiceDraft } from '@/lib/invoicing'
 import { redirect } from 'next/navigation'
 
@@ -69,7 +70,9 @@ export async function emitContractInvoiceAction(_prev: EmitState, fd: FormData):
       total_amount:   draft.total_amount,
       issued_by:      user.id,
       lines:          draft.lines,
-    },
+      // p_payload es jsonb (tipado Json por el generador). El draft es un objeto nominal
+      // serializable; TS no lo acepta como Json sin index signature → cast explícito.
+    } as unknown as Json,
   })
 
   if (error || !invoiceId) {

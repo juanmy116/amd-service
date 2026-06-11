@@ -62,7 +62,8 @@ async function getDashboardData() {
   ])
 
   const incidents  = incidentsRes.data  ?? []
-  const csatData   = csatRes.data       ?? []
+  // Solo respuestas con nota (rating) real; la columna es nullable en BD.
+  const csatData   = (csatRes.data ?? []).filter((r): r is typeof r & { rating: number } => r.rating !== null)
   const counters   = countersRes.data   ?? []
   const techs      = techRes.data       ?? []
 

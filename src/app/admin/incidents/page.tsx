@@ -73,17 +73,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
   const truncated = (incidents?.length ?? 0) >= RESULT_LIMIT
 
   // Transformación a filas planas para los dos renderizados.
-  type CmNested = {
-    machine_id: string
-    machines: { numero_serie: string } | null
-    contracts: { client_id: number; clients: { nom_client: string } | null } | null
-  } | null
-  type Row = NonNullable<typeof incidents>[number] & {
-    contract_machines: CmNested
-    profiles: { full_name: string | null } | null
-  }
-
-  const rows = ((incidents ?? []) as unknown as Row[]).map((inc) => {
+  const rows = (incidents ?? []).map((inc) => {
     const cm = inc.contract_machines
     const resolvedMachineId = cm?.machine_id ?? inc.machine_id
     const resolvedClientName = cm?.contracts?.clients?.nom_client ?? null
@@ -97,7 +87,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
       machine_id: resolvedMachineId,
       created_at: inc.created_at,
       clientName: resolvedClientName,
-      technicianName: (inc.profiles as unknown as { full_name: string | null } | null)?.full_name ?? null,
+      technicianName: inc.profiles?.full_name ?? null,
     }
   })
 

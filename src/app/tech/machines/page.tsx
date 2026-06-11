@@ -14,7 +14,7 @@ export default async function TechMachinesPage() {
     .eq('assigned_to', user.id)
     .not('status', 'in', '("fermé")')
 
-  const machineIds = [...new Set((assignedIncidents ?? []).map(i => i.machine_id))]
+  const machineIds = [...new Set((assignedIncidents ?? []).map(i => i.machine_id).filter((x): x is string => x !== null))]
 
   const { data: machines } = machineIds.length > 0
     ? await supabase

@@ -86,9 +86,9 @@ export default async function TechAgendaPanel() {
           ) : (
             <div className="space-y-0.5">
               {visits.map(v => {
-                const line     = v.contract_machines as any
-                const contract = line?.contracts as any
-                const machine  = line?.machines as any
+                const line     = v.contract_machines
+                const contract = line?.contracts
+                const machine  = line?.machines
                 const { label, isOverdue } = fmtDate(v.scheduled_date)
                 const serie = machine?.numero_serie as string | undefined
                 return (

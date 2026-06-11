@@ -9,7 +9,7 @@ import type { BillingType } from '@/lib/billing'
 
 type FormState = { error: string } | null
 
-type BillingPlanOption = { id: string; name: string; type: BillingType }
+export type BillingPlanOption = { id: string; name: string; type: BillingType }
 
 type ContractData = {
   numero_contrat?: string
@@ -18,7 +18,8 @@ type ContractData = {
   date_renouvellement?: string | null
   statut?: 'actif' | 'suspendu' | 'terminé'
   billing_day?: number | null
-  maintenance_frequency?: 'mensuel' | 'trimestriel' | null
+  // Valor inicial del <select>; en BD es text (CHECK mensuel/trimestriel).
+  maintenance_frequency?: string | null
 }
 
 type LineInput = {

@@ -32,13 +32,6 @@ function formatDate(d: string | null) {
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 
-type ContractMachineLine = {
-  id: string
-  statut: string
-  date_fin: string | null
-  machines: { marque: string; modele: string } | null
-}
-
 export default async function ContractsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams
   const q = sanitizeSearchQuery(firstParam(sp.q))
@@ -124,8 +117,8 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
               </tr>
             )}
             {contracts?.map((c) => {
-              const client = c.clients as unknown as { nom_client: string } | null
-              const allLines = (c.contract_machines ?? []) as unknown as ContractMachineLine[]
+              const client = c.clients
+              const allLines = c.contract_machines ?? []
               const activeLines = allLines.filter(
                 (l) => l.statut === 'actif' && l.date_fin === null
               )

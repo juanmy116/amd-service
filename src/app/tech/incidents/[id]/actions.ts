@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
+import type { TablesUpdate } from '@/lib/supabase/types'
 import { redirect } from 'next/navigation'
 import { sendCsatForIncident } from '@/lib/csat'
 
@@ -43,7 +44,7 @@ export async function submitInterventionAction(
   const autres_pieces     = (formData.get('autres_pieces') as string).trim() || null
   const comment           = (formData.get('comment') as string)?.trim() || null
 
-  const updates: Record<string, unknown> = { status: new_status, assigned_to: user.id }
+  const updates: TablesUpdate<'incidents'> = { status: new_status, assigned_to: user.id }
   if (rapport)       updates.rapport_intervention = rapport
   if (autres_pieces) updates.autres_pieces = autres_pieces
   if (new_status === 'résolu' && old_status !== 'résolu') updates.resolved_at = new Date().toISOString()

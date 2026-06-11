@@ -44,7 +44,7 @@ export default async function MachineScanPage({
 
   // Obtener línea abierta para la máquina (nuevo modelo contract_machines)
   const openLine = await getOpenLineForMachine(supabase, numero_serie)
-  let contract: { id: string; numero_contrat: string; clients: unknown } | null = null
+  let contract: { id: string; numero_contrat: string; clients: { nom_client: string } | null } | null = null
   if (openLine) {
     const { data } = await supabase
       .from('contracts')
@@ -54,7 +54,7 @@ export default async function MachineScanPage({
     contract = data
   }
 
-  const client = contract?.clients as unknown as { nom_client: string } | null
+  const client = contract?.clients ?? null
 
   // Auto-transición primer escaneo: assigné → en_cours para incidentes asignados a este técnico en esta máquina.
   // Se ejecuta después del guard machine.active para no mutar incidentes en máquinas dadas de baja.

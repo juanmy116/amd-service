@@ -52,11 +52,7 @@ export default async function TechPage() {
 
   // Cliente vía contract_machine_id; las públicas (machine_id directo) no tienen cliente.
   const incidents: HomeIncident[] = (incidentsRes.data ?? []).map((row) => {
-    const r = row as unknown as {
-      id: string; title: string; status: string; priority: string
-      created_at: string; machine_id: string | null
-      contract_machines: { contracts: { clients: { nom_client: string } | null } | null } | null
-    }
+    const r = row
     return {
       id: r.id,
       title: r.title,

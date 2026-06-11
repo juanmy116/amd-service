@@ -23,7 +23,7 @@ export type KanbanIncident = {
   id: string
   numero_incident: string
   title: string
-  machine_id: string
+  machine_id: string | null
   category: string
   priority: string
   status: string

@@ -24,7 +24,7 @@ export type IncidentRow = {
   title: string
   status: string
   priority: string
-  machine_id: string
+  machine_id: string | null
   created_at: string
   clientName: string | null
   technicianName: string | null

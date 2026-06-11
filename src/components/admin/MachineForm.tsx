@@ -11,7 +11,7 @@ type MachineData = {
   numero_serie?: string
   marque?: string
   modele?: string
-  type?: 'color' | 'noir_blanc'
+  type?: 'color' | 'noir_blanc' | null
   localisation?: string | null
   active?: boolean
 }

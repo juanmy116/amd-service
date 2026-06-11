@@ -29,7 +29,7 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
       .select('contracts(client_id)')
       .eq('id', incident.contract_machine_id)
       .single()
-    clientId = (line?.contracts as unknown as { client_id: number } | null)?.client_id ?? null
+    clientId = line?.contracts?.client_id ?? null
   }
 
   if (!clientId) return

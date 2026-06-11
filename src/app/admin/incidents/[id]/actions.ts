@@ -2,6 +2,7 @@
 
 import { requireAdmin } from '@/lib/auth'
 import { INCIDENT_CATEGORIES, INCIDENT_PRIORITIES, INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
+import type { TablesUpdate } from '@/lib/supabase/types'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -34,7 +35,7 @@ export async function updateIncidentAction(
       ? 'assigné' as const
       : new_status
 
-  const updates: Record<string, unknown> = {
+  const updates: TablesUpdate<'incidents'> = {
     title,
     description:  (formData.get('description') as string).trim() || null,
     category,

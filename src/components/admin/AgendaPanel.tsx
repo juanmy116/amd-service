@@ -117,9 +117,9 @@ export default async function AdminAgendaPanel() {
           ) : (
             <div className="space-y-0.5">
               {visits.slice(0, 6).map(v => {
-                const line     = v.contract_machines as any
-                const contract = line?.contracts as any
-                const machine  = line?.machines as any
+                const line     = v.contract_machines
+                const contract = line?.contracts
+                const machine  = line?.machines
                 const { label, isOverdue } = fmtDate(v.scheduled_date)
                 return (
                   <Link

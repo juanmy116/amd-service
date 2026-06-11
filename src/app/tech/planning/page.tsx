@@ -71,10 +71,7 @@ export default async function TechPlanningPage() {
   }
 
   function toRow(v: (typeof visits)[number]): VisitRow {
-    const line = v.contract_machines as unknown as {
-      machines: { numero_serie: string; marque: string; modele: string; localisation: string | null } | null
-      contracts: { clients: { nom_client: string } | null } | null
-    } | null
+    const line = v.contract_machines
     return {
       id: v.id,
       scheduled_date: v.scheduled_date,

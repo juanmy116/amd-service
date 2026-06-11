@@ -47,16 +47,11 @@ export default async function EditIncidentPage({
       .select('machine_id, machines(marque, modele), contracts(numero_contrat, clients(nom_client))')
       .eq('id', incident.contract_machine_id)
       .maybeSingle()
-    const lineTyped = line as unknown as {
-      machine_id: string
-      machines: { marque: string; modele: string } | null
-      contracts: { numero_contrat: string; clients: { nom_client: string } | null } | null
-    } | null
-    if (lineTyped) {
+    if (line) {
       contextInfo = {
-        clientName:     lineTyped.contracts?.clients?.nom_client ?? null,
-        machineName:    lineTyped.machines ? `${lineTyped.machines.marque} ${lineTyped.machines.modele}` : lineTyped.machine_id,
-        contractNumber: lineTyped.contracts?.numero_contrat ?? null,
+        clientName:     line.contracts?.clients?.nom_client ?? null,
+        machineName:    line.machines ? `${line.machines.marque} ${line.machines.modele}` : line.machine_id,
+        contractNumber: line.contracts?.numero_contrat ?? null,
       }
     }
   } else if (incident.machine_id) {
@@ -73,7 +68,7 @@ export default async function EditIncidentPage({
 
   let profileMap = new Map<string, string | null>()
   if (history && history.length > 0) {
-    const ids = [...new Set(history.map((h) => h.changed_by))]
+    const ids = [...new Set(history.map((h) => h.changed_by).filter((x): x is string => x !== null))]
     const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', ids)
     profileMap = new Map(profiles?.map((p) => [p.id, p.full_name]) ?? [])
   }
@@ -156,7 +151,7 @@ export default async function EditIncidentPage({
               {history.map((h) => (
                 <div key={h.id} className="flex gap-3">
                   <div className="flex flex-col items-center pt-1">
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[h.new_status] ?? 'bg-gray-400'}`} />
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[h.new_status ?? ''] ?? 'bg-gray-400'}`} />
                   </div>
                   <div className="flex-1 pb-4 border-b border-line-subtle last:border-0 last:pb-0">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -164,13 +159,13 @@ export default async function EditIncidentPage({
                         <span className="text-xs text-ink-muted">
                           {STATUS_LABEL[h.old_status] ?? h.old_status}
                           {' → '}
-                          <span className="font-medium text-ink">{STATUS_LABEL[h.new_status] ?? h.new_status}</span>
+                          <span className="font-medium text-ink">{STATUS_LABEL[h.new_status ?? ''] ?? h.new_status}</span>
                         </span>
                       ) : (
-                        <span className="text-xs font-medium text-ink">{STATUS_LABEL[h.new_status] ?? h.new_status}</span>
+                        <span className="text-xs font-medium text-ink">{STATUS_LABEL[h.new_status ?? ''] ?? h.new_status}</span>
                       )}
                       <span className="text-xs text-ink-muted">·</span>
-                      <span className="text-xs text-ink-muted">{profileMap.get(h.changed_by) ?? 'Système'}</span>
+                      <span className="text-xs text-ink-muted">{(h.changed_by ? profileMap.get(h.changed_by) : null) ?? 'Système'}</span>
                       <span className="text-xs text-ink-muted">·</span>
                       <span className="text-xs text-ink-muted">{formatDateTime(h.created_at)}</span>
                     </div>
