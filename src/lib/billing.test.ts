@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   validateTiers, pickVersionAsOf, resolveEffectiveTariffAsOf,
-  type TariffVersion, type OverrideVersion,
+  roundFcfa, calculateMonthlyAmount,
+  type TariffVersion, type OverrideVersion, type EffectiveTariff,
 } from '@/lib/billing'
 
 // P2-2: validateTiers recibe JSON no confiable (JSON.parse del formulario / BD).
@@ -197,5 +198,43 @@ describe('resolveEffectiveTariffAsOf — facturar con los precios de AQUEL mes',
 
   it('sin versiones de plan → null (el caller decide el fallback)', () => {
     expect(resolveEffectiveTariffAsOf([], [], '2026-06-01')).toBeNull()
+  })
+})
+
+// P2-1: el dinero se redondea a entero FCFA. `Math.round` directo sobre un
+// producto en coma flotante sufre el error binario (Math.round(1.005*100) === 100,
+// no 101). roundFcfa colapsa el ruido binario con toFixed(6) antes de redondear.
+describe('roundFcfa (P2-1 — redondeo entero robusto)', () => {
+  it('corrige el caso binario clásico: 1.005 * 100 → 101 (no 100)', () => {
+    expect(Math.round(1.005 * 100)).toBe(100) // el bug que evitamos
+    expect(roundFcfa(1.005 * 100)).toBe(101)  // resultado correcto
+  })
+
+  it('redondea .5 hacia arriba y deja los enteros intactos', () => {
+    expect(roundFcfa(100.5)).toBe(101)
+    expect(roundFcfa(100.4)).toBe(100)
+    expect(roundFcfa(1000)).toBe(1000)
+    expect(roundFcfa(0)).toBe(0)
+  })
+})
+
+describe('calculateMonthlyAmount — redondeo por componente', () => {
+  const perCopy = (price_bw: number, price_color: number, fixed_fee = 0): EffectiveTariff => ({
+    type: 'per_copy', fixed_fee, price_bw, price_color, tiers: null,
+  })
+
+  it('per_copy con precio decimal problemático factura el entero correcto', () => {
+    // price_bw = 1.005, delta = 100 → 100.5 real → 101 (no 100 por el float)
+    const r = calculateMonthlyAmount(perCopy(1.005, 0), 100, 0)
+    expect(r.amount_bw).toBe(101)
+    expect(r.amount_total).toBe(101)
+  })
+
+  it('caso entero normal: sin cambios de importe', () => {
+    const r = calculateMonthlyAmount(perCopy(10, 50, 5000), 1000, 200)
+    expect(r.amount_fixed).toBe(5000)
+    expect(r.amount_bw).toBe(10000)
+    expect(r.amount_color).toBe(10000)
+    expect(r.amount_total).toBe(25000)
   })
 })

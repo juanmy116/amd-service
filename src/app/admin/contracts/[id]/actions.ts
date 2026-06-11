@@ -96,26 +96,30 @@ export async function deleteContractAction(
   const id = formData.get('id') as string
 
   const admin = createAdminClient()
-  const { data, error } = await admin.rpc('can_delete_contract', { p_contract_id: id })
+  // Borrado atómico: la RPC comprueba dependencias y borra en una sola transacción
+  // (antes eran dos round-trips separados → ventana TOCTOU). Ver migración
+  // 20260611120000_delete_contract_atomic.sql.
+  const { data, error } = await admin.rpc('delete_contract', { p_contract_id: id })
 
   if (error) {
-    console.error('[deleteContract.check]', error)
-    return { error: 'Une erreur est survenue lors de la vérification du contrat.' }
-  }
-
-  const check = data as { can_delete: boolean; incidents: number; counters: number; maintenance: number }
-  if (!check.can_delete) {
-    const parts: string[] = []
-    if (check.incidents > 0)   parts.push(`${check.incidents} incident(s)`)
-    if (check.counters > 0)    parts.push(`${check.counters} relevé(s) de compteur`)
-    if (check.maintenance > 0) parts.push(`${check.maintenance} plan(s) de maintenance`)
-    return { error: `Impossible de supprimer ce contrat : ${parts.join(', ')} associé(s). Retirez-les d'abord.` }
-  }
-
-  const { error: delError } = await admin.from('contracts').delete().eq('id', id)
-  if (delError) {
-    console.error('[deleteContract.delete]', delError)
+    console.error('[deleteContract]', error)
     return { error: 'Une erreur est survenue lors de la suppression.' }
+  }
+
+  const res = data as {
+    deleted: boolean
+    not_found?: boolean
+    incidents?: number
+    counters?: number
+    maintenance?: number
+  }
+  if (!res.deleted) {
+    if (res.not_found) return { error: 'Contrat introuvable.' }
+    const parts: string[] = []
+    if (res.incidents)   parts.push(`${res.incidents} incident(s)`)
+    if (res.counters)    parts.push(`${res.counters} relevé(s) de compteur`)
+    if (res.maintenance) parts.push(`${res.maintenance} plan(s) de maintenance`)
+    return { error: `Impossible de supprimer ce contrat : ${parts.join(', ')} associé(s). Retirez-les d'abord.` }
   }
 
   redirect('/admin/contracts')

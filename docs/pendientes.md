@@ -73,7 +73,30 @@ Solo si se quiere blindar el camino entero de punta a punta. Playwright.
 
 ---
 
-## 3. ✅ PR-cleanup del refactor N-máquinas — COMPLETADO (2026-06-11)
+## 3. 🧹 Cierre automático de líneas al terminar un contrato (prioridad media)
+
+### Por qué
+Marcar un contrato como `terminé` (vía `update_contract_with_lines`, `supabase/migrations/20260610101000_update_contract_lines_counter_guards.sql:107-114`) **NO cierra** sus líneas `contract_machines` abiertas (`date_fin IS NULL`). Consecuencias:
+- La factura está protegida — `isLineBillable` (`src/lib/invoicing.ts:107-116`) excluye la línea huérfana de un contrato `terminé` — así que **no se factura mal**.
+- Pero la máquina sigue figurando como **alquilada** en `v_machine_park` (que considera alquilada toda línea con `date_fin IS NULL`) → inventario parque/stock incoherente: una máquina que ya no está en servicio aparece como ocupada y no vuelve al stock.
+
+Hoy el único cierre desde UI es el array `retire` manual del formulario (`ContractForm.tsx`), que el admin debe usar a mano máquina por máquina.
+
+### Decisiones de negocio a resolver antes de implementar
+1. **¿Exigir lectura final del contador (`end_counter`) al cerrar?** `return_machine_to_stock` la exige (`20260608120000:81-82`, `end_counter_required`); el array `retire` la permite opcional. Afecta a la última factura del tramo.
+2. **¿Qué `date_fin`?** hoy / `date_renouvellement` / editable por el admin.
+3. **¿Cerrar TODAS las líneas abiertas** del contrato automáticamente al pasar a `terminé`, o seguir permitiendo mezcla actif/terminé?
+4. **Transaccionalidad:** ¿nueva RPC `close_contract_lines(p_contract_id, …)` o extender `update_contract_with_lines` para auto-cerrar cuando `statut → terminé`?
+5. **Mantenimiento:** ¿cancelar/migrar las visitas futuras de las líneas cerradas? (referencia: `replace_contract_machine` ya migra visitas, `20260608140000:104-110`).
+
+### Restricción de BD a respetar
+El CHECK `contract_machines_termine_has_date_fin` (`statut <> 'terminé' OR date_fin IS NOT NULL`) obliga a que toda línea `terminé` tenga `date_fin`. El índice único `contract_machines_one_open_per_machine` garantiza una sola línea abierta por máquina.
+
+> Origen: nota operativa del triaje de la auditoría de facturación (2026-06-11), hallazgo asociado a P1-6. No bloquea facturar, pero conviene cerrarlo para mantener el parque coherente. PR propio.
+
+---
+
+## 4. ✅ PR-cleanup del refactor N-máquinas — COMPLETADO (2026-06-11)
 
 - ✅ Columnas legacy eliminadas en prod (`contracts.machine_id`, `contracts.lieu_installation`, `incidents.contract_id`) — Fase 4, PR #30.
 - ✅ NO tocar: `auth_tech_incident_ids()` y `auth_tech_incident_contract_ids()` están EN USO por policies RLS del técnico (verificado vía `pg_depend`).

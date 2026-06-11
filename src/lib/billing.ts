@@ -159,25 +159,36 @@ export function resolveEffectiveTariffAsOf(
   }
 }
 
+/**
+ * Redondea un importe a entero FCFA (sin céntimos). Los precios son numeric(10,6)
+ * y se multiplican por deltas en coma flotante, por lo que `Math.round` directo
+ * sufre el error binario clásico (`Math.round(1.005 * 100) === 100`, no 101).
+ * `toFixed(6)` colapsa el ruido binario hasta los 6 decimales reales del precio
+ * antes de redondear a entero, dejando el `.5` exacto para que suba correctamente.
+ */
+export function roundFcfa(x: number): number {
+  return Math.round(Number(x.toFixed(6)))
+}
+
 /** Calcula el importe mensual. Redondea cada componente a entero (FCFA sin decimales). */
 export function calculateMonthlyAmount(
   tariff: EffectiveTariff,
   delta_bw: number,
   delta_color: number,
 ): MonthlyAmounts {
-  const amount_fixed = Math.round(tariff.fixed_fee)
+  const amount_fixed = roundFcfa(tariff.fixed_fee)
 
   let amount_bw = 0
   let amount_color = 0
 
   if (tariff.type === 'per_copy' || tariff.type === 'hybrid') {
-    amount_bw    = Math.round((tariff.price_bw    ?? 0) * delta_bw)
-    amount_color = Math.round((tariff.price_color ?? 0) * delta_color)
+    amount_bw    = roundFcfa((tariff.price_bw    ?? 0) * delta_bw)
+    amount_color = roundFcfa((tariff.price_color ?? 0) * delta_color)
   }
 
   if (tariff.type === 'hybrid_tiered' && tariff.tiers) {
-    amount_bw    = Math.round(applyTiers(tariff.tiers, delta_bw,    'bw'))
-    amount_color = Math.round(applyTiers(tariff.tiers, delta_color, 'color'))
+    amount_bw    = roundFcfa(applyTiers(tariff.tiers, delta_bw,    'bw'))
+    amount_color = roundFcfa(applyTiers(tariff.tiers, delta_color, 'color'))
   }
 
   return {
@@ -249,7 +260,7 @@ export function formatPrice(amount: number): string {
     new Intl.NumberFormat('fr-FR', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(Math.round(amount)) + ' FCFA'
+    }).format(roundFcfa(amount)) + ' FCFA'
   )
 }
 
