@@ -261,7 +261,7 @@ Emisor de **facturas inmutables**, a partir del consumo real de contadores. Tres
 
 Captura automática de contadores enviados por email (fotos/PDF) para los equipos fuera de Princity. Es la **primera de cuatro capacidades** de un "agente supervisor de contadores" (las otras: asistente de preguntas a admins, recordatorios a los 2 trabajadores, vigilante de descuadres). Spec: `docs/superpowers/specs/2026-06-12-buzon-contadores-email-design.md`; plan: `docs/superpowers/plans/2026-06-12-buzon-contadores-email.md`.
 
-**Flujo:** email a `COUNTER_INBOX_ADDRESS` (`admin@test-sav.site` en pruebas → `contadores@amd-service.com` en prod) → un **proveedor de inbound email** (a elegir: Resend Inbound / Mailgun / Cloudflare) traduce el correo a un contrato normalizado y hace POST a `receive-counter-email` → ésta valida la firma (`X-Counter-Webhook-Secret`), sube cada adjunto al bucket privado `counter-images`, crea una fila en `pending_counter_imports` y dispara `parse-counter-image` (vía `EdgeRuntime.waitUntil`) → ésta llama a **Claude Sonnet** (`claude-sonnet-4-6`, tool_use) que extrae serial + contadores, y luego a la RPC `process_counter_extraction` → un **admin revisa en `/admin/contadores/pendientes`** y confirma con un clic → RPC `import_counter_from_pending` inserta en `machine_counters`. Nada se factura sin confirmación humana.
+**Flujo:** email a la dirección del agente (en pruebas la `…@cloudmailin.net` que asigna CloudMailin; en prod `contadores@amd-service.com` con dominio propio) → **CloudMailin** (proveedor de inbound email, plan free 10.000/mes, formato **JSON normalized**, adjuntos base64 inline) hace POST a `receive-counter-email?secret=…` → ésta valida la firma (header `X-Counter-Webhook-Secret` **o** query `?secret=`, timing-safe) y parsea el JSON de forma tolerante (`envelope`/`headers`/`attachments[].content|content_base64`, `file_name|filename`), sube cada adjunto al bucket privado `counter-images`, crea una fila en `pending_counter_imports` y dispara `parse-counter-image` (vía `EdgeRuntime.waitUntil`) → ésta llama a **Claude Sonnet** (`claude-sonnet-4-6`, tool_use) que extrae serial + contadores, y luego a la RPC `process_counter_extraction` → un **admin revisa en `/admin/contadores/pendientes`** y confirma con un clic → RPC `import_counter_from_pending` inserta en `machine_counters` (rechaza con `no_active_line` si la máquina no tiene contrato activo). Nada se factura sin confirmación humana.
 
 - **Semáforo (en SQL, `process_counter_extraction`):** 🟢 `green` (serial casa con `machines.numero_serie` activo + todas las validaciones pasan) · 🟡 `amber` (casa pero algo chirría: confianza <0.80, sumas cruzadas Ricoh, contador decreciente, salto, duplicado de mes) · 🔴 `red` (no es hoja de contador, serial ilegible o sin match). Códigos en `validation_errors` (`V_CONF`, `V_CROSS_BW`, `V_NONDECR_BW`, `V_NO_MATCH`, …).
 - **Tabla `pending_counter_imports`** (cola + audit log, RLS admin select/update, INSERT solo `service_role`). Estados: `pending_review` → `confirmed`/`rejected`/`failed_extraction`. Idempotencia por `image_hash_sha256` (UNIQUE).
@@ -1028,6 +1028,32 @@ Snapshot inmutable por máquina: plan, tarifa efectiva y consumo congelados al e
 > **Coherencia contable en BD (P1-1):** `emit_contract_invoice` valida **antes** de insertar — ≥1 línea, cliente/contrato existe y coincide, importes no negativos, `amount_total = fixed+bw+color` por línea, cabecera = suma de líneas; persiste `breakdown`.
 > **Inmutabilidad (Bloque C):** trigger `trg_invoice_lines_immutable` → snapshot puro, ni `UPDATE` ni `DELETE`.
 > Migración `20260606000300_billing_in_contract_rpcs.sql`: `create/update_contract_with_lines` persisten los campos billing por línea. `update_contract_with_lines` reescrita por el Bloque D (`20260608140100`, guard P1-4 cambio de cliente) y el Bloque C (`20260609082000`, P0-6 pertenencia de líneas al contrato).
+
+---
+
+### Tabla: `pending_counter_imports` (agente de contadores por email, 2026-06-12)
+Cola de revisión + audit log de los contadores recibidos por email. Migración `20260612104341_counter_imports.sql`.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | |
+| `image_path` | text | ruta en el bucket `counter-images` (`{year}/{month}/{hash}.{ext}`) |
+| `image_size_bytes` | int | |
+| `image_hash_sha256` | text | **UNIQUE** → idempotencia (no reprocesa el mismo adjunto) |
+| `source` | text | CHECK `email` / `whatsapp` / `manual` |
+| `email_from` / `email_subject` / `email_message_id` | text | metadatos del correo (nullable) |
+| `extraction_model` | text | p.ej. `claude-sonnet-4-6` |
+| `extraction_cost_usd` | numeric(10,6) | coste de la lectura IA |
+| `extracted_data` | jsonb | `{serial, date_iso, counter_bw, counter_color, copier_*, printer_*, confidence, is_valid_counter_sheet, issues[]}` |
+| `matched_machine_id` | text | FK → `machines(numero_serie)` ON DELETE SET NULL (resultado del match por serial) |
+| `validation_errors` | jsonb | códigos que fallaron (`V_CONF`, `V_CROSS_BW`, `V_NONDECR_BW`, `V_NO_MATCH`, `V_DUP_MONTH`…) |
+| `light` | text | CHECK `green` / `amber` / `red` (semáforo) |
+| `status` | text | CHECK `pending_review` / `confirmed` / `rejected` / `failed_extraction` |
+| `imported_counter_id` | uuid | FK → `machine_counters` (poblado al confirmar) |
+| `reviewed_by` / `reviewed_at` / `rejection_reason` / `notes` | — | auditoría de la revisión |
+
+> **Bucket `counter-images`** (privado, primer uso de Storage en el repo): políticas `counter_images_service_all` (service_role) + `counter_images_admin_read` (admin vía `is_admin()`); la UI usa signed URLs TTL 1h. RLS de la tabla: `pci_admin_select`/`pci_admin_update` (admin), INSERT solo `service_role`.
+> **RPCs SECURITY DEFINER (guard `service_role`):** `process_counter_extraction(p_pending_id, p_extracted)` (match por serial + validaciones de forma/datos + fija `light`/`validation_errors`) e `import_counter_from_pending(p_pending_id, p_reviewed_by, p_overrides)` (confirma → INSERT en `machine_counters`; respeta `machine_counters_one_active_per_month`; rechaza `no_active_line` sin contrato activo). Detalle del flujo y estado en §"Buzón de Contadores por Email".
 
 ---
 
