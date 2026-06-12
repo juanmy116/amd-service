@@ -257,6 +257,23 @@ Emisor de **facturas inmutables**, a partir del consumo real de contadores. Tres
 
 ---
 
+## Buzón de Contadores por Email (Fase 1 del agente supervisor de contadores)
+
+Captura automática de contadores enviados por email (fotos/PDF) para los equipos fuera de Princity. Es la **primera de cuatro capacidades** de un "agente supervisor de contadores" (las otras: asistente de preguntas a admins, recordatorios a los 2 trabajadores, vigilante de descuadres). Spec: `docs/superpowers/specs/2026-06-12-buzon-contadores-email-design.md`; plan: `docs/superpowers/plans/2026-06-12-buzon-contadores-email.md`.
+
+**Flujo:** email a `COUNTER_INBOX_ADDRESS` (`admin@test-sav.site` en pruebas → `contadores@amd-service.com` en prod) → un **proveedor de inbound email** (a elegir: Resend Inbound / Mailgun / Cloudflare) traduce el correo a un contrato normalizado y hace POST a `receive-counter-email` → ésta valida la firma (`X-Counter-Webhook-Secret`), sube cada adjunto al bucket privado `counter-images`, crea una fila en `pending_counter_imports` y dispara `parse-counter-image` (vía `EdgeRuntime.waitUntil`) → ésta llama a **Claude Sonnet** (`claude-sonnet-4-6`, tool_use) que extrae serial + contadores, y luego a la RPC `process_counter_extraction` → un **admin revisa en `/admin/contadores/pendientes`** y confirma con un clic → RPC `import_counter_from_pending` inserta en `machine_counters`. Nada se factura sin confirmación humana.
+
+- **Semáforo (en SQL, `process_counter_extraction`):** 🟢 `green` (serial casa con `machines.numero_serie` activo + todas las validaciones pasan) · 🟡 `amber` (casa pero algo chirría: confianza <0.80, sumas cruzadas Ricoh, contador decreciente, salto, duplicado de mes) · 🔴 `red` (no es hoja de contador, serial ilegible o sin match). Códigos en `validation_errors` (`V_CONF`, `V_CROSS_BW`, `V_NONDECR_BW`, `V_NO_MATCH`, …).
+- **Tabla `pending_counter_imports`** (cola + audit log, RLS admin select/update, INSERT solo `service_role`). Estados: `pending_review` → `confirmed`/`rejected`/`failed_extraction`. Idempotencia por `image_hash_sha256` (UNIQUE).
+- **Bucket `counter-images`** (privado, primer uso de Storage en el repo). Imágenes vía signed URL TTL 1h en la UI.
+- **RPCs SECURITY DEFINER (service_role):** `process_counter_extraction(p_pending_id, p_extracted)` (match + validaciones + semáforo) e `import_counter_from_pending(p_pending_id, p_reviewed_by, p_overrides)` (confirma → `machine_counters`; rechaza con `no_active_line` si la máquina no tiene línea de contrato activa). Migración `20260612104341_counter_imports.sql`.
+- **Edge Functions:** `receive-counter-email` (webhook, `verify_jwt:false`, firma propia) y `parse-counter-image` (OCR). Aviso de lote vía template `counter_batch_processed` en `send-email`.
+- **Secrets (Supabase Edge Functions, NUNCA Vercel):** `ANTHROPIC_API_KEY`, `COUNTER_WEBHOOK_SECRET`, `COUNTER_NOTIFY_EMAILS`, `COUNTER_INBOX_ADDRESS`.
+
+> Estado: **B1 (datos/RPCs) desplegado y validado en prod** (semáforos + confirmación + guard `no_active_line`, datos sintéticos + limpieza). B2–B5 (Edge Functions + UI + aviso) **implementados y en build verde**, pendientes de despliegue. ⚠️ **Acciones manuales para activarlo:** (1) elegir proveedor inbound + apuntar los **MX de `test-sav.site`**; (2) cargar los 4 secrets en Supabase; (3) `supabase functions deploy parse-counter-image receive-counter-email send-email`. Hasta entonces, la recepción por email no está operativa (el resto del flujo sí está probado).
+
+---
+
 ## Stack Tecnológico
 
 | Capa | Tecnología |
