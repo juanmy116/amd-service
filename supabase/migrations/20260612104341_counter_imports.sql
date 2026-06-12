@@ -230,6 +230,12 @@ BEGIN
   WHERE cm.machine_id = v_machine AND cm.date_fin IS NULL AND cm.statut = 'actif'
   LIMIT 1;
 
+  -- Sin línea de contrato activa el relevé no se podría facturar (quedaría huérfano de cliente).
+  -- Mejor rechazar y que el admin cree/active el contrato antes de importar.
+  IF v_contract IS NULL THEN
+    RAISE EXCEPTION 'no_active_line';
+  END IF;
+
   INSERT INTO public.machine_counters
     (machine_id, contract_id, client_id, year, month, day, counter_bw, counter_color,
      status, notes, recorded_by, recorded_at)

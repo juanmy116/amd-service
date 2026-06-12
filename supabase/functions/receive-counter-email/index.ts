@@ -41,6 +41,7 @@ Deno.serve(async (req: Request) => {
   const yr = now.getUTCFullYear()
   const mo = String(now.getUTCMonth() + 1).padStart(2, '0')
   let queued = 0, skipped = 0
+  const triggers: Promise<void>[] = []
 
   for (const att of email.attachments ?? []) {
     if (!ALLOWED.has(att.content_type)) { skipped++; continue }
@@ -55,9 +56,8 @@ Deno.serve(async (req: Request) => {
     const { data: existing } = await db.from('pending_counter_imports').select('id').eq('image_hash_sha256', hash).maybeSingle()
     if (existing) { skipped++; continue }
 
-    const up = await db.storage.from('counter-images').upload(path, bytes, { contentType: att.content_type, upsert: false })
-    if (up.error) { console.error('[receive-counter-email] upload', up.error); skipped++; continue }
-
+    // Insertar la fila ANTES de subir, para no dejar objetos huérfanos en el bucket si el insert
+    // falla. El UNIQUE(image_hash_sha256) cierra cualquier carrera entre dos correos iguales (→ skipped).
     const { data: pending, error: insErr } = await db.from('pending_counter_imports').insert({
       image_path: path, image_size_bytes: bytes.length, image_hash_sha256: hash,
       source: 'email', email_from: email.from, email_subject: email.subject ?? null,
@@ -65,12 +65,21 @@ Deno.serve(async (req: Request) => {
     }).select('id').single()
     if (insErr) { console.error('[receive-counter-email] insert', insErr); skipped++; continue }
 
-    // Disparar el OCR (fire-and-forget; no bloquea la respuesta al proveedor).
-    fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/parse-counter-image`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SECRET_KEY}` },
-      body: JSON.stringify({ pending_id: pending!.id, image_path: path, content_type: att.content_type }),
-    }).catch(e => console.error('[receive-counter-email] trigger parse', e))
+    // Subir la imagen (upsert: tolera un reintento que ya hubiera dejado el objeto).
+    // Si falla, la fila ya existe y el OCR la marcará failed_extraction al no poder descargar
+    // (visible para el admin), en vez de quedar un objeto huérfano que bloquee reenvíos.
+    const up = await db.storage.from('counter-images').upload(path, bytes, { contentType: att.content_type, upsert: true })
+    if (up.error) console.error('[receive-counter-email] upload', up.error)
+
+    // Disparar el OCR. Se recoge la promesa para EdgeRuntime.waitUntil (sin él, el runtime de
+    // Supabase puede cancelar el fetch al devolver la Response y el OCR no se ejecutaría nunca).
+    triggers.push(
+      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/parse-counter-image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SECRET_KEY}` },
+        body: JSON.stringify({ pending_id: pending!.id, image_path: path, content_type: att.content_type }),
+      }).then(() => {}).catch(e => console.error('[receive-counter-email] trigger parse', e))
+    )
     queued++
   }
 
@@ -89,6 +98,10 @@ Deno.serve(async (req: Request) => {
       }).catch(e => console.error('[receive-counter-email] notify', e))
     }
   }
+
+  // Garantizar que los disparos del OCR se completen DESPUÉS de devolver la respuesta al proveedor.
+  const edge = (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime
+  if (triggers.length > 0 && edge) edge.waitUntil(Promise.all(triggers))
 
   return new Response(JSON.stringify({ ok: true, queued, skipped }), { headers: { 'Content-Type': 'application/json' } })
 })

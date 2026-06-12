@@ -21,6 +21,7 @@ export async function confirmPendingAction(_p: ActionState, fd: FormData): Promi
     console.error('[confirmPending]', error)
     const map: Record<string, string> = {
       no_machine: 'Aucune machine associée. Choisissez-en une.',
+      no_active_line: 'Aucun contrat actif pour cette machine. Activez le contrat avant import.',
       counter_exists_for_month: 'Un relevé existe déjà pour ce mois.',
       already_processed: 'Déjà traité.',
       missing_counters: 'Compteurs manquants.',
