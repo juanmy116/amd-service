@@ -109,16 +109,16 @@ BEGIN
   FROM public.machines WHERE numero_serie = v_serial AND active = true;
 
   -- Validaciones de forma (amber).
-  IF v_conf < 0.80 THEN v_errors := v_errors || 'V_CONF'; END IF;
-  IF v_bw IS NULL OR v_bw < 0 OR v_bw > 100000000 THEN v_errors := v_errors || 'V_RANGE_BW'; END IF;
-  IF v_color IS NULL OR v_color < 0 OR v_color > 100000000 THEN v_errors := v_errors || 'V_RANGE_COLOR'; END IF;
-  IF v_year NOT IN (v_cur_year, v_cur_year - 1) THEN v_errors := v_errors || 'V_YEAR'; END IF;
-  IF v_month < 1 OR v_month > 12 THEN v_errors := v_errors || 'V_MONTH'; END IF;
+  IF v_conf < 0.80 THEN v_errors := array_append(v_errors, 'V_CONF'); END IF;
+  IF v_bw IS NULL OR v_bw < 0 OR v_bw > 100000000 THEN v_errors := array_append(v_errors, 'V_RANGE_BW'); END IF;
+  IF v_color IS NULL OR v_color < 0 OR v_color > 100000000 THEN v_errors := array_append(v_errors, 'V_RANGE_COLOR'); END IF;
+  IF v_year NOT IN (v_cur_year, v_cur_year - 1) THEN v_errors := array_append(v_errors, 'V_YEAR'); END IF;
+  IF v_month < 1 OR v_month > 12 THEN v_errors := array_append(v_errors, 'V_MONTH'); END IF;
   -- Sumas cruzadas SOLO si la hoja trae los sub-campos (Ricoh). Pantum/otras no los traen.
   IF v_copier_bw IS NOT NULL AND v_printer_bw IS NOT NULL AND v_bw IS NOT NULL
-     AND (v_copier_bw + v_printer_bw) <> v_bw THEN v_errors := v_errors || 'V_CROSS_BW'; END IF;
+     AND (v_copier_bw + v_printer_bw) <> v_bw THEN v_errors := array_append(v_errors, 'V_CROSS_BW'); END IF;
   IF v_copier_col IS NOT NULL AND v_printer_col IS NOT NULL AND v_color IS NOT NULL
-     AND (v_copier_col + v_printer_col) <> v_color THEN v_errors := v_errors || 'V_CROSS_COLOR'; END IF;
+     AND (v_copier_col + v_printer_col) <> v_color THEN v_errors := array_append(v_errors, 'V_CROSS_COLOR'); END IF;
 
   -- Validaciones que dependen de datos (solo si hay máquina).
   IF v_machine IS NOT NULL THEN
@@ -129,16 +129,16 @@ BEGIN
     LIMIT 1;
 
     IF v_prev_bw IS NOT NULL AND v_bw IS NOT NULL AND v_bw < v_prev_bw THEN
-      v_errors := v_errors || 'V_NONDECR_BW';
+      v_errors := array_append(v_errors, 'V_NONDECR_BW');
     END IF;
     IF v_prev_color IS NOT NULL AND v_color IS NOT NULL AND v_color < v_prev_color THEN
-      v_errors := v_errors || 'V_NONDECR_COLOR';
+      v_errors := array_append(v_errors, 'V_NONDECR_COLOR');
     END IF;
     IF EXISTS (
       SELECT 1 FROM public.machine_counters
       WHERE machine_id = v_machine AND year = v_year AND month = v_month AND status = 'actif'
     ) THEN
-      v_errors := v_errors || 'V_DUP_MONTH';
+      v_errors := array_append(v_errors, 'V_DUP_MONTH');
     END IF;
   END IF;
 
@@ -147,7 +147,7 @@ BEGIN
     v_light := 'red';
   ELSIF v_machine IS NULL THEN
     v_light := 'red';
-    v_errors := v_errors || 'V_NO_MATCH';
+    v_errors := array_append(v_errors, 'V_NO_MATCH');
   ELSIF array_length(v_errors, 1) IS NULL THEN
     v_light := 'green';
   ELSE
