@@ -257,6 +257,23 @@ Emisor de **facturas inmutables**, a partir del consumo real de contadores. Tres
 
 ---
 
+## Buzón de Contadores por Email (Fase 1 del agente supervisor de contadores)
+
+Captura automática de contadores enviados por email (fotos/PDF) para los equipos fuera de Princity. Es la **primera de cuatro capacidades** de un "agente supervisor de contadores" (las otras: asistente de preguntas a admins, recordatorios a los 2 trabajadores, vigilante de descuadres). Spec: `docs/superpowers/specs/2026-06-12-buzon-contadores-email-design.md`; plan: `docs/superpowers/plans/2026-06-12-buzon-contadores-email.md`.
+
+**Flujo:** email a `COUNTER_INBOX_ADDRESS` (`admin@test-sav.site` en pruebas → `contadores@amd-service.com` en prod) → un **proveedor de inbound email** (a elegir: Resend Inbound / Mailgun / Cloudflare) traduce el correo a un contrato normalizado y hace POST a `receive-counter-email` → ésta valida la firma (`X-Counter-Webhook-Secret`), sube cada adjunto al bucket privado `counter-images`, crea una fila en `pending_counter_imports` y dispara `parse-counter-image` (vía `EdgeRuntime.waitUntil`) → ésta llama a **Claude Sonnet** (`claude-sonnet-4-6`, tool_use) que extrae serial + contadores, y luego a la RPC `process_counter_extraction` → un **admin revisa en `/admin/contadores/pendientes`** y confirma con un clic → RPC `import_counter_from_pending` inserta en `machine_counters`. Nada se factura sin confirmación humana.
+
+- **Semáforo (en SQL, `process_counter_extraction`):** 🟢 `green` (serial casa con `machines.numero_serie` activo + todas las validaciones pasan) · 🟡 `amber` (casa pero algo chirría: confianza <0.80, sumas cruzadas Ricoh, contador decreciente, salto, duplicado de mes) · 🔴 `red` (no es hoja de contador, serial ilegible o sin match). Códigos en `validation_errors` (`V_CONF`, `V_CROSS_BW`, `V_NONDECR_BW`, `V_NO_MATCH`, …).
+- **Tabla `pending_counter_imports`** (cola + audit log, RLS admin select/update, INSERT solo `service_role`). Estados: `pending_review` → `confirmed`/`rejected`/`failed_extraction`. Idempotencia por `image_hash_sha256` (UNIQUE).
+- **Bucket `counter-images`** (privado, primer uso de Storage en el repo). Imágenes vía signed URL TTL 1h en la UI.
+- **RPCs SECURITY DEFINER (service_role):** `process_counter_extraction(p_pending_id, p_extracted)` (match + validaciones + semáforo) e `import_counter_from_pending(p_pending_id, p_reviewed_by, p_overrides)` (confirma → `machine_counters`; rechaza con `no_active_line` si la máquina no tiene línea de contrato activa). Migración `20260612104341_counter_imports.sql`.
+- **Edge Functions:** `receive-counter-email` (webhook, `verify_jwt:false`, firma propia) y `parse-counter-image` (OCR). Aviso de lote vía template `counter_batch_processed` en `send-email`.
+- **Secrets (Supabase Edge Functions, NUNCA Vercel):** `ANTHROPIC_API_KEY`, `COUNTER_WEBHOOK_SECRET`, `COUNTER_NOTIFY_EMAILS`, `COUNTER_INBOX_ADDRESS`.
+
+> Estado: **DESPLEGADO Y FUNCIONANDO POR EMAIL REAL (2026-06-12).** B1 (datos/RPCs) + B2/B3 (Edge Functions `parse-counter-image` y `receive-counter-email`, desplegadas vía MCP, `verify_jwt:false`, auth propia) + B4 (UI `/admin/contadores/pendientes`) operativos. Secrets en Supabase: `ANTHROPIC_API_KEY`, `COUNTER_WEBHOOK_SECRET`, `COUNTER_NOTIFY_EMAILS`. **Cartero = CloudMailin** (inbound, plan free 10.000/mes, formato **JSON normalized**); `receive-counter-email` tolera su formato (`envelope`/`headers`/`attachments[].content`) + secret por `?secret=` query. **Gate E2E real PASADO:** email desde Gmail con foto Ricoh adjunta → CloudMailin → OCR 🟢 green (serial+contadores exactos, 0.98 conf, $0.011). ⚠️ **Pendientes (no bloquean):** (a) redesplegar `send-email` con el template `counter_batch_processed` vía CLI (el aviso de lote; hoy falla controlado) — diferido por ser función en uso; (b) conectar el **dominio propio** en CloudMailin + MX en Hostinger para usar `contadores@amd-service.com` en vez de la dirección `@cloudmailin.net` de pruebas.
+
+---
+
 ## Stack Tecnológico
 
 | Capa | Tecnología |

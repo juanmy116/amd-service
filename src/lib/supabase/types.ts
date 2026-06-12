@@ -1207,6 +1207,110 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_counter_imports: {
+        Row: {
+          created_at: string
+          email_from: string | null
+          email_message_id: string | null
+          email_subject: string | null
+          extracted_at: string
+          extracted_data: Json
+          extraction_cost_usd: number
+          extraction_model: string
+          id: string
+          image_hash_sha256: string
+          image_path: string
+          image_size_bytes: number
+          imported_counter_id: string | null
+          light: string
+          matched_machine_id: string | null
+          notes: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source: string
+          status: string
+          validation_errors: Json
+        }
+        Insert: {
+          created_at?: string
+          email_from?: string | null
+          email_message_id?: string | null
+          email_subject?: string | null
+          extracted_at?: string
+          extracted_data?: Json
+          extraction_cost_usd?: number
+          extraction_model?: string
+          id?: string
+          image_hash_sha256: string
+          image_path: string
+          image_size_bytes: number
+          imported_counter_id?: string | null
+          light?: string
+          matched_machine_id?: string | null
+          notes?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          status?: string
+          validation_errors?: Json
+        }
+        Update: {
+          created_at?: string
+          email_from?: string | null
+          email_message_id?: string | null
+          email_subject?: string | null
+          extracted_at?: string
+          extracted_data?: Json
+          extraction_cost_usd?: number
+          extraction_model?: string
+          id?: string
+          image_hash_sha256?: string
+          image_path?: string
+          image_size_bytes?: number
+          imported_counter_id?: string | null
+          light?: string
+          matched_machine_id?: string | null
+          notes?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          status?: string
+          validation_errors?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_counter_imports_imported_counter_id_fkey"
+            columns: ["imported_counter_id"]
+            isOneToOne: false
+            referencedRelation: "machine_counters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_counter_imports_matched_machine_id_fkey"
+            columns: ["matched_machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["numero_serie"]
+          },
+          {
+            foreignKeyName: "pending_counter_imports_matched_machine_id_fkey"
+            columns: ["matched_machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machine_park"
+            referencedColumns: ["numero_serie"]
+          },
+          {
+            foreignKeyName: "pending_counter_imports_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       princity_alerts: {
         Row: {
           alert_type: Database["public"]["Enums"]["alert_type"] | null
@@ -1429,8 +1533,6 @@ export type Database = {
       auth_tech_incident_contract_ids: { Args: never; Returns: string[] }
       auth_tech_incident_ids: { Args: never; Returns: string[] }
       auth_tech_visit_ids: { Args: never; Returns: string[] }
-      delete_contract: { Args: { p_contract_id: string }; Returns: Json }
-      terminate_contract: { Args: { p_payload: Json }; Returns: Json }
       close_maintenance_visit: {
         Args: {
           p_autres_pieces: string
@@ -1443,12 +1545,26 @@ export type Database = {
         Returns: Json
       }
       create_contract_with_lines: { Args: { payload: Json }; Returns: Json }
+      delete_contract: { Args: { p_contract_id: string }; Returns: Json }
       emit_contract_invoice: { Args: { p_payload: Json }; Returns: string }
+      import_counter_from_pending: {
+        Args: {
+          p_overrides?: Json
+          p_pending_id: string
+          p_reviewed_by: string
+        }
+        Returns: string
+      }
       is_admin: { Args: never; Returns: boolean }
       next_incident_number: { Args: never; Returns: string }
       next_invoice_number: { Args: never; Returns: string }
+      process_counter_extraction: {
+        Args: { p_extracted: Json; p_pending_id: string }
+        Returns: Json
+      }
       replace_contract_machine: { Args: { p_payload: Json }; Returns: string }
       return_machine_to_stock: { Args: { p_payload: Json }; Returns: string }
+      terminate_contract: { Args: { p_payload: Json }; Returns: Json }
       update_contract_with_lines: {
         Args: { p_contract_id: string; payload: Json }
         Returns: Json
