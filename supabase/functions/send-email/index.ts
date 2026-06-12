@@ -5,7 +5,7 @@ const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
 const FROM = Deno.env.get('RESEND_FROM') ?? 'AMD Service <noreply@amd-service.com>'
 const RESEND_URL = 'https://api.resend.com/emails'
 
-type TemplateName = 'ticket_open' | 'ticket_assigned' | 'ticket_resolved' | 'csat' | 'raw'
+type TemplateName = 'ticket_open' | 'ticket_assigned' | 'ticket_resolved' | 'csat' | 'counter_batch_processed' | 'raw'
 
 interface EmailPayload {
   template: TemplateName
@@ -100,6 +100,18 @@ function renderTemplate(
           </div>
         `
       }
+
+    case 'counter_batch_processed': {
+      const total = data.total ?? '0'
+      const greens = data.greens ?? '0'
+      const attention = data.attention ?? '0'
+      return {
+        subject: `[AMD SAV] ${total} compteur(s) traité(s) par email`,
+        html: `<p><strong>${total}</strong> compteur(s) reçus par email ont été traités.</p>
+             <ul><li>🟢 ${greens} prêt(s) à confirmer</li><li>🟡🔴 ${attention} à vérifier</li></ul>
+             <p><a href="${data.url ?? ''}">Voir la file d'attente →</a></p>`,
+      }
+    }
 
     case 'raw':
       if (!data.subject || !data.html) throw new Error('raw requiert subject et html dans data')
