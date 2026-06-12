@@ -20,6 +20,7 @@ const NAV_GROUPS = [
       { href: '/admin/leads',      label: 'Leads',           icon: Inbox },
       { href: '/admin/machines',   label: 'Machines',        icon: Printer },
       { href: '/admin/contadores', label: 'Compteurs',       icon: BarChart2 },
+      { href: '/admin/contadores/pendientes', label: 'Compteurs en attente', icon: Inbox },
       { href: '/admin/contracts',  label: 'Contrats',        icon: FileText },
     ],
   },
