@@ -73,6 +73,50 @@ describe('process_counter_extraction — semáforo', () => {
   })
 })
 
+describe('process_counter_extraction — duplicado en la cola (V_DUP_PENDING)', () => {
+  it('🟡 amber cuando otra lectura de la misma máquina y mes ya está en cola', async () => {
+    // A: primera lectura de SN para marzo 2026 (mes aislado de los otros tests, que usan junio).
+    const idA = await seedPending('TESTHASH-duppend-a')
+    const { data: a } = await admin.rpc('process_counter_extraction', {
+      p_pending_id: idA,
+      p_extracted: { serial: SN, date_iso: '2026-03-10T10:00:00', counter_bw: 100, counter_color: 50,
+        confidence: 0.95, is_valid_counter_sheet: true, issues: [] },
+    })
+    expect(a.light).toBe('green') // aún no hay duplicado → verde
+
+    // B: segunda lectura de SN para el MISMO mes mientras A sigue en pending_review.
+    const idB = await seedPending('TESTHASH-duppend-b')
+    const { data: b } = await admin.rpc('process_counter_extraction', {
+      p_pending_id: idB,
+      p_extracted: { serial: SN, date_iso: '2026-03-22T10:00:00', counter_bw: 110, counter_color: 55,
+        confidence: 0.95, is_valid_counter_sheet: true, issues: [] },
+    })
+    expect(b.light).toBe('amber')
+    expect(b.errors).toContain('V_DUP_PENDING')
+  })
+})
+
+describe('register_counter_duplicate — reenvío del mismo fichero', () => {
+  it('incrementa duplicate_count y devuelve la fila; null si el hash no existe', async () => {
+    const id = await seedPending('TESTHASH-regdup')
+
+    const { data: first } = await admin.rpc('register_counter_duplicate', { p_hash: 'TESTHASH-regdup' })
+    expect(first?.duplicate_count).toBe(1)
+    expect(first?.id).toBe(id)
+
+    const { data: second } = await admin.rpc('register_counter_duplicate', { p_hash: 'TESTHASH-regdup' })
+    expect(second?.duplicate_count).toBe(2)
+
+    const { data: pci } = await admin.from('pending_counter_imports')
+      .select('duplicate_count, last_duplicate_at').eq('id', id).single()
+    expect(pci?.duplicate_count).toBe(2)
+    expect(pci?.last_duplicate_at).not.toBeNull()
+
+    const { data: none } = await admin.rpc('register_counter_duplicate', { p_hash: 'TESTHASH-does-not-exist' })
+    expect(none).toBeNull()
+  })
+})
+
 describe('import_counter_from_pending — confirmación', () => {
   it('inserta en machine_counters y marca confirmed', async () => {
     const id = await seedPending('TESTHASH-import')
