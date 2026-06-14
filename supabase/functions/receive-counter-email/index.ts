@@ -60,7 +60,7 @@ Deno.serve(async (req: Request) => {
   const now = new Date()
   const yr = now.getUTCFullYear()
   const mo = String(now.getUTCMonth() + 1).padStart(2, '0')
-  let queued = 0, skipped = 0
+  let queued = 0, skipped = 0, duplicates = 0
   const triggers: Promise<void>[] = []
 
   for (const att of email.attachments ?? []) {
@@ -76,9 +76,12 @@ Deno.serve(async (req: Request) => {
     const ext = ctype === 'application/pdf' ? 'pdf' : ctype.split('/')[1]
     const path = `${yr}/${mo}/${hash}.${ext}`
 
-    // Idempotencia: si el hash ya existe, saltar.
-    const { data: existing } = await db.from('pending_counter_imports').select('id').eq('image_hash_sha256', hash).maybeSingle()
-    if (existing) { skipped++; continue }
+    // Idempotencia: si el hash ya existe, NO reprocesar, pero dejar rastro visible
+    // (antes se descartaba en SILENCIO → parecía que "no llegaban los correos").
+    // register_counter_duplicate incrementa duplicate_count en la fila original y la
+    // devuelve; null = el hash no existía aún → seguimos al flujo normal de inserción.
+    const { data: dup } = await db.rpc('register_counter_duplicate', { p_hash: hash })
+    if (dup) { duplicates++; continue }
 
     // Insertar la fila ANTES de subir, para no dejar objetos huérfanos en el bucket si el insert
     // falla. El UNIQUE(image_hash_sha256) cierra cualquier carrera entre dos correos iguales (→ skipped).
@@ -106,19 +109,34 @@ Deno.serve(async (req: Request) => {
     queued++
   }
 
-  // Aviso de lote (B5): un solo email-resumen a los admins si se encoló algo.
-  if (queued > 0) {
-    const notify = (Deno.env.get('COUNTER_NOTIFY_EMAILS') ?? '').split(',').map(s => s.trim()).filter(Boolean)
-    const appUrl = Deno.env.get('NEXT_PUBLIC_APP_URL') ?? ''
-    if (notify.length > 0) {
+  // Aviso a los admins. Caso normal: lote encolado. Caso "solo reenvíos": foto(s) ya
+  // recibida(s) que no se reprocesaron (doublon exact) — antes era silencio total.
+  const notify = (Deno.env.get('COUNTER_NOTIFY_EMAILS') ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  const appUrl = Deno.env.get('NEXT_PUBLIC_APP_URL') ?? ''
+  const queueUrl = `${appUrl}/admin/contadores/pendientes`
+  if (notify.length > 0) {
+    if (queued > 0) {
       await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SECRET_KEY}` },
         body: JSON.stringify({
           template: 'counter_batch_processed', to: notify,
-          data: { total: String(queued), greens: '—', attention: '—', url: `${appUrl}/admin/contadores/pendientes` },
+          data: { total: String(queued), greens: '—', attention: '—', url: queueUrl },
         }),
       }).catch(e => console.error('[receive-counter-email] notify', e))
+    } else if (duplicates > 0) {
+      await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SECRET_KEY}` },
+        body: JSON.stringify({
+          template: 'raw', to: notify,
+          data: {
+            subject: '[AMD SAV] Photo de compteur déjà reçue',
+            html: `<p><strong>${duplicates}</strong> photo(s) de compteur déjà reçue(s) ont été renvoyées et n'ont pas été retraitées (doublon exact).</p>`
+                 + `<p><a href="${queueUrl}">Voir la file d'attente →</a></p>`,
+          },
+        }),
+      }).catch(e => console.error('[receive-counter-email] notify dup', e))
     }
   }
 
@@ -126,5 +144,5 @@ Deno.serve(async (req: Request) => {
   const edge = (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime
   if (triggers.length > 0 && edge) edge.waitUntil(Promise.all(triggers))
 
-  return new Response(JSON.stringify({ ok: true, queued, skipped }), { headers: { 'Content-Type': 'application/json' } })
+  return new Response(JSON.stringify({ ok: true, queued, skipped, duplicates }), { headers: { 'Content-Type': 'application/json' } })
 })

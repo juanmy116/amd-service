@@ -3,6 +3,8 @@ import { adminClient, SERVICE_KEY } from './helpers'
 
 const admin = adminClient()
 const SN = 'TEST-PCI-SN1'
+const CT = 'TEST-PCI-CT1'
+const CLIENT = 'TEST-PCI Client'
 
 async function seedPending(hash: string): Promise<string> {
   const { data, error } = await admin.from('pending_counter_imports').insert({
@@ -12,19 +14,36 @@ async function seedPending(hash: string): Promise<string> {
   return data!.id as string
 }
 
+// Borra el escenario en orden inverso a las dependencias (líneas → contadores → contrato → máquina → cliente).
+async function cleanScenario() {
+  await admin.from('pending_counter_imports').delete().like('image_hash_sha256', 'TESTHASH-%')
+  await admin.from('contract_machines').delete().eq('machine_id', SN)
+  await admin.from('machine_counters').delete().eq('machine_id', SN)
+  await admin.from('contracts').delete().eq('numero_contrat', CT)
+  await admin.from('machines').delete().eq('numero_serie', SN)
+  await admin.from('clients').delete().eq('nom_client', CLIENT)
+}
+
 beforeAll(async () => {
   if (!SERVICE_KEY) throw new Error('Falta SERVICE_ROLE_KEY. Ejecuta con `supabase start`.')
-  await admin.from('pending_counter_imports').delete().like('image_hash_sha256', 'TESTHASH-%')
-  await admin.from('machine_counters').delete().eq('machine_id', SN)
-  await admin.from('machines').delete().eq('numero_serie', SN)
-  const { error } = await admin.from('machines').insert({ numero_serie: SN, marque: 'Ricoh', modele: 'T', type: 'color' })
-  if (error) throw new Error(`seed machine: ${error.message}`)
+  await cleanScenario()
+
+  const { error: mErr } = await admin.from('machines').insert({ numero_serie: SN, marque: 'Ricoh', modele: 'T', type: 'color' })
+  if (mErr) throw new Error(`seed machine: ${mErr.message}`)
+
+  // Línea de contrato activa: la exige el guard no_active_line de import_counter_from_pending.
+  const { data: client, error: cErr } = await admin.from('clients').insert({ nom_client: CLIENT }).select('id').single()
+  if (cErr) throw new Error(`seed client: ${cErr.message}`)
+  const { data: contract, error: ctErr } = await admin.from('contracts')
+    .insert({ client_id: client!.id, numero_contrat: CT, date_debut: '2026-01-01' }).select('id').single()
+  if (ctErr) throw new Error(`seed contract: ${ctErr.message}`)
+  const { error: cmErr } = await admin.from('contract_machines')
+    .insert({ contract_id: contract!.id, machine_id: SN, date_debut: '2026-01-01', statut: 'actif' })
+  if (cmErr) throw new Error(`seed contract_machine: ${cmErr.message}`)
 }, 60_000)
 
 afterAll(async () => {
-  await admin.from('pending_counter_imports').delete().like('image_hash_sha256', 'TESTHASH-%')
-  await admin.from('machine_counters').delete().eq('machine_id', SN)
-  await admin.from('machines').delete().eq('numero_serie', SN)
+  await cleanScenario()
 })
 
 describe('process_counter_extraction — semáforo', () => {
@@ -70,6 +89,50 @@ describe('process_counter_extraction — semáforo', () => {
     })
     expect(data.light).toBe('amber')
     expect(data.errors).toContain('V_CROSS_BW')
+  })
+})
+
+describe('process_counter_extraction — duplicado en la cola (V_DUP_PENDING)', () => {
+  it('🟡 amber cuando otra lectura de la misma máquina y mes ya está en cola', async () => {
+    // A: primera lectura de SN para marzo 2026 (mes aislado de los otros tests, que usan junio).
+    const idA = await seedPending('TESTHASH-duppend-a')
+    const { data: a } = await admin.rpc('process_counter_extraction', {
+      p_pending_id: idA,
+      p_extracted: { serial: SN, date_iso: '2026-03-10T10:00:00', counter_bw: 100, counter_color: 50,
+        confidence: 0.95, is_valid_counter_sheet: true, issues: [] },
+    })
+    expect(a.light).toBe('green') // aún no hay duplicado → verde
+
+    // B: segunda lectura de SN para el MISMO mes mientras A sigue en pending_review.
+    const idB = await seedPending('TESTHASH-duppend-b')
+    const { data: b } = await admin.rpc('process_counter_extraction', {
+      p_pending_id: idB,
+      p_extracted: { serial: SN, date_iso: '2026-03-22T10:00:00', counter_bw: 110, counter_color: 55,
+        confidence: 0.95, is_valid_counter_sheet: true, issues: [] },
+    })
+    expect(b.light).toBe('amber')
+    expect(b.errors).toContain('V_DUP_PENDING')
+  })
+})
+
+describe('register_counter_duplicate — reenvío del mismo fichero', () => {
+  it('incrementa duplicate_count y devuelve la fila; null si el hash no existe', async () => {
+    const id = await seedPending('TESTHASH-regdup')
+
+    const { data: first } = await admin.rpc('register_counter_duplicate', { p_hash: 'TESTHASH-regdup' })
+    expect(first?.duplicate_count).toBe(1)
+    expect(first?.id).toBe(id)
+
+    const { data: second } = await admin.rpc('register_counter_duplicate', { p_hash: 'TESTHASH-regdup' })
+    expect(second?.duplicate_count).toBe(2)
+
+    const { data: pci } = await admin.from('pending_counter_imports')
+      .select('duplicate_count, last_duplicate_at').eq('id', id).single()
+    expect(pci?.duplicate_count).toBe(2)
+    expect(pci?.last_duplicate_at).not.toBeNull()
+
+    const { data: none } = await admin.rpc('register_counter_duplicate', { p_hash: 'TESTHASH-does-not-exist' })
+    expect(none).toBeNull()
   })
 })
 

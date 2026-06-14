@@ -9,6 +9,7 @@ type Pending = {
   id: string; image_path: string; light: 'green' | 'amber' | 'red'; status: string
   matched_machine_id: string | null; email_from: string | null; extracted_at: string
   extracted_data: Record<string, unknown>; validation_errors: string[]
+  duplicate_count: number; last_duplicate_at: string | null
 }
 
 export default async function PendingCountersPage() {
@@ -16,7 +17,7 @@ export default async function PendingCountersPage() {
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('pending_counter_imports')
-    .select('id, image_path, light, status, matched_machine_id, email_from, extracted_at, extracted_data, validation_errors')
+    .select('id, image_path, light, status, matched_machine_id, email_from, extracted_at, extracted_data, validation_errors, duplicate_count, last_duplicate_at')
     .eq('status', 'pending_review')
     .order('extracted_at', { ascending: false })
     .limit(200)

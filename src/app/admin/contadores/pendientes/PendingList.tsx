@@ -1,11 +1,13 @@
 'use client'
 import { useActionState, useState } from 'react'
 import { confirmPendingAction, rejectPendingAction } from './actions'
+import { labelFor, DUPLICATE_CODES } from './validation-labels'
 
 type Row = {
   id: string; image_url: string | null; light: 'green' | 'amber' | 'red'
   matched_machine_id: string | null; email_from: string | null
   extracted_data: Record<string, unknown>; validation_errors: string[]
+  duplicate_count: number; last_duplicate_at: string | null
 }
 type Machine = { numero_serie: string; marque: string; modele: string }
 
@@ -42,9 +44,22 @@ function Detail({ row, machines }: { row: Row; machines: Machine[] }) {
   return (
     <div className="p-5 space-y-4">
       {row.image_url && <img src={row.image_url} alt="relevé" className="max-h-64 rounded-lg border border-line object-contain" />}
+      {row.duplicate_count > 0 && (
+        <p className="text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded px-2 py-1.5">
+          ⚠️ Photo renvoyée {row.duplicate_count} fois
+          {row.last_duplicate_at ? ` (dernier : ${new Date(row.last_duplicate_at).toLocaleString('fr-FR')})` : ''}
+        </p>
+      )}
       {row.validation_errors.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {row.validation_errors.map(e => <span key={e} className="text-xs bg-amber-100 text-amber-800 rounded px-1.5 py-0.5">{e}</span>)}
+          {row.validation_errors.map(e => (
+            <span key={e}
+              className={`text-xs rounded px-1.5 py-0.5 ${DUPLICATE_CODES.has(e)
+                ? 'bg-amber-200 text-amber-900 font-medium'
+                : 'bg-amber-100 text-amber-800'}`}>
+              {labelFor(e)}
+            </span>
+          ))}
         </div>
       )}
       <form action={confirmAction} className="space-y-3">

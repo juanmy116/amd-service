@@ -1210,6 +1210,7 @@ export type Database = {
       pending_counter_imports: {
         Row: {
           created_at: string
+          duplicate_count: number
           email_from: string | null
           email_message_id: string | null
           email_subject: string | null
@@ -1222,6 +1223,7 @@ export type Database = {
           image_path: string
           image_size_bytes: number
           imported_counter_id: string | null
+          last_duplicate_at: string | null
           light: string
           matched_machine_id: string | null
           notes: string | null
@@ -1234,6 +1236,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          duplicate_count?: number
           email_from?: string | null
           email_message_id?: string | null
           email_subject?: string | null
@@ -1246,6 +1249,7 @@ export type Database = {
           image_path: string
           image_size_bytes: number
           imported_counter_id?: string | null
+          last_duplicate_at?: string | null
           light?: string
           matched_machine_id?: string | null
           notes?: string | null
@@ -1258,6 +1262,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          duplicate_count?: number
           email_from?: string | null
           email_message_id?: string | null
           email_subject?: string | null
@@ -1270,6 +1275,7 @@ export type Database = {
           image_path?: string
           image_size_bytes?: number
           imported_counter_id?: string | null
+          last_duplicate_at?: string | null
           light?: string
           matched_machine_id?: string | null
           notes?: string | null
@@ -1562,6 +1568,7 @@ export type Database = {
         Args: { p_extracted: Json; p_pending_id: string }
         Returns: Json
       }
+      register_counter_duplicate: { Args: { p_hash: string }; Returns: Json }
       replace_contract_machine: { Args: { p_payload: Json }; Returns: string }
       return_machine_to_stock: { Args: { p_payload: Json }; Returns: string }
       terminate_contract: { Args: { p_payload: Json }; Returns: Json }
