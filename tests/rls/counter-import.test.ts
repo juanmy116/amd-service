@@ -3,6 +3,8 @@ import { adminClient, SERVICE_KEY } from './helpers'
 
 const admin = adminClient()
 const SN = 'TEST-PCI-SN1'
+const CT = 'TEST-PCI-CT1'
+const CLIENT = 'TEST-PCI Client'
 
 async function seedPending(hash: string): Promise<string> {
   const { data, error } = await admin.from('pending_counter_imports').insert({
@@ -12,19 +14,36 @@ async function seedPending(hash: string): Promise<string> {
   return data!.id as string
 }
 
+// Borra el escenario en orden inverso a las dependencias (líneas → contadores → contrato → máquina → cliente).
+async function cleanScenario() {
+  await admin.from('pending_counter_imports').delete().like('image_hash_sha256', 'TESTHASH-%')
+  await admin.from('contract_machines').delete().eq('machine_id', SN)
+  await admin.from('machine_counters').delete().eq('machine_id', SN)
+  await admin.from('contracts').delete().eq('numero_contrat', CT)
+  await admin.from('machines').delete().eq('numero_serie', SN)
+  await admin.from('clients').delete().eq('nom_client', CLIENT)
+}
+
 beforeAll(async () => {
   if (!SERVICE_KEY) throw new Error('Falta SERVICE_ROLE_KEY. Ejecuta con `supabase start`.')
-  await admin.from('pending_counter_imports').delete().like('image_hash_sha256', 'TESTHASH-%')
-  await admin.from('machine_counters').delete().eq('machine_id', SN)
-  await admin.from('machines').delete().eq('numero_serie', SN)
-  const { error } = await admin.from('machines').insert({ numero_serie: SN, marque: 'Ricoh', modele: 'T', type: 'color' })
-  if (error) throw new Error(`seed machine: ${error.message}`)
+  await cleanScenario()
+
+  const { error: mErr } = await admin.from('machines').insert({ numero_serie: SN, marque: 'Ricoh', modele: 'T', type: 'color' })
+  if (mErr) throw new Error(`seed machine: ${mErr.message}`)
+
+  // Línea de contrato activa: la exige el guard no_active_line de import_counter_from_pending.
+  const { data: client, error: cErr } = await admin.from('clients').insert({ nom_client: CLIENT }).select('id').single()
+  if (cErr) throw new Error(`seed client: ${cErr.message}`)
+  const { data: contract, error: ctErr } = await admin.from('contracts')
+    .insert({ client_id: client!.id, numero_contrat: CT, date_debut: '2026-01-01' }).select('id').single()
+  if (ctErr) throw new Error(`seed contract: ${ctErr.message}`)
+  const { error: cmErr } = await admin.from('contract_machines')
+    .insert({ contract_id: contract!.id, machine_id: SN, date_debut: '2026-01-01', statut: 'actif' })
+  if (cmErr) throw new Error(`seed contract_machine: ${cmErr.message}`)
 }, 60_000)
 
 afterAll(async () => {
-  await admin.from('pending_counter_imports').delete().like('image_hash_sha256', 'TESTHASH-%')
-  await admin.from('machine_counters').delete().eq('machine_id', SN)
-  await admin.from('machines').delete().eq('numero_serie', SN)
+  await cleanScenario()
 })
 
 describe('process_counter_extraction — semáforo', () => {
