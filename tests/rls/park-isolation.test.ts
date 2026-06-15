@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { adminClient, anonClient, signInAs, cleanup, ANON_KEY, SERVICE_KEY } from './helpers'
+import { adminClient, anonClient, signInAs, cleanup, expectEmpty, ANON_KEY, SERVICE_KEY } from './helpers'
 import { seedTenants, SC, type Tenants } from './scenario'
 
 // Aislamiento RLS del PARQUE: machines, contracts, contract_machines, clients,
@@ -9,6 +9,7 @@ import { seedTenants, SC, type Tenants } from './scenario'
 
 const admin = adminClient()
 let t: Tenants
+const SN_CLOSED = 'TEST-SN-CLOSED' // máquina del cliente A con su línea YA cerrada
 
 beforeAll(async () => {
   if (!ANON_KEY || !SERVICE_KEY) {
@@ -22,6 +23,18 @@ beforeAll(async () => {
     machine_id: SC.snA, year: 2026, month: 6, counter_bw: 100, counter_color: 50,
   })
   if (error) throw new Error(`seed counter: ${error.message}`)
+
+  // Máquina con una línea CERRADA (date_fin no nulo) en el contrato del cliente A.
+  // auth_client_machine_ids() exige statut='actif' AND date_fin IS NULL → el cliente
+  // NO debe ver esta máquina. Prueba la regla "solo líneas activas".
+  const { error: mErr } = await admin.from('machines')
+    .insert({ numero_serie: SN_CLOSED, marque: 'TEST', modele: 'X', type: 'color' })
+  if (mErr) throw new Error(`seed closed machine: ${mErr.message}`)
+  const { error: lErr } = await admin.from('contract_machines').insert({
+    contract_id: t.contractAId, machine_id: SN_CLOSED,
+    date_debut: '2026-01-01', date_fin: '2026-02-01', statut: 'terminé',
+  })
+  if (lErr) throw new Error(`seed closed line: ${lErr.message}`)
 }, 90_000)
 
 afterAll(async () => {
@@ -47,8 +60,16 @@ describe('RLS parque — machines', () => {
 
   it('el técnico B (sin trabajo asignado) no ve ninguna máquina de prueba', async () => {
     const c = await signInAs(SC.techBEmail)
-    const { data } = await c.from('machines').select('numero_serie').like('numero_serie', 'TEST-%')
-    expect(data ?? []).toHaveLength(0)
+    expectEmpty(await c.from('machines').select('numero_serie').like('numero_serie', 'TEST-%'))
+  })
+
+  it('el cliente A NO ve una máquina cuya línea ya está cerrada (solo líneas activas)', async () => {
+    const c = await signInAs(SC.clientAEmail)
+    const { data, error } = await c.from('machines').select('numero_serie').like('numero_serie', 'TEST-%')
+    expect(error).toBeNull()
+    const sns = (data ?? []).map((m) => m.numero_serie)
+    expect(sns).toContain(SC.snA)        // línea activa → la ve
+    expect(sns).not.toContain(SN_CLOSED) // línea cerrada → NO la ve
   })
 
   it('el admin ve ambas máquinas', async () => {
@@ -66,8 +87,27 @@ describe('RLS parque — machines', () => {
   it('el cliente A NO puede crear una máquina (escritura admin-only)', async () => {
     const c = await signInAs(SC.clientAEmail)
     await c.from('machines').insert({ numero_serie: 'TEST-SN-HACK', marque: 'X', modele: 'Y', type: 'color' })
-    const { data } = await admin.from('machines').select('numero_serie').eq('numero_serie', 'TEST-SN-HACK')
-    expect(data ?? []).toHaveLength(0)
+    // Verificación con service_role: la fila no se creó (RLS WITH CHECK la rechazó).
+    expectEmpty(await admin.from('machines').select('numero_serie').eq('numero_serie', 'TEST-SN-HACK'))
+  })
+})
+
+describe('RLS parque — denegación de escritura (admin-only)', () => {
+  it('el cliente A NO puede crear una línea de contrato', async () => {
+    // SN_CLOSED solo tiene una línea CERRADA, así que reabrirla no chocaría con la
+    // restricción "una línea abierta por máquina": el único guardián es RLS.
+    const c = await signInAs(SC.clientAEmail)
+    await c.from('contract_machines').insert({
+      contract_id: t.contractAId, machine_id: SN_CLOSED, date_debut: '2026-03-01', statut: 'actif',
+    })
+    // No se creó ninguna línea ACTIVA (date_fin NULL) para esa máquina.
+    expectEmpty(await admin.from('contract_machines').select('id').eq('machine_id', SN_CLOSED).is('date_fin', null))
+  })
+
+  it('el cliente A NO puede crear un cliente', async () => {
+    const c = await signInAs(SC.clientAEmail)
+    await c.from('clients').insert({ nom_client: 'TEST Client HACK' })
+    expectEmpty(await admin.from('clients').select('id').eq('nom_client', 'TEST Client HACK'))
   })
 })
 
@@ -149,14 +189,12 @@ describe('RLS parque — clients', () => {
 describe('RLS parque — machine_counters (admin-only)', () => {
   it('el cliente A no ve los contadores de su propia máquina', async () => {
     const c = await signInAs(SC.clientAEmail)
-    const { data } = await c.from('machine_counters').select('id').eq('machine_id', SC.snA)
-    expect(data ?? []).toHaveLength(0)
+    expectEmpty(await c.from('machine_counters').select('id').eq('machine_id', SC.snA))
   })
 
   it('el técnico A no ve los contadores', async () => {
     const c = await signInAs(SC.techAEmail)
-    const { data } = await c.from('machine_counters').select('id').eq('machine_id', SC.snA)
-    expect(data ?? []).toHaveLength(0)
+    expectEmpty(await c.from('machine_counters').select('id').eq('machine_id', SC.snA))
   })
 
   it('el admin ve los contadores', async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { adminClient, anonClient, signInAs, cleanup, ANON_KEY, SERVICE_KEY } from './helpers'
+import { adminClient, anonClient, signInAs, cleanup, expectEmpty, ANON_KEY, SERVICE_KEY } from './helpers'
 import { seedTenants, SC } from './scenario'
 
 // Aislamiento RLS de tablas INTERNAS admin-only: leads, princity_api_logs,
@@ -54,14 +54,12 @@ const cases: { table: string; column: string; value: string }[] = [
 describe.each(cases)('RLS admin-only — $table', ({ table, column, value }) => {
   it('el cliente no la ve', async () => {
     const c = await signInAs(SC.clientAEmail)
-    const { data } = await c.from(table).select('*').eq(column, value)
-    expect(data ?? []).toHaveLength(0)
+    expectEmpty(await c.from(table).select('*').eq(column, value))
   })
 
   it('el técnico no la ve', async () => {
     const c = await signInAs(SC.techAEmail)
-    const { data } = await c.from(table).select('*').eq(column, value)
-    expect(data ?? []).toHaveLength(0)
+    expectEmpty(await c.from(table).select('*').eq(column, value))
   })
 
   it('el anónimo no la ve', async () => {
