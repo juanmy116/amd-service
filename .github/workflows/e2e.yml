@@ -11,7 +11,7 @@ on:
       - 'src/app/login/**'
       - 'src/app/admin/incidents/**'
       - 'src/app/tech/**'
-      - 'src/middleware.ts'
+      - 'src/proxy.ts'
       - '.github/workflows/e2e.yml'
 
 jobs:
