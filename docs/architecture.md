@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-06-11 — **3 capas de tests montadas** (unit + aislamiento RLS + E2E Playwright, ver §Testing), endurecimiento RLS de `maintenance_visits` + `auth_rls_initplan`, borrado/terminación atómicos de contrato (`delete_contract`/`terminate_contract`), cabos de auditoría cerrados y reconstrucción limpia de la BD arreglada (P0-1). PRs #74–#85.
+> Última actualización: 2026-06-15 — **tests RLS de cobertura completa** (88 tests de aislamiento por rol sobre todas las tablas sensibles, PR #93), **migración `middleware` → `proxy`** (convención Next.js 16, PR #94) y `main` protegida en GitHub (required check `typecheck · test · build`). Config de prod cerrada: `COMMERCIAL_EMAIL`, `NEXT_PUBLIC_APP_URL`. Histórico previo (2026-06-11): 3 capas de tests montadas (unit + aislamiento RLS + E2E Playwright, ver §Testing), endurecimiento RLS de `maintenance_visits` + `auth_rls_initplan`, borrado/terminación atómicos de contrato (`delete_contract`/`terminate_contract`), cabos de auditoría cerrados y reconstrucción limpia de la BD arreglada (P0-1). PRs #74–#85.
 
 ---
 
@@ -231,7 +231,7 @@ Route handler que recibe el formulario de contacto del sitio web público y capt
 - Kiosko de taller a pantalla completa para una TV de 32" conectada a una Raspberry Pi 3 — tema oscuro «centro de mando», auto-refresco cada 30 s
 - Muestra todas las incidencias en Kanban (drag & drop = cambia estado) + mini-tablero de mantenimientos lun–vie + 4 tarjetas KPI
 - Cuenta especial «Atelier»: rol `technician` + flag `profiles.is_dispatcher` → un *dispatcher* puede asignar incidencias y visitas de mantenimiento a los técnicos sin ser admin
-- Las Server Actions de despacho validan `admin OR is_dispatcher` y escriben vía `createAdminClient()`; el middleware protege `/atelier` y `/dashboard` redirige ahí a los dispatchers
+- Las Server Actions de despacho validan `admin OR is_dispatcher` y escriben vía `createAdminClient()`; el proxy (`src/proxy.ts`) protege `/atelier` y `/dashboard` redirige ahí a los dispatchers
 
 ### 12. Sistema de Facturación (`/admin/billing-plans`, `/admin/facturation`, `/admin/factures`) ✅ — sesión 28-29 (núcleo Tasks 1-11)
 
@@ -1268,7 +1268,7 @@ Hallazgos P0 confirmados con SQL real contra producción y corregidos en el PR W
 Montadas en 2026-06-11 (cierra el plan de tests de `docs/pendientes.md` §1). Cada capa tiene su comando y, las de integración, su propio job de CI que levanta un **Supabase local efímero (Docker)** — separados del CI normal porque éste no tiene Supabase.
 
 - **Unit (vitest)** — `npm test`. Lógica pura en `src/lib` (`billing`, `invoicing`, `counters`, `qr`, `incident`). `include: src/**/*.test.ts`. Corre en el CI normal (`ci.yml`: typecheck + test + build).
-- **Aislamiento RLS (vitest + Supabase local)** — `npm run test:rls` (config `vitest.rls.config.ts`, `tests/rls/`). Job `.github/workflows/rls.yml`: `supabase start` → grant `service_role` → tests firmando como cada rol (técnico ve solo lo suyo, cliente sus contratos, admin todo, anon nada, técnico no edita incidencia ajena). Helpers en `tests/rls/helpers.ts` (crear usuarios por rol, sign-in, fixtures, cleanup `*.test`).
+- **Aislamiento RLS (vitest + Supabase local)** — `npm run test:rls` (config `vitest.rls.config.ts`, `tests/rls/`). **Cobertura completa (88 tests, PR #93):** parque (machines/contracts/contract_machines/clients/machine_counters), facturación (invoices/invoice_lines/billing_plans), mantenimiento (visits/plans), perfiles (visibilidad + escalada de privilegios bloqueada) y tablas internas admin-only (leads, princity_*, pending_counter_imports, csat_responses, incident_photos). Job `.github/workflows/rls.yml`: `supabase start` → **grant a `service_role` Y `authenticated`** (replica los default privileges de prod; sin el grant a `authenticated`, las tablas nuevas darían 0 filas por permiso denegado en vez de por RLS) + re-aplica la restricción de columna de `profiles` → tests firmando como cada rol. Escenario base reutilizable en `tests/rls/scenario.ts` (2 clientes + 2 técnicos + admin); aserción anti-falso-verde `expectEmpty` en `tests/rls/assert.ts` (exige `error===null` + 0 filas; vive aparte de `helpers.ts` porque éste lo reutiliza Playwright, que no corre bajo vitest). Helpers en `tests/rls/helpers.ts` (crear usuarios por rol, sign-in, fixtures, cleanup `*.test`).
 - **E2E (Playwright + app + Supabase local)** — `npm run test:e2e` (`playwright.config.ts`, `tests/e2e/`). Job `.github/workflows/e2e.yml`: `supabase start` → grants a los 3 roles → `build`+`start` → Chromium. Specs: login por rol + recorrido SAV (admin asigna → `assigné` → técnico ve en `/tech` → `/tech/scan/<serie>` → `en_cours` + `incident_history`). Reutiliza los helpers de RLS.
 - **Notas de reproducibilidad (aprendidas al montar los tests):** (1) la cadena de migraciones **ahora sí se reconstruye desde cero** — se arregló un `REVOKE` sobre funciones legacy inexistentes (`20260508182457`, con `to_regprocedure` condicional) que abortaba `db reset` (cerró de verdad el P0-1, que estaba mal dado por resuelto). (2) El Postgres local del CLI no reproduce las **default privileges** de Supabase → los jobs otorgan grants explícitos (RLS solo `service_role`; E2E los 3 roles, porque los **embeddings de PostgREST** como `/tech/incidents` necesitan `GRANT SELECT` a `authenticated`). El aislamiento lo garantizan las RLS policies, no estos grants.
 
@@ -1289,7 +1289,7 @@ Seis entregas en producción tras el refactor de contratos N máquinas (PR #23):
 
 ### Fase 1 — SAV ✅ COMPLETADO
 - [x] Schema de BD (13 tablas + RLS)
-- [x] Auth (email/password, redirección por rol, middleware)
+- [x] Auth (email/password, redirección por rol, proxy `src/proxy.ts`)
 - [x] Back-office AMD (clientes, máquinas, contratos, incidents kanban, equipo)
 - [x] Portal cliente (registro, verificación contrato, dashboard, incidencias)
 - [x] PWA técnico (dashboard, intervenciones, scanner QR, machines)
