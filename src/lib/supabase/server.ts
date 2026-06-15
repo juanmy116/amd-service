@@ -20,7 +20,7 @@ export async function createClient() {
             )
           } catch {
             // Llamado desde un Server Component — ignorar.
-            // El middleware se encarga de refrescar la sesión.
+            // El proxy (antes middleware) se encarga de refrescar la sesión.
           }
         },
       },

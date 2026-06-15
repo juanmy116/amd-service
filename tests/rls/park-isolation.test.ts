@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { adminClient, anonClient, signInAs, cleanup, expectEmpty, ANON_KEY, SERVICE_KEY } from './helpers'
+import { adminClient, anonClient, signInAs, cleanup, ANON_KEY, SERVICE_KEY } from './helpers'
+import { expectEmpty } from './assert'
 import { seedTenants, SC, type Tenants } from './scenario'
 
 // Aislamiento RLS del PARQUE: machines, contracts, contract_machines, clients,
