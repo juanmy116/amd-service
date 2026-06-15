@@ -53,6 +53,18 @@ export async function signInAs(email: string): Promise<SupabaseClient> {
 // Borra todos los datos de fixture (prefijo TEST-) y los usuarios de prueba.
 // En CI la BD es efímera (supabase db reset), pero esto da idempotencia en local.
 export async function cleanup(admin: SupabaseClient): Promise<void> {
+  // Tablas que referencian con ON DELETE RESTRICT al grafo base (clients,
+  // machines, incidents) o son independientes con prefijo TEST: se borran ANTES,
+  // o el borrado del grafo fallaría por la FK.
+  await admin.from('csat_responses').delete().like('token', 'TEST-%')           // RESTRICT → incidents
+  await admin.from('invoices').delete().like('numero_facture', 'TEST-%')        // RESTRICT → clients (invoice_lines cascada)
+  await admin.from('machine_counters').delete().like('machine_id', 'TEST-%')    // RESTRICT → machines
+  await admin.from('leads').delete().like('name', 'TEST %')
+  await admin.from('billing_plans').delete().like('name', 'TEST %')
+  await admin.from('pending_counter_imports').delete().like('image_hash_sha256', 'TEST%')
+  await admin.from('princity_api_logs').delete().like('function_name', 'TEST-%')
+  await admin.from('princity_health').delete().like('function_name', 'TEST-%')
+
   await admin.from('incidents').delete().like('numero_incident', 'TEST-%')
   await admin.from('contract_machines').delete().like('machine_id', 'TEST-%')
   await admin.from('contracts').delete().like('numero_contrat', 'TEST-%')
