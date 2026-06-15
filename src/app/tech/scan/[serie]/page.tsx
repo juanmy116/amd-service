@@ -24,7 +24,7 @@ export default async function MachineScanPage({
   const numero_serie = decodeURIComponent(serie)
   const supabase = await createClient()
 
-  // Check explícito de auth y rol — no depender únicamente del middleware o RLS
+  // Check explícito de auth y rol — no depender únicamente del proxy o RLS
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
   const { data: profile } = await supabase
