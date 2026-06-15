@@ -56,8 +56,11 @@ export async function cleanup(admin: SupabaseClient): Promise<void> {
   // Tablas que referencian con ON DELETE RESTRICT al grafo base (clients,
   // machines, incidents) o son independientes con prefijo TEST: se borran ANTES,
   // o el borrado del grafo fallaría por la FK.
+  // NOTA: las facturas NO se borran aquí — son inmutables por trigger (ni siquiera
+  // service_role puede borrarlas). El billing test usa clientes dedicados con prefijo
+  // 'TESTINV ' (fuera de este barrido) para que sus facturas nunca bloqueen el
+  // borrado de los clientes 'TEST '. Ver tests/rls/billing-isolation.test.ts.
   await admin.from('csat_responses').delete().like('token', 'TEST-%')           // RESTRICT → incidents
-  await admin.from('invoices').delete().like('numero_facture', 'TEST-%')        // RESTRICT → clients (invoice_lines cascada)
   await admin.from('machine_counters').delete().like('machine_id', 'TEST-%')    // RESTRICT → machines
   await admin.from('leads').delete().like('name', 'TEST %')
   await admin.from('billing_plans').delete().like('name', 'TEST %')

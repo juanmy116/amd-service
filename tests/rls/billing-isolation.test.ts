@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { adminClient, anonClient, signInAs, cleanup, ANON_KEY, SERVICE_KEY } from './helpers'
-import { seedTenants, SC, type Tenants } from './scenario'
+import { seedTenants, SC } from './scenario'
 
 // Aislamiento RLS de FACTURACIÓN: invoices, invoice_lines, billing_plans,
 // billing_plan_versions, contract_machine_override_versions, invoice_counters.
@@ -12,11 +12,25 @@ import { seedTenants, SC, type Tenants } from './scenario'
 // revisar la policy conscientemente.
 
 const admin = adminClient()
-let t: Tenants
 let invoiceAId: string
 let invoiceBId: string
 
-async function seedInvoice(clientId: number, clientName: string, num: string): Promise<string> {
+// Cliente dedicado para facturas. Las facturas son inmutables (no se pueden borrar),
+// así que su cliente quedaría "pegado" por la FK RESTRICT. Por eso usamos un prefijo
+// 'TESTINV ' que cleanup() NO barre (cleanup borra 'TEST '), y lo creamos de forma
+// idempotente (upsert) para que el test sea re-ejecutable en local sin reset.
+async function ensureInvoiceClient(name: string): Promise<number> {
+  const { data, error } = await admin.from('clients')
+    .upsert({ nom_client: name }, { onConflict: 'nom_client' }).select('id').single()
+  if (error) throw new Error(`ensure invoice client (${name}): ${error.message}`)
+  return data!.id as number
+}
+
+// Idempotente: si la factura ya existe (re-run local), reutiliza su id en vez de
+// insertar (no se puede hacer upsert: el UPDATE lo bloquea el trigger de inmutabilidad).
+async function ensureInvoice(clientId: number, clientName: string, num: string): Promise<string> {
+  const found = await admin.from('invoices').select('id').eq('numero_facture', num).maybeSingle()
+  if (found.data) return found.data.id as string
   const { data: inv, error } = await admin.from('invoices').insert({
     numero_facture: num, client_id: clientId, client_name: clientName,
     period_year: 2026, period_month: 6, total_amount: 1000,
@@ -36,10 +50,13 @@ beforeAll(async () => {
     throw new Error('Faltan ANON_KEY/SERVICE_ROLE_KEY. Ejecuta con `supabase start` y exporta las claves.')
   }
   await cleanup(admin)
-  t = await seedTenants(admin)
+  // seedTenants da los usuarios (admin/client/tech) para iniciar sesión por rol.
+  await seedTenants(admin)
 
-  invoiceAId = await seedInvoice(t.clientAId, 'TEST Client A', 'TEST-2026-0001')
-  invoiceBId = await seedInvoice(t.clientBId, 'TEST Client B', 'TEST-2026-0002')
+  const invClientAId = await ensureInvoiceClient('TESTINV Client A')
+  const invClientBId = await ensureInvoiceClient('TESTINV Client B')
+  invoiceAId = await ensureInvoice(invClientAId, 'TESTINV Client A', 'TESTINV-2026-0001')
+  invoiceBId = await ensureInvoice(invClientBId, 'TESTINV Client B', 'TESTINV-2026-0002')
 
   const { error: bpErr } = await admin.from('billing_plans').insert({
     name: 'TEST Plan per_copy', type: 'per_copy', price_bw: 10, price_color: 50,

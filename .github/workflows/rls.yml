@@ -34,15 +34,27 @@ jobs:
       - name: Start Supabase (aplica las migraciones)
         run: supabase start
 
-      - name: Grants de service_role (backend) en el entorno local
-        # En prod, service_role tiene acceso total al schema public vía las default
-        # privileges que configura Supabase (fuera de las migraciones). El Postgres
-        # local del CLI no las reproduce siempre → se otorgan explícitamente. Solo
-        # afecta a service_role (backend, nunca expuesto al cliente); NO toca anon/
-        # authenticated, los roles cuyo aislamiento RLS se está probando.
+      - name: Grants (replica las default privileges de Supabase en el entorno local)
+        # En prod, Supabase configura default privileges que otorgan ACCESO TOTAL al
+        # schema public a service_role, authenticated y anon (verificado: los tres
+        # tienen SELECT/INSERT/UPDATE/DELETE sobre todas las tablas). El Postgres local
+        # del CLI no las reproduce para las tablas creadas por migraciones → se otorgan
+        # explícitamente, o `authenticated` no puede ni intentar leer las tablas nuevas
+        # (invoices, billing_plans, machine_counters, contract_machines, maintenance_*…)
+        # y los tests darían 0 filas por permiso denegado, no por RLS.
+        #
+        # IMPORTANTE: otorgar a authenticated NO falsea el aislamiento. El GRANT solo
+        # permite "intentar"; RLS sigue siendo la única puerta que decide QUÉ filas se
+        # ven. Es exactamente el estado de producción. (anon se deja como está: sus
+        # tests esperan 0 filas, que se cumple igual por RLS o por permiso denegado.)
         run: |
           DB_URL=$(supabase status -o json | jq -r '.DB_URL')
-          psql "$DB_URL" -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;"
+          psql "$DB_URL" -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role, authenticated; GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role, authenticated;"
+          # El GRANT ALL anterior deshace la restricción de columna de profiles
+          # (migración 20260610100000: authenticated solo puede UPDATE full_name/phone,
+          # no role/is_dispatcher). La re-aplicamos para reproducir prod fielmente y
+          # mantener viva la capa "GRANT por columna" que prueba profiles-isolation.
+          psql "$DB_URL" -c "REVOKE UPDATE ON public.profiles FROM authenticated; GRANT UPDATE (full_name, phone) ON public.profiles TO authenticated;"
 
       - name: Exportar claves locales al entorno
         run: |

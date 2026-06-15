@@ -114,23 +114,35 @@ describe('RLS parque — contract_machines', () => {
   })
 })
 
-describe('RLS parque — clients (admin-only)', () => {
-  it('el cliente A no puede leer la tabla clients (ni la suya)', async () => {
+describe('RLS parque — clients', () => {
+  // El cliente ve SU propia ficha de empresa (client_own_client_select); el técnico
+  // ve las de su trabajo asignado (tech_clients_select). Nunca las de otro inquilino.
+  it('el cliente A ve SOLO su propia ficha de cliente (no la del cliente B)', async () => {
     const c = await signInAs(SC.clientAEmail)
-    const { data } = await c.from('clients').select('id').like('nom_client', 'TEST %')
-    expect(data ?? []).toHaveLength(0)
+    const { data } = await c.from('clients').select('id').in('id', [t.clientAId, t.clientBId])
+    const ids = (data ?? []).map((x) => x.id)
+    expect(ids).toContain(t.clientAId)
+    expect(ids).not.toContain(t.clientBId)
   })
 
-  it('el técnico A no puede leer la tabla clients', async () => {
+  it('el técnico A ve el cliente de su trabajo asignado (A), no el B', async () => {
     const c = await signInAs(SC.techAEmail)
-    const { data } = await c.from('clients').select('id').like('nom_client', 'TEST %')
+    const { data } = await c.from('clients').select('id').in('id', [t.clientAId, t.clientBId])
+    const ids = (data ?? []).map((x) => x.id)
+    expect(ids).toContain(t.clientAId)
+    expect(ids).not.toContain(t.clientBId)
+  })
+
+  it('el anónimo no ve ningún cliente', async () => {
+    const { data } = await anonClient().from('clients').select('id').in('id', [t.clientAId, t.clientBId])
     expect(data ?? []).toHaveLength(0)
   })
 
-  it('el admin ve los clientes', async () => {
+  it('el admin ve ambos clientes', async () => {
     const c = await signInAs(SC.adminEmail)
-    const { data } = await c.from('clients').select('id').like('nom_client', 'TEST %')
-    expect((data ?? []).length).toBeGreaterThanOrEqual(2)
+    const { data } = await c.from('clients').select('id').in('id', [t.clientAId, t.clientBId])
+    const ids = (data ?? []).map((x) => x.id)
+    expect(ids).toEqual(expect.arrayContaining([t.clientAId, t.clientBId]))
   })
 })
 
