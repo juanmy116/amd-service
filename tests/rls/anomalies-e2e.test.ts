@@ -93,4 +93,14 @@ describe('E2E historial de piezas — cadena completa hasta la anomalía', () =>
     expect(ev?.type).toBe('consumo_alto_sin_cambio')
     expect(ev?.reason).toContain('Remplacement')
   })
+
+  it('una ficha en otra unidad (copies_color) NO duplica ni contamina la vista efectiva', async () => {
+    // Regresión del fix del review holístico: el FULL JOIN filtraba unit en el ON.
+    await admin.from('part_yield_specs')
+      .insert({ marque: MARQUE, modele: MODELE, part_id: 7, expected_yield: 99999, unit: 'copies_color', source: 'fabricant' })
+    const { data } = await admin.from('v_part_yield_effective')
+      .select('expected_yield_total, yield_source').eq('marque', MARQUE).eq('part_id', 7)
+    // Sigue habiendo UNA sola fila, la de copies_total; la de color se descarta.
+    expect(data).toEqual([{ expected_yield_total: 10000, yield_source: 'fabricant' }])
+  })
 })

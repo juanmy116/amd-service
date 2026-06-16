@@ -213,6 +213,12 @@ El OCR de contadores (`pending_counter_imports`) usa **semáforos 🟢🟡🔴**
 > - **Divergencias del DDL frente al diseño** (conscientes, sin impacto en la única regla implementada): la tabla usa `detected_at` en vez de `created_at`, el CHECK de `light` es `('amber','red')` (no se persiste verde) y se omitieron `period_start/period_end` (la regla preventiva no usa periodos; las reglas que sí los necesiten los añadirán).
 > - **Refinamientos tras la verificación adversarial** (mig. `20260616121054`): la vista `v_machine_part_consumption` aplica `GREATEST(0, …)` (no expone consumos negativos) y desempate determinista en los `DISTINCT ON`. **Sesgo conocido:** si una pieza se cambia tras un reemplazo de máquina y no hay lectura intermedia, `counter_at_change` cae en la lectura del reemplazo y el consumo se sobreestima (falso positivo preventivo, no peligroso — hay revisión humana).
 
+> **Correcciones del review holístico (2026-06-16, tras integrar las 4 fases):**
+> - **Bug de unidades en `v_part_yield_effective` (mig. `20260616133323`):** el filtro `unit='copies_total'` estaba en el `ON` del `FULL JOIN`, así que una ficha en otra unidad no se descartaba sino que se emitía como fila `fabricant` extra y duplicaba la pieza si había baseline → anomalías duplicadas/mal calculadas (caso tóner color). Corregido pre-filtrando las fichas a `copies_total` antes del join.
+> - **Recálculo atómico (mig. `20260616133505`):** `recalcAnomaliesAction` pasa a usar el RPC `replace_consumption_anomalies(p_rows jsonb)` (SECURITY INVOKER, `service_role`) — borra+reinserta en una transacción, coherente con `set_incident_parts`.
+> - **Riesgo conocido (documentado en `docs/pendientes.md`):** el enlace ficha↔máquina es por igualdad de texto `marque`/`modele`; una ficha con nombre variante no casa y la anomalía no salta sin error. Cargar fichas copiando los valores exactos de `machines`.
+> - **`quantity` no la usa la regla actual:** `evaluateConsumption`/baseline razonan por *cuándo* fue el último cambio y deltas de contador, no por unidades cambiadas. Es correcto para la regla preventiva; `quantity` será relevante para `consumo_excesivo` (diferida).
+
 **Objetivo:** vigilar y levantar banderas para revisión humana. **Reutiliza el patrón semáforo + cola** del OCR.
 
 1. **Tabla `machine_anomalies`** (cola de revisión, espejo conceptual de `pending_counter_imports`):

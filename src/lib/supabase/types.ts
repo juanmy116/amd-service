@@ -1713,6 +1713,7 @@ export type Database = {
       }
       register_counter_duplicate: { Args: { p_hash: string }; Returns: Json }
       replace_contract_machine: { Args: { p_payload: Json }; Returns: string }
+      replace_consumption_anomalies: { Args: { p_rows: Json }; Returns: undefined }
       return_machine_to_stock: { Args: { p_payload: Json }; Returns: string }
       set_incident_parts: { Args: { p_incident_id: string; p_parts: Json }; Returns: undefined }
       terminate_contract: { Args: { p_payload: Json }; Returns: Json }

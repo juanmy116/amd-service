@@ -7,8 +7,6 @@ import { revalidatePath } from 'next/cache'
 
 type ActionState = { error: string } | { ok: true; count?: number } | null
 
-const CONSUMO = 'consumo_alto_sin_cambio'
-
 /**
  * Recalcula las anomalías de consumo: lee v_machine_part_consumption, aplica la
  * regla pura (src/lib/anomalies.ts) y regenera las anomalías ABIERTAS de tipo
@@ -50,19 +48,12 @@ export async function recalcAnomaliesAction(): Promise<ActionState> {
     }]
   })
 
-  // Regenerar el conjunto abierto de este tipo (idempotente).
-  const { error: delErr } = await admin.from('machine_anomalies')
-    .delete().eq('status', 'open').eq('anomaly_type', CONSUMO)
-  if (delErr) {
-    console.error('[recalcAnomalies.delete]', delErr)
+  // Regenerar el conjunto abierto de este tipo de forma ATÓMICA (borra + reinserta
+  // en una transacción vía RPC, coherente con set_incident_parts de la Fase 0).
+  const { error: rpcErr } = await admin.rpc('replace_consumption_anomalies', { p_rows: detected })
+  if (rpcErr) {
+    console.error('[recalcAnomalies.rpc]', rpcErr)
     return { error: 'Erreur lors du recalcul.' }
-  }
-  if (detected.length > 0) {
-    const { error: insErr } = await admin.from('machine_anomalies').insert(detected)
-    if (insErr) {
-      console.error('[recalcAnomalies.insert]', insErr)
-      return { error: 'Erreur lors de l\'enregistrement des anomalies.' }
-    }
   }
 
   revalidatePath('/admin/anomalies')

@@ -15,6 +15,8 @@
 > 2. Ejecutar el recálculo del agente (`/admin/anomalies`) y revisar que los semáforos 🟢🟡🔴 tienen sentido con los datos reales; ajustar los umbrales con AMD.
 > 3. Confirmar que el cálculo respeta los reemplazos de máquina (ya cubierto por `repl_epoch`, pero validar con un caso real).
 > 4. **Cargar las fichas del fabricante** (`part_yield_specs`) de los modelos principales (Ricoh MP C3002/C3003, etc.) por SQL — da la referencia preventiva desde el día 1, sin esperar al histórico. Se puede hacer en cualquier momento; la vista `v_part_yield_effective` las prioriza automáticamente.
+>    - ⚠️ **`marque`/`modele` EXACTOS:** el enlace ficha↔máquina es por igualdad de texto. Copiar los valores de `SELECT DISTINCT marque, modele FROM machines` (sin espacios de borde ni variaciones de mayúsculas) — si no casan, la anomalía NO salta y NO da error. Detectado en el review holístico (2026-06-16); hoy `machines` está limpia, pero al cargar fichas a mano es el fallo más probable.
+>    - ⚠️ **Unidad:** la vista efectiva solo usa `unit='copies_total'`. Las fichas de tóner color suelen venir del fabricante en *copias color*; conviértelas a copias totales (o decide el mapeo pieza→unidad como ampliación) antes de cargarlas, o no producirán señal.
 >
 > **Por qué pendiente:** decisión consciente (2026-06-16) de construir el armazón completo ahora y verificarlo con datos cuando lleguen, en vez de bloquear la feature esperando a los contadores.
 
