@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Plus, Activity, ChevronRight } from 'lucide-react'
 import { CsatTrendChart, IncidentsTrendChart } from '@/components/admin/DashboardCharts'
 import type { CsatPoint, IncidentPoint } from '@/components/admin/DashboardCharts'
 import DashboardKpiStrip from '@/components/admin/DashboardKpiStrip'
@@ -37,6 +37,7 @@ async function getDashboardData() {
     csatRes,
     countersRes,
     techRes,
+    anomaliesRes,
   ] = await Promise.all([
     supabase.from('clients').select('*', { count: 'exact', head: true }).eq('active', true),
     supabase.from('machines').select('*', { count: 'exact', head: true }).eq('active', true),
@@ -59,6 +60,7 @@ async function getDashboardData() {
       .eq('month', currentMonth)
       .eq('status', 'actif'),
     supabase.from('profiles').select('id, full_name').eq('role', 'technician').order('full_name'),
+    supabase.from('machine_anomalies').select('light').eq('status', 'open'),
   ])
 
   const incidents  = incidentsRes.data  ?? []
@@ -66,6 +68,9 @@ async function getDashboardData() {
   const csatData   = (csatRes.data ?? []).filter((r): r is typeof r & { rating: number } => r.rating !== null)
   const counters   = countersRes.data   ?? []
   const techs      = techRes.data       ?? []
+  const anomalies  = anomaliesRes.data  ?? []
+  const openAnomalies = anomalies.length
+  const redAnomalies  = anomalies.filter(a => a.light === 'red').length
 
   const openIncidents = incidents.filter(i => !['résolu', 'fermé'].includes(i.status)).length
   const totalCopies   = counters.reduce((s, c) => s + (c.counter_bw ?? 0) + (c.counter_color ?? 0), 0)
@@ -133,6 +138,8 @@ async function getDashboardData() {
     statusDist,
     statusTotal,
     techPerf,
+    openAnomalies,
+    redAnomalies,
     today: now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
   }
 }
@@ -164,6 +171,20 @@ export default async function Dashboard() {
         openIncidents={data.stats.openIncidents}
         avgCsat={data.avgCsat}
       />
+
+      {data.openAnomalies > 0 && (
+        <Link
+          href="/admin/anomalies"
+          className="flex items-center gap-3 px-4 py-3 rounded-xl border border-warning/30 bg-warning-soft text-sm hover:bg-warning-soft/70 transition-colors"
+        >
+          <Activity size={16} className="text-warning shrink-0" />
+          <span className="text-ink font-medium">
+            {data.openAnomalies} anomalie{data.openAnomalies > 1 ? 's' : ''} de consommation à traiter
+            {data.redAnomalies > 0 && ` · ${data.redAnomalies} à remplacer`}
+          </span>
+          <ChevronRight size={15} className="text-ink-muted ml-auto" />
+        </Link>
+      )}
 
       <DashboardCopiesBanner totalCopies={data.totalCopies} />
 

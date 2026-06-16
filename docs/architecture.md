@@ -358,6 +358,12 @@ Decisión del dueño (evitar desincronización en dinero). `machines.active`/`lo
   - Vista `v_part_yield_baseline` (`security_invoker`): rendimiento aprendido = copias_total medias entre cambios consecutivos de la misma pieza en la misma máquina, agregado por (marque, modele, part_id) + `samples`.
   - Vista `v_part_yield_effective` (`security_invoker`): rendimiento efectivo en copies_total = ficha del fabricante (`unit='copies_total'`) si existe, si no el baseline; expone `yield_source` ('fabricant'|'historique'). Base para el agente de anomalías (Fase 3).
 
+- **Agente de anomalías de consumo** (Fase 3 del historial, mig. `20260616115502`):
+  - Tabla `machine_anomalies` (admin-only): cola de revisión — `(machine_id, part_id, anomaly_type, light ∈ amber/red, reason, metrics jsonb, status ∈ open/ack/dismissed/resolved)`. Índice único parcial: una anomalía abierta por (machine, part, type).
+  - Vista `v_machine_part_consumption` (`security_invoker`): copias desde el último cambio de cada pieza + rendimiento esperado; respeta reemplazos (misma época de máquina).
+  - Lógica pura testeable en `src/lib/anomalies.ts` (`evaluateConsumption`): regla `consumo_alto_sin_cambio` (ámbar ≥80% / rojo ≥100% del rendimiento; exige `samples>=3` si es aprendido). Reglas `consumo_excesivo`/`desviacion_modelo` diferidas.
+  - UI `/admin/anomalies`: cola con semáforos + acciones (Résolu/Acquitter/Écarter) + botón "Recalculer" (`recalcAnomaliesAction`). Cron automático diferido hasta que haya datos.
+
 **El stock es la frontera entre clientes** (regla de negocio): una máquina nunca pasa directa de un cliente a otro; siempre Cliente A → stock → Cliente B. Dos eventos del ciclo de vida, vía RPC atómica (`SECURITY DEFINER`, `service_role`), con Server Actions en `src/app/admin/contracts/[id]/stock-actions.ts`:
 
 - **`return_machine_to_stock(p_payload)`** — motivo (a) resiliación: cierra la línea con su `end_counter_bw/color` **real** (lectura al retirar) + `date_fin` + `statut='terminé'`. La máquina queda en stock; no factura mientras lo está. Valida que el cierre no sea inferior a la mayor lectura conocida. **No encadena** (`replaces_contract_machine_id` queda NULL en cualquier futura asignación).

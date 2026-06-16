@@ -884,6 +884,48 @@ export type Database = {
         }
         Relationships: []
       }
+      machine_anomalies: {
+        Row: {
+          anomaly_type: string
+          detected_at: string
+          id: string
+          light: string
+          machine_id: string
+          metrics: Json | null
+          part_id: number | null
+          reason: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          anomaly_type: string
+          detected_at?: string
+          id?: string
+          light: string
+          machine_id: string
+          metrics?: Json | null
+          part_id?: number | null
+          reason: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          anomaly_type?: string
+          detected_at?: string
+          id?: string
+          light?: string
+          machine_id?: string
+          metrics?: Json | null
+          part_id?: number | null
+          reason?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       machine_counters: {
         Row: {
           annulation_reason: string | null
@@ -1542,6 +1584,21 @@ export type Database = {
       }
     }
     Views: {
+      v_machine_part_consumption: {
+        Row: {
+          copies_since_change: number | null
+          expected_yield_total: number | null
+          last_change_at: string | null
+          machine_id: string | null
+          marque: string | null
+          modele: string | null
+          part_id: number | null
+          part_name: string | null
+          samples: number | null
+          yield_source: string | null
+        }
+        Relationships: []
+      }
       v_part_yield_baseline: {
         Row: {
           avg_yield_total: number | null
