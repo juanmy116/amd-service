@@ -6,17 +6,9 @@ import { ArrowLeft, Loader2, MapPin, Building2, FileText } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import type { BadgeVariant } from '@/components/ui/Badge'
+import { PARTS } from '@/lib/parts'
 
 type FormState = { error: string } | null
-
-const PARTS = [
-  { id: 1, name: 'Four' }, { id: 2, name: 'Transfer Belt' },
-  { id: 3, name: 'Tambour BK' }, { id: 4, name: 'Tambour C' },
-  { id: 5, name: 'Tambour M' }, { id: 6, name: 'Tambour Y' },
-  { id: 7, name: 'Toner BK' }, { id: 8, name: 'Toner C' },
-  { id: 9, name: 'Toner M' }, { id: 10, name: 'Toner Y' },
-  { id: 11, name: 'Cassette' }, { id: 12, name: 'Rouleau Pression' },
-]
 
 const STATUS_OPTIONS = [
   { value: 'en_cours', label: 'En cours — intervention démarrée' },
@@ -40,7 +32,8 @@ type Props = {
   machineName: string
   machineLocation: string | null
   contractNumber: string | null
-  checkedParts: Set<number>
+  /** part_id → cantidad ya registrada (para precargar el formulario) */
+  checkedParts: Map<number, number>
 }
 
 export default function InterventionForm({
@@ -148,14 +141,23 @@ export default function InterventionForm({
           <p className="text-sm font-semibold text-ink-soft mb-3">Pièces remplacées</p>
           <div className="grid grid-cols-2 gap-2">
             {PARTS.map((p) => (
-              <label key={p.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-line cursor-pointer">
+              <label key={p.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-line cursor-pointer">
                 <input
                   type="checkbox"
                   name={`part_${p.id}`}
                   defaultChecked={checkedParts.has(p.id)}
-                  className="w-4 h-4 rounded accent-red-600"
+                  className="w-4 h-4 rounded accent-red-600 shrink-0"
                 />
-                <span className="text-sm text-ink-soft">{p.name}</span>
+                <span className="text-sm text-ink-soft flex-1 min-w-0 truncate">{p.name}</span>
+                <input
+                  type="number"
+                  name={`qty_${p.id}`}
+                  min={1}
+                  defaultValue={checkedParts.get(p.id) ?? 1}
+                  aria-label={`Quantité ${p.name}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-12 px-1.5 py-1 rounded-lg border border-line text-sm text-center text-ink shrink-0 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
               </label>
             ))}
           </div>

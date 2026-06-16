@@ -472,14 +472,17 @@ export type Database = {
         Row: {
           incident_id: string
           part_id: number
+          quantity: number
         }
         Insert: {
           incident_id: string
           part_id: number
+          quantity?: number
         }
         Update: {
           incident_id?: string
           part_id?: number
+          quantity?: number
         }
         Relationships: [
           {

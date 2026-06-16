@@ -22,7 +22,7 @@ export default async function TechIncidentPage({
 
   const [{ data: incident }, { data: parts }] = await Promise.all([
     supabase.from('incidents').select('*').eq('id', id).single(),
-    supabase.from('incident_parts').select('part_id').eq('incident_id', id),
+    supabase.from('incident_parts').select('part_id, quantity').eq('incident_id', id),
   ])
 
   if (!incident) notFound()
@@ -61,7 +61,7 @@ export default async function TechIncidentPage({
   const machineLocation = machine?.localisation ?? null
   const contractNumber = contractInfo?.numero_contrat ?? null
 
-  const checkedParts = new Set(parts?.map((p) => p.part_id) ?? [])
+  const checkedParts = new Map((parts ?? []).map((p) => [p.part_id, p.quantity]))
   const boundAction  = submitInterventionAction.bind(null, incident.id)
 
   return (

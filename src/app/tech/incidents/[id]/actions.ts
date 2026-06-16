@@ -5,17 +5,9 @@ import { INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { redirect } from 'next/navigation'
 import { sendCsatForIncident } from '@/lib/csat'
+import { PARTS } from '@/lib/parts'
 
 type FormState = { error: string } | null
-
-const PARTS = [
-  { id: 1, name: 'Four' }, { id: 2, name: 'Transfer Belt' },
-  { id: 3, name: 'Tambour BK' }, { id: 4, name: 'Tambour C' },
-  { id: 5, name: 'Tambour M' }, { id: 6, name: 'Tambour Y' },
-  { id: 7, name: 'Toner BK' }, { id: 8, name: 'Toner C' },
-  { id: 9, name: 'Toner M' }, { id: 10, name: 'Toner Y' },
-  { id: 11, name: 'Cassette' }, { id: 12, name: 'Rouleau Pression' },
-]
 
 export async function submitInterventionAction(
   id: string,
@@ -64,13 +56,19 @@ export async function submitInterventionAction(
     })
   }
 
-  // Piezas reemplazadas
-  const selectedParts = PARTS.filter((p) => formData.get(`part_${p.id}`) === 'on').map((p) => p.id)
+  // Piezas reemplazadas (con cantidad). Se reemplaza el set completo:
+  // borramos siempre y reinsertamos las marcadas, para que desmarcar todas
+  // también vacíe la lista.
+  const selectedParts = PARTS
+    .filter((p) => formData.get(`part_${p.id}`) === 'on')
+    .map((p) => {
+      const raw = Number(formData.get(`qty_${p.id}`))
+      const quantity = Number.isInteger(raw) && raw > 0 ? raw : 1
+      return { incident_id: id, part_id: p.id, quantity }
+    })
+  await supabase.from('incident_parts').delete().eq('incident_id', id)
   if (selectedParts.length > 0) {
-    await supabase.from('incident_parts').delete().eq('incident_id', id)
-    await supabase.from('incident_parts').insert(
-      selectedParts.map((part_id) => ({ incident_id: id, part_id }))
-    )
+    await supabase.from('incident_parts').insert(selectedParts)
   }
 
   if (new_status === 'résolu' && old_status !== 'résolu') {
