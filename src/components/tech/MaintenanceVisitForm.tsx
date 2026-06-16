@@ -4,17 +4,9 @@ import { useActionState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, Building2, MapPin, Wrench, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import { PARTS } from '@/lib/parts'
 
 type FormState = { error: string } | null
-
-const PARTS = [
-  { id: 1,  name: 'Four'            }, { id: 2,  name: 'Transfer Belt'   },
-  { id: 3,  name: 'Tambour BK'      }, { id: 4,  name: 'Tambour C'       },
-  { id: 5,  name: 'Tambour M'       }, { id: 6,  name: 'Tambour Y'       },
-  { id: 7,  name: 'Toner BK'        }, { id: 8,  name: 'Toner C'         },
-  { id: 9,  name: 'Toner M'         }, { id: 10, name: 'Toner Y'         },
-  { id: 11, name: 'Cassette'        }, { id: 12, name: 'Rouleau Pression' },
-]
 
 type Props = {
   boundAction:     (prev: FormState, data: FormData) => Promise<FormState>

@@ -5,17 +5,9 @@ import { INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { redirect } from 'next/navigation'
 import { sendCsatForIncident } from '@/lib/csat'
+import { PARTS } from '@/lib/parts'
 
 type FormState = { error: string } | null
-
-const PARTS = [
-  { id: 1, name: 'Four' }, { id: 2, name: 'Transfer Belt' },
-  { id: 3, name: 'Tambour BK' }, { id: 4, name: 'Tambour C' },
-  { id: 5, name: 'Tambour M' }, { id: 6, name: 'Tambour Y' },
-  { id: 7, name: 'Toner BK' }, { id: 8, name: 'Toner C' },
-  { id: 9, name: 'Toner M' }, { id: 10, name: 'Toner Y' },
-  { id: 11, name: 'Cassette' }, { id: 12, name: 'Rouleau Pression' },
-]
 
 export async function submitInterventionAction(
   id: string,
@@ -64,13 +56,24 @@ export async function submitInterventionAction(
     })
   }
 
-  // Piezas reemplazadas
-  const selectedParts = PARTS.filter((p) => formData.get(`part_${p.id}`) === 'on').map((p) => p.id)
-  if (selectedParts.length > 0) {
-    await supabase.from('incident_parts').delete().eq('incident_id', id)
-    await supabase.from('incident_parts').insert(
-      selectedParts.map((part_id) => ({ incident_id: id, part_id }))
-    )
+  // Piezas reemplazadas (con cantidad). Se reemplaza el set completo de forma
+  // atómica vía RPC: borra las existentes y reinserta las marcadas en una sola
+  // transacción (desmarcar todas vacía la lista). El RPC es SECURITY INVOKER:
+  // respeta la RLS del técnico sobre incident_parts.
+  const selectedParts = PARTS
+    .filter((p) => formData.get(`part_${p.id}`) === 'on')
+    .map((p) => {
+      const raw = Number(formData.get(`qty_${p.id}`))
+      const quantity = Number.isInteger(raw) && raw > 0 ? raw : 1
+      return { part_id: p.id, quantity }
+    })
+  const { error: partsError } = await supabase.rpc('set_incident_parts', {
+    p_incident_id: id,
+    p_parts: selectedParts,
+  })
+  if (partsError) {
+    console.error('[submitIntervention.parts]', partsError)
+    return { error: 'Erreur lors de l\'enregistrement des pièces. Veuillez réessayer.' }
   }
 
   if (new_status === 'résolu' && old_status !== 'résolu') {

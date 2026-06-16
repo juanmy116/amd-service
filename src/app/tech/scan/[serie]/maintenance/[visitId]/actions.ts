@@ -3,10 +3,13 @@
 import { requireTechnician } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { PARTS } from '@/lib/parts'
 
 type FormState = { error: string } | null
 
-const PART_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+// Derivado de la lista central: así las piezas nuevas del catálogo se
+// reconocen aquí sin tener que mantener una lista de ids aparte.
+const PART_IDS = PARTS.map((p) => p.id)
 
 async function notifyMatrix(message: string): Promise<void> {
   const homeserver = process.env.MATRIX_HOMESERVER_URL

@@ -750,7 +750,7 @@ Audit trail de cambios de estado.
 ---
 
 ### Tabla: `parts`
-Catálogo de piezas disponibles para intervenciones.
+Catálogo de piezas disponibles para intervenciones (14 piezas). Espejo en cliente: `src/lib/parts.ts` (fuente única importada por los formularios del técnico y las actions). Ids 1–12 originales; 13 = `ADF`, 14 = `Poubelle Transfer` (mig. `20260616094356`).
 
 | Campo | Tipo | Notas |
 |---|---|---|
@@ -764,8 +764,11 @@ Piezas reemplazadas por intervención (tabla puente).
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `incident_id` | UUID PK | FK → incidents |
+| `incident_id` | UUID PK | FK → incidents (ON DELETE CASCADE) |
 | `part_id` | smallint PK | FK → parts |
+| `quantity` | int | NOT NULL DEFAULT 1, CHECK > 0 (mig. `20260616094356`) |
+
+Escritura vía RPC `set_incident_parts(p_incident_id, p_parts jsonb)` (`SECURITY INVOKER`, mig. `20260616101329`): reemplaza el set de piezas de forma atómica (borra + reinserta en una transacción), respetando la RLS del técnico.
 
 ---
 
