@@ -26,10 +26,9 @@ export default async function AnomaliesPage() {
     .from('machine_anomalies')
     .select('id, machine_id, part_id, light, reason, detected_at')
     .eq('status', 'open')
-    .order('light', { ascending: true })       // 'amber' < 'red'
     .order('detected_at', { ascending: false })
 
-  // Rojo (más urgente) primero.
+  // Rojo (más urgente) primero; el sort es estable, así conserva el orden por fecha.
   const anomalies = ((data ?? []) as Anomaly[]).sort((a, b) =>
     a.light === b.light ? 0 : a.light === 'red' ? -1 : 1
   )

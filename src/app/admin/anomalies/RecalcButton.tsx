@@ -13,12 +13,16 @@ export default function RecalcButton() {
   function recalc() {
     setMsg(null)
     startTransition(async () => {
-      const res = await recalcAnomaliesAction()
-      if (res && 'ok' in res) {
-        setMsg(`${res.count ?? 0} anomalie(s) détectée(s)`)
-        router.refresh()
-      } else {
-        setMsg(res?.error ?? 'Erreur')
+      try {
+        const res = await recalcAnomaliesAction()
+        if (res && 'ok' in res) {
+          setMsg(`${res.count ?? 0} anomalie(s) détectée(s)`)
+          router.refresh()
+        } else {
+          setMsg(res?.error ?? 'Erreur')
+        }
+      } catch {
+        setMsg('Erreur réseau. Réessayez.')
       }
     })
   }

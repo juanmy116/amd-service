@@ -49,6 +49,15 @@ describe('evaluateConsumption — regla consumo_alto_sin_cambio', () => {
     expect(evaluateConsumption({ copiesSinceChange: 8000, expectedYield: 10000, source: 'fabricant', samples: null })?.light).toBe('amber')
   })
 
+  it('frontera exacta 1.0 → rojo', () => {
+    expect(evaluateConsumption({ copiesSinceChange: 10000, expectedYield: 10000, source: 'fabricant', samples: null })?.light).toBe('red')
+  })
+
+  it('baseline aprendido con exactamente el mínimo de muestras SÍ evalúa', () => {
+    const r = evaluateConsumption({ copiesSinceChange: 8500, expectedYield: 10000, source: 'historique', samples: MIN_HISTORICAL_SAMPLES })
+    expect(r?.light).toBe('amber')
+  })
+
   it('copias no positivas → null (datos incompletos)', () => {
     expect(evaluateConsumption({ copiesSinceChange: 0, expectedYield: 10000, source: 'fabricant', samples: null })).toBeNull()
     expect(evaluateConsumption({ copiesSinceChange: -500, expectedYield: 10000, source: 'fabricant', samples: null })).toBeNull()
