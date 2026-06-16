@@ -6,6 +6,20 @@
 
 ---
 
+## ⏰ Verificar el agente de anomalías cuando empiecen a entrar datos reales
+
+> **Qué:** las Fases 0-3 del *historial de piezas + agente de anomalías* (spec `docs/superpowers/specs/2026-06-15-historial-piezas-anomalias-design.md`) están en prod, pero el agente **no produce alertas hasta que haya datos**: hoy (2026-06-16) hay **0 lecturas de contador** cargadas y casi ningún cambio de pieza registrado.
+>
+> **Cuándo retomar:** en cuanto se empiece a cargar contadores con regularidad (vía el agente OCR / importación). Entonces:
+> 1. Verificar que `v_part_yield_baseline` empieza a producir rendimientos aprendidos coherentes (revisar `samples`; exigir un mínimo antes de fiarse).
+> 2. Ejecutar el recálculo del agente (`/admin/anomalies`) y revisar que los semáforos 🟢🟡🔴 tienen sentido con los datos reales; ajustar los umbrales con AMD.
+> 3. Confirmar que el cálculo respeta los reemplazos de máquina (ya cubierto por `repl_epoch`, pero validar con un caso real).
+> 4. **Cargar las fichas del fabricante** (`part_yield_specs`) de los modelos principales (Ricoh MP C3002/C3003, etc.) por SQL — da la referencia preventiva desde el día 1, sin esperar al histórico. Se puede hacer en cualquier momento; la vista `v_part_yield_effective` las prioriza automáticamente.
+>
+> **Por qué pendiente:** decisión consciente (2026-06-16) de construir el armazón completo ahora y verificarlo con datos cuando lleguen, en vez de bloquear la feature esperando a los contadores.
+
+---
+
 ## 1. ✅ Tests de los flujos críticos — Fases 1 y 2 COMPLETADAS (2026-06-11)
 
 - ✅ **Fase 1** (PR #77): `extractSerie()` → `src/lib/qr.ts` + tests; `getIncidentDisplayName` + `TECH_INCIDENT_SELECT` en `src/lib/incident.ts` + tests.
