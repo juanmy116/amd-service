@@ -81,7 +81,9 @@ El OCR de contadores (`pending_counter_imports`) usa **semáforos 🟢🟡🔴**
 
 2. **Fuente única de la lista en cliente** (`src/lib/parts.ts`): la constante `PARTS` estaba **triplicada** (`intervention-form.tsx`, `actions.ts`, `MaintenanceVisitForm.tsx`). Se centraliza en un módulo único que todos importan, evitando que el catálogo se desincronice. Las dos piezas nuevas se añaden una sola vez aquí.
 
-3. **UI técnico** (`intervention-form.tsx`): junto a cada pieza, input numérico de cantidad (default 1, `min=1`). Se precarga con la cantidad ya registrada al reabrir. `MaintenanceVisitForm.tsx` pasa a importar la lista central (las piezas nuevas aparecen automáticamente).
+3. **UI técnico** (`intervention-form.tsx`): junto a cada pieza, input numérico de cantidad (default 1, `min=1`). Se precarga con la cantidad ya registrada al reabrir. `MaintenanceVisitForm.tsx` pasa a importar la lista central (las piezas nuevas aparecen automáticamente). El filtro server-side del mantenimiento (`maintenance/[visitId]/actions.ts`) deriva ahora `PART_IDS` de la lista central en vez de hardcodear `[1..12]` — si no, las piezas 13/14 marcadas en una visita se perderían en silencio (detectado en code-review).
+
+   > **Limitación conocida (no regresión):** el cierre de mantenimiento sigue guardando `quantity = 1` por pieza (el RPC `close_maintenance_visit` no recibe cantidades). Añadir input de cantidad al formulario de mantenimiento queda fuera del alcance de la Fase 0 (requiere tocar el RPC). Ver pregunta abierta #5.
 
 4. **Server action** (`submitInterventionAction`): captura y persiste `quantity` por pieza. Se corrige además el reemplazo del set: ahora **siempre borra** antes de reinsertar, de modo que desmarcar todas las piezas también vacía la lista (antes solo borraba si quedaba alguna marcada).
 
@@ -252,3 +254,4 @@ Cada fase = una rama / PR independiente, revisable y desplegable por separado.
 2. **`autres_pieces`** (texto libre en incidencias): ¿migrar a `incident_parts` estructurado o dejarlo como nota? Afecta a la completitud del historial.
 3. **Umbral de los semáforos** (cuántas copias / cuántos cambios disparan 🟡 vs 🔴): definir con AMD valores iniciales razonables, ajustables después.
 4. **UI de carga de specs del fabricante:** ¿pantalla en admin desde el inicio o carga por CSV/SQL en la primera iteración?
+5. **Cantidad en mantenimiento:** ¿añadir input de cantidad al formulario de mantenimiento preventivo (hoy siempre `quantity = 1`)? Requiere ampliar el RPC `close_maintenance_visit` para aceptar pares pieza/cantidad. Conviene para que el historial de la Fase 1 no quede sesgado en el lado preventivo.
