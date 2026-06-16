@@ -4,9 +4,9 @@ import {
 } from './helpers'
 
 // La vista v_machine_parts_history (Fase 1) es security_invoker: debe heredar
-// la RLS de las tablas base. Verificamos que el aislamiento por rol se mantiene
-// al leer el historial a través de la vista (un técnico no debe ver, vía la
-// vista, piezas de incidencias que no tiene asignadas). Supabase LOCAL efímero.
+// la RLS de las tablas base. Verificamos el aislamiento por rol al leer el
+// historial a través de la vista, cubriendo SUS DOS ORÍGENES: averías
+// (incident_parts) y mantenimiento (maintenance_parts). Supabase LOCAL efímero.
 
 const admin = adminClient()
 
@@ -17,13 +17,17 @@ const CLIENT = 'client@rls.test'
 
 const SERIE = 'TEST-SN1'
 
-async function partsViaView(
+type ViewRow = { source: string | null; part_id: number | null }
+
+async function rowsViaView(
   client: Awaited<ReturnType<typeof signInAs>> | ReturnType<typeof anonClient>,
-): Promise<number[]> {
+): Promise<ViewRow[]> {
   const { data } = await client
-    .from('v_machine_parts_history').select('part_id').eq('machine_id', SERIE)
-  return (data ?? []).map((r) => r.part_id as number).sort((a, b) => a - b)
+    .from('v_machine_parts_history').select('source, part_id').eq('machine_id', SERIE)
+  return (data ?? []) as ViewRow[]
 }
+
+const partIds = (rows: ViewRow[]) => rows.map((r) => r.part_id).sort((a, b) => (a ?? 0) - (b ?? 0))
 
 beforeAll(async () => {
   if (!ANON_KEY || !SERVICE_KEY) {
@@ -67,12 +71,26 @@ beforeAll(async () => {
   const incA = incs!.find((i) => i.numero_incident === 'TEST-I1')!.id
   const incB = incs!.find((i) => i.numero_incident === 'TEST-I2')!.id
 
-  // Pieza 7 (Toner BK) en la incidencia de A; pieza 3 (Tambour BK) en la de B.
+  // Origen 1 (averías): pieza 7 (Toner BK) en A; pieza 3 (Tambour BK) en B.
   const { error: pErr } = await admin.from('incident_parts').insert([
     { incident_id: incA, part_id: 7, quantity: 2 },
     { incident_id: incB, part_id: 3, quantity: 1 },
   ])
   if (pErr) throw new Error(`seed incident_parts: ${pErr.message}`)
+
+  // Origen 2 (mantenimiento): plan + visita en la misma máquina + pieza 5 (Tambour M).
+  // Las FK de mantenimiento son ON DELETE CASCADE → el cleanup las borra al borrar
+  // el contrato/línea, sin limpieza explícita.
+  const { data: plan, error: plErr } = await admin.from('maintenance_plans')
+    .insert({ contract_id: contract!.id, frequency: 'mensuel' }).select('id').single()
+  if (plErr) throw new Error(`seed plan: ${plErr.message}`)
+  const { data: visit, error: vErr } = await admin.from('maintenance_visits')
+    .insert({ plan_id: plan!.id, contract_machine_id: line!.id, scheduled_date: '2026-05-01' })
+    .select('id').single()
+  if (vErr) throw new Error(`seed visit: ${vErr.message}`)
+  const { error: mpErr } = await admin.from('maintenance_parts')
+    .insert({ visit_id: visit!.id, part_id: 5, quantity: 1 })
+  if (mpErr) throw new Error(`seed maintenance_parts: ${mpErr.message}`)
 }, 60_000)
 
 afterAll(async () => {
@@ -80,29 +98,36 @@ afterAll(async () => {
 })
 
 describe('RLS — v_machine_parts_history (vista unificada)', () => {
-  it('el admin ve el historial completo de la máquina (ambas incidencias)', async () => {
+  it('el admin ve el historial completo: averías (3, 7) + mantenimiento (5)', async () => {
     const c = await signInAs(ADMIN)
-    expect(await partsViaView(c)).toEqual([3, 7])
+    expect(partIds(await rowsViaView(c))).toEqual([3, 5, 7])
   })
 
-  it('el técnico A ve por la vista solo las piezas de SU incidencia', async () => {
-    const c = await signInAs(TECH_A)
-    expect(await partsViaView(c)).toEqual([7])
+  it('el admin ve la pieza del origen mantenimiento vía la vista', async () => {
+    const c = await signInAs(ADMIN)
+    const maint = (await rowsViaView(c)).filter((r) => r.source === 'maintenance')
+    expect(maint.map((r) => r.part_id)).toEqual([5])
   })
 
-  it('el técnico B ve por la vista solo las piezas de SU incidencia', async () => {
-    const c = await signInAs(TECH_B)
-    expect(await partsViaView(c)).toEqual([3])
+  it('el técnico A ve por la vista su pieza de avería (7), no la de B (3)', async () => {
+    const ids = partIds(await rowsViaView(await signInAs(TECH_A)))
+    expect(ids).toContain(7)
+    expect(ids).not.toContain(3)
   })
 
-  it('el cliente NO ve el desglose de piezas vía la vista (incident_parts es interno de AMD)', async () => {
-    // incident_parts no tiene policy de SELECT para clientes (solo admin + técnico).
-    // Al ser security_invoker, la vista hereda esa restricción: el cliente no ve filas.
-    const c = await signInAs(CLIENT)
-    expect(await partsViaView(c)).toEqual([])
+  it('el técnico B ve por la vista su pieza de avería (3), no la de A (7)', async () => {
+    const ids = partIds(await rowsViaView(await signInAs(TECH_B)))
+    expect(ids).toContain(3)
+    expect(ids).not.toContain(7)
+  })
+
+  it('el cliente NO ve el desglose de piezas vía la vista (ni averías ni mantenimiento: es interno de AMD)', async () => {
+    // Ni incident_parts ni maintenance_parts/visits tienen policy SELECT para clientes.
+    // Al ser security_invoker, la vista hereda esa restricción → 0 filas.
+    expect(await rowsViaView(await signInAs(CLIENT))).toEqual([])
   })
 
   it('un usuario anónimo no ve ninguna fila de la vista', async () => {
-    expect(await partsViaView(anonClient())).toEqual([])
+    expect(await rowsViaView(anonClient())).toEqual([])
   })
 })

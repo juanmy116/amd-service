@@ -13,7 +13,6 @@ type HistoryRow = {
   reference: string | null
   part_id: number | null
   part_name: string | null
-  description: string | null
   quantity: number | null
   changed_at: string | null
   category: string | null
@@ -48,7 +47,7 @@ export default async function MachinePartsHistoryPage({
     .order('changed_at', { ascending: false })
 
   const history = (rows ?? []) as HistoryRow[]
-  const totalUnits = history.reduce((sum, r) => sum + (r.quantity ?? 0), 0)
+  const totalUnits = history.reduce((sum, r) => sum + (r.quantity ?? 1), 0)
 
   const serieEnc = encodeURIComponent(numero_serie)
 
@@ -79,17 +78,15 @@ export default async function MachinePartsHistoryPage({
       </div>
 
       {/* Résumé */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="p-4 flex items-center gap-3">
-          <Package size={16} className="text-ink-muted shrink-0" />
-          <div>
-            <p className="text-xs text-ink-muted">Pièces / consommables remplacés</p>
-            <p className="text-sm font-semibold text-ink">
-              {totalUnits} unité{totalUnits > 1 ? 's' : ''} · {history.length} ligne{history.length > 1 ? 's' : ''}
-            </p>
-          </div>
-        </Card>
-      </div>
+      <Card className="p-4 flex items-center gap-3 md:max-w-sm">
+        <Package size={16} className="text-ink-muted shrink-0" />
+        <div>
+          <p className="text-xs text-ink-muted">Pièces / consommables remplacés</p>
+          <p className="text-sm font-semibold text-ink">
+            {totalUnits} unité{totalUnits > 1 ? 's' : ''} · {history.length} ligne{history.length > 1 ? 's' : ''}
+          </p>
+        </div>
+      </Card>
 
       {/* Historique */}
       <Card className="overflow-hidden">
@@ -123,7 +120,7 @@ export default async function MachinePartsHistoryPage({
                 ? new Date(r.changed_at).toLocaleDateString('fr-FR')
                 : '—'
               return (
-                <tr key={`${r.source}-${r.source_id}-${r.part_id ?? idx}`} className="hover:bg-neutral-soft transition-colors">
+                <tr key={`${r.source}-${r.source_id}-${r.part_id ?? 'x'}-${idx}`} className="hover:bg-neutral-soft transition-colors">
                   <td className="px-5 py-3.5 text-ink-soft whitespace-nowrap">{dateStr}</td>
                   <td className="px-4 py-3.5">
                     <Badge variant={originVariant}>
