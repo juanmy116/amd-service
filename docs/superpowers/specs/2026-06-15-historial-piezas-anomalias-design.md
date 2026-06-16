@@ -166,6 +166,13 @@ El OCR de contadores (`pending_counter_imports`) usa **semáforos 🟢🟡🔴**
 
 ### Fase 2 — Referencia de "lo normal" (rendimientos esperados)
 
+> **Estado:** ✅ **IMPLEMENTADA (2026-06-16, armazón sin UI).** Mig. `20260616111117` aplicada a prod. Decisiones de implementación:
+> - **Alcance = armazón de datos** (decisión del usuario): tabla + vistas + RLS + tipos + test, **sin UI de gestión** todavía. Las fichas se cargan por SQL hasta que se decida una pantalla.
+> - **Contexto en prod (2026-06-16):** 0 lecturas de contador, ~4 cambios de pieza → el baseline aún no produce datos; se llenará con el uso. La única fuente de señal inmediata serían fichas del fabricante (no cargadas aún).
+> - **Métrica del baseline = `copies_total`** (bw+color) entre cambios consecutivos de la misma pieza en la misma máquina. Simplificación consciente: no distingue aún tóner color (copias color) de tambores/B&N; el agente (Fase 3) puede afinar por unidad. La tabla de fichas sí soporta las 4 unidades.
+> - **Cómo cargar fichas del fabricante** (ejemplo): `INSERT INTO part_yield_specs (marque, modele, part_id, expected_yield, unit) VALUES ('Ricoh','MP C3002', 7, 15000, 'copies_total');`
+> - **RLS:** `part_yield_specs` es admin-only; las vistas son security_invoker (heredan que `machine_counters` es admin-only → solo admin/service_role ven el baseline). Test `tests/rls/part-yield-specs.test.ts`.
+
 **Objetivo:** dar al agente con qué comparar. Decisión del cliente = **mezcla**.
 
 1. **Tabla `part_yield_specs`** (rendimiento oficial del fabricante, cuando se disponga):

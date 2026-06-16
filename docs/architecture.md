@@ -353,6 +353,11 @@ Decisión del dueño (evitar desincronización en dinero). `machines.active`/`lo
 
 - **Vista `v_machine_parts_history`** (`security_invoker=true`, mig. `20260616103252`): historial unificado de piezas/tóner cambiados por máquina, uniendo `incident_parts` (averías) y `maintenance_parts` (mantenimiento). Columnas: `machine_id`, `source` ('incident'|'maintenance'), `source_id`, `reference`, `part_id`, `part_name`, `description`, `quantity`, `changed_at`, `category`, `technician_id`, `technician_name`. Al ser security_invoker hereda la RLS: el cliente no ve `incident_parts` (no tiene policy) → la vista no le expone el desglose. La consume la página admin `/admin/machines/[serie]/pieces` (Fase 1 del historial de piezas).
 
+- **Referencia de rendimiento de piezas** (Fase 2 del historial, mig. `20260616111117`):
+  - Tabla `part_yield_specs` (admin-only): fichas del fabricante — `(marque, modele, part_id, expected_yield, unit ∈ copies_bw/color/total/mois, source ∈ fabricant/estimé)`, UNIQUE(marque,modele,part_id,unit). Se cargan por SQL.
+  - Vista `v_part_yield_baseline` (`security_invoker`): rendimiento aprendido = copias_total medias entre cambios consecutivos de la misma pieza en la misma máquina, agregado por (marque, modele, part_id) + `samples`.
+  - Vista `v_part_yield_effective` (`security_invoker`): rendimiento efectivo en copies_total = ficha del fabricante (`unit='copies_total'`) si existe, si no el baseline; expone `yield_source` ('fabricant'|'historique'). Base para el agente de anomalías (Fase 3).
+
 **El stock es la frontera entre clientes** (regla de negocio): una máquina nunca pasa directa de un cliente a otro; siempre Cliente A → stock → Cliente B. Dos eventos del ciclo de vida, vía RPC atómica (`SECURITY DEFINER`, `service_role`), con Server Actions en `src/app/admin/contracts/[id]/stock-actions.ts`:
 
 - **`return_machine_to_stock(p_payload)`** — motivo (a) resiliación: cierra la línea con su `end_counter_bw/color` **real** (lectura al retirar) + `date_fin` + `statut='terminé'`. La máquina queda en stock; no factura mientras lo está. Valida que el cierre no sea inferior a la mayor lectura conocida. **No encadena** (`replaces_contract_machine_id` queda NULL en cualquier futura asignación).
