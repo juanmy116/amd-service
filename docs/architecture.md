@@ -351,6 +351,8 @@ Decisión del dueño (evitar desincronización en dinero). `machines.active`/`lo
 
 - **Vista `v_machine_park`** (`security_invoker=true`): expone por máquina `louee` (bool), su línea abierta (`open_line_id`, `open_contract_id`, `open_date_debut`), `numero_contrat` y `client_id`. SELECT solo para `authenticated`/`service_role`.
 
+- **Vista `v_machine_parts_history`** (`security_invoker=true`, mig. `20260616103252`): historial unificado de piezas/tóner cambiados por máquina, uniendo `incident_parts` (averías) y `maintenance_parts` (mantenimiento). Columnas: `machine_id`, `source` ('incident'|'maintenance'), `source_id`, `reference`, `part_id`, `part_name`, `description`, `quantity`, `changed_at`, `category`, `technician_id`, `technician_name`. Al ser security_invoker hereda la RLS: el cliente no ve `incident_parts` (no tiene policy) → la vista no le expone el desglose. La consume la página admin `/admin/machines/[serie]/pieces` (Fase 1 del historial de piezas).
+
 **El stock es la frontera entre clientes** (regla de negocio): una máquina nunca pasa directa de un cliente a otro; siempre Cliente A → stock → Cliente B. Dos eventos del ciclo de vida, vía RPC atómica (`SECURITY DEFINER`, `service_role`), con Server Actions en `src/app/admin/contracts/[id]/stock-actions.ts`:
 
 - **`return_machine_to_stock(p_payload)`** — motivo (a) resiliación: cierra la línea con su `end_counter_bw/color` **real** (lectura al retirar) + `date_fin` + `statut='terminé'`. La máquina queda en stock; no factura mientras lo está. Valida que el cierre no sea inferior a la mayor lectura conocida. **No encadena** (`replaces_contract_machine_id` queda NULL en cualquier futura asignación).

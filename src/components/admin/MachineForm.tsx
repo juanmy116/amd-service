@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
+import { Loader2, ArrowLeft, Trash2, AlertTriangle, Gauge, Package } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 
 type FormState = { error: string } | null
@@ -49,6 +49,26 @@ export default function MachineForm({ action, defaultValues, title, isEdit, mach
         <h1 className="flex-1 text-2xl font-semibold text-ink font-display">
           {title}
         </h1>
+
+        {/* Navegación a las sub-secciones de la máquina (solo en edición) */}
+        {isEdit && machineId && (
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/admin/contadores/${encodeURIComponent(machineId)}`}
+              className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-line text-sm font-medium text-ink-soft bg-card hover:bg-neutral-soft transition-colors"
+            >
+              <Gauge size={15} className="text-ink-muted" />
+              Compteurs
+            </Link>
+            <Link
+              href={`/admin/machines/${encodeURIComponent(machineId)}/pieces`}
+              className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-line text-sm font-medium text-ink-soft bg-card hover:bg-neutral-soft transition-colors"
+            >
+              <Package size={15} className="text-ink-muted" />
+              Historique pièces
+            </Link>
+          </div>
+        )}
 
         {/* Delete */}
         {deleteAction && machineId && (

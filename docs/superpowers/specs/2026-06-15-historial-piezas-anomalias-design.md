@@ -101,6 +101,13 @@ El OCR de contadores (`pending_counter_imports`) usa **semáforos 🟢🟡🔴**
 
 ### Fase 1 — Vista unificada + Historial visible por máquina
 
+> **Estado:** ✅ **IMPLEMENTADA (2026-06-16).** Vista `v_machine_parts_history` aplicada a prod (mig. `20260616103252`) y página `/admin/machines/[serie]/pieces` enlazada desde la ficha. Decisiones de implementación frente al diseño original:
+> - **Página hermana, no pestaña:** la ficha de máquina es un formulario sin sistema de tabs; se siguió el patrón ya existente de `/admin/contadores/[serie]` (página dedicada) con enlaces de navegación (Compteurs · Historique pièces) en la cabecera de la ficha.
+> - **La vista expone también `technician_name`** (LEFT JOIN a `profiles`) y resuelve el texto libre de mantenimiento como `part_name` (`COALESCE(p.name, mp.description)`).
+> - **Curva de contadores:** no se duplica aquí; se enlaza a `/admin/contadores/[serie]` (donde ya vive el gráfico Recharts). El cruce real copias↔piezas es trabajo de la Fase 3.
+> - **Enlace de la referencia:** las incidencias enlazan a `/admin/incidents/[id]`; las visitas de mantenimiento se muestran como texto (la vista no expone `plan_id`; añadir enlace requeriría incluirlo).
+> - **RLS verificada:** test `tests/rls/machine-parts-history.test.ts`. Hallazgo confirmado: `incident_parts` no tiene policy de SELECT para clientes → la vista (security_invoker) **no** expone el desglose de piezas a clientes (es interno de AMD); admin ve todo, cada técnico solo lo suyo.
+
 **Objetivo:** ver, por máquina, qué se le ha cambiado y cuándo, junto a su consumo.
 
 1. **Vista `v_machine_parts_history`** (`security_invoker = true` para respetar RLS por rol):
