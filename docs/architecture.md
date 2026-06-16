@@ -356,13 +356,15 @@ Decisión del dueño (evitar desincronización en dinero). `machines.active`/`lo
 - **Referencia de rendimiento de piezas** (Fase 2 del historial, mig. `20260616111117`):
   - Tabla `part_yield_specs` (admin-only): fichas del fabricante — `(marque, modele, part_id, expected_yield, unit ∈ copies_bw/color/total/mois, source ∈ fabricant/estimé)`, UNIQUE(marque,modele,part_id,unit). Se cargan por SQL.
   - Vista `v_part_yield_baseline` (`security_invoker`): rendimiento aprendido = copias_total medias entre cambios consecutivos de la misma pieza en la misma máquina, agregado por (marque, modele, part_id) + `samples`.
-  - Vista `v_part_yield_effective` (`security_invoker`): rendimiento efectivo en copies_total = ficha del fabricante (`unit='copies_total'`) si existe, si no el baseline; expone `yield_source` ('fabricant'|'historique'). Base para el agente de anomalías (Fase 3).
+  - Vista `v_part_yield_effective` (`security_invoker`): rendimiento efectivo en copies_total = ficha del fabricante (`unit='copies_total'`) si existe, si no el baseline; expone `yield_source` ('fabricant'|'historique'). Base para el agente de anomalías (Fase 3). Las fichas se pre-filtran a `unit='copies_total'` ANTES del `FULL JOIN` (mig. `20260616133323`) — fichas en otra unidad no entran (evita duplicar/contaminar). ⚠️ El enlace ficha↔máquina es por igualdad de texto `marque`/`modele`: cargar fichas con los valores exactos de `machines` o no casan (no alerta, sin error).
 
 - **Agente de anomalías de consumo** (Fase 3 del historial, mig. `20260616115502`):
   - Tabla `machine_anomalies` (admin-only): cola de revisión — `(machine_id, part_id, anomaly_type, light ∈ amber/red, reason, metrics jsonb, status ∈ open/ack/dismissed/resolved)`. Índice único parcial: una anomalía abierta por (machine, part, type).
-  - Vista `v_machine_part_consumption` (`security_invoker`): copias desde el último cambio de cada pieza + rendimiento esperado; respeta reemplazos (misma época de máquina).
+  - Vista `v_machine_part_consumption` (`security_invoker`, endurecida en mig. `20260616121054`: `GREATEST(0,…)` + `DISTINCT ON` determinista): copias desde el último cambio de cada pieza + rendimiento esperado; respeta reemplazos (misma época de máquina).
   - Lógica pura testeable en `src/lib/anomalies.ts` (`evaluateConsumption`): regla `consumo_alto_sin_cambio` (ámbar ≥80% / rojo ≥100% del rendimiento; exige `samples>=3` si es aprendido). Reglas `consumo_excesivo`/`desviacion_modelo` diferidas.
-  - UI `/admin/anomalies`: cola con semáforos + acciones (Résolu/Acquitter/Écarter) + botón "Recalculer" (`recalcAnomaliesAction`). Cron automático diferido hasta que haya datos.
+  - Recálculo atómico vía RPC `replace_consumption_anomalies(p_rows jsonb)` (`SECURITY INVOKER`, `service_role`, mig. `20260616133505`): `recalcAnomaliesAction` calcula con `evaluateConsumption` y persiste el conjunto en una transacción.
+  - UI `/admin/anomalies`: cola con semáforos + acciones (Résolu/Acquitter/Écarter) + botón "Recalculer" (`recalcAnomaliesAction`); banner contador en el dashboard `/admin`. Cron automático diferido hasta que haya datos.
+  - Gate de integración end-to-end: `tests/rls/anomalies-e2e.test.ts` (cadena completa con datos sintéticos). 9 migraciones de la feature en prod (`20260616094356`–`133505`), drift cero.
 
 **El stock es la frontera entre clientes** (regla de negocio): una máquina nunca pasa directa de un cliente a otro; siempre Cliente A → stock → Cliente B. Dos eventos del ciclo de vida, vía RPC atómica (`SECURITY DEFINER`, `service_role`), con Server Actions en `src/app/admin/contracts/[id]/stock-actions.ts`:
 
