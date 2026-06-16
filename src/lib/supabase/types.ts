@@ -1210,6 +1210,50 @@ export type Database = {
         }
         Relationships: []
       }
+      part_yield_specs: {
+        Row: {
+          created_at: string
+          expected_yield: number
+          id: string
+          marque: string
+          modele: string
+          notes: string | null
+          part_id: number
+          source: string
+          unit: string
+        }
+        Insert: {
+          created_at?: string
+          expected_yield: number
+          id?: string
+          marque: string
+          modele: string
+          notes?: string | null
+          part_id: number
+          source?: string
+          unit: string
+        }
+        Update: {
+          created_at?: string
+          expected_yield?: number
+          id?: string
+          marque?: string
+          modele?: string
+          notes?: string | null
+          part_id?: number
+          source?: string
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "part_yield_specs_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_counter_imports: {
         Row: {
           created_at: string
@@ -1498,6 +1542,28 @@ export type Database = {
       }
     }
     Views: {
+      v_part_yield_baseline: {
+        Row: {
+          avg_yield_total: number | null
+          marque: string | null
+          modele: string | null
+          part_id: number | null
+          samples: number | null
+        }
+        Relationships: []
+      }
+      v_part_yield_effective: {
+        Row: {
+          expected_yield_total: number | null
+          historical_samples: number | null
+          marque: string | null
+          modele: string | null
+          part_id: number | null
+          part_name: string | null
+          yield_source: string | null
+        }
+        Relationships: []
+      }
       v_machine_parts_history: {
         Row: {
           category: string | null
