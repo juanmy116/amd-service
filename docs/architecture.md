@@ -768,6 +768,8 @@ Piezas reemplazadas por intervención (tabla puente).
 | `part_id` | smallint PK | FK → parts |
 | `quantity` | int | NOT NULL DEFAULT 1, CHECK > 0 (mig. `20260616094356`) |
 
+Escritura vía RPC `set_incident_parts(p_incident_id, p_parts jsonb)` (`SECURITY INVOKER`, mig. `20260616101329`): reemplaza el set de piezas de forma atómica (borra + reinserta en una transacción), respetando la RLS del técnico.
+
 ---
 
 ### Tabla: `incident_photos`

@@ -56,19 +56,24 @@ export async function submitInterventionAction(
     })
   }
 
-  // Piezas reemplazadas (con cantidad). Se reemplaza el set completo:
-  // borramos siempre y reinsertamos las marcadas, para que desmarcar todas
-  // también vacíe la lista.
+  // Piezas reemplazadas (con cantidad). Se reemplaza el set completo de forma
+  // atómica vía RPC: borra las existentes y reinserta las marcadas en una sola
+  // transacción (desmarcar todas vacía la lista). El RPC es SECURITY INVOKER:
+  // respeta la RLS del técnico sobre incident_parts.
   const selectedParts = PARTS
     .filter((p) => formData.get(`part_${p.id}`) === 'on')
     .map((p) => {
       const raw = Number(formData.get(`qty_${p.id}`))
       const quantity = Number.isInteger(raw) && raw > 0 ? raw : 1
-      return { incident_id: id, part_id: p.id, quantity }
+      return { part_id: p.id, quantity }
     })
-  await supabase.from('incident_parts').delete().eq('incident_id', id)
-  if (selectedParts.length > 0) {
-    await supabase.from('incident_parts').insert(selectedParts)
+  const { error: partsError } = await supabase.rpc('set_incident_parts', {
+    p_incident_id: id,
+    p_parts: selectedParts,
+  })
+  if (partsError) {
+    console.error('[submitIntervention.parts]', partsError)
+    return { error: 'Erreur lors de l\'enregistrement des pièces. Veuillez réessayer.' }
   }
 
   if (new_status === 'résolu' && old_status !== 'résolu') {

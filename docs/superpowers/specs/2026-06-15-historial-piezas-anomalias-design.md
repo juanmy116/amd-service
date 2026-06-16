@@ -85,7 +85,7 @@ El OCR de contadores (`pending_counter_imports`) usa **semáforos 🟢🟡🔴**
 
    > **Limitación conocida (no regresión):** el cierre de mantenimiento sigue guardando `quantity = 1` por pieza (el RPC `close_maintenance_visit` no recibe cantidades). Añadir input de cantidad al formulario de mantenimiento queda fuera del alcance de la Fase 0 (requiere tocar el RPC). Ver pregunta abierta #5.
 
-4. **Server action** (`submitInterventionAction`): captura y persiste `quantity` por pieza. Se corrige además el reemplazo del set: ahora **siempre borra** antes de reinsertar, de modo que desmarcar todas las piezas también vacía la lista (antes solo borraba si quedaba alguna marcada).
+4. **Server action** (`submitInterventionAction`): captura y persiste `quantity` por pieza. El reemplazo del set se hace de forma **atómica vía RPC `set_incident_parts(p_incident_id, p_parts jsonb)`** (`SECURITY INVOKER`, respeta la RLS del técnico) — borra y reinserta en una sola transacción, de modo que un fallo en la inserción no deja la incidencia sin piezas, y desmarcar todas vacía la lista. Sustituye al `delete()+insert()` no transaccional que detectó el code-review. Migración `20260616101329_set_incident_parts_rpc.sql`. Cubierto por `tests/rls/incident-parts-isolation.test.ts` (aislamiento por rol + cantidad + pieza nueva).
 
 5. **Carga previa** (`page.tsx`): `checkedParts` pasa de `Set<number>` a `Map<number, number>` (part_id → cantidad).
 

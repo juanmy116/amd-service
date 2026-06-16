@@ -1574,6 +1574,7 @@ export type Database = {
       register_counter_duplicate: { Args: { p_hash: string }; Returns: Json }
       replace_contract_machine: { Args: { p_payload: Json }; Returns: string }
       return_machine_to_stock: { Args: { p_payload: Json }; Returns: string }
+      set_incident_parts: { Args: { p_incident_id: string; p_parts: Json }; Returns: undefined }
       terminate_contract: { Args: { p_payload: Json }; Returns: Json }
       update_contract_with_lines: {
         Args: { p_contract_id: string; payload: Json }
