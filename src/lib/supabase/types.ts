@@ -1498,6 +1498,23 @@ export type Database = {
       }
     }
     Views: {
+      v_machine_parts_history: {
+        Row: {
+          category: string | null
+          changed_at: string | null
+          description: string | null
+          machine_id: string | null
+          part_id: number | null
+          part_name: string | null
+          quantity: number | null
+          reference: string | null
+          source: string | null
+          source_id: string | null
+          technician_id: string | null
+          technician_name: string | null
+        }
+        Relationships: []
+      }
       v_machine_park: {
         Row: {
           active: boolean | null
