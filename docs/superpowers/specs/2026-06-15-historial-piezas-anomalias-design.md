@@ -204,6 +204,13 @@ El OCR de contadores (`pending_counter_imports`) usa **semáforos 🟢🟡🔴**
 
 ### Fase 3 — Agente de detección de anomalías
 
+> **Estado:** ✅ **IMPLEMENTADA (2026-06-16).** Migración `20260616115502` en prod. Decisiones de implementación:
+> - **Regla implementada: `consumo_alto_sin_cambio`** (preventiva, la más valiosa y autocontenida). Lógica pura testeable en `src/lib/anomalies.ts` (`evaluateConsumption`, 9 tests vitest): ratio = copias desde el último cambio / rendimiento efectivo → ámbar (≥80%) / rojo (≥100%). Exige `samples >= 3` si el rendimiento es aprendido (no fiarse de baseline pobre); el del fabricante no exige muestras.
+> - **Reglas diferidas:** `consumo_excesivo` (frecuencia de cambios vs copias) y `desviacion_modelo` (estadística entre máquinas del modelo) — necesitan más volumen de datos y desviación estándar robusta. El marco (tabla `machine_anomalies` con `anomaly_type` libre + cola + UI) admite añadirlas sin rediseño.
+> - **Inputs vía vista `v_machine_part_consumption`** (security_invoker): por (máquina, pieza) da copias desde el último cambio + rendimiento efectivo. **Respeta reemplazos** (solo cuenta si el último cambio y la lectura actual están en la misma época de máquina).
+> - **Disparo: botón "Recalculer" manual** en `/admin/anomalies` (server action `recalcAnomaliesAction`, usa `src/lib/anomalies.ts`). El **cron automático queda diferido** (sin datos no hay nada que recalcular; cuando entren contadores, se añade un pg_cron que invoque el recálculo). El recálculo regenera las anomalías `open` de tipo consumo (idempotente); las revisadas (ack/dismissed/resolved) se conservan. ⚠️ Una anomalía `dismissed` que siga vigente reaparece en el próximo recálculo (el admin debe resolver la causa, no solo descartar).
+> - **UI** `/admin/anomalies` (cola con semáforos 🔴 Remplacer / 🟡 Surveiller + acciones Résolu/Acquitter/Écarter), enlace en sidebar (Service → Anomalies). RLS admin-only (`machine_anomalies`); test `tests/rls/machine-anomalies.test.ts`.
+
 **Objetivo:** vigilar y levantar banderas para revisión humana. **Reutiliza el patrón semáforo + cola** del OCR.
 
 1. **Tabla `machine_anomalies`** (cola de revisión, espejo conceptual de `pending_counter_imports`):

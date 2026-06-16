@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, Printer, FileText,
   AlertCircle, UserCog, LogOut, BarChart2, Wrench, CalendarDays,
-  ChevronLeft, ChevronRight, Plug, Inbox, Receipt, FileSpreadsheet,
+  ChevronLeft, ChevronRight, Plug, Inbox, Receipt, FileSpreadsheet, Activity,
 } from 'lucide-react'
 import { signOut } from '@/app/login/actions'
 import { Avatar } from '@/components/ui/Avatar'
@@ -38,6 +38,7 @@ const NAV_GROUPS = [
       { href: '/admin/incidents',   label: 'Incidents SAV', icon: AlertCircle },
       { href: '/admin/maintenance', label: 'Maintenance',   icon: Wrench },
       { href: '/admin/calendrier',  label: 'Calendrier',    icon: CalendarDays },
+      { href: '/admin/anomalies',   label: 'Anomalies',     icon: Activity },
     ],
   },
   {

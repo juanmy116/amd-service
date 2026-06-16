@@ -72,6 +72,7 @@ export async function cleanup(admin: SupabaseClient): Promise<void> {
   // borrado de los clientes 'TEST '. Ver tests/rls/billing-isolation.test.ts.
   await admin.from('csat_responses').delete().like('token', 'TEST-%')           // RESTRICT → incidents
   await admin.from('machine_counters').delete().like('machine_id', 'TEST-%')    // RESTRICT → machines
+  await admin.from('machine_anomalies').delete().like('machine_id', 'TEST-%')   // RESTRICT → machines
   await admin.from('leads').delete().like('name', 'TEST %')
   await admin.from('billing_plans').delete().like('name', 'TEST %')
   await admin.from('pending_counter_imports').delete().like('image_hash_sha256', 'TEST%')
