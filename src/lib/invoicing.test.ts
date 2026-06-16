@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { calcDeltas, counterDelta, type Counter } from '@/lib/counters'
 import {
   countersForLine, BillingDataError, isLineBillable,
-  computeBillingCycle, computeLineConsumptionCycle, buildContractInvoiceDraft,
+  computeInvoiceMonth, computeLineConsumptionByReadings, buildContractInvoiceDraft,
   type LineCounters,
 } from '@/lib/invoicing'
 
@@ -10,10 +10,12 @@ import {
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: vi.fn() }))
 import { createAdminClient } from '@/lib/supabase/admin'
 
-// Helper: construye un relevé con valores por defecto razonables.
+// Helper: construye un relevé con valores por defecto razonables. `recorded_at` deriva de la
+// fecha (year-month-day) para que el desempate por recorded_at sea coherente con la fecha real.
 function mkCounter(p: Partial<Counter> & { id: string; year: number; month: number }): Counter {
+  const day = p.day ?? 1
   return {
-    day: null,
+    day,
     counter_bw: 0,
     counter_color: 0,
     status: 'actif',
@@ -22,20 +24,18 @@ function mkCounter(p: Partial<Counter> & { id: string; year: number; month: numb
     annulation_reason: null,
     annule_at: null,
     notes: null,
-    recorded_at: `${p.year}-${String(p.month).padStart(2, '0')}-15T10:00:00Z`,
+    recorded_at: `${p.year}-${String(p.month).padStart(2, '0')}-${String(day).padStart(2, '0')}T10:00:00Z`,
     ...p,
   }
 }
 
-// Línea de contrato "normal" (sin reemplazo): abierta desde antes del periodo, sin cerrar,
-// sin puntos start/end propios. Es el caso donde factura y Contadores DEBEN coincidir.
-const NORMAL_LINE: LineCounters = {
-  date_debut: '2026-04-01',
-  date_fin: null,
-  start_counter_bw: null,
-  start_counter_color: null,
-  end_counter_bw: null,
-  end_counter_color: null,
+// Relevé con las columnas de atribución (CounterRow): Counter + machine_id + contract_id.
+function mkRow(
+  p: Partial<Counter> & { id: string; year: number; month: number },
+  machine_id: string,
+  contract_id: string | null,
+) {
+  return { ...mkCounter(p), machine_id, contract_id }
 }
 
 describe('counterDelta (primitiva compartida)', () => {
@@ -53,20 +53,9 @@ describe('counterDelta (primitiva compartida)', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BLOQUE B — atribución por línea/contrato (P0-3) y bloqueo por fallo técnico (P0-7).
+// BLOQUE B — atribución por línea/contrato (P0-3).
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Relevé con las columnas de atribución (CounterRow): Counter + machine_id + contract_id.
-function mkRow(
-  p: Partial<Counter> & { id: string; year: number; month: number },
-  machine_id: string,
-  contract_id: string | null,
-) {
-  return { ...mkCounter(p), machine_id, contract_id }
-}
-
 describe('Bloque B — countersForLine (P0-3): cada línea solo ve los relevés de SU contrato', () => {
-  // Una misma máquina física rotó: contrato A (cA) y, tras pasar por stock, contrato B (cB).
   const all = [
     mkRow({ id: 'a-may', year: 2026, month: 5, counter_bw: 1000, counter_color: 200 }, 'M1', 'cA'),
     mkRow({ id: 'b-jun', year: 2026, month: 6, counter_bw: 200,  counter_color: 40  }, 'M1', 'cB'),
@@ -84,26 +73,21 @@ describe('Bloque B — countersForLine (P0-3): cada línea solo ve los relevés 
       ...all,
       mkRow({ id: 'legacy-jun', year: 2026, month: 6, day: 5, counter_bw: 50, counter_color: 10 }, 'M1', null),
     ]
-    // El relevé heredado del 2026-06-05 cae en la vigencia de A [04-01, 06-10], no en la de B [06-11, …].
     const forA = countersForLine('cA', '2026-04-01', '2026-06-10', withLegacy)
     const forB = countersForLine('cB', '2026-06-11', null,        withLegacy)
     expect(forA.map(c => c.id).sort()).toEqual(['a-may', 'legacy-jun'])
     expect(forB.map(c => c.id)).toEqual(['b-jun'])
   })
 
-  it('invariante de no-solapamiento: un relevé legacy en el día-frontera (date_fin=X=date_debut) cuenta en UNA sola línea', () => {
+  it('invariante de no-solapamiento: relevé legacy en el día-frontera cuenta en UNA sola línea', () => {
     const X = '2026-06-10'
-    // Misma máquina: línea A cierra en X, línea B abre en X. Relevé heredado fechado exactamente en X.
     const onFrontier = [
       mkRow({ id: 'legacy-X', year: 2026, month: 6, day: 10, counter_bw: 500, counter_color: 100 }, 'M1', null),
     ]
-    const forA = countersForLine('cA', '2026-04-01', X,   onFrontier)  // (date_debut, date_fin=X]
-    const forB = countersForLine('cB', X,          null, onFrontier)  // (date_debut=X, …]
-
-    // Se atribuye SOLO a la línea que cierra (X <= date_fin), nunca a la que abre (X no es > date_debut).
+    const forA = countersForLine('cA', '2026-04-01', X,   onFrontier)
+    const forB = countersForLine('cB', X,          null, onFrontier)
     expect(forA.map(c => c.id)).toEqual(['legacy-X'])
     expect(forB).toEqual([])
-    // Y nunca en ambas (sin doble cobro).
     expect(forA.length + forB.length).toBe(1)
   })
 })
@@ -128,362 +112,258 @@ function makeAdmin(byTable: Record<string, { data: unknown; error: unknown }>) {
 // ─────────────────────────────────────────────────────────────────────────────
 // BLOQUE D / P1-6 — facturabilidad por estado de contrato/línea.
 // ─────────────────────────────────────────────────────────────────────────────
-describe('Bloque D — isLineBillable (P1-6): suspendu excluido; terminé gobernado por date_fin', () => {
-  it('contrato suspendu → NO factura', () => {
-    expect(isLineBillable('actif', 'suspendu', null)).toBe(false)
+describe('Bloque D — isLineBillable (P1-6)', () => {
+  it('contrato suspendu → NO factura', () => expect(isLineBillable('actif', 'suspendu', null)).toBe(false))
+  it('línea suspendu → NO factura', () => expect(isLineBillable('suspendu', 'actif', null)).toBe(false))
+  it('contrato terminé con línea aún abierta → NO factura (huérfana)', () => expect(isLineBillable('actif', 'terminé', null)).toBe(false))
+  it('contrato terminé con línea cerrada (date_fin) → SÍ factura su mes de cierre', () => expect(isLineBillable('terminé', 'terminé', '2026-06-10')).toBe(true))
+  it('línea terminé por retirada/reemplazo, contrato actif → SÍ factura (H-D6)', () => expect(isLineBillable('terminé', 'actif', '2026-06-10')).toBe(true))
+  it('todo actif → factura', () => expect(isLineBillable('actif', 'actif', null)).toBe(true))
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FORMA B — regla del mes facturado (computeInvoiceMonth). Spec §4.3.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('FORMA B — computeInvoiceMonth (mes anterior al vencimiento más cercano al cierre)', () => {
+  it('día 1, cierre 03-jun → mayo', () => {
+    expect(computeInvoiceMonth(1, '2026-06-03')).toEqual({ year: 2026, month: 5 })
   })
-  it('línea suspendu → NO factura', () => {
-    expect(isLineBillable('suspendu', 'actif', null)).toBe(false)
+  it('día 1, cierre 29-abr (unos días ANTES del día 1) → abril, no marzo', () => {
+    expect(computeInvoiceMonth(1, '2026-04-29')).toEqual({ year: 2026, month: 4 })
   })
-  it('contrato terminé con línea aún abierta (date_fin NULL) → NO factura (huérfana, no factura sin fin)', () => {
-    expect(isLineBillable('actif', 'terminé', null)).toBe(false)
+  it('día 1, cierre 01-jul (justo el vencimiento) → junio', () => {
+    expect(computeInvoiceMonth(1, '2026-07-01')).toEqual({ year: 2026, month: 6 })
   })
-  it('contrato terminé con línea bien cerrada (date_fin) → SÍ factura su mes de cierre', () => {
-    expect(isLineBillable('terminé', 'terminé', '2026-06-10')).toBe(true)
+  it('día 20, cierre 20-may → abril (Opción 1 del usuario)', () => {
+    expect(computeInvoiceMonth(20, '2026-05-20')).toEqual({ year: 2026, month: 4 })
   })
-  it('línea terminé por retirada/reemplazo (date_fin), contrato actif → SÍ factura (H-D6)', () => {
-    expect(isLineBillable('terminé', 'actif', '2026-06-10')).toBe(true)
+  it('cruce de año: día 1, cierre 02-ene → diciembre del año anterior', () => {
+    expect(computeInvoiceMonth(1, '2026-01-02')).toEqual({ year: 2025, month: 12 })
   })
-  it('todo actif → factura', () => {
-    expect(isLineBillable('actif', 'actif', null)).toBe(true)
+  it('clamp de fin de mes: día 31, cierre 01-mar → enero (vencimiento 28-feb)', () => {
+    expect(computeInvoiceMonth(31, '2026-03-01')).toEqual({ year: 2026, month: 1 })
   })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BLOQUE E / regla 9 — ciclo de aniversario por contrato (con clamp de fin de mes).
+// FORMA B — consumo por línea entre lecturas reales (computeLineConsumptionByReadings). §4.1.
 // ─────────────────────────────────────────────────────────────────────────────
-describe('Bloque E — computeBillingCycle (regla 9)', () => {
-  it('día 4, ancla enero → [04 ene, 03 feb]', () => {
-    expect(computeBillingCycle(4, 2026, 1)).toEqual({ start: '2026-01-04', end: '2026-02-03' })
-  })
-  it('día 1 → coincide con el mes natural completo', () => {
-    expect(computeBillingCycle(1, 2026, 1)).toEqual({ start: '2026-01-01', end: '2026-01-31' })
-  })
-  it('día 31 anclado en enero → fin recortado al billing_day clamped de febrero (27, día anterior a feb 28)', () => {
-    expect(computeBillingCycle(31, 2026, 1)).toEqual({ start: '2026-01-31', end: '2026-02-27' })
-  })
-  it('día 31 anclado en febrero → inicio clamped a feb 28; fin = 30 mar (día anterior a mar 31)', () => {
-    expect(computeBillingCycle(31, 2026, 2)).toEqual({ start: '2026-02-28', end: '2026-03-30' })
-  })
-  it('día 31 en año bisiesto: ancla febrero 2024 → inicio feb 29', () => {
-    expect(computeBillingCycle(31, 2024, 2)).toEqual({ start: '2024-02-29', end: '2024-03-30' })
-  })
-  it('cruce de año: día 31 anclado en diciembre → [31 dic, 30 ene del año siguiente]', () => {
-    expect(computeBillingCycle(31, 2026, 12)).toEqual({ start: '2026-12-31', end: '2027-01-30' })
-  })
-  it('día 15, ancla noviembre → [15 nov, 14 dic]', () => {
-    expect(computeBillingCycle(15, 2026, 11)).toEqual({ start: '2026-11-15', end: '2026-12-14' })
-  })
-})
-
-describe('Bloque E — computeLineConsumptionCycle: consumo por rango de fechas del ciclo', () => {
-  // Ciclo de aniversario [2026-01-04, 2026-02-03]. Relevés capturados en los billing_day:
-  //   03 ene (base del ciclo previo) = 1000/200 ; 03 feb (fin de este ciclo) = 1500/260.
-  const cycleStart = '2026-01-04'
-  const cycleEnd   = '2026-02-03'
-  const counters: Counter[] = [
-    mkCounter({ id: 'c-prev', year: 2026, month: 1, day: 3, counter_bw: 1000, counter_color: 200 }),
-    mkCounter({ id: 'c-fin',  year: 2026, month: 2, day: 3, counter_bw: 1500, counter_color: 260 }),
-  ]
+describe('FORMA B — computeLineConsumptionByReadings', () => {
   const NL: LineCounters = {
-    date_debut: '2025-12-01', date_fin: null,
+    date_debut: '2026-01-01', date_fin: null,
     start_counter_bw: null, start_counter_color: null, end_counter_bw: null, end_counter_color: null,
   }
+  // Caso real 2AS (día 1): recogidas el 29-abr y el 03-jun.
+  const counters: Counter[] = [
+    mkCounter({ id: 'c-abr', year: 2026, month: 4, day: 29, counter_bw: 1000, counter_color: 200 }),
+    mkCounter({ id: 'c-jun', year: 2026, month: 6, day: 3,  counter_bw: 1500, counter_color: 260 }),
+  ]
 
-  it('consumo = lectura(fin del ciclo) − lectura(anterior al inicio del ciclo)', () => {
-    const r = computeLineConsumptionCycle(NL, counters, cycleStart, cycleEnd)
+  it('factura de MAYO = entre la recogida del 29-abr y la del 03-jun, con fechas reales', () => {
+    const r = computeLineConsumptionByReadings(NL, counters, 2026, 5, 1)
     expect(r.is_estimated).toBe(false)
-    expect(r.delta_bw).toBe(500)     // 1500 − 1000
-    expect(r.delta_color).toBe(60)   // 260 − 200
+    expect(r.delta_bw).toBe(500)            // 1500 − 1000
+    expect(r.delta_color).toBe(60)          // 260 − 200
+    expect(r.open_date).toBe('2026-04-29')
+    expect(r.close_date).toBe('2026-06-03')
   })
 
-  it('NO cuenta un relevé posterior al fin del ciclo (pertenece al ciclo siguiente)', () => {
-    const withNext = [
-      ...counters,
-      mkCounter({ id: 'c-next', year: 2026, month: 2, day: 10, counter_bw: 9999, counter_color: 999 }),
+  it('la primera recogida (29-abr) es la BASE: facturar abril queda estimado (sin apertura)', () => {
+    const r = computeLineConsumptionByReadings(NL, counters, 2026, 4, 1)
+    expect(r.is_estimated).toBe(true)
+    expect(r.delta_bw).toBe(0)
+    expect(r.close_date).toBe('2026-04-29')  // hay cierre etiquetado abril…
+    expect(r.open_date).toBeNull()           // …pero no hay lectura anterior
+  })
+
+  it('mes sin recogida → close_date null (la línea no pertenece a la tanda de ese mes)', () => {
+    const r = computeLineConsumptionByReadings(NL, counters, 2026, 6, 1)  // nadie cierra junio aún
+    expect(r.close_date).toBeNull()
+  })
+
+  it('mes saltado (D4): la siguiente recogida factura el periodo doble', () => {
+    const skipped: Counter[] = [
+      ...counters,  // 29-abr (1000), 3-jun (1500) → 3-jun cierra mayo
+      mkCounter({ id: 'c-ago', year: 2026, month: 8, day: 4, counter_bw: 2500, counter_color: 360 }),
     ]
-    const r = computeLineConsumptionCycle(NL, withNext, cycleStart, cycleEnd)
-    expect(r.delta_bw).toBe(500)     // ignora el 9999 del 10 feb (fuera del ciclo)
-    expect(r.delta_color).toBe(60)
+    // No hubo recogida de "junio" (~1-jul). La del 4-ago etiqueta JULIO y empareja con la del 3-jun.
+    const real = computeLineConsumptionByReadings(NL, skipped, 2026, 7, 1)
+    expect(real.is_estimated).toBe(false)
+    expect(real.delta_bw).toBe(1000)        // 2500 − 1500 (junio + julio juntos)
+    expect(real.open_date).toBe('2026-06-03')
+    expect(real.close_date).toBe('2026-08-04')
   })
 
-  it('línea que arranca dentro del ciclo con start_counter: factura desde su lectura real', () => {
+  it('máquina nueva con start_counter: su lectura inicial es la apertura de la 1ª factura', () => {
     const newLine: LineCounters = {
-      date_debut: '2026-01-15', date_fin: null,
+      date_debut: '2026-06-15', date_fin: null,
       start_counter_bw: 15, start_counter_color: 5, end_counter_bw: null, end_counter_color: null,
     }
-    // Relevé del fin del ciclo bajo esta línea: 200/40.
-    const cs: Counter[] = [mkCounter({ id: 'x', year: 2026, month: 2, day: 3, counter_bw: 200, counter_color: 40 })]
-    const r = computeLineConsumptionCycle(newLine, cs, cycleStart, cycleEnd)
+    const cs: Counter[] = [mkCounter({ id: 'x', year: 2026, month: 7, day: 1, counter_bw: 200, counter_color: 40 })]
+    const r = computeLineConsumptionByReadings(newLine, cs, 2026, 6, 1)  // 01-jul cierra junio
     expect(r.is_estimated).toBe(false)
-    expect(r.delta_bw).toBe(185)     // 200 − 15
-    expect(r.delta_color).toBe(35)
+    expect(r.delta_bw).toBe(185)            // 200 − 15
+    expect(r.open_date).toBe('2026-06-15')
   })
 
-  it('falta la lectura de cierre del ciclo → estimada', () => {
-    const onlyBase: Counter[] = [
-      mkCounter({ id: 'c-prev', year: 2026, month: 1, day: 3, counter_bw: 1000, counter_color: 200 }),
+  it('cierre por reemplazo con AMBOS end_counter usa los puntos de la línea', () => {
+    const replLine: LineCounters = {
+      date_debut: '2026-01-01', date_fin: '2026-06-03',
+      start_counter_bw: null, start_counter_color: null, end_counter_bw: 1400, end_counter_color: 250,
+    }
+    const r = computeLineConsumptionByReadings(replLine, counters, 2026, 5, 1)  // date_fin 03-jun → mayo
+    expect(r.is_estimated).toBe(false)
+    expect(r.delta_bw).toBe(400)            // end 1400 − apertura 1000 (29-abr)
+    expect(r.delta_color).toBe(50)
+    expect(r.close_date).toBe('2026-06-03')
+  })
+
+  it('relevé que retrocede (reset): delta negativo → estimada', () => {
+    const reset: Counter[] = [
+      mkCounter({ id: 'c-abr', year: 2026, month: 4, day: 29, counter_bw: 1000, counter_color: 200 }),
+      mkCounter({ id: 'c-jun', year: 2026, month: 6, day: 3,  counter_bw: 900,  counter_color: 200 }),
     ]
-    const r = computeLineConsumptionCycle(NL, onlyBase, cycleStart, cycleEnd)
+    const r = computeLineConsumptionByReadings(NL, reset, 2026, 5, 1)
     expect(r.is_estimated).toBe(true)
     expect(r.delta_bw).toBe(0)
   })
-})
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BLOQUE E — escenarios de negocio del consumo POR CICLO (parque/stock, H-D7,
-// coincidencia con Contadores). Portados de la variante mensual legacy
-// `computeLineConsumption` (retirada en WP-3b). Se usa un ciclo que coincide con
-// el mes natural de junio para reutilizar los relevés tal cual (day=1 → su fecha
-// cae dentro/fuera del ciclo igual que el antiguo filtro por mes). El cruce real
-// de dos meses ya lo cubren los tests del ciclo de aniversario de arriba.
-// ─────────────────────────────────────────────────────────────────────────────
-const CYCLE_START = '2026-06-01'
-const CYCLE_END   = '2026-06-30'
-
-describe('Bloque E — coincidencia factura ↔ Contadores y política de negativos (por ciclo)', () => {
-  it('línea normal: el delta del ciclo coincide con el de la pantalla de Contadores', () => {
-    const counters: Counter[] = [
-      mkCounter({ id: 'c-may', year: 2026, month: 5, counter_bw: 1000, counter_color: 200 }),
-      mkCounter({ id: 'c-jun', year: 2026, month: 6, counter_bw: 1500, counter_color: 260 }),
-    ]
+  it('coincide con la pantalla de Contadores (mismo delta que calcDeltas) en línea normal', () => {
     const screen = calcDeltas(counters).get('c-jun')!
-    const billing = computeLineConsumptionCycle(NORMAL_LINE, counters, CYCLE_START, CYCLE_END)
-    expect(screen.delta_bw).toBe(500)
-    expect(billing.is_estimated).toBe(false)
-    expect(billing.delta_bw).toBe(screen.delta_bw)        // ← invariante que protege este test
+    const billing = computeLineConsumptionByReadings(NL, counters, 2026, 5, 1)
+    expect(billing.delta_bw).toBe(screen.delta_bw)
     expect(billing.delta_color).toBe(screen.delta_color)
   })
-
-  it('relevé que retrocede (reset): Contadores muestra el negativo, facturación lo deja estimado', () => {
-    const counters: Counter[] = [
-      mkCounter({ id: 'c-may', year: 2026, month: 5, counter_bw: 1000, counter_color: 200 }),
-      mkCounter({ id: 'c-jun', year: 2026, month: 6, counter_bw: 900,  counter_color: 200 }),
-    ]
-    const billing = computeLineConsumptionCycle(NORMAL_LINE, counters, CYCLE_START, CYCLE_END)
-    expect(billing.is_estimated).toBe(true)   // no cobra consumo negativo
-    expect(billing.delta_bw).toBe(0)
-  })
 })
 
-describe('Bloque E — H-D7 por ciclo: cierre por reemplazo exige AMBOS contadores', () => {
-  const counters: Counter[] = [
-    mkCounter({ id: 'c-may', year: 2026, month: 5, counter_bw: 1000, counter_color: 200 }),
-    mkCounter({ id: 'c-jun', year: 2026, month: 6, counter_bw: 1500, counter_color: 260 }),
-  ]
-
-  it('cierre con bw seteado pero color NULL NO es reemplazo válido: cae al relevé del ciclo', () => {
-    const partialLine: LineCounters = {
-      date_debut: '2026-04-01', date_fin: '2026-06-20',
-      start_counter_bw: null, start_counter_color: null,
-      end_counter_bw: 1400, end_counter_color: null,
-    }
-    const r = computeLineConsumptionCycle(partialLine, counters, CYCLE_START, CYCLE_END)
-    expect(r.is_estimated).toBe(false)
-    expect(r.delta_bw).toBe(500)     // relevé jun 1500 − may 1000
-    expect(r.delta_color).toBe(60)
-  })
-
-  it('cierre por reemplazo con AMBOS contadores usa los puntos de la línea', () => {
-    const replLine: LineCounters = {
-      date_debut: '2026-04-01', date_fin: '2026-06-20',
-      start_counter_bw: null, start_counter_color: null,
-      end_counter_bw: 1400, end_counter_color: 250,
-    }
-    const r = computeLineConsumptionCycle(replLine, counters, CYCLE_START, CYCLE_END)
-    expect(r.is_estimated).toBe(false)
-    expect(r.delta_bw).toBe(400)     // end 1400 − may 1000
-    expect(r.delta_color).toBe(50)
-  })
-})
-
-describe('Bloque E — parque/stock por ciclo: retirada, alta sin lectura y rotación A→stock→B', () => {
-  it('retirada a stock: factura hasta el end_counter, NO el relevé del ciclo (ya del cliente siguiente)', () => {
-    const counters: Counter[] = [
-      mkCounter({ id: 'c-may', year: 2026, month: 5, counter_bw: 1000, counter_color: 200 }),
-      mkCounter({ id: 'c-jun', year: 2026, month: 6, counter_bw: 1800, counter_color: 400 }),
-    ]
-    const retiredLine: LineCounters = {
-      date_debut: '2026-04-01', date_fin: '2026-06-10',
-      start_counter_bw: null, start_counter_color: null,
-      end_counter_bw: 1200, end_counter_color: 220,
-    }
-    const r = computeLineConsumptionCycle(retiredLine, counters, CYCLE_START, CYCLE_END)
-    expect(r.is_estimated).toBe(false)
-    expect(r.delta_bw).toBe(200)     // 1200 − 1000 (mayo), NO 1800
-    expect(r.delta_color).toBe(20)
-  })
-
-  it('línea nueva SIN start_counter en su primer ciclo queda estimada (falta el punto inicial)', () => {
-    const counters: Counter[] = [
-      mkCounter({ id: 'c-jun', year: 2026, month: 6, counter_bw: 200, counter_color: 40 }),
-    ]
-    const lineNoStart: LineCounters = {
-      date_debut: '2026-06-11', date_fin: null,
-      start_counter_bw: null, start_counter_color: null,
-      end_counter_bw: null, end_counter_color: null,
-    }
-    const r = computeLineConsumptionCycle(lineNoStart, counters, CYCLE_START, CYCLE_END)
-    expect(r.is_estimated).toBe(true)   // por eso assign_machine_from_stock exige la lectura
-    expect(r.delta_bw).toBe(0)
-  })
-
-  it('máquina reseteada A → stock → B en el mismo ciclo: cada línea factura su lado del corte', () => {
-    // Ambas líneas comparten el MISMO array de relevés de la máquina física:
-    //   mayo 1000/200 (registrado bajo A) · junio 200/40 (registrado bajo B tras el reset a 15/5).
-    const shared: Counter[] = [
-      mkCounter({ id: 'c-may', year: 2026, month: 5, counter_bw: 1000, counter_color: 200 }),
-      mkCounter({ id: 'c-jun', year: 2026, month: 6, counter_bw: 200,  counter_color: 40 }),
-    ]
-    const lineA: LineCounters = {
-      date_debut: '2026-04-01', date_fin: '2026-06-10',
-      start_counter_bw: null, start_counter_color: null,
-      end_counter_bw: 1200, end_counter_color: 220,   // lectura real al devolver a stock
-    }
-    const lineB: LineCounters = {
-      date_debut: '2026-06-11', date_fin: null,
-      start_counter_bw: 15, start_counter_color: 5,    // copias de prueba del taller
-      end_counter_bw: null, end_counter_color: null,
-    }
-    const a = computeLineConsumptionCycle(lineA, shared, CYCLE_START, CYCLE_END)
-    const b = computeLineConsumptionCycle(lineB, shared, CYCLE_START, CYCLE_END)
-    // A: 1200 (end_counter) − 1000 (mayo) = 200/20. Ignora el 200/40 de junio (es de B).
-    expect(a.is_estimated).toBe(false)
-    expect(a.delta_bw).toBe(200)
-    expect(a.delta_color).toBe(20)
-    // B: 200 (relevé de junio) − 15 (start_counter) = 185/35. Ignora el 1000 de mayo (es de A).
-    expect(b.is_estimated).toBe(false)
-    expect(b.delta_bw).toBe(185)
-    expect(b.delta_color).toBe(35)
-  })
-})
-
-describe('Bloque E — buildContractInvoiceDraft: factura por contrato y ciclo', () => {
-  // contrato day=4; ciclo ancla enero → [2026-01-04, 2026-02-03]. Una máquina, plan per_copy.
+// ─────────────────────────────────────────────────────────────────────────────
+// FORMA B — buildContractInvoiceDraft: factura por contrato y mes, con fechas reales.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('FORMA B — buildContractInvoiceDraft', () => {
   const contractRow = {
-    id: 'ctr-1', numero_contrat: 'CT-2026-001', client_id: 7, billing_day: 4, statut: 'actif',
+    id: 'ctr-1', numero_contrat: 'CT-2026-001', client_id: 7, billing_day: 1, statut: 'actif',
     clients: { id: 7, nom_client: 'ACME' },
   }
   const lineRow = {
     id: 'cm-1', machine_id: 'M1', billing_plan_id: 'plan-1',
-    date_debut: '2025-12-01', date_fin: null, statut: 'actif',
-    replaces_contract_machine_id: null,
+    date_debut: '2026-01-01', date_fin: null, statut: 'actif', replaces_contract_machine_id: null,
     start_counter_bw: null, start_counter_color: null, end_counter_bw: null, end_counter_color: null,
     price_bw_override: null, price_color_override: null, fixed_fee_override: null,
     billing_plans: { id: 'plan-1', name: 'Par copie', type: 'per_copy', fixed_fee: null, price_bw: 10, price_color: 50, tiers: null },
     machines: { numero_serie: 'M1', marque: 'HP', modele: 'X' },
   }
+  const mkRowC = (id: string, year: number, month: number, day: number, bw: number, color: number) => ({
+    id, machine_id: 'M1', contract_id: 'ctr-1', year, month, day, counter_bw: bw, counter_color: color,
+    status: 'actif', is_replacement_start: false, previous_machine_id: null,
+    annulation_reason: null, annule_at: null, notes: null,
+    recorded_at: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T10:00:00Z`,
+  })
   const counterRows = [
-    { id: 'c-prev', machine_id: 'M1', contract_id: 'ctr-1', year: 2026, month: 1, day: 3, counter_bw: 1000, counter_color: 200, status: 'actif', is_replacement_start: false, previous_machine_id: null, annulation_reason: null, annule_at: null, notes: null, recorded_at: '2026-01-03T10:00:00Z' },
-    { id: 'c-fin',  machine_id: 'M1', contract_id: 'ctr-1', year: 2026, month: 2, day: 3, counter_bw: 1500, counter_color: 260, status: 'actif', is_replacement_start: false, previous_machine_id: null, annulation_reason: null, annule_at: null, notes: null, recorded_at: '2026-02-03T10:00:00Z' },
+    mkRowC('c-abr', 2026, 4, 29, 1000, 200),
+    mkRowC('c-jun', 2026, 6, 3,  1500, 260),
   ]
 
-  it('deriva el ciclo del billing_day y factura consumo = fin − base del ciclo', async () => {
-    vi.mocked(createAdminClient).mockReturnValue(
-      makeAdmin({
-        contracts:         { data: contractRow,   error: null },
-        contract_machines: { data: [lineRow],     error: null },
-        machine_counters:  { data: counterRows,   error: null },
-      }),
-    )
-    const draft = await buildContractInvoiceDraft('ctr-1', 2026, 1)
+  it('factura el mes de mayo con el periodo real 29/04 → 03/06 y consumo = 1500 − 1000', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(makeAdmin({
+      contracts:         { data: contractRow, error: null },
+      contract_machines: { data: [lineRow],   error: null },
+      machine_counters:  { data: counterRows, error: null },
+    }))
+    const draft = await buildContractInvoiceDraft('ctr-1', 2026, 5)
     expect(draft).not.toBeNull()
-    expect(draft!.period_start).toBe('2026-01-04')
-    expect(draft!.period_end).toBe('2026-02-03')
+    expect(draft!.period_start).toBe('2026-04-29')
+    expect(draft!.period_end).toBe('2026-06-03')
+    expect(draft!.period_year).toBe(2026)
+    expect(draft!.period_month).toBe(5)
     expect(draft!.lines).toHaveLength(1)
-    expect(draft!.lines[0].delta_bw).toBe(500)        // 1500 − 1000
-    expect(draft!.lines[0].delta_color).toBe(60)      // 260 − 200
+    expect(draft!.lines[0].delta_bw).toBe(500)
     expect(draft!.lines[0].amount_total).toBe(500 * 10 + 60 * 50)   // 8000
     expect(draft!.total_amount).toBe(8000)
     expect(draft!.has_estimated).toBe(false)
   })
 
-  it('contrato inexistente → null (no error técnico)', async () => {
+  it('mes sin tanda (ninguna lectura de cierre etiquetada) → null', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(makeAdmin({
+      contracts:         { data: contractRow, error: null },
+      contract_machines: { data: [lineRow],   error: null },
+      machine_counters:  { data: counterRows, error: null },
+    }))
+    // En julio nadie cierra (no hay lectura ~1-ago) → no hay nada que facturar.
+    await expect(buildContractInvoiceDraft('ctr-1', 2026, 7)).resolves.toBeNull()
+  })
+
+  it('máquina muda (sin lectura este mes pero activa) entra estimada al forfait si hay tanda', async () => {
+    const hybridPlan = { id: 'plan-h', name: 'Forfait', type: 'hybrid', fixed_fee: 5000, price_bw: 10, price_color: 50, tiers: null }
+    const lineA = { ...lineRow, id: 'cm-A', machine_id: 'M1', billing_plans: hybridPlan, machines: { numero_serie: 'M1', marque: 'HP', modele: 'X' } }
+    const lineB = { ...lineRow, id: 'cm-B', machine_id: 'M2', billing_plans: hybridPlan, machines: { numero_serie: 'M2', marque: 'HP', modele: 'Y' } }
+    // Solo M1 tiene recogidas; M2 está muda este mes.
+    const rows = [
+      mkRowC('a1', 2026, 4, 29, 1000, 200),
+      mkRowC('a2', 2026, 6, 3,  1500, 260),
+    ].map(r => ({ ...r, machine_id: 'M1' }))
+    vi.mocked(createAdminClient).mockReturnValue(makeAdmin({
+      contracts:         { data: contractRow, error: null },
+      contract_machines: { data: [lineA, lineB], error: null },
+      machine_counters:  { data: rows, error: null },
+    }))
+    const draft = await buildContractInvoiceDraft('ctr-1', 2026, 5)
+    expect(draft).not.toBeNull()
+    const byMachine = Object.fromEntries(draft!.lines.map(l => [l.machine_id, l]))
+    expect(byMachine['M1'].is_estimated).toBe(false)
+    expect(byMachine['M1'].amount_total).toBe(5000 + 500 * 10 + 60 * 50)
+    expect(byMachine['M2'].is_estimated).toBe(true)        // muda → estimada
+    expect(byMachine['M2'].amount_total).toBe(5000)        // solo forfait
+    expect(draft!.has_estimated).toBe(true)
+  })
+
+  it('contrato inexistente → null', async () => {
     vi.mocked(createAdminClient).mockReturnValue(makeAdmin({ contracts: { data: null, error: null } }))
-    await expect(buildContractInvoiceDraft('nope', 2026, 1)).resolves.toBeNull()
+    await expect(buildContractInvoiceDraft('nope', 2026, 5)).resolves.toBeNull()
   })
 
   it('error técnico al leer el contrato → BillingDataError', async () => {
     vi.mocked(createAdminClient).mockReturnValue(makeAdmin({ contracts: { data: null, error: { message: 'boom' } } }))
-    await expect(buildContractInvoiceDraft('ctr-1', 2026, 1)).rejects.toBeInstanceOf(BillingDataError)
+    await expect(buildContractInvoiceDraft('ctr-1', 2026, 5)).rejects.toBeInstanceOf(BillingDataError)
   })
 
-  it('error técnico al leer los contadores (contrato y líneas OK) → BillingDataError (P0-7: nunca factura 0)', async () => {
-    vi.mocked(createAdminClient).mockReturnValue(
-      makeAdmin({
-        contracts:         { data: contractRow, error: null },
-        contract_machines: { data: [lineRow],   error: null },
-        machine_counters:  { data: null, error: { message: 'boom' } },
-      }),
-    )
-    await expect(buildContractInvoiceDraft('ctr-1', 2026, 1)).rejects.toBeInstanceOf(BillingDataError)
-  })
-
-  it('dos contratos del MISMO cliente y mes-ancla: misma terna (client_id, year, month) pero distinto contract_id', async () => {
-    // Invariante que motiva restringir el índice legacy a contract_id IS NULL (fix migración 150000):
-    // la unicidad de factura emise NO puede ir por (client_id, period_year, period_month) — dos
-    // contratos del mismo cliente anclados al mismo mes comparten esa terna. Debe ir por contrato.
-    const mkContract = (id: string) => ({
-      id, numero_contrat: `CT-${id}`, client_id: 7, billing_day: 4, statut: 'actif',
-      clients: { id: 7, nom_client: 'ACME' },
-    })
-    const mkLine = (cmId: string) => ({
-      id: cmId, machine_id: `M-${cmId}`, billing_plan_id: 'plan-1',
-      date_debut: '2025-12-01', date_fin: null, statut: 'actif', replaces_contract_machine_id: null,
-      start_counter_bw: null, start_counter_color: null, end_counter_bw: null, end_counter_color: null,
-      price_bw_override: null, price_color_override: null, fixed_fee_override: null,
-      billing_plans: { id: 'plan-1', name: 'Forfait', type: 'hybrid', fixed_fee: 5000, price_bw: 10, price_color: 50, tiers: null },
-      machines: { numero_serie: `M-${cmId}`, marque: 'HP', modele: 'X' },
-    })
-    const noCounters = { data: [] as unknown[], error: null }
-
-    vi.mocked(createAdminClient).mockReturnValue(
-      makeAdmin({ contracts: { data: mkContract('A'), error: null }, contract_machines: { data: [mkLine('a1')], error: null }, machine_counters: noCounters }),
-    )
-    const dA = await buildContractInvoiceDraft('A', 2026, 1)
-
-    vi.mocked(createAdminClient).mockReturnValue(
-      makeAdmin({ contracts: { data: mkContract('B'), error: null }, contract_machines: { data: [mkLine('b1')], error: null }, machine_counters: noCounters }),
-    )
-    const dB = await buildContractInvoiceDraft('B', 2026, 1)
-
-    // Misma terna legacy (chocaría con el índice viejo)…
-    expect(dA!.client_id).toBe(dB!.client_id)
-    expect([dA!.period_year, dA!.period_month, dA!.period_start])
-      .toEqual([dB!.period_year, dB!.period_month, dB!.period_start])
-    // …pero contratos distintos → el índice por (contract_id, period_start) NO colisiona.
-    expect(dA!.contract_id).not.toBe(dB!.contract_id)
+  it('error técnico al leer contadores (P0-7: nunca factura 0) → BillingDataError', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(makeAdmin({
+      contracts:         { data: contractRow, error: null },
+      contract_machines: { data: [lineRow],   error: null },
+      machine_counters:  { data: null, error: { message: 'boom' } },
+    }))
+    await expect(buildContractInvoiceDraft('ctr-1', 2026, 5)).rejects.toBeInstanceOf(BillingDataError)
   })
 })
 
-describe('P1-5 — buildContractInvoiceDraft usa la tarifa VIGENTE al inicio del ciclo', () => {
-  // contrato day=4. Plan per_copy: 10/50 desde ene; SUBIDO a 20/100 desde el 15-jun.
+describe('P1-5 — buildContractInvoiceDraft usa la tarifa VIGENTE a la fecha de apertura', () => {
   const contractRow = {
-    id: 'ctr-1', numero_contrat: 'CT-2026-001', client_id: 7, billing_day: 4, statut: 'actif',
+    id: 'ctr-1', numero_contrat: 'CT-2026-001', client_id: 7, billing_day: 1, statut: 'actif',
     clients: { id: 7, nom_client: 'ACME' },
   }
   const lineRow = {
     id: 'cm-1', machine_id: 'M1', billing_plan_id: 'plan-1',
-    date_debut: '2025-12-01', date_fin: null, statut: 'actif', replaces_contract_machine_id: null,
+    date_debut: '2026-01-01', date_fin: null, statut: 'actif', replaces_contract_machine_id: null,
     start_counter_bw: null, start_counter_color: null, end_counter_bw: null, end_counter_color: null,
     price_bw_override: null, price_color_override: null, fixed_fee_override: null,
-    // El plan embebido refleja el precio ACTUAL (nuevo); el historial es la fuente de verdad temporal.
     billing_plans: { id: 'plan-1', name: 'Par copie', type: 'per_copy', fixed_fee: null, price_bw: 20, price_color: 100, tiers: null },
     machines: { numero_serie: 'M1', marque: 'HP', modele: 'X' },
   }
+  // Precio viejo 10/50 desde enero; SUBIDA a 20/100 desde el 15-may.
   const planVersions = [
     { plan_id: 'plan-1', effective_from: '2026-01-01', type: 'per_copy', fixed_fee: null, price_bw: 10, price_color: 50, tiers: null },
-    { plan_id: 'plan-1', effective_from: '2026-06-15', type: 'per_copy', fixed_fee: null, price_bw: 20, price_color: 100, tiers: null },
+    { plan_id: 'plan-1', effective_from: '2026-05-15', type: 'per_copy', fixed_fee: null, price_bw: 20, price_color: 100, tiers: null },
   ]
-  const mk = (year: number, month: number, day: number, bw: number, color: number) => ({
-    id: `c-${year}-${month}-${day}`, machine_id: 'M1', contract_id: 'ctr-1', year, month, day,
-    counter_bw: bw, counter_color: color, status: 'actif', is_replacement_start: false,
-    previous_machine_id: null, annulation_reason: null, annule_at: null, notes: null,
+  const mk = (id: string, year: number, month: number, day: number, bw: number, color: number) => ({
+    id, machine_id: 'M1', contract_id: 'ctr-1', year, month, day, counter_bw: bw, counter_color: color,
+    status: 'actif', is_replacement_start: false, previous_machine_id: null,
+    annulation_reason: null, annule_at: null, notes: null,
     recorded_at: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T10:00:00Z`,
   })
   const counterRows = [
-    mk(2026, 5, 3, 1000, 200), mk(2026, 6, 3, 1500, 260),   // ciclo mayo: base 05-03, fin 06-03
-    mk(2026, 7, 3, 2000, 300), mk(2026, 8, 3, 2500, 360),   // ciclo julio: base 07-03, fin 08-03
+    mk('c-abr', 2026, 4, 30, 1000, 200),   // cierra abril
+    mk('c-jun', 2026, 6, 3,  1500, 260),   // cierra mayo (apertura 30-abr < subida)
+    mk('c-jul', 2026, 7, 1,  2000, 300),   // cierra junio (apertura 03-jun > subida)
   ]
   const admin = () => makeAdmin({
     contracts:             { data: contractRow,  error: null },
@@ -493,32 +373,20 @@ describe('P1-5 — buildContractInvoiceDraft usa la tarifa VIGENTE al inicio del
     contract_machine_override_versions: { data: [], error: null },
   })
 
-  it('ciclo de MAYO (antes de la subida) factura con el precio viejo 10/50', async () => {
+  it('mayo (apertura 30-abr, antes de la subida) → precio viejo 10/50', async () => {
     vi.mocked(createAdminClient).mockReturnValue(admin())
-    const draft = await buildContractInvoiceDraft('ctr-1', 2026, 5)   // [2026-05-04, 2026-06-03]
-    expect(draft!.period_start).toBe('2026-05-04')
-    expect(draft!.lines[0].delta_bw).toBe(500)
-    expect(draft!.lines[0].price_bw).toBe(10)                          // precio vigente en mayo
-    expect(draft!.lines[0].amount_total).toBe(500 * 10 + 60 * 50)      // 8 000
-  })
-
-  it('ciclo de JULIO (tras la subida) factura con el precio nuevo 20/100', async () => {
-    vi.mocked(createAdminClient).mockReturnValue(admin())
-    const draft = await buildContractInvoiceDraft('ctr-1', 2026, 7)   // [2026-07-04, 2026-08-03]
-    expect(draft!.period_start).toBe('2026-07-04')
-    expect(draft!.lines[0].delta_bw).toBe(500)
-    expect(draft!.lines[0].price_bw).toBe(20)                          // precio vigente en julio
-    expect(draft!.lines[0].amount_total).toBe(500 * 20 + 60 * 100)     // 16 000
-  })
-
-  it('sin historial (tablas vacías) cae al precio actual del plan embebido (robustez)', async () => {
-    vi.mocked(createAdminClient).mockReturnValue(makeAdmin({
-      contracts:         { data: contractRow,  error: null },
-      contract_machines: { data: [lineRow],    error: null },
-      machine_counters:  { data: counterRows,  error: null },
-      // billing_plan_versions sin entrada → fallback a resolveEffectiveTariff(line) (precio actual 20/100)
-    }))
     const draft = await buildContractInvoiceDraft('ctr-1', 2026, 5)
+    expect(draft!.period_start).toBe('2026-04-30')
+    expect(draft!.lines[0].price_bw).toBe(10)
+    expect(draft!.lines[0].amount_total).toBe(500 * 10 + 60 * 50)   // 8000
+  })
+
+  it('junio (apertura 03-jun, tras la subida) → precio nuevo 20/100', async () => {
+    vi.mocked(createAdminClient).mockReturnValue(admin())
+    const draft = await buildContractInvoiceDraft('ctr-1', 2026, 6)
+    expect(draft!.period_start).toBe('2026-06-03')
+    expect(draft!.lines[0].delta_bw).toBe(500)    // 2000 − 1500
     expect(draft!.lines[0].price_bw).toBe(20)
+    expect(draft!.lines[0].amount_total).toBe(500 * 20 + 40 * 100)  // 14000
   })
 })
