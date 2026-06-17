@@ -149,12 +149,14 @@ BEGIN
       COALESCE((v_line->>'amount_total')::numeric, 0),
       CASE WHEN v_line->'breakdown' IS NULL OR v_line->'breakdown' = 'null'::jsonb
            THEN NULL ELSE v_line->'breakdown' END,
-      -- cm_id = contract_machine_id de la línea; fechas reales = open_date/close_date del draft.
+      -- cm_id = contract_machine_id de la línea. Las fechas de IDENTIDAD de la cadena son
+      -- opening/closing_reading_date (NO open/close_date, que son el rango de DISPLAY y se expanden
+      -- al consolidar reemplazos). El siguiente punto de partida se reconstruye de closing_reading_date.
       NULLIF(v_line->>'cm_id','')::uuid,
       NULLIF(v_line->>'opening_counter_id','')::uuid,
       NULLIF(v_line->>'closing_counter_id','')::uuid,
-      NULLIF(v_line->>'open_date','')::date,
-      NULLIF(v_line->>'close_date','')::date,
+      NULLIF(v_line->>'opening_reading_date','')::date,
+      NULLIF(v_line->>'closing_reading_date','')::date,
       NULLIF(v_line->>'opening_counter_bw','')::int,
       NULLIF(v_line->>'opening_counter_color','')::int,
       NULLIF(v_line->>'closing_counter_bw','')::int,

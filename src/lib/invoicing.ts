@@ -165,10 +165,19 @@ export type DraftLine = {
   delta_bw: number
   delta_color: number
   is_estimated: boolean
-  /** FORMA B — fechas reales del periodo de ESTA línea (pueden variar entre máquinas). */
+  /**
+   * Fechas de DISPLAY del periodo de la línea (rango ENVOLVENTE tras consolidar reemplazos: de la
+   * apertura más temprana al cierre más tardío). Solo para mostrar; NO son la identidad de la cadena.
+   */
   open_date: string | null
   close_date: string | null
-  /** Identidad de la cadena (spec §5): lecturas/contadores de apertura y cierre de esta línea. */
+  /**
+   * Identidad de la CADENA (spec §5): apertura/cierre del propio tramo de ESTA línea (la cabeza tras
+   * consolidar). La persistencia y el siguiente punto de partida usan ESTOS campos, no open/close_date
+   * (que se expanden al consolidar). closing_* null ⇒ tramo sin cierre (solo-fijo) ⇒ no avanza la cadena.
+   */
+  opening_reading_date: string | null
+  closing_reading_date: string | null
   opening_counter_id: string | null
   closing_counter_id: string | null
   opening_counter_bw: number | null
@@ -179,7 +188,24 @@ export type DraftLine = {
   amount_bw: number
   amount_color: number
   amount_total: number
-  breakdown?: { machine_label: string; delta_bw: number; delta_color: number }[]
+  /** Desglose por tramo de un puesto reemplazado A→B (§5): identidad completa de cada tramo. */
+  breakdown?: BreakdownEntry[]
+}
+
+/** Tramo de un puesto reemplazado: delta + identidad de apertura/cierre (spec §5, trazabilidad). */
+export type BreakdownEntry = {
+  machine_label: string
+  contract_machine_id: string
+  delta_bw: number
+  delta_color: number
+  opening_reading_date: string | null
+  closing_reading_date: string | null
+  opening_counter_id: string | null
+  closing_counter_id: string | null
+  opening_counter_bw: number | null
+  opening_counter_color: number | null
+  closing_counter_bw: number | null
+  closing_counter_color: number | null
 }
 
 /**
@@ -315,7 +341,10 @@ export function computeLineChainConsumption(
   if (closedByReplacement && after(line.date_fin!, '~')) {
     candidates.push({ id: null, date: line.date_fin!, order2: '~', bw: line.end_counter_bw, color: line.end_counter_color })
   }
-  candidates.sort((a, b) => a.date.localeCompare(b.date) || a.order2.localeCompare(b.order2))
+  // Comparación por CODE POINT (no localeCompare): el sentinel sintético '~' (0x7E) debe quedar
+  // siempre DESPUÉS de un recorded_at ISO ('2…'); localeCompare puede ordenar la puntuación antes.
+  const cmp = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0)
+  candidates.sort((a, b) => cmp(a.date, b.date) || cmp(a.order2, b.order2))
   const close: { id: string | null; date: string; bw: number | null; color: number | null } | null =
     candidates[0] ?? null
 
@@ -375,9 +404,15 @@ function consolidateReplacements(draftLines: DraftLine[]): { lines: DraftLine[];
     }
     chain.reverse()
 
-    // Capturar el desglose con los deltas ORIGINALES antes de sobrescribir la cabeza.
-    const breakdown = chain.map(l => ({
-      machine_label: l.machine_label, delta_bw: l.delta_bw, delta_color: l.delta_color,
+    // Desglose por tramo con IDENTIDAD completa (spec §5): cada eslabón conserva sus contadores de
+    // apertura/cierre, no solo el delta. Trazabilidad contable de A→B aunque se facture en una línea.
+    const breakdown: BreakdownEntry[] = chain.map(l => ({
+      machine_label: l.machine_label, contract_machine_id: l.cm_id,
+      delta_bw: l.delta_bw, delta_color: l.delta_color,
+      opening_reading_date: l.opening_reading_date, closing_reading_date: l.closing_reading_date,
+      opening_counter_id: l.opening_counter_id, closing_counter_id: l.closing_counter_id,
+      opening_counter_bw: l.opening_counter_bw, opening_counter_color: l.opening_counter_color,
+      closing_counter_bw: l.closing_counter_bw, closing_counter_color: l.closing_counter_color,
     }))
     const merged_bw    = chain.reduce((s, l) => s + l.delta_bw,    0)
     const merged_color = chain.reduce((s, l) => s + l.delta_color, 0)
@@ -402,9 +437,12 @@ function consolidateReplacements(draftLines: DraftLine[]): { lines: DraftLine[];
     head.amount_color = amounts.amount_color
     head.amount_total = amounts.amount_total
     head.breakdown    = breakdown
-    // El periodo consolidado abarca de la apertura más temprana al cierre más tardío de la cadena.
+    // DISPLAY: el periodo mostrado abarca de la apertura más temprana al cierre más tardío de la cadena.
     head.open_date    = dateBounds(chain.map(l => l.open_date)).min  ?? head.open_date
     head.close_date   = dateBounds(chain.map(l => l.close_date)).max ?? head.close_date
+    // IDENTIDAD de la cadena (P0): NO se toca. La cabeza conserva la apertura/cierre de SU propio
+    // tramo (la máquina entrante B), que es el punto de partida del siguiente mes del puesto. Heredar
+    // el cierre de A (la saliente) corrompería el prevClose de B (close_date de A + contadores nulos).
 
     for (const l of chain) if (l.cm_id !== head.cm_id) discarded.add(l.cm_id)
   }
@@ -573,7 +611,13 @@ export async function buildContractInvoiceDraft(
     if (!line.machine_id) continue
     if (!isLineBillable(line.statut, contractStatut, line.date_fin)) continue
     const prevClose = chainStartFor(line.id)
-    if (line.date_fin !== null && prevClose?.reading_date != null && prevClose.reading_date >= line.date_fin) continue
+    // Excluir una línea cerrada SOLO si su cierre final SINTÉTICO (end_counter de reemplazo) ya se
+    // facturó (counter_id null + fecha ≥ date_fin). Si el último cierre fue una LECTURA REAL del mismo
+    // día que date_fin (counter_id != null), aún falta facturar el tramo hasta el end_counter → no excluir.
+    if (
+      line.date_fin !== null && prevClose?.reading_date != null &&
+      prevClose.reading_date >= line.date_fin && prevClose.counter_id === null
+    ) continue
     const machineCounters = countersByMachine.get(line.machine_id) ?? []
     const counters = countersForLine(line.id, line.date_debut, line.date_fin, machineCounters)
     const cons = computeLineChainConsumption(line, counters, prevClose)
@@ -646,8 +690,11 @@ export async function buildContractInvoiceDraft(
       delta_bw,
       delta_color,
       is_estimated:   isEstimated,
+      // DISPLAY (se expanden al consolidar) e IDENTIDAD (no se tocan): aquí coinciden por línea simple.
       open_date:      cons.opening_reading_date,
       close_date:     real ? cons.closing_reading_date : null,
+      opening_reading_date:  cons.opening_reading_date,
+      closing_reading_date:  real ? cons.closing_reading_date : null,
       opening_counter_id:    cons.opening_counter_id,
       closing_counter_id:    real ? cons.closing_counter_id : null,
       opening_counter_bw:    cons.opening_counter_bw,

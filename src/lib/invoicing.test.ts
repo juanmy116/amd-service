@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { counterDelta, type Counter } from '@/lib/counters'
 import {
   countersForLine, BillingDataError, isLineBillable,
-  computeInvoiceMonth, buildContractInvoiceDraft,
+  computeInvoiceMonth, buildContractInvoiceDraft, listReadyToBill,
   computeLineChainConsumption, type ChainStart, type LineCounters,
 } from '@/lib/invoicing'
 
@@ -332,6 +332,33 @@ describe('FORMA B — buildContractInvoiceDraft', () => {
     expect(draft!.has_estimated).toBe(true)
   })
 
+  it('P0 reemplazo consolidado: la línea conserva la IDENTIDAD de cierre de B (no la de A)', async () => {
+    const planH = { id: 'plan-h', name: 'Forfait', type: 'hybrid', fixed_fee: 5000, price_bw: 10, price_color: 50, tiers: null }
+    // A (M1): se cierra el 15-jun con end_counter 1700; abrió con la lectura base 30-abr (1000).
+    // B (M2): reemplaza a A el 15-jun con start_counter 0 y AÚN sin lectura real posterior.
+    const lineA = { ...lineRow, id: 'cm-A', machine_id: 'M1', date_fin: '2026-06-15',
+      end_counter_bw: 1700, end_counter_color: 300, billing_plans: planH, machines: { numero_serie: 'M1', marque: 'HP', modele: 'X' } }
+    const lineB = { ...lineRow, id: 'cm-B', machine_id: 'M2', date_debut: '2026-06-15',
+      replaces_contract_machine_id: 'cm-A', start_counter_bw: 0, start_counter_color: 0,
+      billing_plans: planH, machines: { numero_serie: 'M2', marque: 'HP', modele: 'Y' } }
+    const rows = [mkRowC('a-base', 2026, 4, 30, 1000, 200)]   // solo M1; M2 sin lecturas
+    vi.mocked(createAdminClient).mockReturnValue(makeAdmin({
+      contracts:         { data: contractRow, error: null },
+      contract_machines: { data: [lineA, lineB], error: null },
+      machine_counters:  { data: rows, error: null },
+    }))
+    const draft = await buildContractInvoiceDraft('ctr-1', 2026, 5)   // 15-jun (día 1) ancla mayo
+    expect(draft).not.toBeNull()
+    expect(draft!.lines).toHaveLength(1)
+    const line = draft!.lines[0]
+    expect(line.machine_id).toBe('M2')                   // cabeza = B (la máquina entrante)
+    expect(line.delta_bw).toBe(700)                      // consumo consolidado A(700) + B(0)
+    expect(line.close_date).toBe('2026-06-15')           // DISPLAY: hasta el cierre de A
+    expect(line.closing_reading_date).toBeNull()         // IDENTIDAD: B no cerró → NO corrompe la cadena
+    expect(line.closing_counter_bw).toBeNull()
+    expect(line.breakdown).toHaveLength(2)               // trazabilidad por tramo (§5)
+  })
+
   it('contrato inexistente → null', async () => {
     vi.mocked(createAdminClient).mockReturnValue(makeAdmin({ contracts: { data: null, error: null } }))
     await expect(buildContractInvoiceDraft('nope', 2026, 5)).resolves.toBeNull()
@@ -482,6 +509,26 @@ describe('MOTOR DE CADENA — computeLineChainConsumption', () => {
     expect(fin.delta_color).toBe(40)
   })
 
+  it('P0 same-day: una lectura real en date_fin cierra ANTES que el end_counter; el final usa el end_counter', () => {
+    // date_fin = 15-jun con end_counter 1700; y una lectura REAL también el 15-jun = 1600.
+    const replLine: LineCounters = {
+      date_debut: '2026-01-01', date_fin: '2026-06-15',
+      start_counter_bw: null, start_counter_color: null, end_counter_bw: 1700, end_counter_color: 300,
+    }
+    const cs = [mkCounter({ id: 'real', year: 2026, month: 6, day: 15, counter_bw: 1600, counter_color: 280 })]
+
+    // Tramo 1 (apertura 30-abr): cierra con la LECTURA REAL del 15-jun, no con el end_counter.
+    const t1 = computeLineChainConsumption(replLine, cs, start(1000, 200, '2026-04-30', 'prev', '2026-04-30T10:00:00Z'))
+    expect(t1.closing_counter_id).toBe('real')
+    expect(t1.delta_bw).toBe(600)                 // 1600 − 1000
+
+    // Tramo 2 (apertura = la lectura real del 15-jun): cierra con el end_counter sintético (mismo día).
+    const t2 = computeLineChainConsumption(replLine, cs, start(1600, 280, '2026-06-15', 'real', '2026-06-15T10:00:00Z'))
+    expect(t2.closing_counter_id).toBeNull()
+    expect(t2.closing_reading_date).toBe('2026-06-15')
+    expect(t2.delta_bw).toBe(100)                 // 1700 − 1600 (copias que NO se pueden perder)
+  })
+
   it('delta negativo (reset) → estimada, conservando identidad de apertura/cierre', () => {
     const cs = [
       mkCounter({ id: 'a', year: 2026, month: 4, day: 29, counter_bw: 1000, counter_color: 200 }),
@@ -563,5 +610,76 @@ describe('P1-5 — buildContractInvoiceDraft usa la tarifa VIGENTE a la fecha de
     expect(draft!.lines[0].delta_bw).toBe(500)    // 2000 − 1500
     expect(draft!.lines[0].price_bw).toBe(20)
     expect(draft!.lines[0].amount_total).toBe(500 * 20 + 40 * 100)  // 14000
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOTOR DE CADENA — listReadyToBill: un mes por contrato (secuencia) y nunca futuros.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('MOTOR DE CADENA — listReadyToBill', () => {
+  const contractNested = {
+    id: 'ctr-1', numero_contrat: 'CT-2026-001', billing_day: 1, statut: 'actif',
+    clients: { nom_client: 'ACME' },
+  }
+  // Fila de contract_machines que satisface el select de listReadyToBill Y el de buildDraft (anidados).
+  const cmRow = {
+    id: 'cm-1', contract_id: 'ctr-1', machine_id: 'M1', billing_plan_id: 'plan-1',
+    date_debut: '2026-01-01', date_fin: null, statut: 'actif', replaces_contract_machine_id: null,
+    start_counter_bw: null, start_counter_color: null, end_counter_bw: null, end_counter_color: null,
+    price_bw_override: null, price_color_override: null, fixed_fee_override: null,
+    billing_plans: { id: 'plan-1', name: 'Par copie', type: 'per_copy', fixed_fee: null, price_bw: 10, price_color: 50, tiers: null },
+    machines: { numero_serie: 'M1', marque: 'HP', modele: 'X' },
+    contracts: contractNested,
+  }
+  const contractRow = { id: 'ctr-1', numero_contrat: 'CT-2026-001', client_id: 7, billing_day: 1, statut: 'actif', clients: { id: 7, nom_client: 'ACME' } }
+  const mkRow = (id: string, y: number, m: number, d: number, bw: number, color: number) => ({
+    id, machine_id: 'M1', contract_id: 'ctr-1', contract_machine_id: null,
+    reading_date: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+    year: y, month: m, day: d, counter_bw: bw, counter_color: color,
+    status: 'actif', is_replacement_start: false, previous_machine_id: null,
+    annulation_reason: null, annule_at: null, notes: null,
+    recorded_at: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T10:00:00Z`,
+  })
+  const adminWith = (counters: unknown[]) => makeAdmin({
+    contract_machines: { data: [cmRow], error: null },
+    machine_counters:  { data: counters, error: null },
+    invoices:          { data: [], error: null },
+    contracts:         { data: contractRow, error: null },
+    billing_plan_versions: { data: [], error: null },
+    contract_machine_override_versions: { data: [], error: null },
+  })
+
+  it('ofrece el primer mes (mayo) cuando hay base + cierre y el mes ya pasó', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-06-17T08:00:00Z'))
+    vi.mocked(createAdminClient).mockReturnValue(adminWith([
+      mkRow('base', 2026, 4, 30, 1000, 200),
+      mkRow('clo',  2026, 6, 3,  1500, 260),
+    ]))
+    const list = await listReadyToBill()
+    vi.useRealTimers()
+    expect(list).toHaveLength(1)
+    expect(list[0].contract_id).toBe('ctr-1')
+    expect(list[0].period_year).toBe(2026)
+    expect(list[0].period_month).toBe(5)
+  })
+
+  it('NO ofrece un mes futuro (mes actual en hora de Dakar/UTC)', async () => {
+    // Hoy = 15-abr-2026; el primer cierre (03-jun, día 1) anclaría mayo → mes futuro → no se ofrece.
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-04-15T08:00:00Z'))
+    vi.mocked(createAdminClient).mockReturnValue(adminWith([
+      mkRow('base', 2026, 4, 30, 1000, 200),
+      mkRow('clo',  2026, 6, 3,  1500, 260),
+    ]))
+    const list = await listReadyToBill()
+    vi.useRealTimers()
+    expect(list).toHaveLength(0)
+  })
+
+  it('contrato sin lecturas de cierre (solo base) → no se ofrece nada', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-06-17T08:00:00Z'))
+    vi.mocked(createAdminClient).mockReturnValue(adminWith([mkRow('base', 2026, 4, 30, 1000, 200)]))
+    const list = await listReadyToBill()
+    vi.useRealTimers()
+    expect(list).toHaveLength(0)
   })
 })

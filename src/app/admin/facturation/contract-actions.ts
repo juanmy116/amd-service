@@ -42,6 +42,13 @@ export async function emitContractInvoiceAction(_prev: EmitState, fd: FormData):
   if (!Number.isInteger(year) || year < 2020 || year > 2100) return { error: 'Année invalide.' }
   if (!Number.isInteger(month) || month < 1 || month > 12) return { error: 'Mois invalide.' }
 
+  // P1: no emitir un mes FUTURO. listReadyToBill ya lo bloquea, pero la acción recibe year/month del
+  // formulario → se revalida aquí. «Mes actual» en hora de NEGOCIO (Africa/Dakar = UTC, sin DST; A4).
+  const now = new Date()
+  if (year * 12 + (month - 1) > now.getUTCFullYear() * 12 + now.getUTCMonth()) {
+    return { error: 'Mois futur : facturation impossible.' }
+  }
+
   let draft
   try {
     draft = await buildContractInvoiceDraft(contract_id, year, month)
