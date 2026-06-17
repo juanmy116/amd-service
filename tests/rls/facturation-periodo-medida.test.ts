@@ -103,8 +103,10 @@ describe('Gate Forma B — factura de mayo con periodo real (caso 2AS)', () => {
     expect(inv).toMatchObject({
       period_year: 2026, period_month: 5,
       period_start: '2026-04-29', period_end: '2026-06-03',
-      total_amount: '8000.00', status: 'emise',
+      status: 'emise',
     })
+    // total_amount es numeric: supabase-js puede devolverlo como número u string → comparar valor.
+    expect(Number(inv!.total_amount)).toBe(8000)
   })
 
   it('P0 dedup: re-emitir el MISMO mes se bloquea aunque period_start cambie', async () => {
