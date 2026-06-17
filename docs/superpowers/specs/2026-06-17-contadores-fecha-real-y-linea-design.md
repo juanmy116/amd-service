@@ -158,13 +158,17 @@ Se mantiene 1-31 (hay clientes fin de mes). La semántica la da N7 (no se restri
 - El concepto de «estimada/forzar» (se reutiliza para el mes solo-fijo).
 - El dedup por `(contract_id, period_year, period_month)` (sigue válido).
 
-## 8. Orden de PRs
-1. PR-A: FASE 1 (modelo: `reading_date`, `contract_machine_id`, índices, columnas de identidad en `invoice_lines`).
-2. PR-B: FASE 2 (escrituras: `getLineForMachineAtDate`, same-day, Princity por fecha) + tests.
-3. PR-C: FASE 3 (algoritmo de cadena §4 + atribución por línea + orden + vistas/dashboards por `reading_date`) + tests motor.
-4. PR-D: FASE 4 (cierres por línea, emisión endurecida, guards) + FASE 5 + tests.
-5. PR-E: gate E2E completo (§9) + consolidar docs (`architecture.md`).
-NO facturar a 2AS hasta cerrar PR-A..E con CI verde.
+## 8. Orden de PRs — ESTADO (actualizado 2026-06-17, rama `feat/contadores-rediseno-fecha-real`)
+1. ✅ PR-A: FASE 1 (modelo: `reading_date`, `contract_machine_id`, índices, columnas de identidad en `invoice_lines`). Mig. `20260617130000`.
+2. ✅ PR-B: FASE 2 (escrituras por fecha real + línea; Princity por fecha) + tests. Mig. `20260617140000`.
+3. ✅ PR-C: FASE 3 (algoritmo de cadena §4 + atribución por línea + orden canónico + vistas/dashboards por `reading_date`) + tests motor. **GO Codex (4 rondas).** Mig. `20260617160000`. Commits `a27ba5a`..`d8e8636`.
+4. 🔄 PR-D: FASE 4 + FASE 5 — EN CURSO:
+   - ✅ **PR-D.1 — emisión endurecida** (`emit_contract_invoice` no confía en el payload: V1 pertenencia de línea, V2 pertenencia de lecturas + vigencia, V3a/b/c no-reutilización de cierres incl. breakdown, V4 secuencia, P2 `contract_id`). **GO Codex validado en BD real.** Mig. `20260617170000`. Banco adversarial `tests/rls/emit-hardening.test.ts` (13 casos). Commits `9007ce9`..`3d44c7a`.
+   - ⬜ **PR-D.2 — cierres por línea** (`return_machine_to_stock`/`terminate_contract`/`replace_contract_machine`: «último contador» de la MISMA línea por `reading_date`; retirada facturable exige `end_counter`; **validar `end_counter ≥ última lectura real de la línea en date_fin`** — nota de Codex en PR-D.1).
+   - ⬜ **PR-D.3 — guards** (`can_delete_contract` y guard de cambio de cliente miran también `contract_machine_id`).
+   - ⬜ FASE 5 (billing_day: sin cambio de CHECK; la semántica la da N7).
+5. ⬜ PR-E: gate E2E completo (§9) + consolidar docs (`architecture.md`).
+NO facturar a 2AS hasta cerrar PR-A..E con CI verde. **Entorno: OrbStack instalado → `supabase start` + `npm run test:rls` corren en local (claves vía `supabase status -o env`).**
 
 ## 9. Casos de prueba del gate
 1. 02-may + 31-may (billing_day=1) conviven; abril y mayo correctos; sin doble cobro. (P0-1)
