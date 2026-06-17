@@ -7,13 +7,20 @@
 -- de identidad §5). Todo lo demás es IDÉNTICO.
 --
 --   V1 — cada `cm_id` (contract_machine_id) de una línea pertenece a ESTE contrato.
---   V2 — cada opening/closing_counter_id (si no es null) es una lectura ACTIVA de esa línea (atribución
---        directa por contract_machine_id, o fallback por máquina para relevés heredados con cm NULL).
---   V3 — el closing_counter_id no fue ya usado como cierre de otra factura EMISE (no reutilización; A2:
---        solo contra 'emise', no 'annulee' → tras anular, la lectura queda libre y se puede reemitir).
+--   V2 — cada opening/closing_counter_id (si no es null) es una lectura ACTIVA de esa línea: atribución
+--        directa por contract_machine_id, o fallback por máquina para relevés heredados con cm NULL
+--        CUYA FECHA cae en la vigencia (date_debut, date_fin] — criterio idéntico a countersForLine.
+--   V3 — no reutilización de un cierre, en TRES frentes:
+--        V3a: ningún `cm_id` repetido dentro del payload (doble forfait/consumo de la misma línea).
+--        V3b: ningún `closing_counter_id` repetido dentro del payload (top-level Y breakdown) → un mismo
+--             cierre no puede cobrarse dos veces en la misma factura.
+--        V3c: ningún closing del payload (top-level o breakdown) fue ya cierre de una factura EMISE
+--             (A2: solo 'emise', no 'annulee' → tras anular, la lectura queda libre para reemitir);
+--             mira AMBOS sitios persistidos: invoice_lines.closing_counter_id y los tramos en breakdown.
 --   V4 — si el contrato ya tiene facturas emise, el mes facturado = último mes facturado + 1 (secuencia;
 --        ordinal year*12+(month-1) para que el borde diciembre→enero sea correcto). Sin historial, el
 --        primer mes lo ancla el draft (N7); la secuencia no tiene referencia en SQL y no se fuerza aquí.
+--   P2 — invoice_lines.contract_id (inmutable) se persiste = v_contract_id validado, no del payload.
 --
 -- Seguro: 0 facturas reales hoy.
 
@@ -49,6 +56,7 @@ DECLARE
   v_open_id     uuid;
   v_close_id    uuid;
   v_last_ord    int;
+  v_dup         int;
 BEGIN
   IF auth.role() <> 'service_role' THEN
     RAISE EXCEPTION 'forbidden';
@@ -89,8 +97,62 @@ BEGIN
     RAISE EXCEPTION 'billing_sequence_mismatch';
   END IF;
 
+  -- ── V3a: ningún cm_id (poste) repetido DENTRO del payload (doble forfait/consumo de la misma línea). ──
+  SELECT count(*) FILTER (WHERE NULLIF(l->>'cm_id','') IS NOT NULL)
+       - count(DISTINCT NULLIF(l->>'cm_id',''))
+    INTO v_dup
+    FROM jsonb_array_elements(v_lines) l;
+  IF v_dup <> 0 THEN
+    RAISE EXCEPTION 'duplicate_cm_in_payload';
+  END IF;
+
+  -- ── V3b: ningún closing_counter_id repetido DENTRO del payload (top-level Y breakdown de reemplazos)
+  --        → un mismo cierre no puede cobrarse dos veces en la misma factura. ──
+  SELECT count(*) - count(DISTINCT cid) INTO v_dup
+    FROM (
+      SELECT NULLIF(l->>'closing_counter_id','')::uuid AS cid
+        FROM jsonb_array_elements(v_lines) l
+       WHERE NULLIF(l->>'closing_counter_id','') IS NOT NULL
+      UNION ALL
+      SELECT NULLIF(b->>'closing_counter_id','')::uuid
+        FROM jsonb_array_elements(v_lines) l
+        CROSS JOIN LATERAL jsonb_array_elements(COALESCE(l->'breakdown','[]'::jsonb)) b
+       WHERE NULLIF(b->>'closing_counter_id','') IS NOT NULL
+    ) s;
+  IF v_dup <> 0 THEN
+    RAISE EXCEPTION 'closing_counter_already_used';
+  END IF;
+
+  -- ── V3c: ningún closing del payload (top-level o breakdown) fue ya cierre de una factura EMISE
+  --        (no reutilización; A2: solo 'emise'). Mira AMBOS sitios donde se persiste un cierre:
+  --        invoice_lines.closing_counter_id Y los tramos dentro de invoice_lines.breakdown. ──
+  IF EXISTS (
+    WITH payload_closings AS (
+      SELECT NULLIF(l->>'closing_counter_id','')::uuid AS cid
+        FROM jsonb_array_elements(v_lines) l
+       WHERE NULLIF(l->>'closing_counter_id','') IS NOT NULL
+      UNION
+      SELECT NULLIF(b->>'closing_counter_id','')::uuid
+        FROM jsonb_array_elements(v_lines) l
+        CROSS JOIN LATERAL jsonb_array_elements(COALESCE(l->'breakdown','[]'::jsonb)) b
+       WHERE NULLIF(b->>'closing_counter_id','') IS NOT NULL
+    )
+    SELECT 1
+      FROM payload_closings pc
+      JOIN public.invoice_lines il ON TRUE
+      JOIN public.invoices i ON i.id = il.invoice_id AND i.status = 'emise'
+     WHERE il.closing_counter_id = pc.cid
+        OR EXISTS (
+             SELECT 1 FROM jsonb_array_elements(COALESCE(il.breakdown,'[]'::jsonb)) bb
+              WHERE NULLIF(bb->>'closing_counter_id','')::uuid = pc.cid
+           )
+  ) THEN
+    RAISE EXCEPTION 'closing_counter_already_used';
+  END IF;
+
   -- P1-1: coherencia contable de cada línea + cuadre de la cabecera.
-  -- V1/V2/V3: cada línea pertenece al contrato; sus lecturas pertenecen a la línea; cierre no reutilizado.
+  -- V1/V2: cada línea pertenece al contrato; sus lecturas pertenecen a la línea (la no-reutilización de
+  -- cierres ya se validó arriba como conjunto, V3a/b/c).
   FOR v_line IN SELECT * FROM jsonb_array_elements(v_lines) LOOP
     IF COALESCE((v_line->>'delta_bw')::int, 0) < 0
        OR COALESCE((v_line->>'delta_color')::int, 0) < 0 THEN
@@ -123,37 +185,33 @@ BEGIN
       RAISE EXCEPTION 'cm_id_not_in_contract';
     END IF;
 
-    -- V2: opening/closing son lecturas ACTIVAS de esa línea (directo por contract_machine_id, o
-    --     fallback por máquina para relevés heredados con contract_machine_id NULL — mismo criterio
-    --     que countersForLine en el motor). Solo se valida cuando el id no es null (apertura por
-    --     start_counter o tramo solo-fijo → null, legítimo).
+    -- V2: opening/closing son lecturas ACTIVAS de esa línea. Criterio IDÉNTICO a countersForLine del
+    --     motor: atribución directa por contract_machine_id, O fallback por máquina para relevés
+    --     heredados (contract_machine_id NULL) cuya FECHA cae en la vigencia de la línea —
+    --     (date_debut, date_fin] (inferior estricto, superior inclusivo). Sin el rango, un relevé
+    --     legacy de OTRA etapa de la misma máquina podría colarse (P1). id null = apertura por
+    --     start_counter o tramo solo-fijo → legítimo, no se valida.
     IF v_open_id IS NOT NULL AND NOT EXISTS (
       SELECT 1 FROM public.machine_counters mc
       JOIN public.contract_machines cm ON cm.id = v_cm_id
       WHERE mc.id = v_open_id AND mc.status = 'actif'
         AND (mc.contract_machine_id = v_cm_id
-             OR (mc.contract_machine_id IS NULL AND mc.machine_id = cm.machine_id))
+             OR (mc.contract_machine_id IS NULL AND mc.machine_id = cm.machine_id
+                 AND mc.reading_date > cm.date_debut
+                 AND (cm.date_fin IS NULL OR mc.reading_date <= cm.date_fin)))
     ) THEN
       RAISE EXCEPTION 'opening_counter_not_in_line';
     END IF;
-    IF v_close_id IS NOT NULL THEN
-      IF NOT EXISTS (
-        SELECT 1 FROM public.machine_counters mc
-        JOIN public.contract_machines cm ON cm.id = v_cm_id
-        WHERE mc.id = v_close_id AND mc.status = 'actif'
-          AND (mc.contract_machine_id = v_cm_id
-               OR (mc.contract_machine_id IS NULL AND mc.machine_id = cm.machine_id))
-      ) THEN
-        RAISE EXCEPTION 'closing_counter_not_in_line';
-      END IF;
-      -- V3: el closing no fue cierre de otra factura EMISE (no reutilización; A2: solo 'emise').
-      IF EXISTS (
-        SELECT 1 FROM public.invoice_lines il
-        JOIN public.invoices i ON i.id = il.invoice_id
-        WHERE il.closing_counter_id = v_close_id AND i.status = 'emise'
-      ) THEN
-        RAISE EXCEPTION 'closing_counter_already_used';
-      END IF;
+    IF v_close_id IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM public.machine_counters mc
+      JOIN public.contract_machines cm ON cm.id = v_cm_id
+      WHERE mc.id = v_close_id AND mc.status = 'actif'
+        AND (mc.contract_machine_id = v_cm_id
+             OR (mc.contract_machine_id IS NULL AND mc.machine_id = cm.machine_id
+                 AND mc.reading_date > cm.date_debut
+                 AND (cm.date_fin IS NULL OR mc.reading_date <= cm.date_fin)))
+    ) THEN
+      RAISE EXCEPTION 'closing_counter_not_in_line';
     END IF;
   END LOOP;
 
@@ -195,7 +253,7 @@ BEGIN
       opening_counter_bw, opening_counter_color, closing_counter_bw, closing_counter_color
     ) VALUES (
       v_invoice_id,
-      NULLIF(v_line->>'contract_id','')::uuid,
+      v_contract_id,   -- P2: columna inmutable → el contrato validado (V1), no el valor del payload.
       v_line->>'numero_contrat',
       v_line->>'machine_id',
       v_line->>'machine_label',

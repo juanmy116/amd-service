@@ -27,6 +27,7 @@ const EMIT_ERROR_LABEL: Record<string, string> = {
   billing_sequence_mismatch: 'Mois hors séquence : facturez d’abord le mois précédent.',
   line_without_cm:           'Ligne sans poste (cm_id) : données incohérentes.',
   cm_id_not_in_contract:     'Une ligne ne correspond pas à ce contrat.',
+  duplicate_cm_in_payload:   'Poste en double dans la facture : données incohérentes.',
   opening_counter_not_in_line: 'Relevé d’ouverture invalide pour ce poste.',
   closing_counter_not_in_line: 'Relevé de clôture invalide pour ce poste.',
   closing_counter_already_used: 'Relevé de clôture déjà facturé.',
