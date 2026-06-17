@@ -91,6 +91,18 @@ BEGIN
     RAISE EXCEPTION 'client_mismatch';
   END IF;
 
+  -- P0 dedup: no duplicar factura emise para el mismo contrato y MES FACTURADO (estable). Va ANTES de
+  -- V4 para que reintentar un mes YA facturado dé el mensaje claro 'already_issued' (y no que lo tape
+  -- 'billing_sequence_mismatch' de V4, que solo debe capturar saltos a meses aún no facturados).
+  IF EXISTS (
+    SELECT 1 FROM public.invoices
+    WHERE contract_id = v_contract_id
+      AND period_year = v_year AND period_month = v_month
+      AND status = 'emise'
+  ) THEN
+    RAISE EXCEPTION 'already_issued';
+  END IF;
+
   -- ── V4: secuencia de mes (solo si hay historial; el primer mes lo ancla el draft). ──
   SELECT MAX(period_year * 12 + (period_month - 1)) INTO v_last_ord
     FROM public.invoices
@@ -230,16 +242,6 @@ BEGIN
 
   IF v_sum <> v_total THEN
     RAISE EXCEPTION 'header_total_mismatch';
-  END IF;
-
-  -- P0 dedup: no duplicar factura emise para el mismo contrato y MES FACTURADO (estable).
-  IF EXISTS (
-    SELECT 1 FROM public.invoices
-    WHERE contract_id = v_contract_id
-      AND period_year = v_year AND period_month = v_month
-      AND status = 'emise'
-  ) THEN
-    RAISE EXCEPTION 'already_issued';
   END IF;
 
   v_numero := public.next_invoice_number();

@@ -19,6 +19,9 @@ const PLAN    = 'TESTINV Plan PM'
 
 let clientId: number
 let contractId: string
+let lineId: string
+let cAbrId: string   // relevé base 29-abr (apertura de mayo)
+let cJunId: string   // relevé 03-jun (cierre de mayo / apertura de junio)
 
 beforeAll(async () => {
   if (!ANON_KEY || !SERVICE_KEY) {
@@ -56,13 +59,17 @@ beforeAll(async () => {
     .insert({ contract_id: contractId, machine_id: SERIE, date_debut: '2026-01-01', statut: 'actif', billing_plan_id: plan.data!.id })
     .select('id').single()
   if (line.error) throw new Error(`seed line: ${line.error.message}`)
+  lineId = line.data!.id as string
 
-  // Caso real 2AS (billing_day=1): 29-abr = base, 03-jun = cierre de mayo.
+  // Caso real 2AS (billing_day=1): 29-abr = base, 03-jun = cierre de mayo. contract_machine_id = la
+  // línea (como lo rellena la escritura real, PR-B) → la emisión endurecida (V2) valida la pertenencia.
   const cnt = await admin.from('machine_counters').insert([
-    { machine_id: SERIE, contract_id: contractId, client_id: clientId, year: 2026, month: 4, day: 29, counter_bw: 1000, counter_color: 200, recorded_at: '2026-04-29T10:00:00Z' },
-    { machine_id: SERIE, contract_id: contractId, client_id: clientId, year: 2026, month: 6, day: 3,  counter_bw: 1500, counter_color: 260, recorded_at: '2026-06-03T10:00:00Z' },
-  ])
+    { machine_id: SERIE, contract_id: contractId, contract_machine_id: lineId, client_id: clientId, year: 2026, month: 4, day: 29, counter_bw: 1000, counter_color: 200, recorded_at: '2026-04-29T10:00:00Z' },
+    { machine_id: SERIE, contract_id: contractId, contract_machine_id: lineId, client_id: clientId, year: 2026, month: 6, day: 3,  counter_bw: 1500, counter_color: 260, recorded_at: '2026-06-03T10:00:00Z' },
+  ]).select('id, month')
   if (cnt.error) throw new Error(`seed counters: ${cnt.error.message}`)
+  cAbrId = cnt.data!.find(c => c.month === 4)!.id as string
+  cJunId = cnt.data!.find(c => c.month === 6)!.id as string
 }, 90_000)
 
 // Payload de emisión de la factura de MAYO, como lo produciría buildContractInvoiceDraft:
@@ -82,11 +89,16 @@ function mayoPayload(periodStart: string) {
     confirm_estimated: false,
     total_amount: 8000,
     lines: [{
+      cm_id: lineId,
       contract_id: contractId, numero_contrat: CONTRAT, machine_id: SERIE,
       machine_label: `TESTPM M1 (${SERIE})`, plan_name: PLAN, billing_type: 'per_copy',
       fixed_fee: null, price_bw: 10, price_color: 50, tiers: null,
       delta_bw: 500, delta_color: 60, is_estimated: false,
       amount_fixed: 0, amount_bw: 5000, amount_color: 3000, amount_total: 8000,
+      opening_counter_id: cAbrId, closing_counter_id: cJunId,
+      opening_reading_date: '2026-04-29', closing_reading_date: '2026-06-03',
+      opening_counter_bw: 1000, opening_counter_color: 200,
+      closing_counter_bw: 1500, closing_counter_color: 260,
     }],
   }
 }
@@ -127,19 +139,27 @@ describe('Gate Forma B — factura de mayo con periodo real (caso 2AS)', () => {
 
   it('otro MES del mismo contrato sí se puede emitir (la unicidad es por mes, no global)', async () => {
     // Junio: cierre 03-jun ya usado como cierre de mayo; añadimos una lectura de julio que cierra junio.
-    await admin.from('machine_counters').insert(
-      { machine_id: SERIE, contract_id: contractId, client_id: clientId, year: 2026, month: 7, day: 1, counter_bw: 1800, counter_color: 300, recorded_at: '2026-07-01T10:00:00Z' },
-    )
+    const ins = await admin.from('machine_counters').insert(
+      { machine_id: SERIE, contract_id: contractId, contract_machine_id: lineId, client_id: clientId, year: 2026, month: 7, day: 1, counter_bw: 1800, counter_color: 300, recorded_at: '2026-07-01T10:00:00Z' },
+    ).select('id').single()
+    if (ins.error) throw new Error(`seed jul: ${ins.error.message}`)
+    const cJulId = ins.data!.id as string
     const junio = {
       ...mayoPayload('2026-06-03'),
       period_end: '2026-07-01', period_month: 6,
       total_amount: 5000,
       lines: [{
+        cm_id: lineId,
         contract_id: contractId, numero_contrat: CONTRAT, machine_id: SERIE,
         machine_label: `TESTPM M1 (${SERIE})`, plan_name: PLAN, billing_type: 'per_copy',
         fixed_fee: null, price_bw: 10, price_color: 50, tiers: null,
         delta_bw: 300, delta_color: 40, is_estimated: false,
         amount_fixed: 0, amount_bw: 3000, amount_color: 2000, amount_total: 5000,
+        // Junio abre en el cierre de mayo (03-jun) y cierra en la lectura de julio (01-jul).
+        opening_counter_id: cJunId, closing_counter_id: cJulId,
+        opening_reading_date: '2026-06-03', closing_reading_date: '2026-07-01',
+        opening_counter_bw: 1500, opening_counter_color: 260,
+        closing_counter_bw: 1800, closing_counter_color: 300,
       }],
     }
     const { data: invoiceId, error } = await admin.rpc('emit_contract_invoice', { p_payload: junio })
