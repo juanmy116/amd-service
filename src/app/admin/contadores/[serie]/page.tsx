@@ -10,12 +10,14 @@ import { Card } from '@/components/ui/Card'
 import { PanelHeader } from '@/components/ui/PanelHeader'
 import { Badge } from '@/components/ui/Badge'
 import { getOpenLineForMachine } from '@/lib/contract-machines'
-import { calcDeltas, type Counter } from '@/lib/counters'
+import { calcDeltas, compareCountersByReading, type Counter } from '@/lib/counters'
 
 function buildChartData(counters: Counter[]): ChartEntry[] {
   const active = [...counters]
     .filter(c => c.status === 'actif')
-    .sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month)
+    // Orden canónico ascendente por FECHA REAL (reading_date, recorded_at, id) — coherente con la
+    // tabla y calcDeltas; ordena bien varias lecturas del mismo mes natural (spec §6).
+    .sort(compareCountersByReading)
     .slice(-12)
 
   const deltaMap = calcDeltas(counters)

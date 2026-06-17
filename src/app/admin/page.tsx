@@ -17,13 +17,14 @@ const MONTHS_FR = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû
 async function getDashboardData() {
   const supabase = await createClient()
   const now = new Date()
-  const currentYear  = now.getFullYear()
-  const currentMonth = now.getMonth() + 1
   // Rango del mes actual por FECHA REAL de lectura (reading_date), no por etiqueta year/month (spec §6).
-  const monthStart = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
-  const nextMonthStart = currentMonth === 12
-    ? `${currentYear + 1}-01-01`
-    : `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`
+  // «Mes actual» en hora de NEGOCIO (Africa/Dakar = UTC, sin DST; A4) para no cruzar de mes a deshora.
+  const dkYear  = now.getUTCFullYear()
+  const dkMonth = now.getUTCMonth() + 1
+  const monthStart = `${dkYear}-${String(dkMonth).padStart(2, '0')}-01`
+  const nextMonthStart = dkMonth === 12
+    ? `${dkYear + 1}-01-01`
+    : `${dkYear}-${String(dkMonth + 1).padStart(2, '0')}-01`
 
   const last6Months = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(now)
