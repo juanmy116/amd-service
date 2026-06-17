@@ -23,6 +23,13 @@ const EMIT_ERROR_LABEL: Record<string, string> = {
   invalid_period:          'Période invalide.',
   invalid_payload:         'Données invalides.',
   forbidden:               'Action non autorisée.',
+  // PR-D.1 — endurecimiento de la emisión (validaciones server-side).
+  billing_sequence_mismatch: 'Mois hors séquence : facturez d’abord le mois précédent.',
+  line_without_cm:           'Ligne sans poste (cm_id) : données incohérentes.',
+  cm_id_not_in_contract:     'Une ligne ne correspond pas à ce contrat.',
+  opening_counter_not_in_line: 'Relevé d’ouverture invalide pour ce poste.',
+  closing_counter_not_in_line: 'Relevé de clôture invalide pour ce poste.',
+  closing_counter_already_used: 'Relevé de clôture déjà facturé.',
 }
 
 // Estado del formulario de emisión (patrón useActionState). En éxito la acción hace redirect()
