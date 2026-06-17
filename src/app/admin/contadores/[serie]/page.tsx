@@ -64,8 +64,8 @@ export default async function ContadoresDetailPage({
     .from('machine_counters')
     .select('*')
     .eq('machine_id', numero_serie)
-    .order('year',  { ascending: false })
-    .order('month', { ascending: false })
+    .order('reading_date', { ascending: false })
+    .order('recorded_at',  { ascending: false })
 
   // `as unknown as`: los tipos generados de Supabase (types.ts) aún no reflejan las columnas nuevas
   // (reading_date, contract_machine_id) hasta regenerarlos tras aplicar la migración a prod. El
@@ -74,9 +74,9 @@ export default async function ContadoresDetailPage({
   const deltaMap  = calcDeltas(counters)
   const chartData = buildChartData(counters)
 
-  // Ordenar para tabla: más reciente arriba
+  // Ordenar para tabla: más reciente arriba, por FECHA REAL (reading_date), recorded_at como desempate.
   const tableRows = [...counters].sort((a, b) =>
-    a.year !== b.year ? b.year - a.year : b.month - a.month
+    b.reading_date.localeCompare(a.reading_date) || b.recorded_at.localeCompare(a.recorded_at)
   )
 
   return (

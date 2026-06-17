@@ -19,6 +19,11 @@ async function getDashboardData() {
   const now = new Date()
   const currentYear  = now.getFullYear()
   const currentMonth = now.getMonth() + 1
+  // Rango del mes actual por FECHA REAL de lectura (reading_date), no por etiqueta year/month (spec §6).
+  const monthStart = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
+  const nextMonthStart = currentMonth === 12
+    ? `${currentYear + 1}-01-01`
+    : `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`
 
   const last6Months = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(now)
@@ -56,8 +61,8 @@ async function getDashboardData() {
     supabase
       .from('machine_counters')
       .select('counter_bw, counter_color')
-      .eq('year', currentYear)
-      .eq('month', currentMonth)
+      .gte('reading_date', monthStart)
+      .lt('reading_date', nextMonthStart)
       .eq('status', 'actif'),
     supabase.from('profiles').select('id, full_name').eq('role', 'technician').order('full_name'),
     supabase.from('machine_anomalies').select('light').eq('status', 'open'),

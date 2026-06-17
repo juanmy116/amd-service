@@ -39,6 +39,11 @@ export default async function AdminAgendaPanel() {
   const in14Str = in14.toISOString().split('T')[0]
   const cYear  = now.getFullYear()
   const cMonth = now.getMonth() + 1
+  // Mes actual por FECHA REAL de lectura (reading_date), no por etiqueta year/month (spec §6).
+  const monthStart = `${cYear}-${String(cMonth).padStart(2, '0')}-01`
+  const nextMonthStart = cMonth === 12
+    ? `${cYear + 1}-01-01`
+    : `${cYear}-${String(cMonth + 1).padStart(2, '0')}-01`
 
   const [
     { data: rawVisits },
@@ -71,8 +76,8 @@ export default async function AdminAgendaPanel() {
     supabase
       .from('machine_counters')
       .select('machine_id')
-      .eq('year', cYear)
-      .eq('month', cMonth)
+      .gte('reading_date', monthStart)
+      .lt('reading_date', nextMonthStart)
       .eq('status', 'actif'),
   ])
 

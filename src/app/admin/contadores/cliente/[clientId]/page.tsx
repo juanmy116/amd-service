@@ -60,8 +60,9 @@ export default async function ClientContadoresPage({
         .select('machine_id, year, month, counter_bw, counter_color')
         .eq('status', 'actif')
         .in('machine_id', machineIds)
-        .order('year',  { ascending: false })
-        .order('month', { ascending: false })
+        // Orden por FECHA REAL: latest y delta usan la lectura más reciente por día, no solo por mes (§6).
+        .order('reading_date', { ascending: false })
+        .order('recorded_at',  { ascending: false })
     : { data: [] }
 
   // Mapa: machine_id → { latest, delta }
