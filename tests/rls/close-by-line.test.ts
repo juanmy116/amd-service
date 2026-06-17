@@ -99,6 +99,24 @@ describe('return_machine_to_stock — cierre por línea + reading_date', () => {
     expect(error).toBeNull()
   })
 
+  it('una lectura LEGACY sin línea (contract_machine_id NULL) dentro de la vigencia SÍ cuenta', async () => {
+    // Reproducción del P0 de Codex: el motor de facturación (countersForLine) factura las
+    // lecturas NULL que caen en la vigencia de la línea; el cierre debe verlas también, o se
+    // cierra por debajo de una lectura real y se cobra de menos. Princity aún crea estas NULL.
+    const { serie, contractId, lineId, clientId } = await seedLine('RETNULL')
+    // Lectura ACTIF sin línea (contract_machine_id NULL), fechada dentro de la vigencia.
+    const ins = await admin.from('machine_counters').insert({
+      machine_id: serie, contract_id: contractId, contract_machine_id: null, client_id: clientId,
+      year: 2026, month: 5, day: 31, counter_bw: 1000, counter_color: 100, recorded_at: '2026-05-31T10:00:00Z',
+    })
+    if (ins.error) throw new Error(`seed null counter: ${ins.error.message}`)
+    const { error } = await admin.rpc('return_machine_to_stock', {
+      p_payload: { cm_id: lineId, date: '2026-06-15', end_counter_bw: 900, end_counter_color: 90 },
+    })
+    // 900 < 1000 (lectura legacy del 31-may) → debe rechazarse.
+    expect(error?.message).toContain('closing_counter_too_low')
+  })
+
   it('la regla de oro sigue protegiendo: cierre < última lectura real de la línea → rechazado', async () => {
     const { lineId } = await seedLine('RET2', {
       counters: [{ date: '2026-04-15', bw: 1000, color: 200 }],

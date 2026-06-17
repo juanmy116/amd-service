@@ -60,13 +60,21 @@ BEGIN
     RAISE EXCEPTION 'date_before_debut';
   END IF;
 
-  -- El cierre no puede ser inferior a la última lectura real DE LA LÍNEA hasta la fecha
-  -- de cierre (o su start_counter si la línea aún no tiene relevé). Por línea + fecha real.
+  -- El cierre no puede ser inferior a la última lectura real que el MOTOR atribuye a esta
+  -- línea hasta la fecha de cierre (o su start_counter si no hay relevé). Mismo criterio que
+  -- countersForLine (src/lib/invoicing.ts): relevé directo de la línea, O relevé legacy sin
+  -- atribuir (contract_machine_id NULL) de la misma máquina dentro de la vigencia
+  -- (reading_date > date_debut, límite inferior exclusivo, igual que el motor). Si el cierre
+  -- no los viera y el motor sí, se cerraría por debajo de una lectura real y se cobraría de menos.
   SELECT counter_bw, counter_color INTO v_ref_bw, v_ref_color
   FROM public.machine_counters
-  WHERE contract_machine_id = v_cm_id AND status = 'actif'
+  WHERE status = 'actif'
     AND reading_date <= v_date
-  ORDER BY reading_date DESC, recorded_at DESC
+    AND ( contract_machine_id = v_cm_id
+          OR ( contract_machine_id IS NULL
+               AND machine_id = v_cm.machine_id
+               AND reading_date > v_cm.date_debut ) )
+  ORDER BY reading_date DESC, recorded_at DESC, id DESC
   LIMIT 1;
   v_ref_bw    := GREATEST(COALESCE(v_ref_bw,    0), COALESCE(v_cm.start_counter_bw,    0));
   v_ref_color := GREATEST(COALESCE(v_ref_color, 0), COALESCE(v_cm.start_counter_color, 0));
@@ -147,13 +155,18 @@ BEGIN
       RAISE EXCEPTION 'date_before_debut';
     END IF;
 
-    -- La lectura final no puede ser inferior a la última lectura real DE LA LÍNEA hasta la
-    -- fecha de cierre (ni a su start_counter). Por línea (contract_machine_id) + fecha real.
+    -- La lectura final no puede ser inferior a la última lectura que el MOTOR atribuye a la
+    -- línea hasta la fecha de cierre (ni a su start_counter). Mismo criterio que countersForLine:
+    -- relevé directo de la línea O legacy NULL de la misma máquina dentro de la vigencia.
     SELECT counter_bw, counter_color INTO v_ref_bw, v_ref_color
       FROM public.machine_counters
-      WHERE contract_machine_id = v_cm.id AND status = 'actif'
+      WHERE status = 'actif'
         AND reading_date <= v_date
-      ORDER BY reading_date DESC, recorded_at DESC
+        AND ( contract_machine_id = v_cm.id
+              OR ( contract_machine_id IS NULL
+                   AND machine_id = v_cm.machine_id
+                   AND reading_date > v_cm.date_debut ) )
+      ORDER BY reading_date DESC, recorded_at DESC, id DESC
       LIMIT 1;
     v_ref_bw    := GREATEST(COALESCE(v_ref_bw,    0), COALESCE(v_cm.start_counter_bw,    0));
     v_ref_color := GREATEST(COALESCE(v_ref_color, 0), COALESCE(v_cm.start_counter_color, 0));
@@ -238,13 +251,18 @@ BEGIN
     RAISE EXCEPTION 'in_machine_busy';
   END IF;
 
-  -- Referencia para validar el cierre: la última lectura real DE LA LÍNEA SALIENTE hasta la
-  -- fecha de cierre (o su start_counter). Por línea (contract_machine_id) + fecha real.
+  -- Referencia para validar el cierre: la última lectura que el MOTOR atribuye a la línea
+  -- SALIENTE hasta la fecha de cierre (o su start_counter). Mismo criterio que countersForLine:
+  -- relevé directo de la línea O legacy NULL de la misma máquina dentro de la vigencia.
   SELECT counter_bw, counter_color INTO v_ref_bw, v_ref_color
   FROM public.machine_counters
-  WHERE contract_machine_id = v_out_id AND status = 'actif'
+  WHERE status = 'actif'
     AND reading_date <= v_date
-  ORDER BY reading_date DESC, recorded_at DESC
+    AND ( contract_machine_id = v_out_id
+          OR ( contract_machine_id IS NULL
+               AND machine_id = v_out.machine_id
+               AND reading_date > v_out.date_debut ) )
+  ORDER BY reading_date DESC, recorded_at DESC, id DESC
   LIMIT 1;
   v_ref_bw    := GREATEST(COALESCE(v_ref_bw, 0),    COALESCE(v_out.start_counter_bw, 0));
   v_ref_color := GREATEST(COALESCE(v_ref_color, 0), COALESCE(v_out.start_counter_color, 0));
