@@ -128,6 +128,18 @@ describe('emit_contract_invoice — endurecimiento: rechazos de payload manipula
     expect(error?.message).toContain('closing_counter_not_in_line')
   })
 
+  it('V2 — relevé legacy (contract_machine_id NULL) FUERA de la vigencia (date_debut, date_fin] → rechazado', async () => {
+    // Línea vigente desde 2026-01-01. Un relevé legacy fechado el 2025-12-15 (≤ date_debut) NO cae en
+    // (date_debut, date_fin] → el fallback de V2 no lo acepta aunque sea de la misma máquina. Demuestra
+    // el rango de vigencia (sin él, un legacy de otra etapa de la máquina se colaría).
+    const leg = await admin.from('machine_counters')
+      .insert({ machine_id: SERIE, contract_id: contractId, contract_machine_id: null, client_id: clientId, year: 2025, month: 12, day: 15, counter_bw: 500, counter_color: 100, recorded_at: '2025-12-15T10:00:00Z' })
+      .select('id').single()
+    if (leg.error) throw new Error(`seed legacy: ${leg.error.message}`)
+    const { error } = await emit(basePayload([{ ...baseLine(), closing_counter_id: leg.data!.id }]))
+    expect(error?.message).toContain('closing_counter_not_in_line')
+  })
+
   it('V3a — dos líneas con el mismo cm_id → duplicate_cm_in_payload', async () => {
     const { error } = await emit(basePayload([baseLine(), baseLine()]))
     expect(error?.message).toContain('duplicate_cm_in_payload')
@@ -191,6 +203,82 @@ describe('emit_contract_invoice — endurecimiento: secuencia, dedup y no-reutil
          opening_reading_date: '2026-04-29', closing_reading_date: '2026-06-03' }],
       { period_month: 6, period_end: '2026-06-03' },
     )
+    const { error } = await emit(junio)
+    expect(error?.message).toContain('closing_counter_already_used')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3c sobre cierre persistido SOLO en breakdown (no top-level) de una factura emise previa.
+// Contrato dedicado (HARD2) para aislar el historial. La factura previa se inserta a mano con el
+// cierre X únicamente dentro de invoice_lines.breakdown → V3c debe seguir detectando su reutilización.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('emit_contract_invoice — V3c detecta reutilización de un cierre guardado solo en breakdown', () => {
+  const SERIE2 = 'TESTINV-HARD-M2'
+  const CONTRAT2 = 'TESTINV-HARD-C2'
+  let contractId2: string
+  let lineId2: string
+  let cXId: string   // cierre real persistido solo en el breakdown de la factura previa
+
+  beforeAll(async () => {
+    await admin.from('machine_counters').delete().eq('machine_id', SERIE2)
+    const prev = await admin.from('contracts').select('id').eq('numero_contrat', CONTRAT2).maybeSingle()
+    if (prev.data) {
+      await admin.from('contract_machines').delete().eq('contract_id', prev.data.id)
+      await admin.from('contracts').delete().eq('id', prev.data.id)
+    }
+    await admin.from('machines').delete().eq('numero_serie', SERIE2)
+
+    await admin.from('machines').insert({ numero_serie: SERIE2, marque: 'TESTHARD', modele: 'M2', type: 'color' })
+    const c = await admin.from('contracts')
+      .insert({ numero_contrat: CONTRAT2, client_id: clientId, date_debut: '2026-01-01', statut: 'actif', billing_day: 1 })
+      .select('id').single()
+    contractId2 = c.data!.id as string
+    const planRow = await admin.from('billing_plans').select('id').eq('name', PLAN).single()
+    const ln = await admin.from('contract_machines')
+      .insert({ contract_id: contractId2, machine_id: SERIE2, date_debut: '2026-01-01', statut: 'actif', billing_plan_id: planRow.data!.id })
+      .select('id').single()
+    lineId2 = ln.data!.id as string
+
+    // Apertura (base) + cierre X (real). cX se usará como cierre dentro del breakdown de la factura previa.
+    const cnt = await admin.from('machine_counters').insert([
+      { machine_id: SERIE2, contract_id: contractId2, contract_machine_id: lineId2, client_id: clientId, year: 2026, month: 4, day: 29, counter_bw: 1000, counter_color: 200, recorded_at: '2026-04-29T10:00:00Z' },
+      { machine_id: SERIE2, contract_id: contractId2, contract_machine_id: lineId2, client_id: clientId, year: 2026, month: 6, day: 3,  counter_bw: 1500, counter_color: 260, recorded_at: '2026-06-03T10:00:00Z' },
+    ]).select('id, month')
+    cXId = cnt.data!.find(c => c.month === 6)!.id as string
+
+    // Factura previa de MAYO insertada a mano: el cierre X vive SOLO dentro de breakdown (top-level null).
+    const inv = await admin.from('invoices').insert({
+      numero_facture: 'TESTINV-HARD-BD1', client_id: clientId, client_name: CLIENT, contract_id: contractId2,
+      period_year: 2026, period_month: 5, status: 'emise', total_amount: 8000,
+    }).select('id').single()
+    if (inv.error) throw new Error(`seed prev invoice: ${inv.error.message}`)
+    const il = await admin.from('invoice_lines').insert({
+      invoice_id: inv.data!.id, contract_id: contractId2, numero_contrat: CONTRAT2, machine_id: SERIE2,
+      machine_label: `TESTHARD M2 (${SERIE2})`, plan_name: PLAN, billing_type: 'per_copy',
+      delta_bw: 500, delta_color: 60, amount_fixed: 0, amount_bw: 5000, amount_color: 3000, amount_total: 8000,
+      contract_machine_id: lineId2, closing_counter_id: null,   // top-level NULL a propósito
+      breakdown: [{ contract_machine_id: lineId2, machine_label: 'M2', delta_bw: 500, delta_color: 60, closing_counter_id: cXId }],
+    })
+    if (il.error) throw new Error(`seed prev line: ${il.error.message}`)
+  }, 90_000)
+
+  it('emitir JUNIO reutilizando X (que en la factura de mayo está solo en breakdown) → bloqueado', async () => {
+    const junio = {
+      contract_id: contractId2, client_id: clientId, client_name: CLIENT, numero_contrat: CONTRAT2,
+      period_start: '2026-06-03', period_end: '2026-07-01', period_year: 2026, period_month: 6,
+      has_estimated: false, has_replacement: false, confirm_estimated: false, total_amount: 8000,
+      lines: [{
+        cm_id: lineId2, contract_id: contractId2, numero_contrat: CONTRAT2, machine_id: SERIE2,
+        machine_label: `TESTHARD M2 (${SERIE2})`, plan_name: PLAN, billing_type: 'per_copy',
+        fixed_fee: null, price_bw: 10, price_color: 50, tiers: null,
+        delta_bw: 500, delta_color: 60, is_estimated: false,
+        amount_fixed: 0, amount_bw: 5000, amount_color: 3000, amount_total: 8000,
+        opening_counter_id: null, closing_counter_id: cXId,
+        opening_reading_date: '2026-06-03', closing_reading_date: '2026-06-03',
+        opening_counter_bw: 1000, opening_counter_color: 200, closing_counter_bw: 1500, closing_counter_color: 260,
+      }],
+    }
     const { error } = await emit(junio)
     expect(error?.message).toContain('closing_counter_already_used')
   })
