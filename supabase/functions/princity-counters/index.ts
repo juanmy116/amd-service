@@ -21,6 +21,7 @@ Deno.serve(async (_req: Request) => {
     const { data: lines } = await db
       .from('contract_machines')
       .select(`
+        id,
         machine_id,
         contract_id,
         billing_day_override,
@@ -41,6 +42,7 @@ Deno.serve(async (_req: Request) => {
       .not('machines.princity_device_id', 'is', null)
 
     const machinesWithContracts = (lines ?? []).map(l => ({
+      cm_id:                l.id as string,   // línea (contract_machines) = atribución de la lectura
       numero_serie:         (l.machines as unknown as { numero_serie: string; princity_device_id: string | null }).numero_serie,
       princity_device_id:   (l.machines as unknown as { numero_serie: string; princity_device_id: string | null }).princity_device_id,
       billing_day_override: l.billing_day_override as number | null,
@@ -78,31 +80,35 @@ Deno.serve(async (_req: Request) => {
       const counterDate = String(entry['BillingCounter.date'] ?? '')
       if (!counterDate) continue
 
-      // Verificar que el billing counter es del mes actual
-      const [cy, cm] = counterDate.split('-').map(Number)
-      if (cy !== year || cm !== month) continue
+      // year/month/day se derivan de la FECHA REAL de la lectura (BillingCounter.date),
+      // no de la fecha de ejecución del cron. Se mantiene la cota al mes actual (el cron
+      // solo recoge el relevé del periodo en curso).
+      const [cYear, cMonth, cDayRaw] = counterDate.split('-').map(Number)
+      const counterDay = cDayRaw || 1
+      if (cYear !== year || cMonth !== month) continue
 
-      // Idempotencia: verificar que no existe ya un relevé activo para este mes+máquina
+      // Idempotencia por FECHA REAL (reading_date), no por mes: el modelo nuevo admite dos
+      // relevés el mismo mes en días distintos (uno por máquina y día).
       const { data: existing } = await db
         .from('machine_counters')
         .select('id')
         .eq('machine_id', m.numero_serie)
-        .eq('year', year)
-        .eq('month', month)
+        .eq('year', cYear)
+        .eq('month', cMonth)
+        .eq('day', counterDay)
         .eq('status', 'actif')
         .maybeSingle()
 
       if (existing) continue
 
-      const counterDay = Number(counterDate.split('-')[2] ?? 1)
-
       const { error: insertErr } = await db.from('machine_counters').insert({
-        machine_id:    m.numero_serie,
-        contract_id:   contract.id,
-        client_id:     contract.client_id,
-        year,
-        month,
-        day:           counterDay,
+        machine_id:          m.numero_serie,
+        contract_id:         contract.id,
+        contract_machine_id: m.cm_id,   // atribución directa a la línea (evita relevés huérfanos NULL)
+        client_id:           contract.client_id,
+        year:                cYear,
+        month:               cMonth,
+        day:                 counterDay,
         counter_bw:    Number(entry['BillingCounter.endMono']   ?? 0),
         counter_color: Number(entry['BillingCounter.endColor']  ?? 0),
         status:        'actif',
