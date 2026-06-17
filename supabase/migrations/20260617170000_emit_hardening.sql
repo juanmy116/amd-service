@@ -10,14 +10,14 @@
 --   V2 — cada opening/closing_counter_id (si no es null) es una lectura ACTIVA de esa línea: atribución
 --        directa por contract_machine_id, o fallback por máquina para relevés heredados con cm NULL
 --        CUYA FECHA cae en la vigencia (date_debut, date_fin] — criterio idéntico a countersForLine.
---   V3 — no reutilización de un cierre, en TRES frentes. Se opera sobre los CIERRES LÓGICOS del payload
---        (uno por tramo real): línea sin breakdown → su closing top-level; línea con breakdown
---        (reemplazo consolidado) → los closing de cada tramo del breakdown (NO el top-level, que es la
---        cabeza ya incluida en el breakdown — contarlos juntos daría un falso duplicado).
+--   V3 — no reutilización de un cierre, en TRES frentes. Los cierres se recolectan POR LÍNEA: el cierre
+--        top-level SIEMPRE se incluye (un payload con breakdown:[] no puede ocultarlo) + los cierres de
+--        cada tramo del breakdown. El duplicado BENIGNO (la cabeza de un reemplazo aparece en top-level
+--        Y en su propio breakdown, misma línea) se colapsa con DISTINCT (línea, cierre).
 --        V3a: ningún `cm_id` top-level repetido en el payload (doble forfait/consumo de la misma línea).
---        V3b: ningún cierre lógico repetido en el payload → un mismo cierre no se cobra dos veces.
---        V3c: ningún cierre lógico del payload fue ya cierre de una factura EMISE (A2: solo 'emise',
---             no 'annulee' → tras anular, la lectura queda libre para reemitir); mira AMBOS sitios
+--        V3b: ningún cierre aparece en MÁS DE UNA línea → un mismo cierre no se cobra dos veces.
+--        V3c: ningún cierre del payload fue ya cierre de una factura EMISE (A2: solo 'emise', no
+--             'annulee' → tras anular, la lectura queda libre para reemitir); mira AMBOS sitios
 --             persistidos: invoice_lines.closing_counter_id y los tramos en breakdown.
 --   V4 — si el contrato ya tiene facturas emise, el mes facturado = último mes facturado + 1 (secuencia;
 --        ordinal year*12+(month-1) para que el borde diciembre→enero sea correcto). Sin historial, el
@@ -107,34 +107,48 @@ BEGIN
     RAISE EXCEPTION 'duplicate_cm_in_payload';
   END IF;
 
-  -- ── Cierres LÓGICOS del payload (uno por tramo real, sin doble representación):
-  --     · línea SIN breakdown → su closing_counter_id top-level;
-  --     · línea CON breakdown (reemplazo consolidado A→B) → los closing de cada TRAMO del breakdown.
-  --       NO se cuenta el top-level porque la identidad de la cabeza B ya está DENTRO del breakdown
-  --       (consolidateReplacements incluye la cabeza en chain) → contarlos juntos marcaría un falso
-  --       duplicado y bloquearía un reemplazo legítimo (corrección de la 2ª revisión de Codex). ──
-  SELECT array_agg(cid) INTO v_closings FROM (
-    SELECT NULLIF(l->>'closing_counter_id','')::uuid AS cid
-      FROM jsonb_array_elements(v_lines) l
-     WHERE jsonb_typeof(l->'breakdown') IS DISTINCT FROM 'array'
-       AND NULLIF(l->>'closing_counter_id','') IS NOT NULL
-    UNION ALL
-    SELECT NULLIF(b->>'closing_counter_id','')::uuid
-      FROM jsonb_array_elements(v_lines) l
-      CROSS JOIN LATERAL jsonb_array_elements(l->'breakdown') b
-     WHERE jsonb_typeof(l->'breakdown') = 'array'
-       AND NULLIF(b->>'closing_counter_id','') IS NOT NULL
-  ) s;
+  -- ── Cierres del payload, recolectados POR LÍNEA (WITH ORDINALITY = índice de línea). El cierre
+  --     top-level SIEMPRE se incluye (un payload con breakdown:[] no puede ocultarlo, P0 de la 3ª
+  --     revisión); también se incluyen los cierres de cada tramo del breakdown. El duplicado BENIGNO
+  --     (la cabeza B aparece en top-level Y en su propio breakdown, misma línea) se colapsa con
+  --     DISTINCT (ord, cid): dentro de una línea un id cuenta una vez; entre líneas distintas, no. ──
 
-  -- ── V3b: ningún cierre lógico repetido en el payload (un mismo cierre no se cobra dos veces). ──
-  IF v_closings IS NOT NULL
-     AND cardinality(v_closings) <> (SELECT count(DISTINCT x) FROM unnest(v_closings) x) THEN
+  -- V3b: ningún cierre aparece en MÁS DE UNA línea (eso sí sería cobrar dos veces el mismo cierre).
+  IF EXISTS (
+    SELECT 1 FROM (
+      SELECT DISTINCT ord, cid FROM (
+        SELECT l.ord AS ord, NULLIF(l.val->>'closing_counter_id','')::uuid AS cid
+          FROM jsonb_array_elements(v_lines) WITH ORDINALITY AS l(val, ord)
+         WHERE NULLIF(l.val->>'closing_counter_id','') IS NOT NULL
+        UNION ALL
+        SELECT l.ord, NULLIF(b->>'closing_counter_id','')::uuid
+          FROM jsonb_array_elements(v_lines) WITH ORDINALITY AS l(val, ord)
+          CROSS JOIN LATERAL jsonb_array_elements(
+            CASE WHEN jsonb_typeof(l.val->'breakdown') = 'array' THEN l.val->'breakdown' ELSE '[]'::jsonb END) b
+         WHERE NULLIF(b->>'closing_counter_id','') IS NOT NULL
+      ) all_c
+    ) per_line
+    GROUP BY cid HAVING count(*) > 1
+  ) THEN
     RAISE EXCEPTION 'closing_counter_already_used';
   END IF;
 
-  -- ── V3c: ningún cierre lógico del payload fue ya cierre de una factura EMISE (no reutilización;
-  --        A2: solo 'emise'). Mira AMBOS sitios persistidos: invoice_lines.closing_counter_id Y los
-  --        tramos dentro de invoice_lines.breakdown. ──
+  -- Conjunto (distinct) de TODOS los cierres del payload (top-level SIEMPRE + breakdown) para V3c.
+  SELECT array_agg(DISTINCT cid) INTO v_closings FROM (
+    SELECT NULLIF(l->>'closing_counter_id','')::uuid AS cid
+      FROM jsonb_array_elements(v_lines) l
+     WHERE NULLIF(l->>'closing_counter_id','') IS NOT NULL
+    UNION ALL
+    SELECT NULLIF(b->>'closing_counter_id','')::uuid
+      FROM jsonb_array_elements(v_lines) l
+      CROSS JOIN LATERAL jsonb_array_elements(
+        CASE WHEN jsonb_typeof(l->'breakdown') = 'array' THEN l->'breakdown' ELSE '[]'::jsonb END) b
+     WHERE NULLIF(b->>'closing_counter_id','') IS NOT NULL
+  ) s;
+
+  -- ── V3c: ningún cierre del payload fue ya cierre de una factura EMISE (no reutilización; A2: solo
+  --        'emise'). Mira AMBOS sitios persistidos: invoice_lines.closing_counter_id Y los tramos
+  --        dentro de invoice_lines.breakdown. ──
   IF v_closings IS NOT NULL AND EXISTS (
     SELECT 1
       FROM public.invoice_lines il
