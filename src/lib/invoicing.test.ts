@@ -559,6 +559,19 @@ describe('MOTOR DE CADENA — computeLineChainConsumption', () => {
     expect(t1.delta_bw).toBe(600)                 // 1600 − 1000
   })
 
+  it('línea instalada y RETIRADA el mismo día (start + end, date_debut === date_fin) factura end − start', () => {
+    // Borde: el sentinel del end debe superar el recorded_at '' de la apertura start_counter del MISMO día.
+    const sameDayLine: LineCounters = {
+      date_debut: '2026-06-15', date_fin: '2026-06-15',
+      start_counter_bw: 100, start_counter_color: 20, end_counter_bw: 450, end_counter_color: 60,
+    }
+    const r = computeLineChainConsumption(sameDayLine, [], null)
+    expect(r.is_estimated).toBe(false)
+    expect(r.closing_reading_date).toBe('2026-06-15')
+    expect(r.delta_bw).toBe(350)                  // 450 − 100 (no queda sin cierre)
+    expect(r.delta_color).toBe(40)
+  })
+
   it('delta negativo (reset) → estimada, conservando identidad de apertura/cierre', () => {
     const cs = [
       mkCounter({ id: 'a', year: 2026, month: 4, day: 29, counter_bw: 1000, counter_color: 200 }),

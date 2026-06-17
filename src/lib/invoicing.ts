@@ -327,8 +327,13 @@ export function computeLineChainConsumption(
   //  - Una lectura real del MISMO día que date_fin se ABSORBE en el end_counter: el end es el cierre
   //    DEFINITIVO de la línea (su consumo va hasta el end), de modo que la línea cerrada se factura
   //    completa en UNA sola factura y no queda un tramo huérfano (lectura same-day → end) que, al
-  //    consolidar un reemplazo A→B, se perdería (A deja de tener invoice_line propia). Por eso el
-  //    sintético usa order2 '' (menor que cualquier ISO) → en igualdad de fecha gana al relevé real.
+  //    consolidar un reemplazo A→B, se perdería (A deja de tener invoice_line propia).
+  //
+  // SENTINEL del end_counter = SYN ('\x01'): mayor que '' (recorded_at de una apertura start_counter)
+  // y menor que cualquier timestamp ISO ('2…'). Así, en igualdad de fecha: (a) gana al relevé real
+  // del mismo día (lo absorbe), y (b) supera el umbral de una apertura start_counter del MISMO día
+  // (date_debut === date_fin: instalada y retirada a la vez → factura end − start, no queda sin cierre).
+  const END = '\x01'
   type CloseCand = { id: string | null; date: string; order2: string; bw: number | null; color: number | null }
   const after = (date: string, order2: string) =>
     date > open.date || (date === open.date && order2 > open.recorded_at)
@@ -342,8 +347,8 @@ export function computeLineChainConsumption(
   }
   const closedByReplacement =
     line.date_fin !== null && line.end_counter_bw !== null && line.end_counter_color !== null
-  if (closedByReplacement && after(line.date_fin!, '')) {
-    candidates.push({ id: null, date: line.date_fin!, order2: '', bw: line.end_counter_bw, color: line.end_counter_color })
+  if (closedByReplacement && after(line.date_fin!, END)) {
+    candidates.push({ id: null, date: line.date_fin!, order2: END, bw: line.end_counter_bw, color: line.end_counter_color })
   }
   // Comparación por CODE POINT (no localeCompare, que puede ordenar la puntuación de forma no obvia).
   const cmp = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0)
