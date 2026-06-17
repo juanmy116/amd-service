@@ -49,11 +49,9 @@ export function counterDelta(finalVal: number | null, initialVal: number | null)
  * importada tarde no debe colocarse fuera de su sitio cronológico real).
  */
 export function compareCountersByReading(a: Counter, b: Counter): number {
-  return (
-    a.reading_date.localeCompare(b.reading_date) ||
-    a.recorded_at.localeCompare(b.recorded_at) ||
-    a.id.localeCompare(b.id)
-  )
+  // Comparación por CODE POINT (no localeCompare): orden determinista en cualquier locale.
+  const cmp = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0)
+  return cmp(a.reading_date, b.reading_date) || cmp(a.recorded_at, b.recorded_at) || cmp(a.id, b.id)
 }
 
 /**

@@ -359,6 +359,34 @@ describe('FORMA B — buildContractInvoiceDraft', () => {
     expect(line.breakdown).toHaveLength(2)               // trazabilidad por tramo (§5)
   })
 
+  it('P0 same-day en reemplazo consolidado: A se factura COMPLETA hasta el end_counter (sin huérfano)', async () => {
+    // A (M1) tiene una lectura real el MISMO día de su date_fin (15-jun) y un end_counter mayor. Al
+    // consolidar A→B, A pierde su invoice_line propia → el tramo lectura_real→end NO puede quedar
+    // pendiente: el end absorbe la lectura same-day y A se factura entera (1700−1000) de una vez.
+    const planH = { id: 'plan-h', name: 'Forfait', type: 'hybrid', fixed_fee: 5000, price_bw: 10, price_color: 50, tiers: null }
+    const lineA = { ...lineRow, id: 'cm-A', machine_id: 'M1', date_fin: '2026-06-15',
+      end_counter_bw: 1700, end_counter_color: 300, billing_plans: planH, machines: { numero_serie: 'M1', marque: 'HP', modele: 'X' } }
+    const lineB = { ...lineRow, id: 'cm-B', machine_id: 'M2', date_debut: '2026-06-15',
+      replaces_contract_machine_id: 'cm-A', start_counter_bw: 0, start_counter_color: 0,
+      billing_plans: planH, machines: { numero_serie: 'M2', marque: 'HP', modele: 'Y' } }
+    const rows = [
+      mkRowC('a-base', 2026, 4, 30, 1000, 200),   // apertura de A
+      mkRowC('a-same', 2026, 6, 15, 1600, 280),   // lectura real el MISMO día que date_fin
+    ]
+    vi.mocked(createAdminClient).mockReturnValue(makeAdmin({
+      contracts:         { data: contractRow, error: null },
+      contract_machines: { data: [lineA, lineB], error: null },
+      machine_counters:  { data: rows, error: null },
+    }))
+    const draft = await buildContractInvoiceDraft('ctr-1', 2026, 5)
+    expect(draft).not.toBeNull()
+    const line = draft!.lines[0]
+    expect(line.delta_bw).toBe(700)                      // A completa (1700−1000), NO 600 (no se pierden 100)
+    const bdA = line.breakdown!.find(b => b.contract_machine_id === 'cm-A')!
+    expect(bdA.delta_bw).toBe(700)
+    expect(bdA.closing_reading_date).toBe('2026-06-15')  // cerró con el end_counter, no con la lectura real
+  })
+
   it('contrato inexistente → null', async () => {
     vi.mocked(createAdminClient).mockReturnValue(makeAdmin({ contracts: { data: null, error: null } }))
     await expect(buildContractInvoiceDraft('nope', 2026, 5)).resolves.toBeNull()
@@ -509,7 +537,7 @@ describe('MOTOR DE CADENA — computeLineChainConsumption', () => {
     expect(fin.delta_color).toBe(40)
   })
 
-  it('P0 same-day: una lectura real en date_fin cierra ANTES que el end_counter; el final usa el end_counter', () => {
+  it('P0 same-day: una lectura real en date_fin se ABSORBE en el end_counter (cierre completo, sin huérfano)', () => {
     // date_fin = 15-jun con end_counter 1700; y una lectura REAL también el 15-jun = 1600.
     const replLine: LineCounters = {
       date_debut: '2026-01-01', date_fin: '2026-06-15',
@@ -517,16 +545,18 @@ describe('MOTOR DE CADENA — computeLineChainConsumption', () => {
     }
     const cs = [mkCounter({ id: 'real', year: 2026, month: 6, day: 15, counter_bw: 1600, counter_color: 280 })]
 
-    // Tramo 1 (apertura 30-abr): cierra con la LECTURA REAL del 15-jun, no con el end_counter.
-    const t1 = computeLineChainConsumption(replLine, cs, start(1000, 200, '2026-04-30', 'prev', '2026-04-30T10:00:00Z'))
-    expect(t1.closing_counter_id).toBe('real')
-    expect(t1.delta_bw).toBe(600)                 // 1600 − 1000
+    // Un único tramo (apertura 30-abr → end_counter 15-jun): el end es el cierre DEFINITIVO y absorbe la
+    // lectura real del mismo día. La línea cerrada se factura completa de una vez (no queda tramo huérfano).
+    const t = computeLineChainConsumption(replLine, cs, start(1000, 200, '2026-04-30', 'prev', '2026-04-30T10:00:00Z'))
+    expect(t.closing_counter_id).toBeNull()       // end_counter sintético
+    expect(t.closing_reading_date).toBe('2026-06-15')
+    expect(t.delta_bw).toBe(700)                  // 1700 − 1000 (incluye las copias hasta el end)
 
-    // Tramo 2 (apertura = la lectura real del 15-jun): cierra con el end_counter sintético (mismo día).
-    const t2 = computeLineChainConsumption(replLine, cs, start(1600, 280, '2026-06-15', 'real', '2026-06-15T10:00:00Z'))
-    expect(t2.closing_counter_id).toBeNull()
-    expect(t2.closing_reading_date).toBe('2026-06-15')
-    expect(t2.delta_bw).toBe(100)                 // 1700 − 1600 (copias que NO se pueden perder)
+    // Verificación de no-regresión: una lectura real de fecha ANTERIOR a date_fin sí cierra su tramo.
+    const replEarlier: LineCounters = { ...replLine, date_fin: '2026-06-20' }
+    const t1 = computeLineChainConsumption(replEarlier, cs, start(1000, 200, '2026-04-30', 'prev', '2026-04-30T10:00:00Z'))
+    expect(t1.closing_counter_id).toBe('real')    // 15-jun < date_fin 20-jun → cierra con la lectura real
+    expect(t1.delta_bw).toBe(600)                 // 1600 − 1000
   })
 
   it('delta negativo (reset) → estimada, conservando identidad de apertura/cierre', () => {

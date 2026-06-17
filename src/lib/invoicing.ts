@@ -320,11 +320,15 @@ export function computeLineChainConsumption(
 
   // ── CIERRE ──────────────────────────────────────────────────────────────────
   // El cierre del tramo = el candidato MÁS ANTIGUO estrictamente posterior a la apertura (§4). Los
-  // candidatos son las lecturas reales activas Y —si la línea se cerró por reemplazo— el end_counter
-  // como CANDIDATO SINTÉTICO fechado en date_fin (NO como override absoluto: un end_counter no debe
-  // saltarse una lectura real intermedia anterior al reemplazo; esa lectura cierra su propio tramo y
-  // el end_counter cierra el último). Orden por (fecha, recorded_at); el sintético usa '~' (mayor que
-  // cualquier timestamp ISO) para colocarse DESPUÉS de una lectura real del mismo día.
+  // candidatos son las lecturas reales activas Y —si la línea se cerró por reemplazo/retirada— el
+  // end_counter como CANDIDATO SINTÉTICO fechado en date_fin.
+  //  - Una lectura real de fecha ANTERIOR a date_fin cierra su propio tramo (fecha menor → va antes);
+  //    un end_counter no se salta una lectura real intermedia.
+  //  - Una lectura real del MISMO día que date_fin se ABSORBE en el end_counter: el end es el cierre
+  //    DEFINITIVO de la línea (su consumo va hasta el end), de modo que la línea cerrada se factura
+  //    completa en UNA sola factura y no queda un tramo huérfano (lectura same-day → end) que, al
+  //    consolidar un reemplazo A→B, se perdería (A deja de tener invoice_line propia). Por eso el
+  //    sintético usa order2 '' (menor que cualquier ISO) → en igualdad de fecha gana al relevé real.
   type CloseCand = { id: string | null; date: string; order2: string; bw: number | null; color: number | null }
   const after = (date: string, order2: string) =>
     date > open.date || (date === open.date && order2 > open.recorded_at)
@@ -338,11 +342,10 @@ export function computeLineChainConsumption(
   }
   const closedByReplacement =
     line.date_fin !== null && line.end_counter_bw !== null && line.end_counter_color !== null
-  if (closedByReplacement && after(line.date_fin!, '~')) {
-    candidates.push({ id: null, date: line.date_fin!, order2: '~', bw: line.end_counter_bw, color: line.end_counter_color })
+  if (closedByReplacement && after(line.date_fin!, '')) {
+    candidates.push({ id: null, date: line.date_fin!, order2: '', bw: line.end_counter_bw, color: line.end_counter_color })
   }
-  // Comparación por CODE POINT (no localeCompare): el sentinel sintético '~' (0x7E) debe quedar
-  // siempre DESPUÉS de un recorded_at ISO ('2…'); localeCompare puede ordenar la puntuación antes.
+  // Comparación por CODE POINT (no localeCompare, que puede ordenar la puntuación de forma no obvia).
   const cmp = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0)
   candidates.sort((a, b) => cmp(a.date, b.date) || cmp(a.order2, b.order2))
   const close: { id: string | null; date: string; bw: number | null; color: number | null } | null =
