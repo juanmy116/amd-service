@@ -33,6 +33,16 @@ function counterDate(c: { year: number; month: number; day: number | null }): st
 }
 
 /**
+ * Mínimo y máximo de una lista de fechas ISO (descarta null). Usado para el RANGO ENVOLVENTE de
+ * una tanda de lecturas (apertura más temprana → cierre más tardío). Las fechas ISO YYYY-MM-DD
+ * ordenan correctamente de forma lexicográfica.
+ */
+function dateBounds(dates: (string | null)[]): { min: string | null; max: string | null } {
+  const xs = dates.filter((d): d is string => !!d).sort()
+  return { min: xs[0] ?? null, max: xs[xs.length - 1] ?? null }
+}
+
+/**
  * BLOQUE B / P0-3 — atribución del consumo por LÍNEA/CONTRATO, no por máquina física.
  * Una misma máquina (numero_serie) rota por varios contratos a lo largo del tiempo; cada
  * relevé queda ligado a su `contract_id` (lo rellenan tanto Princity como la entrada manual).
@@ -72,7 +82,18 @@ export function countersForLine(
  *   - billing_day=1, cierre 03-jun → vencimiento más cercano 01-jun → mes facturado = MAYO.
  *   - billing_day=1, cierre 29-abr → vencimiento más cercano 01-may → mes facturado = ABRIL.
  *   - billing_day=20, cierre 20-may → vencimiento 20-may → mes facturado = ABRIL.
- * Spec: docs/superpowers/specs/2026-06-16-facturacion-periodo-a-medida-design.md §4.3.
+ *
+ * TIE-BREAK (B4): si la fecha de cierre cae a igual distancia de dos vencimientos consecutivos,
+ * se elige el vencimiento PASADO (el más temprano) — la recogida cierra el mes que acaba de
+ * terminar. Es determinista (orden de iteración anterior→mismo→siguiente con `<` estricto).
+ *
+ * ÁMBITO (B3): pensado para `billing_day` 1–28, que existen en todos los meses y quedan espaciados
+ * de forma regular (~1 mes) → la heurística de "vencimiento más cercano" es robusta. Para 29–31 el
+ * clamp de fin de mes vuelve irregular el espaciado (p. ej. en febrero) y una recogida a mitad de
+ * mes podría etiquetarse a un mes contiguo: el soporte "fin de mes" se decidirá con el cliente si
+ * aparece un contrato así (regla de negocio a validar, no inventar). Hoy AMD usa días 1/6/12/20.
+ * La validación del rango 1–28 se añadirá en el formulario de contrato (Fase 2).
+ * Spec: docs/superpowers/specs/2026-06-16-facturacion-periodo-a-medida-design.md §4.3, §13 (B3/B4).
  */
 export function computeInvoiceMonth(
   billingDay: number,
@@ -84,6 +105,8 @@ export function computeInvoiceMonth(
   const closeTime = Date.UTC(cy, cm - 1, cd)
 
   // Vencimientos candidatos: el billing_day del mes anterior, del mismo mes y del siguiente.
+  // Orden anterior→mismo→siguiente: con `<` estricto, un empate de distancia se queda con el
+  // candidato PASADO (el primero hallado a la distancia mínima) → tie-break hacia el mes terminado.
   const candidates: { y: number; m: number }[] = [
     { y: cm === 1  ? cy - 1 : cy, m: cm === 1  ? 12 : cm - 1 },
     { y: cy,                      m: cm },
@@ -209,11 +232,16 @@ export function computeLineConsumptionByReadings(
     const m = computeInvoiceMonth(billingDay, iso)
     return m.year === targetYear && m.month === targetMonth
   }
+  // Orden total de relevés por (fecha real, recorded_at) — recorded_at desempata cuando dos
+  // relevés caen el mismo día calendario (B2). Descendente: el [0] es el más reciente.
+  const byRecencyDesc = (a: Counter, b: Counter) =>
+    counterDate(b).localeCompare(counterDate(a)) || b.recorded_at.localeCompare(a.recorded_at)
 
   // Lectura de cierre.
   let closeBw: number | null = null
   let closeColor: number | null = null
   let closeDate: string | null = null
+  let closeRecordedAt = ''   // recorded_at del relevé de cierre; '' para reemplazo (excluye su mismo día)
 
   const closedByReplacement =
     line.date_fin !== null && isTargetMonth(line.date_fin) &&
@@ -223,14 +251,15 @@ export function computeLineConsumptionByReadings(
     closeBw = line.end_counter_bw
     closeColor = line.end_counter_color
     closeDate = line.date_fin
+    // El end_counter de un reemplazo no tiene recorded_at propio; mantenemos '' para que la
+    // apertura solo considere relevés de FECHA estrictamente anterior a date_fin (conservador).
   } else {
-    const closing = active
-      .filter(c => isTargetMonth(counterDate(c)))
-      .sort((a, b) => counterDate(b).localeCompare(counterDate(a)) || b.recorded_at.localeCompare(a.recorded_at))[0]
+    const closing = active.filter(c => isTargetMonth(counterDate(c))).sort(byRecencyDesc)[0]
     if (closing) {
       closeBw = closing.counter_bw
       closeColor = closing.counter_color
       closeDate = counterDate(closing)
+      closeRecordedAt = closing.recorded_at
     }
   }
 
@@ -239,20 +268,25 @@ export function computeLineConsumptionByReadings(
     return { delta_bw: 0, delta_color: 0, is_estimated: true, open_date: null, close_date: null }
   }
 
-  // Lectura de apertura: el relevé activo inmediatamente anterior a la fecha de cierre.
+  // Lectura de apertura: el relevé activo inmediatamente ANTERIOR al cierre en el orden total
+  // (fecha, recorded_at). Comparar por la clave compuesta evita perder un relevé del mismo día
+  // que el cierre con recorded_at anterior (B2).
+  const before = (c: Counter) => {
+    const cd = counterDate(c)
+    return cd < closeDate! || (cd === closeDate && c.recorded_at < closeRecordedAt)
+  }
   let openBw: number | null = null
   let openColor: number | null = null
   let openDate: string | null = null
 
-  const prev = active
-    .filter(c => counterDate(c) < closeDate!)
-    .sort((a, b) => counterDate(b).localeCompare(counterDate(a)) || b.recorded_at.localeCompare(a.recorded_at))[0]
+  const prev = active.filter(before).sort(byRecencyDesc)[0]
   if (prev) {
     openBw = prev.counter_bw
     openColor = prev.counter_color
     openDate = counterDate(prev)
-  } else if (line.start_counter_bw !== null && line.start_counter_color !== null && line.date_debut < closeDate) {
-    // Máquina nueva: su lectura inicial es la apertura de su primera factura.
+  } else if (line.start_counter_bw !== null && line.start_counter_color !== null && line.date_debut <= closeDate) {
+    // Máquina nueva: su lectura inicial es la apertura de su primera factura. `<=` admite el caso
+    // de instalación y primera lectura el MISMO día (B1).
     openBw = line.start_counter_bw
     openColor = line.start_counter_color
     openDate = line.date_debut
@@ -330,8 +364,8 @@ function consolidateReplacements(draftLines: DraftLine[]): { lines: DraftLine[];
     head.amount_total = amounts.amount_total
     head.breakdown    = breakdown
     // El periodo consolidado abarca de la apertura más temprana al cierre más tardío de la cadena.
-    head.open_date    = chain.map(l => l.open_date).filter((d): d is string => !!d).sort()[0] ?? head.open_date
-    head.close_date   = chain.map(l => l.close_date).filter((d): d is string => !!d).sort().at(-1) ?? head.close_date
+    head.open_date    = dateBounds(chain.map(l => l.open_date)).min  ?? head.open_date
+    head.close_date   = dateBounds(chain.map(l => l.close_date)).max ?? head.close_date
 
     for (const l of chain) if (l.cm_id !== head.cm_id) discarded.add(l.cm_id)
   }
@@ -452,14 +486,20 @@ export async function buildContractInvoiceDraft(
   }
 
   // ¿Hay tanda este mes? (alguna línea con lectura de cierre etiquetada en el mes objetivo).
-  const hasBatch = computed.some(c => c.cons.close_date !== null)
-  if (!hasBatch) return null   // no hay nada que facturar este mes
+  // maxCloseDate = cierre más tardío de la tanda → referencia para decidir qué máquinas mudas
+  // estaban ya activas cuando se hizo la recogida (las que entraron DESPUÉS no se facturan aún).
+  const { max: maxCloseDate } = dateBounds(computed.map(c => c.cons.close_date))
+  if (maxCloseDate === null) return null   // no hay tanda → nada que facturar este mes
 
   const draftLines: DraftLine[] = []
   for (const { line, cons } of computed) {
-    // Línea sin cierre este mes: solo entra como "muda estimada" si la máquina sigue activa
-    // (línea abierta). Líneas ya cerradas sin cierre este mes no pertenecen a la tanda.
-    if (cons.close_date === null && line.date_fin !== null) continue
+    // Línea sin cierre este mes ("muda"): solo entra como estimada si (a) sigue activa (abierta) y
+    // (b) ya estaba en el contrato cuando se hizo la recogida (date_debut <= cierre de la tanda).
+    // Una máquina añadida DESPUÉS de la tanda, o una línea ya cerrada, NO pertenecen a este mes.
+    if (cons.close_date === null) {
+      if (line.date_fin !== null) continue
+      if (line.date_debut > maxCloseDate) continue
+    }
 
     const asOf = cons.open_date ?? cons.close_date ?? monthFallback
     const planVersions = line.billing_plan_id ? (planVersionsByPlan.get(line.billing_plan_id) ?? []) : []
@@ -471,7 +511,8 @@ export async function buildContractInvoiceDraft(
 
     const machine = line.machines
     const plan    = line.billing_plans
-    const isEstimated = cons.is_estimated || cons.close_date === null
+    // close_date null ⇒ máquina muda ⇒ el helper ya devolvió is_estimated:true (no hace falta re-OR).
+    const isEstimated = cons.is_estimated
     const amounts = calculateMonthlyAmount(tariff, cons.delta_bw, cons.delta_color)
 
     draftLines.push({
@@ -500,10 +541,10 @@ export async function buildContractInvoiceDraft(
   if (mergedLines.length === 0) return null
 
   // Periodo de cabecera = rango ENVOLVENTE de las lecturas reales de la tanda (spec §4.4, D1).
-  const opens  = mergedLines.map(l => l.open_date).filter((d): d is string => !!d).sort()
-  const closes = mergedLines.map(l => l.close_date).filter((d): d is string => !!d).sort()
-  const period_start = opens[0]  ?? closes[0]            ?? monthFallback
-  const period_end   = closes.at(-1) ?? opens.at(-1) ?? monthFallback
+  const ob = dateBounds(mergedLines.map(l => l.open_date))
+  const cb = dateBounds(mergedLines.map(l => l.close_date))
+  const period_start = ob.min ?? cb.min ?? monthFallback
+  const period_end   = cb.max ?? ob.max ?? monthFallback
 
   return {
     contract_id:   contract.id,

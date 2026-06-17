@@ -141,3 +141,42 @@ La factura es **por contrato** (todas las máquinas). Se agrupan las lecturas de
 - **Tocar el corazón de facturación (probado).** → rama aparte, tests portados + nuevos, gate E2E, revisión `/code-review`, sin facturas reales aún.
 - **Regla del mes/tandas mal entendida** → validar §11 antes de programar (este documento).
 - **Compatibilidad con reemplazos/estimadas** → tests específicos heredados.
+
+---
+
+## 13. Revisión de la Fase 1 (2026-06-16) — hallazgos y PLAN DE CORRECCIÓN
+
+Tras implementar la Fase 1 (motor `invoicing.ts` + 35 tests, commit `057fc2f`), se hizo un `/code-review` a alto esfuerzo (4 finders en paralelo). Hallazgos consolidados, deduplicados y triados abajo. Un hallazgo (comparación de `date_debut` como timestamp) quedó **REFUTADO**: `date_debut`/`date_fin` son tipo `date` en BD → Supabase los devuelve `YYYY-MM-DD`, la comparación lexicográfica con `maxCloseDate` es correcta.
+
+### 🔴 P0 — Riesgo de FACTURA DUPLICADA (dedup por clave no determinista)
+**Qué:** el anti-duplicados vive en 3 sitios y todos usan `(contract_id, period_start)`: (a) índice único `invoices_contract_cycle_emise_unique` (`20260608150000`), (b) `EXISTS` dentro de `emit_contract_invoice`, (c) query «déjà émise» en `facturation/page.tsx:37`. En el modelo viejo `period_start` era DETERMINISTA por (contrato, mes). En FORMA B `period_start` = fecha real de la lectura de apertura más temprana de la tanda → **cambia si llega/edita una lectura después de emitir**. Si cambia, ninguno de los 3 guards reconoce el mes ya facturado → **segunda factura del mismo mes**. Encaja con el flujo real (contadores que entran poco a poco por email).
+**Arreglo:** dedup por la identidad ESTABLE = mes facturado `(contract_id, period_year, period_month)` (una factura por contrato y mes; regla de negocio). Toca:
+- **Migración nueva:** crear `UNIQUE (contract_id, period_year, period_month) WHERE status='emise' AND contract_id IS NOT NULL`; eliminar (o sustituir) `invoices_contract_cycle_emise_unique` sobre `period_start`.
+- **`emit_contract_invoice`:** cambiar el `EXISTS` de `period_start = v_pstart` a `period_year = v_year AND period_month = v_month`. Mantener `period_start/period_end` como datos descriptivos (fechas reales en la factura).
+- **`facturation/page.tsx`:** la query «déjà émise» pasa a filtrar por `period_year`/`period_month`.
+- Tests de integración: re-emitir el mismo mes tras mover la fecha de una lectura → debe bloquear `already_issued`.
+
+### 🟡 P1 — Bugs de borde del motor (arreglo en `invoicing.ts`)
+- **B1 — `start_counter` el mismo día que la 1ª lectura:** en `computeLineConsumptionByReadings` la apertura por `start_counter` exige `line.date_debut < closeDate` (estricto). Una máquina instalada y leída el MISMO día → sin apertura → estimada por error. **Fix:** `<=`.
+- **B2 — dos lecturas el mismo día calendario:** la apertura (`counterDate(c) < closeDate`) descarta una lectura del mismo día que el cierre, aunque su `recorded_at` sea anterior. **Fix:** comparar por `(counterDate, recorded_at)` para no perder el punto de apertura cuando coinciden en fecha.
+
+### 🟡 P2 — Robustez (no afectan a 2AS [día 1], sí a otros clientes)
+- **B3 — `billing_day` 29/30/31:** `clampDay` recorta el vencimiento en meses cortos → dos lecturas de meses distintos pueden etiquetar el mismo mes (colisión) y otro mes quedar sin etiqueta (hueco). **Fix:** decidir regla para días que no existen en todos los meses (p. ej. tratar `billing_day >= 28` como «fin de mes» y etiquetar por el mes natural del cierre, o documentar/limitar el rango). Añadir tests con día 31.
+- **B4 — empates de distancia:** una lectura equidistante entre dos vencimientos resuelve al mes anterior por orden de iteración (no documentado). **Fix:** tie-break explícito y natural = preferir el vencimiento ya pasado (la recogida cierra el mes que acaba de terminar). Documentar + test.
+
+### 🟢 Limpieza (sin cambio de comportamiento)
+- **L1 — `isEstimated` redundante:** `cons.is_estimated || cons.close_date === null` — el helper ya devuelve `is_estimated:true` cuando `close_date` es null. Simplificar.
+- **L2 — patrón «bounds de fechas» repetido 5×** (`.filter(Boolean).sort()[0]/.at(-1)`): extraer helper `dateBounds(dates)`.
+- **L3 — comparador de orden de relevés duplicado 2×** y ya existe la lógica canónica en `counters.ts` (`calcDeltas`): extraer un comparador/`latestActiveBefore` compartido.
+- **L4 — `listBillableContracts` provisional ignora sus params:** se rehace en la Fase 2 (lista «lecturas listas para facturar»). Marcado, no es deuda nueva.
+
+### 🔵 Fase 2 — derivados de la revisión (UI + persistencia)
+- **U1 — textos UI obsoletos:** `page.tsx` y `ContractInvoicePreview` dicen «cycle d'anniversaire» / «jour {billing_day}» → ya no aplica. Reescribir a «période réelle (relevés)».
+- **U2 — fechas reales por LÍNEA:** `invoice_lines` no tiene `open_date/close_date`; hoy solo se persiste el rango a nivel cabecera (`invoices.period_start/end`), que CUBRE el requisito del usuario (la factura muestra 29/04→03/06). Persistir por línea es OPCIONAL → decidir en Fase 2 (si AMD quiere el detalle por máquina en la factura emitida, añadir columnas + RPC + detalle).
+
+### Orden de ejecución del plan
+1. **Completar Fase 1 (motor):** B1, B2, B3, B4 + L1, L2, L3 + tests. (Esta rama.)
+2. **Fase 2a — anti-duplicados P0:** migración + `emit_contract_invoice` + `page.tsx` + tests. (Crítico; antes de cualquier emisión real.)
+3. **Fase 2b — UI:** lista «listo para facturar» (rehacer `listBillableContracts`), textos U1, opcional U2.
+4. **Fase 3 — gate E2E** sobre datos sintéticos con el caso real de 2AS (29/04→03/06 = mayo) + re-emisión bloqueada.
+5. Recién entonces: crear el contrato `099-28` y empezar a facturar 2AS.

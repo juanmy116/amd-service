@@ -143,6 +143,11 @@ describe('FORMA B — computeInvoiceMonth (mes anterior al vencimiento más cerc
   it('clamp de fin de mes: día 31, cierre 01-mar → enero (vencimiento 28-feb)', () => {
     expect(computeInvoiceMonth(31, '2026-03-01')).toEqual({ year: 2026, month: 1 })
   })
+  it('B4: cierre equidistante entre dos vencimientos → mes PASADO (tie-break determinista)', () => {
+    // día 15, cierre 30-abr: a 15 días tanto de 15-abr como de 15-may → gana el vencimiento pasado
+    // (15-abr) → mes facturado = marzo.
+    expect(computeInvoiceMonth(15, '2026-04-30')).toEqual({ year: 2026, month: 3 })
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -165,6 +170,31 @@ describe('FORMA B — computeLineConsumptionByReadings', () => {
     expect(r.delta_bw).toBe(500)            // 1500 − 1000
     expect(r.delta_color).toBe(60)          // 260 − 200
     expect(r.open_date).toBe('2026-04-29')
+    expect(r.close_date).toBe('2026-06-03')
+  })
+
+  it('B1: máquina instalada y leída el MISMO día factura con start_counter (no estimada)', () => {
+    const sameDay: LineCounters = {
+      date_debut: '2026-07-01', date_fin: null,
+      start_counter_bw: 100, start_counter_color: 20, end_counter_bw: null, end_counter_color: null,
+    }
+    const cs: Counter[] = [mkCounter({ id: 'x', year: 2026, month: 7, day: 1, counter_bw: 250, counter_color: 60 })]
+    const r = computeLineConsumptionByReadings(sameDay, cs, 2026, 6, 1)  // 01-jul cierra junio
+    expect(r.is_estimated).toBe(false)
+    expect(r.delta_bw).toBe(150)            // 250 − 100 (antes daba estimada por date_debut < closeDate estricto)
+    expect(r.open_date).toBe('2026-07-01')
+  })
+
+  it('B2: dos lecturas el MISMO día calendario → apertura = la de recorded_at anterior', () => {
+    // El 03-jun se toman dos lecturas: 08:00 (cierre del periodo previo) y 16:00 (cierre de mayo).
+    const cs: Counter[] = [
+      mkCounter({ id: 'am', year: 2026, month: 6, day: 3, counter_bw: 1000, counter_color: 200, recorded_at: '2026-06-03T08:00:00Z' }),
+      mkCounter({ id: 'pm', year: 2026, month: 6, day: 3, counter_bw: 1500, counter_color: 260, recorded_at: '2026-06-03T16:00:00Z' }),
+    ]
+    const r = computeLineConsumptionByReadings(NL, cs, 2026, 5, 1)  // ambas (03-jun, día 1) etiquetan mayo
+    expect(r.is_estimated).toBe(false)
+    expect(r.delta_bw).toBe(500)            // 1500 − 1000 (antes se perdía la apertura del mismo día)
+    expect(r.open_date).toBe('2026-06-03')
     expect(r.close_date).toBe('2026-06-03')
   })
 
@@ -314,6 +344,26 @@ describe('FORMA B — buildContractInvoiceDraft', () => {
     expect(byMachine['M2'].is_estimated).toBe(true)        // muda → estimada
     expect(byMachine['M2'].amount_total).toBe(5000)        // solo forfait
     expect(draft!.has_estimated).toBe(true)
+  })
+
+  it('máquina añadida DESPUÉS del mes facturado NO aparece en la factura', async () => {
+    const hybridPlan = { id: 'plan-h', name: 'Forfait', type: 'hybrid', fixed_fee: 5000, price_bw: 10, price_color: 50, tiers: null }
+    // M1 tiene la tanda de mayo (cierra 03-jun). M2 entró el 15-jul (después de la tanda).
+    const lineA = { ...lineRow, id: 'cm-A', machine_id: 'M1', date_debut: '2026-01-01', billing_plans: hybridPlan, machines: { numero_serie: 'M1', marque: 'HP', modele: 'X' } }
+    const lineB = { ...lineRow, id: 'cm-B', machine_id: 'M2', date_debut: '2026-07-15', billing_plans: hybridPlan, machines: { numero_serie: 'M2', marque: 'HP', modele: 'Y' } }
+    const rows = [
+      mkRowC('a1', 2026, 4, 29, 1000, 200),
+      mkRowC('a2', 2026, 6, 3,  1500, 260),
+    ]
+    vi.mocked(createAdminClient).mockReturnValue(makeAdmin({
+      contracts:         { data: contractRow, error: null },
+      contract_machines: { data: [lineA, lineB], error: null },
+      machine_counters:  { data: rows, error: null },
+    }))
+    const draft = await buildContractInvoiceDraft('ctr-1', 2026, 5)
+    expect(draft).not.toBeNull()
+    expect(draft!.lines).toHaveLength(1)            // solo M1; M2 (futura) excluida
+    expect(draft!.lines[0].machine_id).toBe('M1')
   })
 
   it('contrato inexistente → null', async () => {
