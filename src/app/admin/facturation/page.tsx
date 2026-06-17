@@ -32,9 +32,13 @@ export default async function FacturationPage({
   let alreadyIssued: string | null = null
   if (!technicalError && draft) {
     const admin = createAdminClient()
+    // P0 dedup (Forma B): «déjà émise» se detecta por MES FACTURADO (period_year/period_month),
+    // identidad estable. period_start es una fecha real variable y ya no sirve de clave.
     const { data } = await admin.from('invoices')
       .select('numero_facture')
-      .eq('contract_id', draft.contract_id).eq('period_start', draft.period_start).eq('status', 'emise')
+      .eq('contract_id', draft.contract_id)
+      .eq('period_year', draft.period_year).eq('period_month', draft.period_month)
+      .eq('status', 'emise')
       .maybeSingle()
     alreadyIssued = data?.numero_facture ?? null
   }
