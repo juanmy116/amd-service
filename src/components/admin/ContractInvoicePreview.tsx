@@ -2,58 +2,63 @@
 import { Fragment, useActionState } from 'react'
 import { formatPrice } from '@/lib/billing'
 import { emitContractInvoiceAction } from '@/app/admin/facturation/contract-actions'
-import type { ContractDraft } from '@/lib/invoicing'
+import type { ContractDraft, ReadyToBillEntry } from '@/lib/invoicing'
 
 type Props = {
-  contracts: { id: string; numero_contrat: string; client_name: string }[]
-  selectedContract: string | null
-  year: number; month: number
+  entries: ReadyToBillEntry[]
+  selected: ReadyToBillEntry | null
   draft: ContractDraft | null
   alreadyIssued: string | null
   technicalError?: boolean
 }
 
-function formatCycle(start: string, end: string): string {
-  const fmt = (iso: string) =>
-    new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
-  return `${fmt(start)} – ${fmt(end)}`
+function formatDate(iso: string): string {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+function monthLabel(year: number, month: number): string {
+  return new Date(year, month - 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+}
+function entryKey(e: { contract_id: string; period_year: number; period_month: number }): string {
+  return `${e.contract_id}|${e.period_year}|${e.period_month}`
 }
 
-export default function ContractInvoicePreview({ contracts, selectedContract, year, month, draft, alreadyIssued, technicalError }: Props) {
+export default function ContractInvoicePreview({ entries, selected, draft, alreadyIssued, technicalError }: Props) {
   const [emitState, emitAction] = useActionState(emitContractInvoiceAction, null)
-  function nav(next: Partial<{ contract: string; year: number; month: number }>) {
-    const p = new URLSearchParams({
-      contract: String(next.contract ?? selectedContract ?? ''),
-      year:  String(next.year  ?? year),
-      month: String(next.month ?? month),
-    })
+
+  function selectEntry(key: string) {
+    const [contract, year, month] = key.split('|')
+    const p = new URLSearchParams({ contract, year, month })
     window.location.href = `/admin/facturation?${p.toString()}`
   }
-  const anchorLabel = new Date(year, month - 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+
+  if (!technicalError && entries.length === 0) {
+    return (
+      <div className="text-center py-12 text-sm text-ink-muted">
+        Rien à facturer pour le moment. Un contrat apparaît ici dès qu&apos;un relevé clôture un mois.
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <select value={selectedContract ?? ''} onChange={e => nav({ contract: e.target.value })}
-          className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink">
-          {contracts.length === 0 && <option value="">Aucun contrat facturable</option>}
-          {contracts.map(c => <option key={c.id} value={c.id}>{c.numero_contrat} — {c.client_name}</option>)}
+        <select
+          value={selected ? entryKey(selected) : ''}
+          onChange={e => selectEntry(e.target.value)}
+          className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink min-w-[22rem]">
+          {entries.length === 0 && <option value="">Aucun contrat à facturer</option>}
+          {entries.map(e => (
+            <option key={entryKey(e)} value={entryKey(e)}>
+              {e.numero_contrat} — {e.client_name} · {monthLabel(e.period_year, e.period_month)}
+            </option>
+          ))}
         </select>
-        <select value={month} onChange={e => nav({ month: Number(e.target.value) })}
-          className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink">
-          {Array.from({ length: 12 }, (_, i) => i + 1).map(m =>
-            <option key={m} value={m}>{new Date(2000, m - 1).toLocaleDateString('fr-FR', { month: 'long' })}</option>)}
-        </select>
-        <select value={year} onChange={e => nav({ year: Number(e.target.value) })}
-          className="rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink">
-          {[year - 1, year, year + 1].map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
-        <span className="text-xs text-ink-muted">Cycle ancré sur {anchorLabel}</span>
+        <span className="text-xs text-ink-muted">Période réelle entre relevés</span>
       </div>
 
       {alreadyIssued && (
         <div className="px-4 py-3 rounded-lg bg-info-soft border border-info/20 text-sm text-info flex items-center justify-between">
-          <span>Facture déjà émise pour ce cycle : <strong>{alreadyIssued}</strong></span>
+          <span>Facture déjà émise pour ce mois : <strong>{alreadyIssued}</strong></span>
           <a href="/admin/factures" className="underline">Voir les factures →</a>
         </div>
       )}
@@ -64,14 +69,16 @@ export default function ContractInvoicePreview({ contracts, selectedContract, ye
           <p className="mt-1">Impossible de lire les données de facturation (erreur de base de données). L&apos;aperçu et l&apos;émission sont bloqués pour éviter une facture erronée. Réessayez ; si le problème persiste, prévenez un administrateur.</p>
         </div>
       ) : !draft || draft.lines.length === 0 ? (
-        <div className="text-center py-12 text-sm text-ink-muted">Aucune ligne facturable pour ce contrat sur ce cycle.</div>
+        <div className="text-center py-12 text-sm text-ink-muted">Aucune ligne facturable pour ce mois.</div>
       ) : (
         <>
           <div className="border border-line rounded-card overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 bg-neutral-soft">
               <div>
                 <span className="font-semibold text-sm text-ink">{draft.numero_contrat} — {draft.client_name}</span>
-                <span className="block text-xs text-ink-muted mt-0.5">Cycle {formatCycle(draft.period_start, draft.period_end)} (jour {draft.billing_day})</span>
+                <span className="block text-xs text-ink-muted mt-0.5">
+                  {monthLabel(draft.period_year, draft.period_month)} · période {formatDate(draft.period_start)} – {formatDate(draft.period_end)}
+                </span>
               </div>
               <span className="font-bold text-sm text-ink">{formatPrice(draft.total_amount)}</span>
             </div>
@@ -117,14 +124,14 @@ export default function ContractInvoicePreview({ contracts, selectedContract, ye
           {!alreadyIssued && (
             <form action={emitAction} className="flex flex-wrap items-center justify-end gap-3">
               <input type="hidden" name="contract_id" value={draft.contract_id} />
-              <input type="hidden" name="year" value={year} />
-              <input type="hidden" name="month" value={month} />
+              <input type="hidden" name="year" value={draft.period_year} />
+              <input type="hidden" name="month" value={draft.period_month} />
               {emitState?.error && (
                 <p className="w-full text-sm text-red-600 font-medium" role="alert">⛔ {emitState.error}</p>
               )}
               {draft.has_estimated ? (
                 <>
-                  <p className="text-sm text-warning mr-auto">⚠️ Des machines n&apos;ont pas de relevé pour ce cycle. En forçant, ces lignes seront facturées au forfait (estimées).</p>
+                  <p className="text-sm text-warning mr-auto">⚠️ Des machines n&apos;ont pas de relevé pour ce mois. En forçant, ces lignes seront facturées au forfait (estimées).</p>
                   <button name="confirm_estimated" value="true" type="submit"
                     className="rounded-lg bg-warning px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
                     Forcer la facturation (lignes estimées)

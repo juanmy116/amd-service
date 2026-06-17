@@ -563,29 +563,95 @@ export async function buildContractInvoiceDraft(
   }
 }
 
-/**
- * FORMA B — contratos con al menos una lectura de cierre etiquetada en el mes facturado
- * (targetYear, targetMonth) y aún no facturada. Filtrado fino (tanda real, periodo) en el draft.
- * NOTA: implementación provisional de la Fase 1 — la pantalla de la Fase 2 listará directamente
- * "lecturas listas para facturar" por contrato. De momento devuelve los contratos con líneas
- * facturables, que el draft afinará (devolviendo null si no hay tanda ese mes).
- */
-export async function listBillableContracts(
-  _targetYear: number,
-  _targetMonth: number,
-): Promise<{ id: string; numero_contrat: string; client_name: string }[]> {
-  const admin = createAdminClient()
-  const { data, error } = await admin
-    .from('contract_machines')
-    .select('statut, date_fin, contracts!inner ( id, numero_contrat, statut, clients!inner ( nom_client ) )')
-    .not('billing_plan_id', 'is', null)
-  if (error) throw new BillingDataError('contract_machines')   // P0-7
+/** FORMA B — una «tanda lista para facturar»: un contrato con un mes facturado pendiente. */
+export type ReadyToBillEntry = {
+  contract_id: string
+  numero_contrat: string
+  client_name: string
+  period_year: number
+  period_month: number
+}
 
-  const map = new Map<string, { id: string; numero_contrat: string; client_name: string }>()
-  for (const row of data ?? []) {
-    if (!isLineBillable(row.statut, row.contracts?.statut ?? null, row.date_fin)) continue
-    const c = row.contracts
-    if (c) map.set(c.id, { id: c.id, numero_contrat: c.numero_contrat, client_name: c.clients?.nom_client ?? '—' })
+/**
+ * FORMA B — lista de tandas LISTAS PARA FACTURAR: por cada contrato facturable, los meses que
+ * tienen al menos una lectura de cierre (etiquetada vía computeInvoiceMonth) y aún NO tienen
+ * factura emise. Es el reemplazo del antiguo selector mes/año: la pantalla muestra directamente
+ * «contrato — cliente · mes». El periodo y el total exactos los calcula buildContractInvoiceDraft
+ * al seleccionar una entrada. Spec §5.1, §13.
+ */
+export async function listReadyToBill(): Promise<ReadyToBillEntry[]> {
+  const admin = createAdminClient()
+
+  // 1) Contratos facturables (≥1 línea con plan y facturable) → billing_day + nombre + cliente.
+  const { data: lineRows, error: linesErr } = await admin
+    .from('contract_machines')
+    .select('statut, date_fin, contract_id, contracts!inner ( id, numero_contrat, billing_day, statut, clients!inner ( nom_client ) )')
+    .not('billing_plan_id', 'is', null)
+  if (linesErr) throw new BillingDataError('contract_machines')   // P0-7
+
+  type ContractInfo = { numero_contrat: string; client_name: string; billing_day: number }
+  const billable = new Map<string, ContractInfo>()
+  for (const row of lineRows ?? []) {
+    const c = row.contracts as unknown as {
+      id: string; numero_contrat: string; billing_day: number | null; statut: string | null;
+      clients: { nom_client: string } | null
+    } | null
+    if (!c) continue
+    if (!isLineBillable(row.statut, c.statut, row.date_fin)) continue
+    if (!billable.has(c.id)) {
+      billable.set(c.id, {
+        numero_contrat: c.numero_contrat,
+        client_name:    c.clients?.nom_client ?? '—',
+        billing_day:    c.billing_day ?? 1,
+      })
+    }
   }
-  return [...map.values()].sort((a, b) => a.numero_contrat.localeCompare(b.numero_contrat))
+  if (billable.size === 0) return []
+
+  // 2) Relevés activos atribuidos a esos contratos → mes facturado de cada lectura de cierre.
+  const { data: counterRows, error: cErr } = await admin
+    .from('machine_counters')
+    .select('contract_id, year, month, day, status')
+    .eq('status', 'actif')
+    .not('contract_id', 'is', null)
+    .in('contract_id', [...billable.keys()])
+  if (cErr) throw new BillingDataError('machine_counters')   // P0-7
+
+  // candidatos: clave "contractId|year|month" → {contract_id, year, month}
+  const candidates = new Map<string, { contract_id: string; period_year: number; period_month: number }>()
+  for (const c of counterRows ?? []) {
+    const info = c.contract_id ? billable.get(c.contract_id) : undefined
+    if (!info || !c.contract_id) continue
+    const { year, month } = computeInvoiceMonth(info.billing_day, counterDate(c))
+    candidates.set(`${c.contract_id}|${year}|${month}`, { contract_id: c.contract_id, period_year: year, period_month: month })
+  }
+  if (candidates.size === 0) return []
+
+  // 3) Excluir los meses ya facturados (factura emise por contrato y mes).
+  const { data: issued, error: iErr } = await admin
+    .from('invoices')
+    .select('contract_id, period_year, period_month')
+    .eq('status', 'emise')
+    .not('contract_id', 'is', null)
+  if (iErr) throw new BillingDataError('invoices')   // P0-7
+  const issuedKeys = new Set((issued ?? []).map(i => `${i.contract_id}|${i.period_year}|${i.period_month}`))
+
+  const entries: ReadyToBillEntry[] = []
+  for (const [key, cand] of candidates) {
+    if (issuedKeys.has(key)) continue
+    const info = billable.get(cand.contract_id)!
+    entries.push({
+      contract_id:  cand.contract_id,
+      numero_contrat: info.numero_contrat,
+      client_name:  info.client_name,
+      period_year:  cand.period_year,
+      period_month: cand.period_month,
+    })
+  }
+
+  // Orden: por contrato, y dentro del contrato por mes ascendente (el más antiguo primero).
+  return entries.sort((a, b) =>
+    a.numero_contrat.localeCompare(b.numero_contrat) ||
+    a.period_year - b.period_year ||
+    a.period_month - b.period_month)
 }
