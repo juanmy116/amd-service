@@ -21,7 +21,6 @@ Deno.serve(async (_req: Request) => {
     const { data: lines } = await db
       .from('contract_machines')
       .select(`
-        id,
         machine_id,
         contract_id,
         billing_day_override,
@@ -42,7 +41,6 @@ Deno.serve(async (_req: Request) => {
       .not('machines.princity_device_id', 'is', null)
 
     const machinesWithContracts = (lines ?? []).map(l => ({
-      cm_id:                l.id as string,   // línea (contract_machines) = atribución de la lectura
       numero_serie:         (l.machines as unknown as { numero_serie: string; princity_device_id: string | null }).numero_serie,
       princity_device_id:   (l.machines as unknown as { numero_serie: string; princity_device_id: string | null }).princity_device_id,
       billing_day_override: l.billing_day_override as number | null,
@@ -86,6 +84,28 @@ Deno.serve(async (_req: Request) => {
       const [cYear, cMonth, cDayRaw] = counterDate.split('-').map(Number)
       const counterDay = cDayRaw || 1
       if (cYear !== year || cMonth !== month) continue
+      const readingDate = `${cYear}-${String(cMonth).padStart(2, '0')}-${String(counterDay).padStart(2, '0')}`
+
+      // Atribución por FECHA REAL: la lectura pertenece a la línea VIGENTE en counterDate, no a
+      // «la línea abierta hoy» (un reemplazo intra-mes puede dejar la lectura en la línea
+      // equivocada). Mismo criterio que Manual/OCR (getLineForMachineAtDate): date_debut <= fecha
+      // AND (date_fin IS NULL OR date_fin >= fecha), la de date_debut más reciente. Si ninguna
+      // línea cubre la fecha → no se importa (se registra y se omite).
+      const { data: line } = await db
+        .from('contract_machines')
+        .select('id, contract_id, contracts!inner ( client_id )')
+        .eq('machine_id', m.numero_serie)
+        .lte('date_debut', readingDate)
+        .or(`date_fin.is.null,date_fin.gte.${readingDate}`)
+        .order('date_debut', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!line) {
+        console.warn(`[princity-counters] aucune ligne active pour ${m.numero_serie} au ${readingDate} — relevé ignoré`)
+        continue
+      }
+      const targetClientId = (line.contracts as unknown as { client_id: number }).client_id
 
       // Idempotencia por FECHA REAL (reading_date), no por mes: el modelo nuevo admite dos
       // relevés el mismo mes en días distintos (uno por máquina y día).
@@ -103,9 +123,9 @@ Deno.serve(async (_req: Request) => {
 
       const { error: insertErr } = await db.from('machine_counters').insert({
         machine_id:          m.numero_serie,
-        contract_id:         contract.id,
-        contract_machine_id: m.cm_id,   // atribución directa a la línea (evita relevés huérfanos NULL)
-        client_id:           contract.client_id,
+        contract_id:         line.contract_id,
+        contract_machine_id: line.id,   // línea vigente en la fecha de la lectura
+        client_id:           targetClientId,
         year:                cYear,
         month:               cMonth,
         day:                 counterDay,
