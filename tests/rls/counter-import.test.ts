@@ -92,9 +92,9 @@ describe('process_counter_extraction — semáforo', () => {
   })
 })
 
-describe('process_counter_extraction — duplicado en la cola (V_DUP_PENDING)', () => {
-  it('🟡 amber cuando otra lectura de la misma máquina y mes ya está en cola', async () => {
-    // A: primera lectura de SN para marzo 2026 (mes aislado de los otros tests, que usan junio).
+describe('process_counter_extraction — duplicado en la cola por DÍA (V_DUP_PENDING)', () => {
+  it('🟡 amber cuando otra lectura de la misma máquina y MISMO DÍA ya está en cola', async () => {
+    // A: primera lectura de SN para el 10-mar-2026 (mes aislado de otros tests, que usan junio).
     const idA = await seedPending('TESTHASH-duppend-a')
     const { data: a } = await admin.rpc('process_counter_extraction', {
       p_pending_id: idA,
@@ -103,15 +103,32 @@ describe('process_counter_extraction — duplicado en la cola (V_DUP_PENDING)', 
     })
     expect(a.light).toBe('green') // aún no hay duplicado → verde
 
-    // B: segunda lectura de SN para el MISMO mes mientras A sigue en pending_review.
+    // B: otra lectura del MISMO DÍA (10-mar) mientras A sigue en pending_review → duplicado.
     const idB = await seedPending('TESTHASH-duppend-b')
     const { data: b } = await admin.rpc('process_counter_extraction', {
       p_pending_id: idB,
-      p_extracted: { serial: SN, date_iso: '2026-03-22T10:00:00', counter_bw: 110, counter_color: 55,
+      p_extracted: { serial: SN, date_iso: '2026-03-10T16:00:00', counter_bw: 110, counter_color: 55,
         confidence: 0.95, is_valid_counter_sheet: true, issues: [] },
     })
     expect(b.light).toBe('amber')
     expect(b.errors).toContain('V_DUP_PENDING')
+  })
+
+  it('🟢 NO es duplicado cuando es otro DÍA del mismo mes (modelo por fecha real)', async () => {
+    // Dos lecturas del mismo mes (abril) pero días distintos: con el modelo nuevo conviven.
+    const idA = await seedPending('TESTHASH-duppend-c')
+    await admin.rpc('process_counter_extraction', {
+      p_pending_id: idA,
+      p_extracted: { serial: SN, date_iso: '2026-04-05T10:00:00', counter_bw: 200, counter_color: 80,
+        confidence: 0.95, is_valid_counter_sheet: true, issues: [] },
+    })
+    const idB = await seedPending('TESTHASH-duppend-d')
+    const { data: b } = await admin.rpc('process_counter_extraction', {
+      p_pending_id: idB,
+      p_extracted: { serial: SN, date_iso: '2026-04-20T10:00:00', counter_bw: 210, counter_color: 85,
+        confidence: 0.95, is_valid_counter_sheet: true, issues: [] },
+    })
+    expect(b.errors).not.toContain('V_DUP_PENDING')
   })
 })
 
