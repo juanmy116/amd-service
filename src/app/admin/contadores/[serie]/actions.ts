@@ -108,6 +108,10 @@ export async function cancelCounterAction(
     .eq('status', 'actif')
 
   if (error) {
+    // Guard A3 (trigger BD): no se puede anular un relevé que ya cerró une facture émise.
+    if (error.message?.includes('counter_used_by_emised_invoice')) {
+      return { error: "Ce relevé a déjà été facturé. Annulez d'abord la facture concernée, puis corrigez le relevé." }
+    }
     console.error('[cancelCounter]', error)
     return { error: 'Une erreur est survenue. Veuillez réessayer.' }
   }
