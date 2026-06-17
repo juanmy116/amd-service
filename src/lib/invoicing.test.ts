@@ -3,7 +3,7 @@ import { calcDeltas, counterDelta, type Counter } from '@/lib/counters'
 import {
   countersForLine, BillingDataError, isLineBillable,
   computeInvoiceMonth, computeLineConsumptionByReadings, buildContractInvoiceDraft,
-  type LineCounters,
+  computeLineChainConsumption, type ChainStart, type LineCounters,
 } from '@/lib/invoicing'
 
 // Mock del admin client de Supabase para los tests de buildContractInvoiceDraft (P0-7).
@@ -58,26 +58,27 @@ describe('counterDelta (primitiva compartida)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // BLOQUE B — atribución por línea/contrato (P0-3).
 // ─────────────────────────────────────────────────────────────────────────────
-describe('Bloque B — countersForLine (P0-3): cada línea solo ve los relevés de SU contrato', () => {
+describe('Bloque B — countersForLine (P0-3): cada línea solo ve los relevés de SU línea (contract_machine_id)', () => {
+  // lA, lB = dos LÍNEAS distintas de la misma máquina M1 (puestos sucesivos en el tiempo).
   const all = [
-    mkRow({ id: 'a-may', year: 2026, month: 5, counter_bw: 1000, counter_color: 200 }, 'M1', 'cA'),
-    mkRow({ id: 'b-jun', year: 2026, month: 6, counter_bw: 200,  counter_color: 40  }, 'M1', 'cB'),
+    mkRow({ id: 'a-may', year: 2026, month: 5, contract_machine_id: 'lA', counter_bw: 1000, counter_color: 200 }, 'M1', 'cA'),
+    mkRow({ id: 'b-jun', year: 2026, month: 6, contract_machine_id: 'lB', counter_bw: 200,  counter_color: 40  }, 'M1', 'cB'),
   ]
 
-  it('la línea de A no ve el relevé de B y viceversa', () => {
-    const forA = countersForLine('cA', '2026-04-01', '2026-06-10', all)
-    const forB = countersForLine('cB', '2026-06-11', null,        all)
+  it('la línea A no ve el relevé de B y viceversa (atribución por línea)', () => {
+    const forA = countersForLine('lA', '2026-04-01', '2026-06-10', all)
+    const forB = countersForLine('lB', '2026-06-11', null,        all)
     expect(forA.map(c => c.id)).toEqual(['a-may'])
     expect(forB.map(c => c.id)).toEqual(['b-jun'])
   })
 
-  it('un relevé heredado sin contract_id se atribuye por el intervalo de vigencia de la línea', () => {
+  it('un relevé heredado sin contract_machine_id se atribuye por el intervalo de vigencia de la línea', () => {
     const withLegacy = [
       ...all,
-      mkRow({ id: 'legacy-jun', year: 2026, month: 6, day: 5, counter_bw: 50, counter_color: 10 }, 'M1', null),
+      mkRow({ id: 'legacy-jun', year: 2026, month: 6, day: 5, contract_machine_id: null, counter_bw: 50, counter_color: 10 }, 'M1', null),
     ]
-    const forA = countersForLine('cA', '2026-04-01', '2026-06-10', withLegacy)
-    const forB = countersForLine('cB', '2026-06-11', null,        withLegacy)
+    const forA = countersForLine('lA', '2026-04-01', '2026-06-10', withLegacy)
+    const forB = countersForLine('lB', '2026-06-11', null,        withLegacy)
     expect(forA.map(c => c.id).sort()).toEqual(['a-may', 'legacy-jun'])
     expect(forB.map(c => c.id)).toEqual(['b-jun'])
   })
@@ -85,10 +86,10 @@ describe('Bloque B — countersForLine (P0-3): cada línea solo ve los relevés 
   it('invariante de no-solapamiento: relevé legacy en el día-frontera cuenta en UNA sola línea', () => {
     const X = '2026-06-10'
     const onFrontier = [
-      mkRow({ id: 'legacy-X', year: 2026, month: 6, day: 10, counter_bw: 500, counter_color: 100 }, 'M1', null),
+      mkRow({ id: 'legacy-X', year: 2026, month: 6, day: 10, contract_machine_id: null, counter_bw: 500, counter_color: 100 }, 'M1', null),
     ]
-    const forA = countersForLine('cA', '2026-04-01', X,   onFrontier)
-    const forB = countersForLine('cB', X,          null, onFrontier)
+    const forA = countersForLine('lA', '2026-04-01', X,   onFrontier)
+    const forB = countersForLine('lB', X,          null, onFrontier)
     expect(forA.map(c => c.id)).toEqual(['legacy-X'])
     expect(forB).toEqual([])
     expect(forA.length + forB.length).toBe(1)
@@ -414,6 +415,148 @@ describe('FORMA B — buildContractInvoiceDraft', () => {
       machine_counters:  { data: null, error: { message: 'boom' } },
     }))
     await expect(buildContractInvoiceDraft('ctr-1', 2026, 5)).rejects.toBeInstanceOf(BillingDataError)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOTOR DE CADENA (spec v3.1 §4) — computeLineChainConsumption. Gate §9.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('MOTOR DE CADENA — computeLineChainConsumption', () => {
+  const NL: LineCounters = {
+    date_debut: '2026-01-01', date_fin: null,
+    start_counter_bw: null, start_counter_color: null, end_counter_bw: null, end_counter_color: null,
+  }
+  const start = (bw: number, color: number, date: string, id: string, rec = ''): ChainStart => ({
+    counter_id: id || null, reading_date: date, counter_bw: bw, counter_color: color, recorded_at: rec || null,
+  })
+
+  it('arranque puro (solo la lectura BASE, sin apertura previa) → estimada, sin cierre, opening_is_base', () => {
+    const cs = [mkCounter({ id: 'base', year: 2026, month: 4, day: 29, counter_bw: 1000, counter_color: 200 })]
+    const r = computeLineChainConsumption(NL, cs, null)
+    expect(r.opening_is_base).toBe(true)
+    expect(r.is_estimated).toBe(true)
+    expect(r.closing_counter_id).toBeNull()
+    expect(r.opening_counter_id).toBe('base')
+  })
+
+  it('2AS: 1ª factura = base 29-abr → cierre 03-jun (la más antigua posterior), delta 500/60', () => {
+    const cs = [
+      mkCounter({ id: 'c-abr', year: 2026, month: 4, day: 29, counter_bw: 1000, counter_color: 200 }),
+      mkCounter({ id: 'c-jun', year: 2026, month: 6, day: 3,  counter_bw: 1500, counter_color: 260 }),
+    ]
+    const r = computeLineChainConsumption(NL, cs, null)
+    expect(r.is_estimated).toBe(false)
+    expect(r.delta_bw).toBe(500)
+    expect(r.delta_color).toBe(60)
+    expect(r.opening_counter_id).toBe('c-abr')
+    expect(r.closing_counter_id).toBe('c-jun')
+    expect(r.closing_reading_date).toBe('2026-06-03')
+  })
+
+  it('Gate §9.5 — dos contadores de golpe: cada llamada toma la MÁS ANTIGUA posterior', () => {
+    const cs = [
+      mkCounter({ id: 'abr', year: 2026, month: 5, day: 2,  counter_bw: 1000, counter_color: 200 }), // cierre de abril
+      mkCounter({ id: 'may', year: 2026, month: 6, day: 2,  counter_bw: 1500, counter_color: 260 }), // 02-jun
+      mkCounter({ id: 'jun', year: 2026, month: 6, day: 30, counter_bw: 2000, counter_color: 300 }), // 30-jun
+    ]
+    // Facturado abril (prevClose = lectura 02-may). Mayo usa 02-jun.
+    const mayo = computeLineChainConsumption(NL, cs, start(1000, 200, '2026-05-02', 'abr', '2026-05-02T10:00:00Z'))
+    expect(mayo.closing_counter_id).toBe('may')
+    expect(mayo.delta_bw).toBe(500)
+    // Facturado mayo (prevClose = 02-jun). Junio usa 30-jun.
+    const junio = computeLineChainConsumption(NL, cs, start(1500, 260, '2026-06-02', 'may', '2026-06-02T10:00:00Z'))
+    expect(junio.closing_counter_id).toBe('jun')
+    expect(junio.delta_bw).toBe(500)
+  })
+
+  it('Gate §9.6 — desfase: contador tardío cierra el siguiente tramo (no se salta nada)', () => {
+    const cs = [
+      mkCounter({ id: 'abr', year: 2026, month: 5, day: 2,  counter_bw: 1000, counter_color: 200 }),
+      mkCounter({ id: 'late', year: 2026, month: 6, day: 20, counter_bw: 1800, counter_color: 280 }),
+    ]
+    // Facturado abril; llega un contador el 20-jun → cierra el siguiente tramo (etiquetado mayo por la secuencia).
+    const r = computeLineChainConsumption(NL, cs, start(1000, 200, '2026-05-02', 'abr', '2026-05-02T10:00:00Z'))
+    expect(r.closing_counter_id).toBe('late')
+    expect(r.delta_bw).toBe(800)
+  })
+
+  it('Gate §9.7 — mes solo-fijo: sin lectura posterior al punto de partida → sin cierre (delta 0)', () => {
+    const cs = [mkCounter({ id: 'abr', year: 2026, month: 5, day: 2, counter_bw: 1000, counter_color: 200 })]
+    const r = computeLineChainConsumption(NL, cs, start(1000, 200, '2026-05-02', 'abr', '2026-05-02T10:00:00Z'))
+    expect(r.is_estimated).toBe(true)
+    expect(r.closing_counter_id).toBeNull()
+    expect(r.opening_reading_date).toBe('2026-05-02')
+  })
+
+  it('Gate §9.7 (cont.) — tras un mes solo-fijo, el punto de partida NO avanza: acumula copias', () => {
+    const cs = [
+      mkCounter({ id: 'abr', year: 2026, month: 5, day: 2, counter_bw: 1000, counter_color: 200 }),
+      mkCounter({ id: 'jun', year: 2026, month: 7, day: 1, counter_bw: 2000, counter_color: 300 }),
+    ]
+    // mayo se facturó solo-fijo (no avanzó). Ahora junio: prevClose sigue siendo el cierre de abril (02-may).
+    const r = computeLineChainConsumption(NL, cs, start(1000, 200, '2026-05-02', 'abr', '2026-05-02T10:00:00Z'))
+    expect(r.delta_bw).toBe(1000)   // mayo + junio juntos, sin perder copias
+    expect(r.closing_counter_id).toBe('jun')
+  })
+
+  it('B1 — start_counter y lectura el MISMO día: la lectura cuenta como cierre', () => {
+    const sameDay: LineCounters = {
+      date_debut: '2026-07-01', date_fin: null,
+      start_counter_bw: 100, start_counter_color: 20, end_counter_bw: null, end_counter_color: null,
+    }
+    const cs = [mkCounter({ id: 'x', year: 2026, month: 7, day: 1, counter_bw: 250, counter_color: 60 })]
+    const r = computeLineChainConsumption(sameDay, cs, null)
+    expect(r.is_estimated).toBe(false)
+    expect(r.delta_bw).toBe(150)
+    expect(r.opening_counter_id).toBeNull()       // apertura = start_counter (sintético)
+    expect(r.closing_counter_id).toBe('x')
+  })
+
+  it('cierre por reemplazo con AMBOS end_counter usa el end_counter en date_fin', () => {
+    const replLine: LineCounters = {
+      date_debut: '2026-01-01', date_fin: '2026-06-03',
+      start_counter_bw: null, start_counter_color: null, end_counter_bw: 1400, end_counter_color: 250,
+    }
+    const cs = [mkCounter({ id: 'c-abr', year: 2026, month: 4, day: 29, counter_bw: 1000, counter_color: 200 })]
+    const r = computeLineChainConsumption(replLine, cs, null)
+    expect(r.is_estimated).toBe(false)
+    expect(r.delta_bw).toBe(400)                  // 1400 − 1000
+    expect(r.closing_reading_date).toBe('2026-06-03')
+    expect(r.closing_counter_id).toBeNull()       // end_counter sintético
+  })
+
+  it('P0 reemplazo: el end_counter NO salta una lectura real intermedia anterior al reemplazo', () => {
+    // Apertura 30-abr (1000); lectura real 31-may (1500); reemplazo 15-jun con end_counter 1700.
+    const replLine: LineCounters = {
+      date_debut: '2026-01-01', date_fin: '2026-06-15',
+      start_counter_bw: null, start_counter_color: null, end_counter_bw: 1700, end_counter_color: 300,
+    }
+    const cs = [mkCounter({ id: 'c-may', year: 2026, month: 5, day: 31, counter_bw: 1500, counter_color: 260 })]
+
+    // Tramo de mayo: cierra con la lectura REAL del 31-may (la más antigua posterior), NO con el end_counter.
+    const mayo = computeLineChainConsumption(replLine, cs, start(1000, 200, '2026-04-30', 'prev', '2026-04-30T10:00:00Z'))
+    expect(mayo.closing_counter_id).toBe('c-may')
+    expect(mayo.closing_reading_date).toBe('2026-05-31')
+    expect(mayo.delta_bw).toBe(500)               // 1500 − 1000
+    expect(mayo.delta_color).toBe(60)
+
+    // Tramo final: ya facturado hasta 31-may → ahora sí cierra con el end_counter del reemplazo (15-jun).
+    const fin = computeLineChainConsumption(replLine, cs, start(1500, 260, '2026-05-31', 'c-may', '2026-05-31T10:00:00Z'))
+    expect(fin.closing_counter_id).toBeNull()     // end_counter sintético
+    expect(fin.closing_reading_date).toBe('2026-06-15')
+    expect(fin.delta_bw).toBe(200)                // 1700 − 1500
+    expect(fin.delta_color).toBe(40)
+  })
+
+  it('delta negativo (reset) → estimada, conservando identidad de apertura/cierre', () => {
+    const cs = [
+      mkCounter({ id: 'a', year: 2026, month: 4, day: 29, counter_bw: 1000, counter_color: 200 }),
+      mkCounter({ id: 'b', year: 2026, month: 6, day: 3,  counter_bw: 900,  counter_color: 200 }),
+    ]
+    const r = computeLineChainConsumption(NL, cs, null)
+    expect(r.is_estimated).toBe(true)
+    expect(r.delta_bw).toBe(0)
+    expect(r.closing_counter_id).toBe('b')
   })
 })
 

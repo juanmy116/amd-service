@@ -42,19 +42,30 @@ export function counterDelta(finalVal: number | null, initialVal: number | null)
 }
 
 /**
+ * Orden canónico de relevés por FECHA REAL: (reading_date, recorded_at, id). Spec v3.1 §6.
+ * reading_date (year/month/day) es la fuente de verdad del orden; recorded_at desempata dos
+ * lecturas del mismo día (corrección same-day) y el id da un orden total determinista final.
+ * recorded_at queda solo como auditoría de registro, NO como criterio principal (una lectura
+ * importada tarde no debe colocarse fuera de su sitio cronológico real).
+ */
+export function compareCountersByReading(a: Counter, b: Counter): number {
+  return (
+    a.reading_date.localeCompare(b.reading_date) ||
+    a.recorded_at.localeCompare(b.recorded_at) ||
+    a.id.localeCompare(b.id)
+  )
+}
+
+/**
  * Calcula el delta de cada relevé respecto al relevé activo inmediatamente anterior.
  * - Solo relevés con status 'actif'.
- * - Orden: year, month y `recorded_at` como desempate determinista (fix #4: no hay UNIQUE).
+ * - Orden canónico por FECHA REAL (reading_date, recorded_at, id) — spec v3.1 §6.
  * - El primer relevé y los `is_replacement_start` tienen delta null (no facturable).
  */
 export function calcDeltas(counters: Counter[]): Map<string, CounterDelta> {
   const active = [...counters]
     .filter(c => c.status === 'actif')
-    .sort((a, b) =>
-      a.year !== b.year   ? a.year - b.year :
-      a.month !== b.month ? a.month - b.month :
-      a.recorded_at.localeCompare(b.recorded_at)
-    )
+    .sort(compareCountersByReading)
 
   const deltaMap = new Map<string, CounterDelta>()
   active.forEach((c, i) => {

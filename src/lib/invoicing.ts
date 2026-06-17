@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { counterDelta, type Counter } from '@/lib/counters'
+import { counterDelta, compareCountersByReading, type Counter } from '@/lib/counters'
 import {
   resolveEffectiveTariff,
   resolveEffectiveTariffAsOf,
@@ -24,7 +24,7 @@ export class BillingDataError extends Error {
   }
 }
 
-/** Tipo de relevé tal y como se carga aquí: Counter + las columnas de atribución. */
+/** Tipo de relevé tal y como se carga aquí: Counter + las columnas de atribución (máquina + contrato). */
 type CounterRow = Counter & { machine_id: string; contract_id: string | null }
 
 /** Fecha ISO (YYYY-MM-DD) de un relevé, usando day si existe (día 01 si no). */
@@ -43,14 +43,15 @@ function dateBounds(dates: (string | null)[]): { min: string | null; max: string
 }
 
 /**
- * BLOQUE B / P0-3 — atribución del consumo por LÍNEA/CONTRATO, no por máquina física.
- * Una misma máquina (numero_serie) rota por varios contratos a lo largo del tiempo; cada
- * relevé queda ligado a su `contract_id` (lo rellenan tanto Princity como la entrada manual).
- * Una línea solo debe ver los relevés de SU contrato:
- *   - contract_id === el de la línea  → siempre.
- *   - contract_id NULL (relevé heredado, sin atribución) → solo si su fecha cae dentro del
- *     intervalo de vigencia de la línea (lineDebut, lineFin]. Evita que dos contratos que
- *     compartieron la máquina se roben relevés antiguos sin atribuir.
+ * P0-3 (spec v3.1, Ancla 2) — atribución del consumo por LÍNEA/PUESTO, no por máquina ni por contrato.
+ * Una misma máquina (numero_serie) rota por varias líneas/contratos a lo largo del tiempo; cada
+ * relevé queda ligado a su `contract_machine_id` = la línea vigente en la FECHA de la lectura
+ * (lo resuelve la escritura: manual, OCR y Princity, vía getLineForMachineAtDate). Una línea solo
+ * ve los relevés de SU línea:
+ *   - contract_machine_id === id de la línea  → siempre.
+ *   - contract_machine_id NULL (relevé heredado sin atribución) → solo si su fecha cae dentro del
+ *     intervalo de vigencia de la línea (lineDebut, lineFin]. Defensivo para datos antiguos; en prod
+ *     no hay relevés sin atribuir (0 contadores al migrar).
  *
  * Límite INFERIOR exclusivo (d > lineDebut), superior inclusivo (d <= lineFin): es dinero, así
  * que en el día-frontera entre una línea que cierra (date_fin=X) y otra que abre (date_debut=X)
@@ -58,14 +59,14 @@ function dateBounds(dates: (string | null)[]): { min: string | null; max: string
  * cierra (X <= date_fin), nunca a ambas. Invariante de no-solapamiento (ver test).
  */
 export function countersForLine(
-  lineContractId: string,
+  lineId: string,
   lineDebut: string,
   lineFin: string | null,
   counters: CounterRow[],
 ): Counter[] {
   return counters.filter(c => {
-    if (c.contract_id === lineContractId) return true
-    if (c.contract_id == null) {
+    if (c.contract_machine_id === lineId) return true
+    if (c.contract_machine_id == null) {
       const d = counterDate(c)
       return d > lineDebut && (lineFin === null || d <= lineFin)
     }
@@ -305,6 +306,136 @@ export function computeLineConsumptionByReadings(
     return { delta_bw: 0, delta_color: 0, is_estimated: true, open_date: openDate, close_date: closeDate }
   }
   return { delta_bw, delta_color, is_estimated: false, open_date: openDate, close_date: closeDate }
+}
+
+/**
+ * MOTOR DE CADENA (spec v3.1 §4) — punto de partida de una LÍNEA para su siguiente tramo facturable.
+ * Es el cierre de la última factura REAL (con copias) de la línea, leído de invoice_lines:
+ *   - reading_date: fecha del cierre facturado (la apertura del siguiente tramo).
+ *   - recorded_at: el del relevé de cierre si era un relevé real (para desempatar same-day); null
+ *     si fue un punto sintético (end_counter de un reemplazo) o el arranque.
+ * null ⇒ la línea aún no ha facturado: la apertura se deriva de start_counter o de la 1ª lectura base.
+ */
+export type ChainStart = {
+  counter_id: string | null
+  reading_date: string | null
+  counter_bw: number | null
+  counter_color: number | null
+  recorded_at: string | null
+}
+
+/** Resultado del motor de cadena para una línea: consumo + IDENTIDAD persistible (spec §5). */
+export type LineChainResult = {
+  delta_bw: number
+  delta_color: number
+  is_estimated: boolean
+  /** true cuando la apertura es la 1ª lectura BASE de la línea (arranque puro, sin tramo previo). */
+  opening_is_base: boolean
+  opening_counter_id: string | null
+  opening_reading_date: string | null
+  opening_counter_bw: number | null
+  opening_counter_color: number | null
+  closing_counter_id: string | null
+  closing_reading_date: string | null
+  closing_counter_bw: number | null
+  closing_counter_color: number | null
+}
+
+/**
+ * MOTOR DE CADENA (spec v3.1 §4) — consumo del SIGUIENTE tramo de una línea, con FECHAS REALES y
+ * sin depender de la etiqueta de mes. Reemplaza el modelo de «lectura etiquetada con el mes objetivo».
+ *
+ *  - APERTURA = el punto de partida de la cadena:
+ *      · `prevClose` (cierre de la última factura real de la línea), si la línea ya facturó; si no
+ *      · `start_counter` de la línea (date_debut), si la máquina entró con lectura inicial; si no
+ *      · la 1ª lectura activa = BASE (arranque puro; su tramo no es facturable hasta que llegue otra).
+ *  - CIERRE = la lectura activa MÁS ANTIGUA estrictamente posterior a la apertura (no la más reciente
+ *    ni la «etiquetada con el mes»: corrige el bloqueante de Codex v2). Si la línea se cerró por
+ *    reemplazo con ambos end_counter → el end_counter en date_fin.
+ *
+ * Sin cierre posterior → tramo sin consumo (`is_estimated`, delta 0): el caller decide si es un mes
+ * solo-fijo (línea ya en cadena) o un arranque puro que aún no se factura (`opening_is_base`).
+ * Falta de apertura o delta negativo → estimada (solo forfait), conservando la identidad disponible.
+ */
+export function computeLineChainConsumption(
+  line: LineCounters,
+  counters: Counter[],
+  prevClose: ChainStart | null,
+): LineChainResult {
+  const active = counters.filter(c => c.status === 'actif').sort(compareCountersByReading)
+
+  const empty = (): LineChainResult => ({
+    delta_bw: 0, delta_color: 0, is_estimated: true, opening_is_base: false,
+    opening_counter_id: null, opening_reading_date: null, opening_counter_bw: null, opening_counter_color: null,
+    closing_counter_id: null, closing_reading_date: null, closing_counter_bw: null, closing_counter_color: null,
+  })
+
+  // ── APERTURA ────────────────────────────────────────────────────────────────
+  let open: { id: string | null; date: string; bw: number | null; color: number | null; recorded_at: string }
+  let openingIsBase = false
+  if (prevClose && prevClose.reading_date) {
+    open = {
+      id: prevClose.counter_id, date: prevClose.reading_date,
+      bw: prevClose.counter_bw, color: prevClose.counter_color, recorded_at: prevClose.recorded_at ?? '',
+    }
+  } else if (line.start_counter_bw !== null && line.start_counter_color !== null) {
+    // recorded_at '' (mínimo): una lectura del MISMO día que la instalación cuenta como cierre (B1).
+    open = { id: null, date: line.date_debut, bw: line.start_counter_bw, color: line.start_counter_color, recorded_at: '' }
+  } else {
+    const base = active[0]
+    if (!base) return empty()
+    openingIsBase = true
+    open = { id: base.id, date: counterDate(base), bw: base.counter_bw, color: base.counter_color, recorded_at: base.recorded_at }
+  }
+
+  // ── CIERRE ──────────────────────────────────────────────────────────────────
+  // El cierre del tramo = el candidato MÁS ANTIGUO estrictamente posterior a la apertura (§4). Los
+  // candidatos son las lecturas reales activas Y —si la línea se cerró por reemplazo— el end_counter
+  // como CANDIDATO SINTÉTICO fechado en date_fin (NO como override absoluto: un end_counter no debe
+  // saltarse una lectura real intermedia anterior al reemplazo; esa lectura cierra su propio tramo y
+  // el end_counter cierra el último). Orden por (fecha, recorded_at); el sintético usa '~' (mayor que
+  // cualquier timestamp ISO) para colocarse DESPUÉS de una lectura real del mismo día.
+  type CloseCand = { id: string | null; date: string; order2: string; bw: number | null; color: number | null }
+  const after = (date: string, order2: string) =>
+    date > open.date || (date === open.date && order2 > open.recorded_at)
+
+  const candidates: CloseCand[] = []
+  for (const c of active) {
+    const d = counterDate(c)
+    if (after(d, c.recorded_at)) {
+      candidates.push({ id: c.id, date: d, order2: c.recorded_at, bw: c.counter_bw, color: c.counter_color })
+    }
+  }
+  const closedByReplacement =
+    line.date_fin !== null && line.end_counter_bw !== null && line.end_counter_color !== null
+  if (closedByReplacement && after(line.date_fin!, '~')) {
+    candidates.push({ id: null, date: line.date_fin!, order2: '~', bw: line.end_counter_bw, color: line.end_counter_color })
+  }
+  candidates.sort((a, b) => a.date.localeCompare(b.date) || a.order2.localeCompare(b.order2))
+  const close: { id: string | null; date: string; bw: number | null; color: number | null } | null =
+    candidates[0] ?? null
+
+  const identity = {
+    opening_is_base: openingIsBase,
+    opening_counter_id: open.id,
+    opening_reading_date: open.date,
+    opening_counter_bw: open.bw,
+    opening_counter_color: open.color,
+    closing_counter_id: close?.id ?? null,
+    closing_reading_date: close?.date ?? null,
+    closing_counter_bw: close?.bw ?? null,
+    closing_counter_color: close?.color ?? null,
+  }
+
+  // Sin cierre nuevo → tramo sin consumo (solo-fijo o arranque, lo decide el caller).
+  if (!close) return { delta_bw: 0, delta_color: 0, is_estimated: true, ...identity, closing_counter_id: null }
+
+  const delta_bw = counterDelta(close.bw, open.bw)
+  const delta_color = counterDelta(close.color, open.color)
+  if (delta_bw === null || delta_color === null || delta_bw < 0 || delta_color < 0) {
+    return { delta_bw: 0, delta_color: 0, is_estimated: true, ...identity }
+  }
+  return { delta_bw, delta_color, is_estimated: false, ...identity }
 }
 
 /**
