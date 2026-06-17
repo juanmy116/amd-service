@@ -168,6 +168,13 @@ export type DraftLine = {
   /** FORMA B — fechas reales del periodo de ESTA línea (pueden variar entre máquinas). */
   open_date: string | null
   close_date: string | null
+  /** Identidad de la cadena (spec §5): lecturas/contadores de apertura y cierre de esta línea. */
+  opening_counter_id: string | null
+  closing_counter_id: string | null
+  opening_counter_bw: number | null
+  opening_counter_color: number | null
+  closing_counter_bw: number | null
+  closing_counter_color: number | null
   amount_fixed: number
   amount_bw: number
   amount_color: number
@@ -203,109 +210,6 @@ export type LineCounters = {
   start_counter_color: number | null
   end_counter_bw: number | null
   end_counter_color: number | null
-}
-
-export type LineConsumption = {
-  delta_bw: number
-  delta_color: number
-  is_estimated: boolean
-  open_date: string | null
-  close_date: string | null
-}
-
-/**
- * FORMA B — consumo facturable de UNA línea para el MES facturado (targetYear/targetMonth),
- * usando las LECTURAS REALES (no un ciclo de calendario).
- *  - lectura de cierre: si la línea se cerró por reemplazo y su date_fin cae en el mes objetivo
- *    (con ambos end_counter) → el end_counter en date_fin; si no → el relevé activo más reciente
- *    cuya etiqueta de mes (computeInvoiceMonth) sea el mes objetivo.
- *  - lectura de apertura: el relevé activo inmediatamente anterior a la fecha de cierre; si no hay
- *    ninguno pero la línea nació con start_counter (date_debut < cierre) → el start_counter.
- * Sin cierre etiquetado en el mes → close_date null (la línea NO pertenece a la tanda de este mes).
- * Falta apertura o delta negativo → estimada (solo forfait), conservando close_date.
- * Spec §4.1.
- */
-export function computeLineConsumptionByReadings(
-  line: LineCounters,
-  counters: Counter[],
-  targetYear: number,
-  targetMonth: number,
-  billingDay: number,
-): LineConsumption {
-  const active = counters.filter(c => c.status === 'actif')
-  const isTargetMonth = (iso: string) => {
-    const m = computeInvoiceMonth(billingDay, iso)
-    return m.year === targetYear && m.month === targetMonth
-  }
-  // Orden total de relevés por (fecha real, recorded_at) — recorded_at desempata cuando dos
-  // relevés caen el mismo día calendario (B2). Descendente: el [0] es el más reciente.
-  const byRecencyDesc = (a: Counter, b: Counter) =>
-    counterDate(b).localeCompare(counterDate(a)) || b.recorded_at.localeCompare(a.recorded_at)
-
-  // Lectura de cierre.
-  let closeBw: number | null = null
-  let closeColor: number | null = null
-  let closeDate: string | null = null
-  let closeRecordedAt = ''   // recorded_at del relevé de cierre; '' para reemplazo (excluye su mismo día)
-
-  const closedByReplacement =
-    line.date_fin !== null && isTargetMonth(line.date_fin) &&
-    line.end_counter_bw !== null && line.end_counter_color !== null   // H-D7: ambos puntos
-
-  if (closedByReplacement) {
-    closeBw = line.end_counter_bw
-    closeColor = line.end_counter_color
-    closeDate = line.date_fin
-    // El end_counter de un reemplazo no tiene recorded_at propio; mantenemos '' para que la
-    // apertura solo considere relevés de FECHA estrictamente anterior a date_fin (conservador).
-  } else {
-    const closing = active.filter(c => isTargetMonth(counterDate(c))).sort(byRecencyDesc)[0]
-    if (closing) {
-      closeBw = closing.counter_bw
-      closeColor = closing.counter_color
-      closeDate = counterDate(closing)
-      closeRecordedAt = closing.recorded_at
-    }
-  }
-
-  // Sin lectura de cierre etiquetada en el mes → la línea no pertenece a la tanda de este mes.
-  if (closeDate === null) {
-    return { delta_bw: 0, delta_color: 0, is_estimated: true, open_date: null, close_date: null }
-  }
-
-  // Lectura de apertura: el relevé activo inmediatamente ANTERIOR al cierre en el orden total
-  // (fecha, recorded_at). Comparar por la clave compuesta evita perder un relevé del mismo día
-  // que el cierre con recorded_at anterior (B2).
-  const before = (c: Counter) => {
-    const cd = counterDate(c)
-    return cd < closeDate! || (cd === closeDate && c.recorded_at < closeRecordedAt)
-  }
-  let openBw: number | null = null
-  let openColor: number | null = null
-  let openDate: string | null = null
-
-  const prev = active.filter(before).sort(byRecencyDesc)[0]
-  if (prev) {
-    openBw = prev.counter_bw
-    openColor = prev.counter_color
-    openDate = counterDate(prev)
-  } else if (line.start_counter_bw !== null && line.start_counter_color !== null && line.date_debut <= closeDate) {
-    // Máquina nueva: su lectura inicial es la apertura de su primera factura. `<=` admite el caso
-    // de instalación y primera lectura el MISMO día (B1).
-    openBw = line.start_counter_bw
-    openColor = line.start_counter_color
-    openDate = line.date_debut
-  }
-
-  const delta_bw = counterDelta(closeBw, openBw)
-  const delta_color = counterDelta(closeColor, openColor)
-  if (delta_bw === null || delta_color === null) {
-    return { delta_bw: 0, delta_color: 0, is_estimated: true, open_date: openDate, close_date: closeDate }
-  }
-  if (delta_bw < 0 || delta_color < 0) {
-    return { delta_bw: 0, delta_color: 0, is_estimated: true, open_date: openDate, close_date: closeDate }
-  }
-  return { delta_bw, delta_color, is_estimated: false, open_date: openDate, close_date: closeDate }
 }
 
 /**
@@ -559,7 +463,7 @@ export async function buildContractInvoiceDraft(
   const { data: allCounters, error: countersErr } = machineIds.length
     ? await admin
         .from('machine_counters')
-        .select('id, machine_id, contract_id, year, month, day, counter_bw, counter_color, status, is_replacement_start, previous_machine_id, annulation_reason, annule_at, notes, recorded_at')
+        .select('id, machine_id, contract_id, contract_machine_id, reading_date, year, month, day, counter_bw, counter_color, status, is_replacement_start, previous_machine_id, annulation_reason, annule_at, notes, recorded_at')
         .in('machine_id', machineIds)
     : { data: [] as CounterRow[], error: null }
   if (countersErr) throw new BillingDataError('machine_counters')   // P0-7
@@ -569,6 +473,51 @@ export async function buildContractInvoiceDraft(
     const arr = countersByMachine.get(c.machine_id) ?? []
     arr.push(c)
     countersByMachine.set(c.machine_id, arr)
+  }
+  const counterById = new Map<string, CounterRow>()
+  for (const c of (allCounters ?? []) as CounterRow[]) counterById.set(c.id, c)
+
+  // CADENA (spec §4) — facturas EMISE previas del contrato: dan el «último mes facturado» (secuencia)
+  // y, por línea, el PUNTO DE PARTIDA del siguiente tramo (cierre de la última factura con lectura real).
+  const { data: prevInvoices, error: prevErr } = await admin
+    .from('invoices')
+    .select(`
+      period_year, period_month,
+      invoice_lines ( contract_machine_id, closing_counter_id, closing_reading_date, closing_counter_bw, closing_counter_color )
+    `)
+    .eq('contract_id', contractId)
+    .eq('status', 'emise')
+  if (prevErr) throw new BillingDataError('invoices')   // P0-7
+
+  // Último mes facturado (ordinal year*12+month) y, por LÍNEA, el cierre real más reciente facturado.
+  type PrevLine = { contract_machine_id: string | null; closing_counter_id: string | null;
+    closing_reading_date: string | null; closing_counter_bw: number | null; closing_counter_color: number | null }
+  let lastMonthOrd: number | null = null
+  const prevCloseByLine = new Map<string, { ord: number; line: PrevLine }>()
+  for (const inv of (prevInvoices ?? []) as { period_year: number; period_month: number; invoice_lines: PrevLine[] }[]) {
+    const ord = inv.period_year * 12 + (inv.period_month - 1)
+    lastMonthOrd = lastMonthOrd === null ? ord : Math.max(lastMonthOrd, ord)
+    for (const il of inv.invoice_lines ?? []) {
+      if (!il.contract_machine_id || il.closing_reading_date === null) continue   // solo cierres reales
+      const cur = prevCloseByLine.get(il.contract_machine_id)
+      if (!cur || ord > cur.ord) prevCloseByLine.set(il.contract_machine_id, { ord, line: il })
+    }
+  }
+
+  // ChainStart de una línea desde su última factura con cierre real. recorded_at: el del relevé de
+  // cierre si era real; '~' (mayor que cualquier ISO) si fue un end_counter sintético de reemplazo —
+  // así no se reconsidera el mismo end_counter en igualdad de fecha (P2 de la revisión de Codex).
+  const chainStartFor = (lineId: string): ChainStart | null => {
+    const prev = prevCloseByLine.get(lineId)
+    if (!prev) return null
+    const real = prev.line.closing_counter_id ? counterById.get(prev.line.closing_counter_id) : null
+    return {
+      counter_id: prev.line.closing_counter_id,
+      reading_date: prev.line.closing_reading_date,
+      counter_bw: prev.line.closing_counter_bw,
+      counter_color: prev.line.closing_counter_color,
+      recorded_at: real ? real.recorded_at : '~',
+    }
   }
 
   // P1-5: historial de tarifas (plan + overrides) para resolver el precio VIGENTE a la fecha de
@@ -606,37 +555,67 @@ export async function buildContractInvoiceDraft(
   }
 
   const contractStatut = contract.statut as string | null
-
-  // Primera pasada: consumo por línea (solo facturables). Mes-fallback para tarifa de estimadas.
   const monthFallback = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01`
-  type Computed = { line: typeof lines[number]; cons: LineConsumption }
+  const targetOrd = targetYear * 12 + (targetMonth - 1)
+
+  // 1) Consumo del SIGUIENTE tramo por línea con el MOTOR DE CADENA (apertura = punto de partida de
+  //    facturas previas / start_counter / base; cierre = lectura más antigua posterior). Se excluyen
+  //    las líneas ya cerradas (date_fin) cuyo cierre final YA fue facturado (no re-facturar forfait).
+  type Computed = {
+    line: NonNullable<typeof lines>[number]
+    prevClose: ChainStart | null
+    cons: LineChainResult
+    /** Mes (ordinal) que ancla el PRIMER tramo de una línea sin historial (computeInvoiceMonth N7). */
+    firstMonthOrd: number | null
+  }
   const computed: Computed[] = []
   for (const line of lines ?? []) {
     if (!line.machine_id) continue
     if (!isLineBillable(line.statut, contractStatut, line.date_fin)) continue
+    const prevClose = chainStartFor(line.id)
+    if (line.date_fin !== null && prevClose?.reading_date != null && prevClose.reading_date >= line.date_fin) continue
     const machineCounters = countersByMachine.get(line.machine_id) ?? []
-    const counters = countersForLine(contractId, line.date_debut, line.date_fin, machineCounters)
-    const cons = computeLineConsumptionByReadings(line, counters, targetYear, targetMonth, billingDay)
-    computed.push({ line, cons })
+    const counters = countersForLine(line.id, line.date_debut, line.date_fin, machineCounters)
+    const cons = computeLineChainConsumption(line, counters, prevClose)
+    let firstMonthOrd: number | null = null
+    if (!prevClose && cons.closing_reading_date !== null) {
+      const m = computeInvoiceMonth(billingDay, cons.closing_reading_date)
+      firstMonthOrd = m.year * 12 + (m.month - 1)
+    }
+    computed.push({ line, prevClose, cons, firstMonthOrd })
   }
 
-  // ¿Hay tanda este mes? (alguna línea con lectura de cierre etiquetada en el mes objetivo).
-  // maxCloseDate = cierre más tardío de la tanda → referencia para decidir qué máquinas mudas
-  // estaban ya activas cuando se hizo la recogida (las que entraron DESPUÉS no se facturan aún).
-  const { max: maxCloseDate } = dateBounds(computed.map(c => c.cons.close_date))
-  if (maxCloseDate === null) return null   // no hay tanda → nada que facturar este mes
+  // 2) Mes que TOCA facturar en la SECUENCIA (§4): la fecha solo ancla el primero; luego manda last+1.
+  //    Sin historial: ancla = el primer cierre MÁS TEMPRANO del contrato (menor firstMonthOrd).
+  //    Esto preserva la semántica del modelo anterior (un mes anterior o posterior al que toca → null).
+  const firstOrds = computed.map(c => c.firstMonthOrd).filter((o): o is number => o !== null)
+  const expectedOrd = lastMonthOrd !== null
+    ? lastMonthOrd + 1
+    : (firstOrds.length ? Math.min(...firstOrds) : null)
+  if (expectedOrd === null) return null    // ni historial ni primer cierre → solo base, nada que facturar
+  if (targetOrd !== expectedOrd) return null   // se factura en secuencia; este mes no toca
+
+  // 3) Líneas que aportan CIERRE REAL este mes (definen la "tanda" y su cierre más tardío):
+  //    en cadena → si tienen cierre nuevo; primer tramo → si su cierre ancla justo a expectedOrd.
+  const contributesReal = (c: Computed) =>
+    c.cons.closing_reading_date !== null && (c.prevClose !== null || c.firstMonthOrd === expectedOrd)
+  const { max: maxCloseDate } = dateBounds(computed.filter(contributesReal).map(c => c.cons.closing_reading_date))
 
   const draftLines: DraftLine[] = []
-  for (const { line, cons } of computed) {
-    // Línea sin cierre este mes ("muda"): solo entra como estimada si (a) sigue activa (abierta) y
-    // (b) ya estaba en el contrato cuando se hizo la recogida (date_debut <= cierre de la tanda).
-    // Una máquina añadida DESPUÉS de la tanda, o una línea ya cerrada, NO pertenecen a este mes.
-    if (cons.close_date === null) {
-      if (line.date_fin !== null) continue
-      if (line.date_debut > maxCloseDate) continue
+  for (const c of computed) {
+    const { line, cons } = c
+    const real = contributesReal(c)
+    if (!real) {
+      // Sin cierre real este mes → entra SOLO-FIJO (forfait) únicamente si:
+      //  - ya está en cadena (facturó antes) y sigue activa → mes solo-fijo (§4.4); o
+      //  - es una máquina activa MUDA que ya estaba cuando se hizo la recogida (hay tanda).
+      // Resto (arranque puro, o máquina añadida después de la tanda) → no pertenece a este mes.
+      const inChain = c.prevClose !== null && line.date_fin === null
+      const isMute  = line.date_fin === null && maxCloseDate !== null && line.date_debut <= maxCloseDate
+      if (!inChain && !isMute) continue
     }
 
-    const asOf = cons.open_date ?? cons.close_date ?? monthFallback
+    const asOf = cons.opening_reading_date ?? cons.closing_reading_date ?? monthFallback
     const planVersions = line.billing_plan_id ? (planVersionsByPlan.get(line.billing_plan_id) ?? []) : []
     const ovVersions   = ovVersionsByCm.get(line.id) ?? []
     const tariff =
@@ -646,9 +625,10 @@ export async function buildContractInvoiceDraft(
 
     const machine = line.machines
     const plan    = line.billing_plans
-    // close_date null ⇒ máquina muda ⇒ el helper ya devolvió is_estimated:true (no hace falta re-OR).
-    const isEstimated = cons.is_estimated
-    const amounts = calculateMonthlyAmount(tariff, cons.delta_bw, cons.delta_color)
+    const delta_bw    = real ? cons.delta_bw : 0
+    const delta_color = real ? cons.delta_color : 0
+    const isEstimated = real ? cons.is_estimated : true   // sin cierre real → solo forfait (estimada)
+    const amounts = calculateMonthlyAmount(tariff, delta_bw, delta_color)
 
     draftLines.push({
       cm_id:          line.id,
@@ -663,22 +643,23 @@ export async function buildContractInvoiceDraft(
       price_bw:       tariff.price_bw,
       price_color:    tariff.price_color,
       tiers:          tariff.tiers,
-      delta_bw:       cons.delta_bw,
-      delta_color:    cons.delta_color,
+      delta_bw,
+      delta_color,
       is_estimated:   isEstimated,
-      open_date:      cons.open_date,
-      close_date:     cons.close_date,
+      open_date:      cons.opening_reading_date,
+      close_date:     real ? cons.closing_reading_date : null,
+      opening_counter_id:    cons.opening_counter_id,
+      closing_counter_id:    real ? cons.closing_counter_id : null,
+      opening_counter_bw:    cons.opening_counter_bw,
+      opening_counter_color: cons.opening_counter_color,
+      closing_counter_bw:    real ? cons.closing_counter_bw : null,
+      closing_counter_color: real ? cons.closing_counter_color : null,
       ...amounts,
     })
   }
 
   const { lines: mergedLines, has_replacement } = consolidateReplacements(draftLines)
   if (mergedLines.length === 0) return null
-
-  // Mes de PURO ARRANQUE: si ninguna línea tiene lectura de apertura (solo primeras lecturas =
-  // base, y/o máquinas mudas), no hay consumo que facturar → no se factura el mes de arranque.
-  // (Caso 2AS: la primera tanda —abril— es solo base; no debe ofrecerse como facturable.)
-  if (mergedLines.every(l => l.open_date === null)) return null
 
   // Periodo de cabecera = rango ENVOLVENTE de las lecturas reales de la tanda (spec §4.4, D1).
   const ob = dateBounds(mergedLines.map(l => l.open_date))
@@ -713,15 +694,11 @@ export type ReadyToBillEntry = {
 }
 
 /**
- * FORMA B — lista de tandas LISTAS PARA FACTURAR: por cada contrato facturable, los meses con un
- * relevé que CIERRA un mes (tiene apertura) y aún SIN factura emise. Reemplaza el selector mes/año.
- *
- * Comparte la atribución del motor para no divergir de buildContractInvoiceDraft:
- *  - atribuye los relevés por LÍNEA con countersForLine (incluye relevés legacy contract_id NULL
- *    por fecha, igual que el draft), no solo por contract_id de la fila;
- *  - excluye la BASE (la primera lectura de una máquina, sin apertura previa ni start_counter): un
- *    mes de puro arranque no tiene consumo y no debe ofrecerse (caso 2AS: abril es solo base).
- * El periodo y el total exactos los calcula buildContractInvoiceDraft al seleccionar. Spec §5.1, §13.
+ * MOTOR DE CADENA (spec v3.1 §4) — lista de tandas LISTAS PARA FACTURAR. Por cada contrato facturable
+ * ofrece UN solo mes: el SIGUIENTE en la secuencia (último mes facturado + 1; o, sin historial, el mes
+ * que ancla el primer cierre vía computeInvoiceMonth/N7). Nunca meses futuros (mes ≤ mes actual en hora
+ * de Africa/Dakar = UTC, A4) ni infinitos (uno por contrato). Confirma con buildContractInvoiceDraft
+ * para NO divergir del motor: solo aparece el contrato si ese mes produce un borrador real.
  */
 export async function listReadyToBill(): Promise<ReadyToBillEntry[]> {
   const admin = createAdminClient()
@@ -731,7 +708,7 @@ export async function listReadyToBill(): Promise<ReadyToBillEntry[]> {
     .from('contract_machines')
     .select(`
       id, contract_id, machine_id, date_debut, date_fin, statut,
-      start_counter_bw, start_counter_color,
+      start_counter_bw, start_counter_color, end_counter_bw, end_counter_color,
       contracts!inner ( id, numero_contrat, billing_day, statut, clients!inner ( nom_client ) )
     `)
     .not('billing_plan_id', 'is', null)
@@ -741,6 +718,7 @@ export async function listReadyToBill(): Promise<ReadyToBillEntry[]> {
     id: string; contract_id: string; machine_id: string | null
     date_debut: string; date_fin: string | null; statut: string | null
     start_counter_bw: number | null; start_counter_color: number | null
+    end_counter_bw: number | null; end_counter_color: number | null
     numero_contrat: string; client_name: string; billing_day: number
   }
   const lines: Line[] = []
@@ -755,17 +733,26 @@ export async function listReadyToBill(): Promise<ReadyToBillEntry[]> {
       id: row.id, contract_id: c.id, machine_id: row.machine_id,
       date_debut: row.date_debut, date_fin: row.date_fin, statut: row.statut,
       start_counter_bw: row.start_counter_bw, start_counter_color: row.start_counter_color,
+      end_counter_bw: row.end_counter_bw, end_counter_color: row.end_counter_color,
       numero_contrat: c.numero_contrat, client_name: c.clients?.nom_client ?? '—',
       billing_day: c.billing_day ?? 1,
     })
   }
   if (lines.length === 0) return []
 
+  const info = new Map<string, { numero_contrat: string; client_name: string }>()
+  const linesByContract = new Map<string, Line[]>()
+  for (const l of lines) {
+    info.set(l.contract_id, { numero_contrat: l.numero_contrat, client_name: l.client_name })
+    const arr = linesByContract.get(l.contract_id) ?? []
+    arr.push(l); linesByContract.set(l.contract_id, arr)
+  }
+
   // 2) Relevés activos de esas máquinas (atribución fina por línea = countersForLine, como el draft).
   const machineIds = [...new Set(lines.map(l => l.machine_id).filter((id): id is string => !!id))]
   const { data: counterRows, error: cErr } = await admin
     .from('machine_counters')
-    .select('id, machine_id, contract_id, year, month, day, counter_bw, counter_color, status, is_replacement_start, previous_machine_id, annulation_reason, annule_at, notes, recorded_at')
+    .select('id, machine_id, contract_id, contract_machine_id, reading_date, year, month, day, counter_bw, counter_color, status, is_replacement_start, previous_machine_id, annulation_reason, annule_at, notes, recorded_at')
     .in('machine_id', machineIds)
     .eq('status', 'actif')
   if (cErr) throw new BillingDataError('machine_counters')   // P0-7
@@ -776,48 +763,67 @@ export async function listReadyToBill(): Promise<ReadyToBillEntry[]> {
     arr.push(c); countersByMachine.set(c.machine_id, arr)
   }
 
-  // candidatos: "contractId|year|month" — un relevé es candidato solo si tiene APERTURA
-  // (relevé anterior en la línea, o start_counter con date_debut <= su fecha). Así la base no cuenta.
-  const candidates = new Map<string, { contract_id: string; period_year: number; period_month: number }>()
-  const info = new Map<string, { numero_contrat: string; client_name: string }>()
-  for (const line of lines) {
-    info.set(line.contract_id, { numero_contrat: line.numero_contrat, client_name: line.client_name })
-    const own = countersForLine(line.contract_id, line.date_debut, line.date_fin, countersByMachine.get(line.machine_id!) ?? [])
-      .slice()
-      .sort((a, b) => counterDate(a).localeCompare(counterDate(b)) || a.recorded_at.localeCompare(b.recorded_at))
-    const hasStart = line.start_counter_bw !== null && line.start_counter_color !== null
-    own.forEach((c, i) => {
-      const hasOpening = i > 0 || (hasStart && line.date_debut <= counterDate(c))
-      if (!hasOpening) return   // base: primera lectura sin apertura → no factura
-      const { year, month } = computeInvoiceMonth(line.billing_day, counterDate(c))
-      candidates.set(`${line.contract_id}|${year}|${month}`, { contract_id: line.contract_id, period_year: year, period_month: month })
-    })
-  }
-  if (candidates.size === 0) return []
-
-  // 3) Excluir los meses ya facturados (factura emise por contrato y mes).
+  // 3) Último mes facturado (ordinal) por contrato → secuencia (§4).
   const { data: issued, error: iErr } = await admin
     .from('invoices')
     .select('contract_id, period_year, period_month')
     .eq('status', 'emise')
     .not('contract_id', 'is', null)
   if (iErr) throw new BillingDataError('invoices')   // P0-7
-  const issuedKeys = new Set((issued ?? []).map(i => `${i.contract_id}|${i.period_year}|${i.period_month}`))
-
-  const entries: ReadyToBillEntry[] = []
-  for (const [key, cand] of candidates) {
-    if (issuedKeys.has(key)) continue
-    const ci = info.get(cand.contract_id)!
-    entries.push({
-      contract_id:  cand.contract_id,
-      numero_contrat: ci.numero_contrat,
-      client_name:  ci.client_name,
-      period_year:  cand.period_year,
-      period_month: cand.period_month,
-    })
+  const lastOrdByContract = new Map<string, number>()
+  for (const inv of issued ?? []) {
+    if (!inv.contract_id) continue
+    const ord = inv.period_year * 12 + (inv.period_month - 1)
+    const cur = lastOrdByContract.get(inv.contract_id)
+    if (cur === undefined || ord > cur) lastOrdByContract.set(inv.contract_id, ord)
   }
 
-  // Orden: por contrato, y dentro del contrato por mes ascendente (el más antiguo primero).
+  // 4) Mes que TOCA por contrato: último+1, o (sin historial) el ancla del primer cierre más temprano.
+  //    Nunca meses futuros: A4 evalúa «mes actual» en hora de NEGOCIO (Africa/Dakar = UTC, sin DST).
+  const now = new Date()
+  const currentOrd = now.getUTCFullYear() * 12 + now.getUTCMonth()
+
+  const expectedByContract = new Map<string, number>()
+  for (const [contractId, cLines] of linesByContract) {
+    const lastOrd = lastOrdByContract.get(contractId)
+    let expectedOrd: number | null = null
+    if (lastOrd !== undefined) {
+      expectedOrd = lastOrd + 1
+    } else {
+      // Sin historial: anclar por el primer cierre MÁS TEMPRANO del contrato (misma lógica que el draft).
+      const firstOrds: number[] = []
+      for (const l of cLines) {
+        const counters = countersForLine(l.id, l.date_debut, l.date_fin, countersByMachine.get(l.machine_id!) ?? [])
+        const cons = computeLineChainConsumption(
+          { date_debut: l.date_debut, date_fin: l.date_fin,
+            start_counter_bw: l.start_counter_bw, start_counter_color: l.start_counter_color,
+            end_counter_bw: l.end_counter_bw, end_counter_color: l.end_counter_color },
+          counters, null,
+        )
+        if (cons.closing_reading_date) {
+          const m = computeInvoiceMonth(l.billing_day, cons.closing_reading_date)
+          firstOrds.push(m.year * 12 + (m.month - 1))
+        }
+      }
+      if (firstOrds.length) expectedOrd = Math.min(...firstOrds)
+    }
+    if (expectedOrd === null) continue        // solo base/sin lecturas → nada que facturar
+    if (expectedOrd > currentOrd) continue    // mes futuro: aún no toca (A4)
+    expectedByContract.set(contractId, expectedOrd)
+  }
+
+  // 5) Confirmar con el motor: el contrato aparece solo si ese mes produce un borrador real (no divergir).
+  const entries: ReadyToBillEntry[] = []
+  for (const [contractId, ord] of expectedByContract) {
+    const period_year  = Math.floor(ord / 12)
+    const period_month = (ord % 12) + 1
+    const draft = await buildContractInvoiceDraft(contractId, period_year, period_month)
+    if (!draft) continue
+    const ci = info.get(contractId)!
+    entries.push({ contract_id: contractId, numero_contrat: ci.numero_contrat, client_name: ci.client_name, period_year, period_month })
+  }
+
+  // Orden por contrato (un único mes por contrato).
   return entries.sort((a, b) =>
     a.numero_contrat.localeCompare(b.numero_contrat) ||
     a.period_year - b.period_year ||
