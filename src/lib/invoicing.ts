@@ -540,6 +540,11 @@ export async function buildContractInvoiceDraft(
   const { lines: mergedLines, has_replacement } = consolidateReplacements(draftLines)
   if (mergedLines.length === 0) return null
 
+  // Mes de PURO ARRANQUE: si ninguna línea tiene lectura de apertura (solo primeras lecturas =
+  // base, y/o máquinas mudas), no hay consumo que facturar → no se factura el mes de arranque.
+  // (Caso 2AS: la primera tanda —abril— es solo base; no debe ofrecerse como facturable.)
+  if (mergedLines.every(l => l.open_date === null)) return null
+
   // Periodo de cabecera = rango ENVOLVENTE de las lecturas reales de la tanda (spec §4.4, D1).
   const ob = dateBounds(mergedLines.map(l => l.open_date))
   const cb = dateBounds(mergedLines.map(l => l.close_date))
@@ -573,57 +578,85 @@ export type ReadyToBillEntry = {
 }
 
 /**
- * FORMA B — lista de tandas LISTAS PARA FACTURAR: por cada contrato facturable, los meses que
- * tienen al menos una lectura de cierre (etiquetada vía computeInvoiceMonth) y aún NO tienen
- * factura emise. Es el reemplazo del antiguo selector mes/año: la pantalla muestra directamente
- * «contrato — cliente · mes». El periodo y el total exactos los calcula buildContractInvoiceDraft
- * al seleccionar una entrada. Spec §5.1, §13.
+ * FORMA B — lista de tandas LISTAS PARA FACTURAR: por cada contrato facturable, los meses con un
+ * relevé que CIERRA un mes (tiene apertura) y aún SIN factura emise. Reemplaza el selector mes/año.
+ *
+ * Comparte la atribución del motor para no divergir de buildContractInvoiceDraft:
+ *  - atribuye los relevés por LÍNEA con countersForLine (incluye relevés legacy contract_id NULL
+ *    por fecha, igual que el draft), no solo por contract_id de la fila;
+ *  - excluye la BASE (la primera lectura de una máquina, sin apertura previa ni start_counter): un
+ *    mes de puro arranque no tiene consumo y no debe ofrecerse (caso 2AS: abril es solo base).
+ * El periodo y el total exactos los calcula buildContractInvoiceDraft al seleccionar. Spec §5.1, §13.
  */
 export async function listReadyToBill(): Promise<ReadyToBillEntry[]> {
   const admin = createAdminClient()
 
-  // 1) Contratos facturables (≥1 línea con plan y facturable) → billing_day + nombre + cliente.
+  // 1) Líneas facturables (con plan) → contrato (billing_day, nombre, cliente) + datos de la línea.
   const { data: lineRows, error: linesErr } = await admin
     .from('contract_machines')
-    .select('statut, date_fin, contract_id, contracts!inner ( id, numero_contrat, billing_day, statut, clients!inner ( nom_client ) )')
+    .select(`
+      id, contract_id, machine_id, date_debut, date_fin, statut,
+      start_counter_bw, start_counter_color,
+      contracts!inner ( id, numero_contrat, billing_day, statut, clients!inner ( nom_client ) )
+    `)
     .not('billing_plan_id', 'is', null)
   if (linesErr) throw new BillingDataError('contract_machines')   // P0-7
 
-  type ContractInfo = { numero_contrat: string; client_name: string; billing_day: number }
-  const billable = new Map<string, ContractInfo>()
+  type Line = {
+    id: string; contract_id: string; machine_id: string | null
+    date_debut: string; date_fin: string | null; statut: string | null
+    start_counter_bw: number | null; start_counter_color: number | null
+    numero_contrat: string; client_name: string; billing_day: number
+  }
+  const lines: Line[] = []
   for (const row of lineRows ?? []) {
     const c = row.contracts as unknown as {
       id: string; numero_contrat: string; billing_day: number | null; statut: string | null;
       clients: { nom_client: string } | null
     } | null
-    if (!c) continue
+    if (!c || !row.machine_id) continue
     if (!isLineBillable(row.statut, c.statut, row.date_fin)) continue
-    if (!billable.has(c.id)) {
-      billable.set(c.id, {
-        numero_contrat: c.numero_contrat,
-        client_name:    c.clients?.nom_client ?? '—',
-        billing_day:    c.billing_day ?? 1,
-      })
-    }
+    lines.push({
+      id: row.id, contract_id: c.id, machine_id: row.machine_id,
+      date_debut: row.date_debut, date_fin: row.date_fin, statut: row.statut,
+      start_counter_bw: row.start_counter_bw, start_counter_color: row.start_counter_color,
+      numero_contrat: c.numero_contrat, client_name: c.clients?.nom_client ?? '—',
+      billing_day: c.billing_day ?? 1,
+    })
   }
-  if (billable.size === 0) return []
+  if (lines.length === 0) return []
 
-  // 2) Relevés activos atribuidos a esos contratos → mes facturado de cada lectura de cierre.
+  // 2) Relevés activos de esas máquinas (atribución fina por línea = countersForLine, como el draft).
+  const machineIds = [...new Set(lines.map(l => l.machine_id).filter((id): id is string => !!id))]
   const { data: counterRows, error: cErr } = await admin
     .from('machine_counters')
-    .select('contract_id, year, month, day, status')
+    .select('id, machine_id, contract_id, year, month, day, counter_bw, counter_color, status, is_replacement_start, previous_machine_id, annulation_reason, annule_at, notes, recorded_at')
+    .in('machine_id', machineIds)
     .eq('status', 'actif')
-    .not('contract_id', 'is', null)
-    .in('contract_id', [...billable.keys()])
   if (cErr) throw new BillingDataError('machine_counters')   // P0-7
+  type CRow = Counter & { machine_id: string; contract_id: string | null }
+  const countersByMachine = new Map<string, CRow[]>()
+  for (const c of (counterRows ?? []) as CRow[]) {
+    const arr = countersByMachine.get(c.machine_id) ?? []
+    arr.push(c); countersByMachine.set(c.machine_id, arr)
+  }
 
-  // candidatos: clave "contractId|year|month" → {contract_id, year, month}
+  // candidatos: "contractId|year|month" — un relevé es candidato solo si tiene APERTURA
+  // (relevé anterior en la línea, o start_counter con date_debut <= su fecha). Así la base no cuenta.
   const candidates = new Map<string, { contract_id: string; period_year: number; period_month: number }>()
-  for (const c of counterRows ?? []) {
-    const info = c.contract_id ? billable.get(c.contract_id) : undefined
-    if (!info || !c.contract_id) continue
-    const { year, month } = computeInvoiceMonth(info.billing_day, counterDate(c))
-    candidates.set(`${c.contract_id}|${year}|${month}`, { contract_id: c.contract_id, period_year: year, period_month: month })
+  const info = new Map<string, { numero_contrat: string; client_name: string }>()
+  for (const line of lines) {
+    info.set(line.contract_id, { numero_contrat: line.numero_contrat, client_name: line.client_name })
+    const own = countersForLine(line.contract_id, line.date_debut, line.date_fin, countersByMachine.get(line.machine_id!) ?? [])
+      .slice()
+      .sort((a, b) => counterDate(a).localeCompare(counterDate(b)) || a.recorded_at.localeCompare(b.recorded_at))
+    const hasStart = line.start_counter_bw !== null && line.start_counter_color !== null
+    own.forEach((c, i) => {
+      const hasOpening = i > 0 || (hasStart && line.date_debut <= counterDate(c))
+      if (!hasOpening) return   // base: primera lectura sin apertura → no factura
+      const { year, month } = computeInvoiceMonth(line.billing_day, counterDate(c))
+      candidates.set(`${line.contract_id}|${year}|${month}`, { contract_id: line.contract_id, period_year: year, period_month: month })
+    })
   }
   if (candidates.size === 0) return []
 
@@ -639,11 +672,11 @@ export async function listReadyToBill(): Promise<ReadyToBillEntry[]> {
   const entries: ReadyToBillEntry[] = []
   for (const [key, cand] of candidates) {
     if (issuedKeys.has(key)) continue
-    const info = billable.get(cand.contract_id)!
+    const ci = info.get(cand.contract_id)!
     entries.push({
       contract_id:  cand.contract_id,
-      numero_contrat: info.numero_contrat,
-      client_name:  info.client_name,
+      numero_contrat: ci.numero_contrat,
+      client_name:  ci.client_name,
       period_year:  cand.period_year,
       period_month: cand.period_month,
     })

@@ -322,6 +322,17 @@ describe('FORMA B — buildContractInvoiceDraft', () => {
     await expect(buildContractInvoiceDraft('ctr-1', 2026, 7)).resolves.toBeNull()
   })
 
+  it('mes de PURO ARRANQUE (solo la lectura base, sin apertura) → null (caso 2AS abril)', async () => {
+    // counterRows tiene 29-abr (base) y 03-jun. Facturar abril: el cierre sería 29-abr pero no hay
+    // apertura previa ni start_counter → todo arranque → no se factura el mes de instalación.
+    vi.mocked(createAdminClient).mockReturnValue(makeAdmin({
+      contracts:         { data: contractRow, error: null },
+      contract_machines: { data: [lineRow],   error: null },
+      machine_counters:  { data: counterRows, error: null },
+    }))
+    await expect(buildContractInvoiceDraft('ctr-1', 2026, 4)).resolves.toBeNull()
+  })
+
   it('máquina muda (sin lectura este mes pero activa) entra estimada al forfait si hay tanda', async () => {
     const hybridPlan = { id: 'plan-h', name: 'Forfait', type: 'hybrid', fixed_fee: 5000, price_bw: 10, price_color: 50, tiers: null }
     const lineA = { ...lineRow, id: 'cm-A', machine_id: 'M1', billing_plans: hybridPlan, machines: { numero_serie: 'M1', marque: 'HP', modele: 'X' } }

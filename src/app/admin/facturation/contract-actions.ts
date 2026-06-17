@@ -1,8 +1,8 @@
 'use server'
 
-// Emisión de factura por CONTRATO y CICLO de aniversario (regla 9). Vía ÚNICA de emisión
-// desde WP-3 (la vía legacy por cliente/mes — actions.ts/emitInvoiceAction — fue eliminada).
-// Usa la RPC emit_contract_invoice (validación de coherencia en BD). El draft lo calcula el servidor.
+// Emisión de factura por CONTRATO y MES facturado (Forma B: periodo real entre relevés). Vía ÚNICA
+// de emisión desde WP-3 (la vía legacy por cliente/mes — actions.ts/emitInvoiceAction — fue eliminada).
+// Usa la RPC emit_contract_invoice (validación de coherencia + dedup por mes en BD). El draft lo calcula el servidor.
 
 import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -11,7 +11,7 @@ import { buildContractInvoiceDraft } from '@/lib/invoicing'
 import { redirect } from 'next/navigation'
 
 const EMIT_ERROR_LABEL: Record<string, string> = {
-  already_issued:          'Une facture existe déjà pour ce contrat et ce cycle.',
+  already_issued:          'Une facture existe déjà pour ce contrat et ce mois.',
   estimated_not_confirmed: 'Relevés manquants non confirmés.',
   contract_not_found:      'Contrat introuvable.',
   client_mismatch:         'Incohérence client/contrat.',
