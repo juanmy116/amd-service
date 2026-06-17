@@ -53,6 +53,34 @@ export async function getOpenLineForMachine(
 }
 
 /**
+ * Línea de contract_machine VIGENTE EN UNA FECHA dada (date_debut ≤ fecha ≤ COALESCE(date_fin, ∞)).
+ * Es la atribución CORRECTA para una lectura de contador: la lectura pertenece a la línea/puesto que
+ * estaba en servicio EN SU FECHA REAL, no a «la línea abierta hoy» (clave para lecturas tardías tras
+ * una rotación de máquina entre contratos). Si varias líneas cubrieran la fecha (no debería), toma la
+ * de date_debut más reciente. Spec 2026-06-17 §6/FASE 2.
+ */
+export async function getLineForMachineAtDate(
+  supabase: SupabaseClient,
+  machineId: string,
+  dateISO: string,
+): Promise<ContractMachine | null> {
+  const { data, error } = await supabase
+    .from('contract_machines')
+    .select('*')
+    .eq('machine_id', machineId)
+    .lte('date_debut', dateISO)
+    .or(`date_fin.is.null,date_fin.gte.${dateISO}`)
+    .order('date_debut', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) {
+    console.error('[getLineForMachineAtDate]', error)
+    return null
+  }
+  return data as ContractMachine | null
+}
+
+/**
  * Todas las líneas activas (statut='actif' AND date_fin IS NULL) de un contrato.
  * Incluye los datos de la máquina por join.
  */

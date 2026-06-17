@@ -1,7 +1,7 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth'
-import { getOpenLineForMachine } from '@/lib/contract-machines'
+import { getLineForMachineAtDate } from '@/lib/contract-machines'
 import { revalidatePath } from 'next/cache'
 
 export type CounterFormState = { error?: string; success?: boolean } | null
@@ -15,8 +15,7 @@ export async function saveCounterAction(
   const machine_id           = formData.get('machine_id') as string
   const year                 = parseInt(formData.get('year') as string)
   const month                = parseInt(formData.get('month') as string)
-  const dayRaw               = parseInt(formData.get('day') as string)
-  const day                  = !isNaN(dayRaw) && dayRaw >= 1 && dayRaw <= 31 ? dayRaw : null
+  const day                  = parseInt(formData.get('day') as string)
   const counter_bw           = parseInt(formData.get('counter_bw') as string)
   const counter_color        = parseInt(formData.get('counter_color') as string)
   const notes                = ((formData.get('notes') as string | null) ?? '').trim() || null
@@ -25,28 +24,36 @@ export async function saveCounterAction(
 
   if (isNaN(counter_bw) || isNaN(counter_color)) return { error: 'Les compteurs doivent être des nombres valides.' }
   if (counter_bw < 0 || counter_color < 0)       return { error: 'Les compteurs ne peuvent pas être négatifs.' }
+  // Fecha real OBLIGATORIA (el modelo ancla la lectura a su fecha; day NOT NULL en BD).
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return { error: 'La date du relevé (jour/mois/année) est obligatoire.' }
+  const probe = new Date(year, month - 1, day)
+  if (month < 1 || month > 12 || day < 1 || probe.getMonth() !== month - 1) {
+    return { error: 'Date de relevé invalide (ce jour n’existe pas dans ce mois).' }
+  }
+  const reading_date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 
-  // Verificar que no existe ya un relevé activo para ese mes
+  // Una lectura activa por máquina y DÍA. Otra del mismo día = corrección → anular la anterior primero.
   const { data: existing } = await supabase
     .from('machine_counters')
     .select('id')
     .eq('machine_id', machine_id)
     .eq('year', year)
     .eq('month', month)
+    .eq('day', day)
     .eq('status', 'actif')
     .maybeSingle()
 
-  if (existing) return { error: `Un relevé actif existe déjà pour ce mois. Annulez-le d'abord avant d'en créer un nouveau.` }
+  if (existing) return { error: `Un relevé actif existe déjà pour ce jour. Annulez-le d'abord pour le corriger.` }
 
-  // Capturar contrato y cliente activos en el momento del relevé via contract_machines
-  const openLine = await getOpenLineForMachine(supabase, machine_id)
+  // Atribución por la línea VIGENTE EN LA FECHA del relevé (no «la línea abierta hoy»).
+  const line = await getLineForMachineAtDate(supabase, machine_id, reading_date)
   let contract_id: string | null = null
   let client_id_val: number | null = null
-  if (openLine) {
+  if (line) {
     const { data: contractRow } = await supabase
       .from('contracts')
       .select('id, client_id')
-      .eq('id', openLine.contract_id)
+      .eq('id', line.contract_id)
       .single()
     contract_id = contractRow?.id ?? null
     client_id_val = contractRow?.client_id ?? null
@@ -55,6 +62,7 @@ export async function saveCounterAction(
   const { error } = await supabase.from('machine_counters').insert({
     machine_id,
     contract_id:          contract_id,
+    contract_machine_id:  line?.id ?? null,
     client_id:            client_id_val,
     year,
     month,
@@ -69,7 +77,7 @@ export async function saveCounterAction(
 
   if (error) {
     if (error.code === '23505') {
-      return { error: `Un relevé actif existe déjà pour ce mois. Annulez-le d'abord avant d'en créer un nouveau.` }
+      return { error: `Un relevé actif existe déjà pour ce jour. Annulez-le d'abord pour le corriger.` }
     }
     console.error('[saveCounter]', error)
     return { error: 'Une erreur est survenue. Veuillez réessayer.' }

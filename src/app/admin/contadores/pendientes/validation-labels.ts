@@ -4,8 +4,8 @@
 
 export const VALIDATION_LABELS: Record<string, string> = {
   V_NO_MATCH:      'Aucune machine correspondante',
-  V_DUP_MONTH:     'Relevé déjà existant pour ce mois',
-  V_DUP_PENDING:   'Doublon : un autre relevé de cette machine (même mois) est déjà en attente',
+  V_DUP_DAY:       'Relevé déjà existant pour ce jour',
+  V_DUP_PENDING:   'Doublon : un autre relevé de cette machine (même jour) est déjà en attente',
   V_CONF:          'Lecture peu fiable (confiance faible)',
   V_RANGE_BW:      'Compteur N&B hors plage',
   V_RANGE_COLOR:   'Compteur couleur hors plage',
@@ -18,6 +18,6 @@ export const VALIDATION_LABELS: Record<string, string> = {
 }
 
 // Códigos que señalan un posible duplicado (se resaltan de forma distinta en la UI).
-export const DUPLICATE_CODES = new Set(['V_DUP_MONTH', 'V_DUP_PENDING'])
+export const DUPLICATE_CODES = new Set(['V_DUP_DAY', 'V_DUP_PENDING'])
 
 export const labelFor = (code: string): string => VALIDATION_LABELS[code] ?? code
