@@ -143,13 +143,30 @@ describe('FORMA B — computeInvoiceMonth (mes anterior al vencimiento más cerc
   it('cruce de año: día 1, cierre 02-ene → diciembre del año anterior', () => {
     expect(computeInvoiceMonth(1, '2026-01-02')).toEqual({ year: 2025, month: 12 })
   })
-  it('clamp de fin de mes: día 31, cierre 01-mar → enero (vencimiento 28-feb)', () => {
-    expect(computeInvoiceMonth(31, '2026-03-01')).toEqual({ year: 2026, month: 1 })
-  })
   it('B4: cierre equidistante entre dos vencimientos → mes PASADO (tie-break determinista)', () => {
     // día 15, cierre 30-abr: a 15 días tanto de 15-abr como de 15-may → gana el vencimiento pasado
     // (15-abr) → mes facturado = marzo.
     expect(computeInvoiceMonth(15, '2026-04-30')).toEqual({ year: 2026, month: 3 })
+  })
+
+  // Regla dual N7 — FIN DE MES (billing_day 29/30/31): el mes facturado es el MISMO del vencimiento.
+  it('fin de mes (día 31), cierre 31-may → mayo', () => {
+    expect(computeInvoiceMonth(31, '2026-05-31')).toEqual({ year: 2026, month: 5 })
+  })
+  it('fin de mes (día 31), cierre 28-feb → febrero (clamp al último día)', () => {
+    expect(computeInvoiceMonth(31, '2026-02-28')).toEqual({ year: 2026, month: 2 })
+  })
+  it('fin de mes (día 31) en bisiesto, cierre 29-feb → febrero', () => {
+    expect(computeInvoiceMonth(31, '2024-02-29')).toEqual({ year: 2024, month: 2 })
+  })
+  it('fin de mes (día 31), cierre 30-jun → junio', () => {
+    expect(computeInvoiceMonth(31, '2026-06-30')).toEqual({ year: 2026, month: 6 })
+  })
+  it('fin de mes (día 30), cierre 30-abr → abril', () => {
+    expect(computeInvoiceMonth(30, '2026-04-30')).toEqual({ year: 2026, month: 4 })
+  })
+  it('fin de mes (día 31), cruce de año, cierre 31-dic → diciembre', () => {
+    expect(computeInvoiceMonth(31, '2026-12-31')).toEqual({ year: 2026, month: 12 })
   })
 })
 

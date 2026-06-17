@@ -83,17 +83,14 @@ export function countersForLine(
  *   - billing_day=1, cierre 29-abr → vencimiento más cercano 01-may → mes facturado = ABRIL.
  *   - billing_day=20, cierre 20-may → vencimiento 20-may → mes facturado = ABRIL.
  *
- * TIE-BREAK (B4): si la fecha de cierre cae a igual distancia de dos vencimientos consecutivos,
- * se elige el vencimiento PASADO (el más temprano) — la recogida cierra el mes que acaba de
- * terminar. Es determinista (orden de iteración anterior→mismo→siguiente con `<` estricto).
+ * TIE-BREAK: si la fecha de cierre cae a igual distancia de dos vencimientos consecutivos, se elige
+ * el vencimiento PASADO (el más temprano), por orden de iteración anterior→mismo→siguiente con `<`.
  *
- * ÁMBITO (B3): pensado para `billing_day` 1–28, que existen en todos los meses y quedan espaciados
- * de forma regular (~1 mes) → la heurística de "vencimiento más cercano" es robusta. Para 29–31 el
- * clamp de fin de mes vuelve irregular el espaciado (p. ej. en febrero) y una recogida a mitad de
- * mes podría etiquetarse a un mes contiguo: el soporte "fin de mes" se decidirá con el cliente si
- * aparece un contrato así (regla de negocio a validar, no inventar). Hoy AMD usa días 1/6/12/20.
- * La validación del rango 1–28 se añadirá en el formulario de contrato (Fase 2).
- * Spec: docs/superpowers/specs/2026-06-16-facturacion-periodo-a-medida-design.md §4.3, §13 (B3/B4).
+ * USO: en el modelo de CADENA MENSUAL esta función solo ANCLA el primer mes de un contrato; los meses
+ * siguientes avanzan en secuencia (último facturado + 1), no por la fecha. El soporte fin de mes
+ * (29/30/31) usa el clamp al último día real del mes; para recogidas cerca del fin de mes es robusto
+ * (una recogida a mitad de mes para un cliente fin de mes es atípica y queda documentada como límite).
+ * Spec: docs/superpowers/specs/2026-06-17-contadores-fecha-real-y-linea-design.md §3 (N7), §4.
  */
 export function computeInvoiceMonth(
   billingDay: number,
@@ -121,7 +118,14 @@ export function computeInvoiceMonth(
     if (dist < bestDist) { bestDist = dist; best = c }
   }
 
-  // Mes facturado = mes anterior al mes del vencimiento elegido.
+  // Regla dual (N7):
+  //  - FIN DE MES (billing_day 29/30/31): el mes facturado es el MISMO mes del vencimiento (el que se
+  //    cierra ese día). Ej. día 31, cierre 31-may → mayo; 28-feb → febrero.
+  //  - DÍA FIJO (1-28): el mes facturado es el ANTERIOR al vencimiento. Ej. día 1, cierre ~1-jun → mayo;
+  //    día 20, cierre 20-may → abril.
+  if (billingDay >= 29) {
+    return { year: best.y, month: best.m }
+  }
   return best.m === 1 ? { year: best.y - 1, month: 12 } : { year: best.y, month: best.m - 1 }
 }
 
