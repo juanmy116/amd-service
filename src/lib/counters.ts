@@ -4,7 +4,11 @@ export interface Counter {
   id:                   string
   year:                 number
   month:                number
-  day:                  number | null
+  day:                  number
+  /** Fecha real de la lectura (YYYY-MM-DD), generada de year/month/day. Fuente de orden/atribución. */
+  reading_date:         string
+  /** Línea/puesto (contract_machines.id) vigente en la fecha de la lectura. */
+  contract_machine_id:  string | null
   counter_bw:           number
   counter_color:        number
   status:               string

@@ -55,10 +55,10 @@ beforeAll(async () => {
   // NOTA: todas las filas deben tener LAS MISMAS claves — PostgREST rechaza un bulk
   // insert con objetos de claves distintas (por eso is_replacement_start va en todas).
   const { error: cntErr } = await admin.from('machine_counters').insert([
-    { machine_id: SERIE, year: 2026, month: 1, recorded_at: '2026-01-01T00:00:00Z', counter_bw: 5000,  counter_color: 0, is_replacement_start: false },
-    { machine_id: SERIE, year: 2026, month: 2, recorded_at: '2026-02-01T00:00:00Z', counter_bw: 10000, counter_color: 0, is_replacement_start: false },
-    { machine_id: SERIE, year: 2026, month: 3, recorded_at: '2026-03-01T00:00:00Z', counter_bw: 2000,  counter_color: 0, is_replacement_start: true  },
-    { machine_id: SERIE, year: 2026, month: 4, recorded_at: '2026-04-01T00:00:00Z', counter_bw: 40000, counter_color: 0, is_replacement_start: false },
+    { machine_id: SERIE, year: 2026, month: 1, day: 1, recorded_at: '2026-01-01T00:00:00Z', counter_bw: 5000,  counter_color: 0, is_replacement_start: false },
+    { machine_id: SERIE, year: 2026, month: 2, day: 1, recorded_at: '2026-02-01T00:00:00Z', counter_bw: 10000, counter_color: 0, is_replacement_start: false },
+    { machine_id: SERIE, year: 2026, month: 3, day: 1, recorded_at: '2026-03-01T00:00:00Z', counter_bw: 2000,  counter_color: 0, is_replacement_start: true  },
+    { machine_id: SERIE, year: 2026, month: 4, day: 1, recorded_at: '2026-04-01T00:00:00Z', counter_bw: 40000, counter_color: 0, is_replacement_start: false },
   ])
   if (cntErr) throw new Error(`seed machine_counters: ${cntErr.message}`)
 }, 60_000)

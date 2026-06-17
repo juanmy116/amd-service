@@ -67,7 +67,10 @@ export default async function ContadoresDetailPage({
     .order('year',  { ascending: false })
     .order('month', { ascending: false })
 
-  const counters = (allCounters ?? []) as Counter[]
+  // `as unknown as`: los tipos generados de Supabase (types.ts) aún no reflejan las columnas nuevas
+  // (reading_date, contract_machine_id) hasta regenerarlos tras aplicar la migración a prod. El
+  // SELECT * sí las trae en runtime. Se regenerarán al desplegar el rediseño.
+  const counters = (allCounters ?? []) as unknown as Counter[]
   const deltaMap  = calcDeltas(counters)
   const chartData = buildChartData(counters)
 

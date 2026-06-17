@@ -14,8 +14,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 // fecha (year-month-day) para que el desempate por recorded_at sea coherente con la fecha real.
 function mkCounter(p: Partial<Counter> & { id: string; year: number; month: number }): Counter {
   const day = p.day ?? 1
+  const reading_date = `${p.year}-${String(p.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
   return {
     day,
+    reading_date,
+    contract_machine_id: null,
     counter_bw: 0,
     counter_color: 0,
     status: 'actif',
@@ -24,7 +27,7 @@ function mkCounter(p: Partial<Counter> & { id: string; year: number; month: numb
     annulation_reason: null,
     annule_at: null,
     notes: null,
-    recorded_at: `${p.year}-${String(p.month).padStart(2, '0')}-${String(day).padStart(2, '0')}T10:00:00Z`,
+    recorded_at: `${reading_date}T10:00:00Z`,
     ...p,
   }
 }

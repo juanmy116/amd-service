@@ -51,8 +51,8 @@ beforeAll(async () => {
 
   // Contador 5000 antes del cambio, 18000 ahora → 13 000 copias desde el cambio.
   const { error: cntErr } = await admin.from('machine_counters').insert([
-    { machine_id: SERIE, year: 2026, month: 3, recorded_at: '2026-03-01T00:00:00Z', counter_bw: 5000,  counter_color: 0, is_replacement_start: false },
-    { machine_id: SERIE, year: 2026, month: 5, recorded_at: '2026-05-01T00:00:00Z', counter_bw: 18000, counter_color: 0, is_replacement_start: false },
+    { machine_id: SERIE, year: 2026, month: 3, day: 1, recorded_at: '2026-03-01T00:00:00Z', counter_bw: 5000,  counter_color: 0, is_replacement_start: false },
+    { machine_id: SERIE, year: 2026, month: 5, day: 1, recorded_at: '2026-05-01T00:00:00Z', counter_bw: 18000, counter_color: 0, is_replacement_start: false },
   ])
   if (cntErr) throw new Error(`seed counters: ${cntErr.message}`)
 
