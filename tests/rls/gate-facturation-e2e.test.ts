@@ -493,3 +493,89 @@ describe('Gate §9.4 — retirar línea sin end_counter es rechazado (P0-2)', ()
     expect(error?.message).toContain('end_counter_required')
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CICLO DE VIDA de un cliente MULTI-MÁQUINA (longitudinal) — la prueba que faltaba:
+// un contrato tipo 2AS con 3 máquinas, facturado en CADENA durante 3 meses (feb→abr,
+// pasados), mezclando todos los eventos de fecha en el MISMO contrato:
+//   M1 = ciclo normal · M2 = un mes solo-fijo (sin lectura) y luego acumula al llegar
+//   tarde su contador (flujo temporal real) · M3 = dos lecturas el mismo mes natural.
+// billing_day=1 → una lectura ~01-mes cierra el MES ANTERIOR (N7).
+// Verifica INVARIANTES GLOBALES: una factura por mes; por máquina, Σ copias facturadas =
+// lectura final − inicial (ni se pierde ni se duplica una copia); el mes estimado no se corrige.
+// Cubre lo que los casos aislados no cubren: consolidación multi-línea + coherencia acumulada.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Gate — ciclo de vida de un cliente multi-máquina (3 máquinas × 3 meses en cadena)', () => {
+  it('factura feb→abr en cadena; las copias de cada máquina cuadran con su consumo real total', async () => {
+    const FORFAIT = 25000
+    const M1 = 'TESTINV-GATE-LIFE-M1' // ciclo normal
+    const M2 = 'TESTINV-GATE-LIFE-M2' // solo-fijo en marzo + acumula en abril
+    const M3 = 'TESTINV-GATE-LIFE-M3' // dos lecturas el mismo mes natural
+    const s = await seedScenario('LIFE', {
+      billingDay: 1, planType: 'hybrid', fixedFee: FORFAIT, priceBw: 10, priceColor: 50,
+      lines: [
+        // M1: lecturas que cierran feb (01-mar), marzo (01-abr) y abril (01-may).
+        { serie: M1, dateDebut: '2026-02-01', startBw: 1000, startColor: 0, counters: [
+          { date: '2026-03-01', bw: 1300, color: 0 }, { date: '2026-04-01', bw: 1600, color: 0 }, { date: '2026-05-01', bw: 1900, color: 0 },
+        ] },
+        // M2: solo la lectura que cierra feb (01-mar). La de abril (01-may) llega DESPUÉS de facturar marzo.
+        { serie: M2, dateDebut: '2026-02-01', startBw: 500, startColor: 0, counters: [
+          { date: '2026-03-01', bw: 600, color: 0 },
+        ] },
+        // M3: dos lecturas en marzo-natural (05 y 25) que cierran feb y marzo + la de abril (01-may).
+        { serie: M3, dateDebut: '2026-02-01', startBw: 2000, startColor: 0, counters: [
+          { date: '2026-03-05', bw: 2200, color: 0 }, { date: '2026-03-25', bw: 2500, color: 0 }, { date: '2026-05-01', bw: 2800, color: 0 },
+        ] },
+      ],
+    })
+
+    // FEBRERO: las 3 máquinas con copias (M1 300, M2 100, M3 200).
+    const dFeb = await buildContractInvoiceDraft(s.contractId, 2026, 2)
+    expect(dFeb!.period_month).toBe(2)
+    expect(dFeb!.lines).toHaveLength(3)
+    expect(dFeb!.has_estimated).toBe(false)
+    expect((await emitDraft(dFeb!)).error).toBeNull()
+
+    // MARZO: M1 y M3 cierran (300 y 300); M2 SIN lectura nueva → solo-fijo (estimado).
+    const dMar = await buildContractInvoiceDraft(s.contractId, 2026, 3)
+    expect(dMar!.period_month).toBe(3)
+    expect(dMar!.has_estimated).toBe(true) // M2 estimada
+    const m2Mar = dMar!.lines.find((l) => l.machine_id === M2)!
+    expect(m2Mar.delta_bw).toBe(0)
+    expect(m2Mar.is_estimated).toBe(true)
+    expect((await emitDraft(dMar!, true)).error).toBeNull() // confirm_estimated
+
+    // Ahora LLEGA tarde el contador de abril de M2 (01-may): acumula marzo+abril desde 01-mar (600).
+    const insM2 = await admin.from('machine_counters').insert({
+      machine_id: M2, contract_id: s.contractId, contract_machine_id: s.lineIds[M2], client_id: s.clientId,
+      year: 2026, month: 5, day: 1, counter_bw: 900, counter_color: 0, recorded_at: '2026-05-01T10:00:00Z',
+    })
+    expect(insM2.error).toBeNull()
+
+    // ABRIL: M1 (300), M3 (300) y M2 (300 = 900−600, las copias de marzo+abril sin perderse).
+    const dAbr = await buildContractInvoiceDraft(s.contractId, 2026, 4)
+    expect(dAbr!.period_month).toBe(4)
+    expect(dAbr!.has_estimated).toBe(false)
+    const m2Abr = dAbr!.lines.find((l) => l.machine_id === M2)!
+    expect(m2Abr.delta_bw).toBe(300)
+    expect((await emitDraft(dAbr!)).error).toBeNull()
+
+    // ── INVARIANTES GLOBALES ──────────────────────────────────────────────────
+    // 1) Exactamente 3 facturas, una por mes (feb, marzo, abril).
+    const invs = await admin.from('invoices').select('period_month').eq('contract_id', s.contractId).order('period_month')
+    expect(invs.data!.map((i) => i.period_month)).toEqual([2, 3, 4])
+
+    // 2) Por máquina: la suma de copias facturadas = lectura final − inicial (ni perdidas ni duplicadas).
+    const lines = await admin.from('invoice_lines')
+      .select('machine_id, delta_bw, invoices!inner(contract_id)').eq('invoices.contract_id', s.contractId)
+    const sumByMachine: Record<string, number> = {}
+    for (const l of lines.data!) sumByMachine[l.machine_id as string] = (sumByMachine[l.machine_id as string] ?? 0) + (l.delta_bw as number)
+    expect(sumByMachine[M1]).toBe(900) // 1900 − 1000
+    expect(sumByMachine[M2]).toBe(400) // 900 − 500 (100 en feb + 0 en marzo + 300 en abril)
+    expect(sumByMachine[M3]).toBe(800) // 2800 − 2000
+
+    // 3) El total de copias del contrato = consumo real agregado de las 3 máquinas.
+    const totalCopies = Object.values(sumByMachine).reduce((a, b) => a + b, 0)
+    expect(totalCopies).toBe(2100)
+  })
+})
