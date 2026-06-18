@@ -237,6 +237,23 @@ Route handler que recibe el formulario de contacto del sitio web público y capt
 
 Emisor de **facturas inmutables**, a partir del consumo real de contadores. Tres pantallas + un export. Tras el rediseño del core (Bloques A–E + 0/C, 2026-06-09), el flujo activo factura **por contrato y ciclo de aniversario** (regla 9); el detalle por bloque está en §Jerarquía de Datos (Bloques A/B/D/E/C/0). Esta sección resume la capa de aplicación.
 
+> #### ⭐ Rediseño 2026-06-17 — facturación por CADENA y FECHA REAL (SUSTITUYE al «ciclo de aniversario / mes natural»)
+>
+> El modelo de «ciclo de aniversario» y «mes natural» descrito en esta sección y en los Bloques B/E quedó
+> **superado** por el rediseño a **cadena por fecha real + línea** (spec `docs/superpowers/specs/2026-06-17-contadores-fecha-real-y-linea-design.md`, gate `docs/gate-final-facturacion-cadena-2026-06-18.md`). Desbloquea facturar por «periodo a medida» (fechas reales de lectura). Cambios clave del modelo vigente:
+>
+> - **Lectura anclada a FECHA REAL y a LÍNEA.** `machine_counters` gana `reading_date` (= `make_date(year,month,day)`, `day` NOT NULL) y `contract_machine_id` (la línea/puesto vigente **en la fecha** de la lectura, resuelto por `getLineForMachineAtDate`). Unicidad por `(machine_id, reading_date) WHERE status='actif'` → pueden convivir dos lecturas del mismo mes natural en días distintos (corrige P0-1). Atribución del consumo **por línea**, no por contrato (corrige P0-3).
+> - **Cadena mensual (no ciclo de calendario).** Se factura **un mes cada vez, en secuencia**: el mes a facturar = `último_facturado + 1`; la fecha de la lectura **solo ancla el primer mes** (regla dual **N7** en `computeInvoiceMonth`: día 1-28 → mes anterior al vencimiento; día 29-31 → mismo mes, clampeado a fin de mes). El cierre de un tramo = la lectura real NO facturada **más antigua** posterior a la apertura. Núcleo: `computeLineChainConsumption` + orden canónico `compareCountersByReading` (por `reading_date, recorded_at, id`). El estado de la cadena se persiste **por línea** en `invoice_lines` (`opening/closing_counter_id`, `*_reading_date`, `*_counter_bw/color`).
+> - **Mes solo-fijo (N8/N10).** Un mes sin lectura de cierre se factura **solo forfait** (`is_estimated`); el punto de partida NO avanza; las copias se acumulan en la siguiente factura con lectura, sin perderse ni duplicarse. La factura estimada nunca se corrige.
+> - **Emisión endurecida** (`emit_contract_invoice`, mig. `20260617170000`): la RPC NO confía en el payload — valida pertenencia de línea (V1), de lecturas + vigencia (V2), no-reutilización de cierres incl. breakdown (V3), secuencia de mes (V4) y persiste `contract_id` validado.
+> - **Cierres por línea + fecha** (mig. `20260617180000`): `return_machine_to_stock`/`terminate_contract`/`replace_contract_machine` toman la referencia de cierre de la **misma línea** con `reading_date ≤ date_fin` (no «el último contador de la máquina»). Orden de locks alineado contrato→línea (evita deadlock con `delete_contract`).
+> - **Guards por línea** (mig. `20260617200000`): `delete_contract` y el guard de cambio de cliente (`update_contract_with_lines`) cuentan el historial por `contract_id` **o** por `contract_machine_id` (cubre lecturas que Princity ata con `contract_id` NULL); `delete_contract` además bloquea si hay `invoices` (registro contable inmutable).
+> - **billing_day:** se mantiene 1-31 en todas las capas (CHECK + RPCs + UI); la semántica fin de mes la da N7 (sin cambio de CHECK).
+> - **Princity** etiqueta por la fecha real de `BillingCounter.date` (no por `now()`) y resuelve la línea vigente en esa fecha.
+> - **Gate E2E** (`tests/rls/gate-facturation-e2e.test.ts`): la cadena completa (siembra → `buildContractInvoiceDraft` → `emit_contract_invoice` → factura inmutable) contra Postgres real; los 14 casos del §9 cubiertos (ver doc del gate).
+>
+> Lo que NO cambia: inmutabilidad de facturas, RLS admin-only, planes de tarifa y redondeo FCFA, dedup por `(contract_id, period_year, period_month) WHERE status='emise'`. Las menciones a `computeLineConsumptionCycle` / «ciclo de aniversario» / `period_start-period_end` más abajo describen el modelo anterior y se conservan como historial.
+
 - **Catálogo de planes** (`/admin/billing-plans`): CRUD de `billing_plans`. 4 tipos:
   - `per_copy` — solo precio por copia B&N + color.
   - `hybrid` — forfait fijo mensual + precio por copia.
