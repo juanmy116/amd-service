@@ -235,6 +235,17 @@ BEGIN
     RAISE EXCEPTION 'invalid_payload';
   END IF;
 
+  -- Bloquea PRIMERO el contrato de la línea saliente y LUEGO la línea, para alinear el
+  -- orden de adquisición de locks (contrato → línea) con delete_contract y terminate_contract.
+  -- Al abrir la línea entrante (más abajo) la FK toma FOR KEY SHARE sobre contracts; sin este
+  -- lock previo, replace adquiría línea → contrato y podía formar deadlock con un
+  -- delete_contract concurrente (que adquiere contrato → línea). P2 de concurrencia detectado
+  -- por Codex al endurecer los guards (PR-D.3). El subselect lee el contract_id sin lock; si la
+  -- línea no existe, el FOR UPDATE de v_out (abajo) produce el out_line_invalid de siempre.
+  PERFORM 1 FROM public.contracts
+    WHERE id = (SELECT contract_id FROM public.contract_machines WHERE id = v_out_id)
+    FOR UPDATE;
+
   SELECT * INTO v_out FROM public.contract_machines WHERE id = v_out_id FOR UPDATE;
   IF NOT FOUND OR v_out.date_fin IS NOT NULL THEN
     RAISE EXCEPTION 'out_line_invalid';
