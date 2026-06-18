@@ -137,3 +137,28 @@ El CHECK `contract_machines_termine_has_date_fin` (`statut <> 'terminé' OR date
 - ✅ `auth_tech_incident_machine_ids()` (huérfana) ELIMINADA — migración `20260611110000`.
 
 Nada pendiente. (Historial: `docs/superpowers/specs/2026-06-03-contracts-n-machines-design.md` §6.)
+
+---
+
+## 5. 🔴 Confirmación antes de emitir una factura (evitar emisión accidental) — PRIORITARIO
+
+> **Qué:** añadir un **diálogo de confirmación** antes de emitir una factura en `/admin/facturation`. Al pulsar "Émettre la facture" o "Forcer la facturation", mostrar un modal con cliente, total, periodo y nº de líneas estimadas, y la advertencia **"acción irreversible"**, que exija un segundo clic de confirmación.
+>
+> **Por qué:** el 2026-06-18, durante la primera prueba real con 2AS, se emitió la factura `FACT-2026-0001` **por accidente** — bastó un Enter/toque con el foco en el botón "Forcer la facturation" para emitir una factura real. Las facturas son **inmutables** (solo se pueden anular, no borrar), así que un disparo accidental deja huella permanente (factura anulada + número quemado). Hoy el botón emite **al instante, sin confirmación** → demasiado fácil de activar sin querer.
+>
+> **Pasos:** en `src/components/admin/ContractInvoicePreview.tsx`, interceptar el submit del `<form action={emitAction}>` con un diálogo de confirmación (estado `useState` + modal, o `onSubmit` con `confirm()` como mínimo viable). Mostrar el resumen (total, `has_estimated`, nº líneas). Aplica a **ambos** botones (normal y "Forcer"). Bajo esfuerzo, alto valor de seguridad.
+
+---
+
+## 6. 🔴 Subir los contadores directamente desde la app (ingesta sin depender de CloudMailin) — PRIORITARIO
+
+> **Qué:** una forma de **subir las fotos/PDF de contadores directamente desde la app** (panel admin y/o PWA del técnico), sin pasar por email → CloudMailin. Las imágenes irían directas a storage + `pending_counter_imports` + `parse-counter-image` (el lector OCR ya existe).
+>
+> **Por qué:** la ingesta actual (email a `admin@test-sav.site` → CloudMailin free → OCR) tiene un tope de **512 KB por correo** (plan gratuito de CloudMailin). Inviable para clientes con muchas máquinas: 2AS tiene **40** y sus lecturas no caben (en la prueba del 2026-06-18 hubo que comprimir y mandar de a pocas). Es un cuello de botella duro de un tercero.
+>
+> **Pasos / consideraciones:**
+> 1. UI de subida (drag&drop / cámara del móvil en la PWA técnico) → sube a storage `counter-images` + crea fila en `pending_counter_imports` + dispara `parse-counter-image`. Reutiliza toda la cola/semáforos/confirmación que ya existen.
+> 2. **Partir PDFs multipágina / lotes:** los reportes vienen como **PDF de 1 hoja por máquina** (escaneado, sin texto; las **Pantum ocupan 2 páginas**). El lector procesa **1 imagen = 1 lectura**, así que hay que separar el PDF en imágenes individuales (idealmente en el servidor al subir, no a mano). Las Pantum de 2 páginas requieren combinar o tratar ambas.
+> 3. Alternativa puente (menos buena): subir el plan de CloudMailin (de pago) — sigue con tope y dependencia de un tercero.
+>
+> Encaja con la ampliación del "agente de contadores" (capacidades 2-4 sin empezar, ver `project_agente_supervisor_contadores`).
