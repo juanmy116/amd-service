@@ -112,9 +112,15 @@ export async function deleteContractAction(
     incidents?: number
     counters?: number
     maintenance?: number
+    invoices?: number
   }
   if (!res.deleted) {
     if (res.not_found) return { error: 'Contrat introuvable.' }
+    // Las facturas son inmutables (registro comptable) : un contrato facturado no se
+    // puede borrar y no hay nada que "retirar". Se informa aparte del resto.
+    if (res.invoices) {
+      return { error: `Impossible de supprimer ce contrat : ${res.invoices} facture(s) émise(s). Un contrat facturé ne peut pas être supprimé.` }
+    }
     const parts: string[] = []
     if (res.incidents)   parts.push(`${res.incidents} incident(s)`)
     if (res.counters)    parts.push(`${res.counters} relevé(s) de compteur`)
