@@ -1,8 +1,8 @@
 'use server'
 
-// Emisión de factura por CONTRATO y CICLO de aniversario (regla 9). Vía ÚNICA de emisión
-// desde WP-3 (la vía legacy por cliente/mes — actions.ts/emitInvoiceAction — fue eliminada).
-// Usa la RPC emit_contract_invoice (validación de coherencia en BD). El draft lo calcula el servidor.
+// Emisión de factura por CONTRATO y MES facturado (Forma B: periodo real entre relevés). Vía ÚNICA
+// de emisión desde WP-3 (la vía legacy por cliente/mes — actions.ts/emitInvoiceAction — fue eliminada).
+// Usa la RPC emit_contract_invoice (validación de coherencia + dedup por mes en BD). El draft lo calcula el servidor.
 
 import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -11,7 +11,7 @@ import { buildContractInvoiceDraft } from '@/lib/invoicing'
 import { redirect } from 'next/navigation'
 
 const EMIT_ERROR_LABEL: Record<string, string> = {
-  already_issued:          'Une facture existe déjà pour ce contrat et ce cycle.',
+  already_issued:          'Une facture existe déjà pour ce contrat et ce mois.',
   estimated_not_confirmed: 'Relevés manquants non confirmés.',
   contract_not_found:      'Contrat introuvable.',
   client_mismatch:         'Incohérence client/contrat.',
@@ -23,6 +23,14 @@ const EMIT_ERROR_LABEL: Record<string, string> = {
   invalid_period:          'Période invalide.',
   invalid_payload:         'Données invalides.',
   forbidden:               'Action non autorisée.',
+  // PR-D.1 — endurecimiento de la emisión (validaciones server-side).
+  billing_sequence_mismatch: 'Mois hors séquence : facturez d’abord le mois précédent.',
+  line_without_cm:           'Ligne sans poste (cm_id) : données incohérentes.',
+  cm_id_not_in_contract:     'Une ligne ne correspond pas à ce contrat.',
+  duplicate_cm_in_payload:   'Poste en double dans la facture : données incohérentes.',
+  opening_counter_not_in_line: 'Relevé d’ouverture invalide pour ce poste.',
+  closing_counter_not_in_line: 'Relevé de clôture invalide pour ce poste.',
+  closing_counter_already_used: 'Relevé de clôture déjà facturé.',
 }
 
 // Estado del formulario de emisión (patrón useActionState). En éxito la acción hace redirect()
@@ -41,6 +49,13 @@ export async function emitContractInvoiceAction(_prev: EmitState, fd: FormData):
   if (!contract_id) return { error: 'Contrat invalide.' }
   if (!Number.isInteger(year) || year < 2020 || year > 2100) return { error: 'Année invalide.' }
   if (!Number.isInteger(month) || month < 1 || month > 12) return { error: 'Mois invalide.' }
+
+  // P1: no emitir un mes FUTURO. listReadyToBill ya lo bloquea, pero la acción recibe year/month del
+  // formulario → se revalida aquí. «Mes actual» en hora de NEGOCIO (Africa/Dakar = UTC, sin DST; A4).
+  const now = new Date()
+  if (year * 12 + (month - 1) > now.getUTCFullYear() * 12 + now.getUTCMonth()) {
+    return { error: 'Mois futur : facturation impossible.' }
+  }
 
   let draft
   try {

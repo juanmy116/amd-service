@@ -678,7 +678,12 @@ export type Database = {
           amount_total: number
           billing_type: string
           breakdown: Json | null
+          closing_counter_bw: number | null
+          closing_counter_color: number | null
+          closing_counter_id: string | null
+          closing_reading_date: string | null
           contract_id: string | null
+          contract_machine_id: string | null
           created_at: string
           delta_bw: number
           delta_color: number
@@ -689,6 +694,10 @@ export type Database = {
           machine_id: string | null
           machine_label: string
           numero_contrat: string
+          opening_counter_bw: number | null
+          opening_counter_color: number | null
+          opening_counter_id: string | null
+          opening_reading_date: string | null
           plan_name: string
           price_bw: number | null
           price_color: number | null
@@ -701,7 +710,12 @@ export type Database = {
           amount_total?: number
           billing_type: string
           breakdown?: Json | null
+          closing_counter_bw?: number | null
+          closing_counter_color?: number | null
+          closing_counter_id?: string | null
+          closing_reading_date?: string | null
           contract_id?: string | null
+          contract_machine_id?: string | null
           created_at?: string
           delta_bw?: number
           delta_color?: number
@@ -712,6 +726,10 @@ export type Database = {
           machine_id?: string | null
           machine_label: string
           numero_contrat: string
+          opening_counter_bw?: number | null
+          opening_counter_color?: number | null
+          opening_counter_id?: string | null
+          opening_reading_date?: string | null
           plan_name: string
           price_bw?: number | null
           price_color?: number | null
@@ -724,7 +742,12 @@ export type Database = {
           amount_total?: number
           billing_type?: string
           breakdown?: Json | null
+          closing_counter_bw?: number | null
+          closing_counter_color?: number | null
+          closing_counter_id?: string | null
+          closing_reading_date?: string | null
           contract_id?: string | null
+          contract_machine_id?: string | null
           created_at?: string
           delta_bw?: number
           delta_color?: number
@@ -735,6 +758,10 @@ export type Database = {
           machine_id?: string | null
           machine_label?: string
           numero_contrat?: string
+          opening_counter_bw?: number | null
+          opening_counter_color?: number | null
+          opening_counter_id?: string | null
+          opening_reading_date?: string | null
           plan_name?: string
           price_bw?: number | null
           price_color?: number | null
@@ -933,15 +960,17 @@ export type Database = {
           annule_by: string | null
           client_id: number | null
           contract_id: string | null
+          contract_machine_id: string | null
           counter_bw: number
           counter_color: number
-          day: number | null
+          day: number
           id: string
           is_replacement_start: boolean
           machine_id: string
           month: number
           notes: string | null
           previous_machine_id: string | null
+          reading_date: string
           recorded_at: string
           recorded_by: string | null
           status: string
@@ -953,9 +982,10 @@ export type Database = {
           annule_by?: string | null
           client_id?: number | null
           contract_id?: string | null
+          contract_machine_id?: string | null
           counter_bw?: number
           counter_color?: number
-          day?: number | null
+          day: number
           id?: string
           is_replacement_start?: boolean
           machine_id: string
@@ -973,9 +1003,10 @@ export type Database = {
           annule_by?: string | null
           client_id?: number | null
           contract_id?: string | null
+          contract_machine_id?: string | null
           counter_bw?: number
           counter_color?: number
-          day?: number | null
+          day?: number
           id?: string
           is_replacement_start?: boolean
           machine_id?: string

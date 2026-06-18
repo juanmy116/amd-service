@@ -55,10 +55,10 @@ beforeAll(async () => {
   // NOTA: todas las filas deben tener LAS MISMAS claves — PostgREST rechaza un bulk
   // insert con objetos de claves distintas (por eso is_replacement_start va en todas).
   const { error: cntErr } = await admin.from('machine_counters').insert([
-    { machine_id: SERIE, year: 2026, month: 1, recorded_at: '2026-01-01T00:00:00Z', counter_bw: 5000,  counter_color: 0, is_replacement_start: false },
-    { machine_id: SERIE, year: 2026, month: 2, recorded_at: '2026-02-01T00:00:00Z', counter_bw: 10000, counter_color: 0, is_replacement_start: false },
-    { machine_id: SERIE, year: 2026, month: 3, recorded_at: '2026-03-01T00:00:00Z', counter_bw: 2000,  counter_color: 0, is_replacement_start: true  },
-    { machine_id: SERIE, year: 2026, month: 4, recorded_at: '2026-04-01T00:00:00Z', counter_bw: 40000, counter_color: 0, is_replacement_start: false },
+    { machine_id: SERIE, year: 2026, month: 1, day: 1, recorded_at: '2026-01-01T00:00:00Z', counter_bw: 5000,  counter_color: 0, is_replacement_start: false },
+    { machine_id: SERIE, year: 2026, month: 2, day: 1, recorded_at: '2026-02-01T00:00:00Z', counter_bw: 10000, counter_color: 0, is_replacement_start: false },
+    { machine_id: SERIE, year: 2026, month: 3, day: 1, recorded_at: '2026-03-01T00:00:00Z', counter_bw: 2000,  counter_color: 0, is_replacement_start: true  },
+    { machine_id: SERIE, year: 2026, month: 4, day: 1, recorded_at: '2026-04-01T00:00:00Z', counter_bw: 40000, counter_color: 0, is_replacement_start: false },
   ])
   if (cntErr) throw new Error(`seed machine_counters: ${cntErr.message}`)
 }, 60_000)
@@ -94,5 +94,48 @@ describe('v_part_yield_baseline — lógica de rendimiento aprendido', () => {
     const c = await signInAs(CLIENT)
     const { data } = await c.from('v_part_yield_baseline').select('avg_yield_total').eq('marque', 'TEST')
     expect(data ?? []).toHaveLength(0)
+  })
+})
+
+// Caso 12 del gate (§9): las vistas eligen el contador por reading_date (FECHA REAL),
+// NO por recorded_at (fecha de REGISTRO). Una lectura importada tarde tiene recorded_at
+// posterior pero reading_date anterior; debe ordenarse por reading_date.
+describe('v_machine_part_consumption — elige el contador por reading_date, no recorded_at', () => {
+  it('una lectura importada tarde (recorded_at futuro, reading_date anterior) no se toma como actual', async () => {
+    const SERIE_LATE = 'TEST-SN-LATE'
+    const c = await signInAs(ADMIN)
+    const { data: cli } = await admin.from('clients').insert({ nom_client: 'TEST Client Late' }).select('id').single()
+    const { data: contract } = await admin.from('contracts')
+      .insert({ numero_contrat: 'TEST-C-LATE', client_id: cli!.id, date_debut: '2026-01-01', statut: 'actif' })
+      .select('id').single()
+    await admin.from('machines').insert({ numero_serie: SERIE_LATE, marque: 'TESTLATE', modele: 'X' })
+    const { data: line } = await admin.from('contract_machines')
+      .insert({ contract_id: contract!.id, machine_id: SERIE_LATE, date_debut: '2026-01-01', statut: 'actif' })
+      .select('id').single()
+
+    // Cambio de la pieza 7 el 01-mar (changed_at). counter_at_change = lectura con reading_date <= 01-mar.
+    const { data: inc } = await admin.from('incidents').insert({
+      numero_incident: 'TEST-I-LATE', title: 'Inc late', contract_machine_id: line!.id,
+      status: 'résolu' as const, resolved_at: '2026-03-01T12:00:00Z',
+    }).select('id').single()
+    await admin.from('incident_parts').insert({ incident_id: inc!.id, part_id: 7, quantity: 1 })
+
+    // reading_date es columna GENERATED de (year,month,day) → NO se inserta; se deriva.
+    const { error: cntErr } = await admin.from('machine_counters').insert([
+      // Lectura del cambio (01-mar → reading_date 2026-03-01): 10000.
+      { machine_id: SERIE_LATE, year: 2026, month: 3, day: 1, recorded_at: '2026-03-01T10:00:00Z', counter_bw: 10000, counter_color: 0, status: 'actif', is_replacement_start: false },
+      // Lectura ACTUAL real (01-may): 15000, registrada a tiempo.
+      { machine_id: SERIE_LATE, year: 2026, month: 5, day: 1, recorded_at: '2026-05-01T10:00:00Z', counter_bw: 15000, counter_color: 0, status: 'actif', is_replacement_start: false },
+      // Lectura IMPORTADA TARDE: reading_date anterior (01-abr) pero recorded_at FUTURO (01-jun): 12000.
+      // Por recorded_at sería "la más reciente" → counter_now 12000 → copies 2000 (MAL).
+      // Por reading_date, la actual es la del 01-may (15000) → copies 5000 (BIEN).
+      { machine_id: SERIE_LATE, year: 2026, month: 4, day: 1, recorded_at: '2026-06-01T10:00:00Z', counter_bw: 12000, counter_color: 0, status: 'actif', is_replacement_start: false },
+    ])
+    if (cntErr) throw new Error(`seed counters late: ${cntErr.message}`)
+
+    const { data } = await c.from('v_machine_part_consumption')
+      .select('copies_since_change').eq('machine_id', SERIE_LATE).eq('part_id', 7)
+    expect(data).toHaveLength(1)
+    expect(data![0].copies_since_change).toBe(5000) // 15000 (reading_date 01-may) − 10000, no 2000
   })
 })

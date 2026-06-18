@@ -5,6 +5,10 @@ const admin = adminClient()
 const SN = 'TEST-PCI-SN1'
 const CT = 'TEST-PCI-CT1'
 const CLIENT = 'TEST-PCI Client'
+// Escenario de ROTACIÓN (caso 9 del gate §9): una máquina con dos líneas en el tiempo.
+const SN_ROT = 'TEST-PCI-ROT'
+const CT_ROT = 'TEST-PCI-CT-ROT'
+const CLIENT_ROT = 'TEST-PCI Client ROT'
 
 async function seedPending(hash: string): Promise<string> {
   const { data, error } = await admin.from('pending_counter_imports').insert({
@@ -22,6 +26,12 @@ async function cleanScenario() {
   await admin.from('contracts').delete().eq('numero_contrat', CT)
   await admin.from('machines').delete().eq('numero_serie', SN)
   await admin.from('clients').delete().eq('nom_client', CLIENT)
+  // Escenario de rotación (caso 9).
+  await admin.from('contract_machines').delete().eq('machine_id', SN_ROT)
+  await admin.from('machine_counters').delete().eq('machine_id', SN_ROT)
+  await admin.from('contracts').delete().eq('numero_contrat', CT_ROT)
+  await admin.from('machines').delete().eq('numero_serie', SN_ROT)
+  await admin.from('clients').delete().eq('nom_client', CLIENT_ROT)
 }
 
 beforeAll(async () => {
@@ -92,9 +102,9 @@ describe('process_counter_extraction — semáforo', () => {
   })
 })
 
-describe('process_counter_extraction — duplicado en la cola (V_DUP_PENDING)', () => {
-  it('🟡 amber cuando otra lectura de la misma máquina y mes ya está en cola', async () => {
-    // A: primera lectura de SN para marzo 2026 (mes aislado de los otros tests, que usan junio).
+describe('process_counter_extraction — duplicado en la cola por DÍA (V_DUP_PENDING)', () => {
+  it('🟡 amber cuando otra lectura de la misma máquina y MISMO DÍA ya está en cola', async () => {
+    // A: primera lectura de SN para el 10-mar-2026 (mes aislado de otros tests, que usan junio).
     const idA = await seedPending('TESTHASH-duppend-a')
     const { data: a } = await admin.rpc('process_counter_extraction', {
       p_pending_id: idA,
@@ -103,15 +113,32 @@ describe('process_counter_extraction — duplicado en la cola (V_DUP_PENDING)', 
     })
     expect(a.light).toBe('green') // aún no hay duplicado → verde
 
-    // B: segunda lectura de SN para el MISMO mes mientras A sigue en pending_review.
+    // B: otra lectura del MISMO DÍA (10-mar) mientras A sigue en pending_review → duplicado.
     const idB = await seedPending('TESTHASH-duppend-b')
     const { data: b } = await admin.rpc('process_counter_extraction', {
       p_pending_id: idB,
-      p_extracted: { serial: SN, date_iso: '2026-03-22T10:00:00', counter_bw: 110, counter_color: 55,
+      p_extracted: { serial: SN, date_iso: '2026-03-10T16:00:00', counter_bw: 110, counter_color: 55,
         confidence: 0.95, is_valid_counter_sheet: true, issues: [] },
     })
     expect(b.light).toBe('amber')
     expect(b.errors).toContain('V_DUP_PENDING')
+  })
+
+  it('🟢 NO es duplicado cuando es otro DÍA del mismo mes (modelo por fecha real)', async () => {
+    // Dos lecturas del mismo mes (abril) pero días distintos: con el modelo nuevo conviven.
+    const idA = await seedPending('TESTHASH-duppend-c')
+    await admin.rpc('process_counter_extraction', {
+      p_pending_id: idA,
+      p_extracted: { serial: SN, date_iso: '2026-04-05T10:00:00', counter_bw: 200, counter_color: 80,
+        confidence: 0.95, is_valid_counter_sheet: true, issues: [] },
+    })
+    const idB = await seedPending('TESTHASH-duppend-d')
+    const { data: b } = await admin.rpc('process_counter_extraction', {
+      p_pending_id: idB,
+      p_extracted: { serial: SN, date_iso: '2026-04-20T10:00:00', counter_bw: 210, counter_color: 85,
+        confidence: 0.95, is_valid_counter_sheet: true, issues: [] },
+    })
+    expect(b.errors).not.toContain('V_DUP_PENDING')
   })
 })
 
@@ -153,5 +180,45 @@ describe('import_counter_from_pending — confirmación', () => {
     expect(mc?.counter_bw).toBe(2000)
     const { data: pci } = await admin.from('pending_counter_imports').select('status').eq('id', id).single()
     expect(pci?.status).toBe('confirmed')
+  })
+})
+
+// Caso 9 del gate (§9): lectura tardía tras ROTACIÓN. Al importar una lectura con fecha
+// PASADA, el contract_machine_id debe ser la línea vigente EN ESA FECHA (no la abierta hoy).
+describe('import_counter_from_pending — atribución por la línea vigente en la fecha (rotación)', () => {
+  it('una lectura de marzo se atribuye a la línea A (ene-mar), no a la B abierta hoy', async () => {
+    // Máquina con dos líneas en el tiempo: A [ene→mar] cerrada, B [abr→] abierta.
+    const cli = await admin.from('clients').insert({ nom_client: CLIENT_ROT }).select('id').single()
+    if (cli.error) throw new Error(cli.error.message)
+    await admin.from('machines').insert({ numero_serie: SN_ROT, marque: 'Ricoh', modele: 'T', type: 'color' })
+    const ct = await admin.from('contracts')
+      .insert({ client_id: cli.data!.id, numero_contrat: CT_ROT, date_debut: '2026-01-01', statut: 'actif', billing_day: 1 })
+      .select('id').single()
+    const lineA = await admin.from('contract_machines')
+      .insert({ contract_id: ct.data!.id, machine_id: SN_ROT, date_debut: '2026-01-01', date_fin: '2026-03-31', statut: 'terminé', end_counter_bw: 900, end_counter_color: 400 })
+      .select('id').single()
+    const lineB = await admin.from('contract_machines')
+      .insert({ contract_id: ct.data!.id, machine_id: SN_ROT, date_debut: '2026-04-01', statut: 'actif' })
+      .select('id').single()
+    if (lineA.error || lineB.error) throw new Error(lineA.error?.message ?? lineB.error?.message)
+
+    // Lectura con fecha de MARZO (dentro de la vigencia de A, aunque B es la línea abierta hoy).
+    const id = await seedPending('TESTHASH-rot')
+    await admin.rpc('process_counter_extraction', {
+      p_pending_id: id,
+      p_extracted: { serial: SN_ROT, date_iso: '2026-03-15T10:00:00', counter_bw: 800, counter_color: 350,
+        confidence: 0.95, is_valid_counter_sheet: true, issues: [] },
+    })
+    const { data: counterId, error } = await admin.rpc('import_counter_from_pending', {
+      p_pending_id: id, p_reviewed_by: null, p_overrides: {},
+    })
+    expect(error).toBeNull()
+
+    // La atribución debe ser la línea A (vigente el 15-mar), NO la B abierta hoy.
+    const { data: mc } = await admin.from('machine_counters')
+      .select('reading_date, contract_machine_id').eq('id', counterId).single()
+    expect(mc?.reading_date).toBe('2026-03-15')
+    expect(mc?.contract_machine_id).toBe(lineA.data!.id)
+    expect(mc?.contract_machine_id).not.toBe(lineB.data!.id)
   })
 })

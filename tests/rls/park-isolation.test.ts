@@ -21,7 +21,7 @@ beforeAll(async () => {
 
   // Un contador en la máquina A (tabla admin-only) para probar su aislamiento.
   const { error } = await admin.from('machine_counters').insert({
-    machine_id: SC.snA, year: 2026, month: 6, counter_bw: 100, counter_color: 50,
+    machine_id: SC.snA, year: 2026, month: 6, day: 1, counter_bw: 100, counter_color: 50,
   })
   if (error) throw new Error(`seed counter: ${error.message}`)
 

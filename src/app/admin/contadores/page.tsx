@@ -70,8 +70,9 @@ export default async function ContadoresPage({ searchParams }: { searchParams: S
       .from('machine_counters')
       .select('machine_id, year, month')
       .eq('status', 'actif')
-      .order('year',  { ascending: false })
-      .order('month', { ascending: false }),
+      // Orden por FECHA REAL: la "última lectura" desempata por día, no solo por mes (spec §6).
+      .order('reading_date', { ascending: false })
+      .order('recorded_at',  { ascending: false }),
   ])
   // WP-5b: un fallo técnico de cualquiera de las 3 queries bloquea (boundary) en vez de mostrar
   // un parque parcial/engañoso (p.ej. todas las máquinas como "sin cliente").

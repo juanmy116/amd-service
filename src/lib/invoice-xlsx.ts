@@ -2,7 +2,16 @@ import ExcelJS from 'exceljs'
 
 export type InvoiceHeader = {
   numero_facture: string; client_name: string; period_year: number; period_month: number
+  period_start: string | null; period_end: string | null
   currency: string; total_amount: number; has_estimated: boolean
+}
+
+/** «MM/YYYY · du JJ/MM/AAAA au JJ/MM/AAAA» — incluye las fechas reales de relevé si existen. */
+function periodLabel(h: InvoiceHeader): string {
+  const mois = `${String(h.period_month).padStart(2, '0')}/${h.period_year}`
+  if (!h.period_start || !h.period_end) return mois
+  const d = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR')
+  return `${mois} · du ${d(h.period_start)} au ${d(h.period_end)}`
 }
 export type InvoiceLineRow = {
   numero_contrat: string; machine_label: string; plan_name: string; billing_type: string
@@ -18,7 +27,7 @@ export async function buildInvoiceWorkbook(h: InvoiceHeader, lines: InvoiceLineR
 
   ws.addRow([`Facture ${h.numero_facture}`])
   ws.addRow([`Client : ${h.client_name}`])
-  ws.addRow([`Période : ${String(h.period_month).padStart(2, '0')}/${h.period_year}`])
+  ws.addRow([`Période : ${periodLabel(h)}`])
   ws.addRow([])
   const headerRow = ws.addRow(['Contrat', 'Machine', 'Plan', 'Forfait', 'Prix B&N', 'ΔB&N', 'Prix Coul.', 'ΔCoul.', 'Total', 'Estimée'])
   headerRow.font = { bold: true }

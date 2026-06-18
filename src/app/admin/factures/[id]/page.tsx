@@ -34,8 +34,8 @@ export default async function FactureDetailPage({
   if (!inv) notFound()
   const { data: lines } = await admin.from('invoice_lines').select('*').eq('invoice_id', id).order('numero_contrat')
 
-  // Bloque E: si la factura es por ciclo de aniversario (period_start/end), mostrar el rango;
-  // si es legacy por cliente/mes, mostrar el mes natural.
+  // Forma B: si la factura tiene periodo real entre relevés (period_start/end), mostrar el rango;
+  // si es legacy por cliente/mes (sin fechas), mostrar el mes natural.
   const periodLabel = inv.period_start && inv.period_end
     ? `${new Date(inv.period_start + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })} – ${new Date(inv.period_end + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}`
     : new Date(inv.period_year, inv.period_month - 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
