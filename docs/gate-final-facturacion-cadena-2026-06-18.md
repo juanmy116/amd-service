@@ -28,18 +28,18 @@ Dos niveles de cobertura, complementarios:
 | # | Caso (§9) | Cobertura | Dónde |
 |---|---|---|---|
 | 1 | Dos lecturas el mismo mes natural (billing_day=1): 02-may + 31-may conviven; abril y mayo sin doble cobro (P0-1) | **E2E** + unit | `gate-facturation-e2e.test.ts` §9.1 (abril 200/20 + mayo 300/30, sin solapar) · índice `(machine_id, reading_date)` |
-| 2 | Corrección same-day: 2ª lectura del mismo día anula la anterior (N2) | unit + RPC | `invoicing.test.ts` (same-day en reemplazo) · guard A3 `cancel-billed-counter.test.ts` |
+| 2 | Corrección same-day: 2ª lectura del mismo día anula la anterior (N2) | **E2E** | `gate-facturation-e2e.test.ts` §9.2 (2ª activa mismo día → 23505; tras anular la 1ª, la corrección entra; queda 1 activa) |
 | 3 | Línea L1 cerrada y L2 abierta del mismo contrato: L1 no ve lecturas de L2 (P0-3) | unit + RPC | `invoicing.test.ts` (`countersForLine`) · `close-by-line.test.ts` (otra línea no contamina) |
-| 4 | Retirar línea sin end_counter → error; con `return_machine_to_stock` → ok + factura último tramo (P0-2) | RPC | `close-by-line.test.ts` (return/terminate/replace por línea + fecha) |
+| 4 | Retirar línea sin end_counter → error; con `return_machine_to_stock` → ok + factura último tramo (P0-2) | **E2E** + RPC | `gate-facturation-e2e.test.ts` §9.4 (sin end_counter → `end_counter_required`) · `close-by-line.test.ts` (con end_counter → ok + cierre por línea/fecha) |
 | 5 | Cadena/dos de golpe: mayo usa 02-jun, junio usa 30-jun (más antigua primero) | **E2E** + unit | `gate-facturation-e2e.test.ts` §9.5 (cierres 02-jun/30-jun en orden) · `invoicing.test.ts` |
 | 6 | Desfase N9: facturado abril; contador llega 20-jun → se factura mayo (secuencia) | unit | `invoicing.test.ts` (desfase N9 / cadena) |
 | 7 | Mes solo-fijo + contador posterior (N8/N10): mayo solo-forfait; junio forfait + copias abril→junio | **E2E** + unit | `gate-facturation-e2e.test.ts` §9.7 (copias B&N suman 700 = 1700−1000, 3 forfaits, mayo intacta) |
 | 8 | Fin de mes N7 (31-may→mayo; 28-feb→feb; bisiesto; cruce año; día 20→abril; día 1→mayo) | unit | `invoicing.test.ts` (`computeInvoiceMonth`, 6 casos N7 + casos 1-28) |
-| 9 | Lectura tardía tras rotación: fecha pasada → línea vigente en esa fecha | unit + RPC | `invoicing.test.ts` (legacy por vigencia) · `close-by-line.test.ts` |
+| 9 | Lectura tardía tras rotación: fecha pasada → línea vigente en esa fecha | **RPC** | `counter-import.test.ts` (rotación A[ene-mar]/B[abr-]: lectura de marzo importada → `contract_machine_id` = A, no B) |
 | 10 | No reutilización: emitir factura cuyo closing_counter_id ya fue cierre de otra → rechazado | RPC | `emit-hardening.test.ts` (V3c, top-level y breakdown) |
 | 11 | Reemplazo A→B con lecturas el mismo mes: un forfait, copias sumadas, breakdown por tramo con IDs | **E2E** + unit | `gate-facturation-e2e.test.ts` §9.11 (A 300/30 + B 200/20 = 500/50, breakdown con IDs de A y B) |
-| 12 | Vistas de piezas con lectura importada tarde: por `reading_date`, no `recorded_at` | unit + RPC | `invoicing.test.ts` · `part-yield-baseline.test.ts` |
-| 13 | Orden: tres lecturas el mismo mes (días 2,15,28) → deltas correctos entre consecutivas | unit | `invoicing.test.ts` (orden canónico por `reading_date`) |
+| 12 | Vistas de piezas con lectura importada tarde: por `reading_date`, no `recorded_at` | **RPC** | `part-yield-baseline.test.ts` (`v_machine_part_consumption`: lectura con `recorded_at` futuro y `reading_date` anterior NO se toma como actual → copies 5000, no 2000) |
+| 13 | Orden: tres lecturas el mismo mes (días 2,15,28) → deltas correctos entre consecutivas | **unit** | `counters.test.ts` (`calcDeltas`: 3 lecturas mismo mes desordenadas → deltas 150/350 por `reading_date`; reinicio y anulados cortan) |
 | 14 | Anulación/reemisión: permitida solo tras anular; dedup por mes intacto | **E2E** + RPC | `gate-facturation-e2e.test.ts` §9.14 (reemitir bloqueado mientras `emise`; ok tras `annulee`) |
 
 Inmutabilidad de facturas (P0-5): verificada en `gate-facturation-e2e.test.ts` §9.1 (UPDATE/DELETE de una
@@ -50,7 +50,7 @@ factura `emise` rechazados por el trigger) y en `billing-isolation.test.ts`.
 ```bash
 supabase start            # Postgres local (OrbStack)
 supabase db reset         # BD efímera con todas las migraciones
-npm run test:rls          # 159 tests (incl. gate-facturation-e2e)
+npm run test:rls          # 163 tests (incl. gate + 4 cierres de cobertura)
 ```
 
 > Los tests que EMITEN facturas (gate, emit-hardening, cancel-billed-counter, facturation-periodo-medida)
@@ -68,5 +68,5 @@ npm run test:rls          # 159 tests (incl. gate-facturation-e2e)
 
 ## Veredicto
 
-**GO.** 113 unit + 159 RLS (incl. 5 E2E del gate) + typecheck + build verde. La facturación por cadena y
+**GO.** 116 unit + 163 RLS (incl. 5 E2E del gate + casos 2/4/9/12/13) + typecheck + build verde. La facturación por cadena y
 fecha real está lista para mergear a `main` y para facturar a 2AS por «periodo a medida».

@@ -436,3 +436,60 @@ describe('Gate §9.11 — reemplazo A→B: un forfait, copias sumadas, breakdown
     expect(inv.data!.total_amount).toBe(32500)
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Caso 2 (§9.2) — Corrección same-day (N2): una sola lectura ACTIVA por máquina y día.
+// Una 2ª lectura activa el mismo día está prohibida por el índice único parcial
+// `(machine_id, reading_date) WHERE status='actif'`; la corrección exige anular la
+// anterior primero (no es una «segunda lectura»).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Gate §9.2 — una lectura activa por máquina y día; corrección = anular + reinsertar', () => {
+  it('rechaza la 2ª lectura activa del mismo día; tras anular la 1ª, la corrección entra', async () => {
+    const s = await seedScenario('C2', {
+      billingDay: 1,
+      lines: [{ serie: 'TESTINV-GATE-C2-M', dateDebut: '2026-04-01', startBw: 1000, startColor: 100 }],
+    })
+    const serie = 'TESTINV-GATE-C2-M'
+    const base = {
+      machine_id: serie, contract_id: s.contractId, contract_machine_id: s.lineIds[serie], client_id: s.clientId,
+      year: 2026, month: 5, day: 2, recorded_at: '2026-05-02T10:00:00Z',
+    }
+    const first = await admin.from('machine_counters').insert({ ...base, counter_bw: 1200, counter_color: 120 }).select('id').single()
+    expect(first.error).toBeNull()
+
+    // 2ª lectura ACTIVA el mismo día (machine_id + reading_date) → viola el índice único parcial.
+    const dup = await admin.from('machine_counters').insert({ ...base, counter_bw: 1250, counter_color: 125 })
+    expect(dup.error).not.toBeNull()
+    expect(dup.error!.code).toBe('23505') // unique_violation
+
+    // Corrección consciente: anular la anterior (status='annule') libera el día.
+    const annul = await admin.from('machine_counters').update({ status: 'annule' }).eq('id', first.data!.id)
+    expect(annul.error).toBeNull()
+    const corrected = await admin.from('machine_counters').insert({ ...base, counter_bw: 1250, counter_color: 125 })
+    expect(corrected.error).toBeNull()
+
+    // Queda exactamente UNA lectura activa ese día.
+    const active = await admin.from('machine_counters')
+      .select('id').eq('machine_id', serie).eq('reading_date', '2026-05-02').eq('status', 'actif')
+    expect(active.data).toHaveLength(1)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Caso 4, 1ª mitad (§9.4) — Retirar una línea facturable SIN end_counter → error
+// (P0-2). La 2ª mitad (return_machine_to_stock con end_counter → ok + cierre) ya está
+// en close-by-line.test.ts; aquí fijamos que el cierre sin lectura final se rechaza.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Gate §9.4 — retirar línea sin end_counter es rechazado (P0-2)', () => {
+  it('return_machine_to_stock sin end_counter_bw/color → end_counter_required', async () => {
+    const s = await seedScenario('C4', {
+      billingDay: 1,
+      lines: [{ serie: 'TESTINV-GATE-C4-M', dateDebut: '2026-04-01', startBw: 1000, startColor: 100 }],
+    })
+    // Payload SIN end_counter_bw/color: la retirada de una línea facturable exige la lectura final.
+    const { error } = await admin.rpc('return_machine_to_stock', {
+      p_payload: { cm_id: s.lineIds['TESTINV-GATE-C4-M'], date: '2026-05-31' },
+    })
+    expect(error?.message).toContain('end_counter_required')
+  })
+})
