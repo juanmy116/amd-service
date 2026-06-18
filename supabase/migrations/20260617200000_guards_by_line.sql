@@ -44,6 +44,12 @@ BEGIN
     RETURN jsonb_build_object('deleted', false, 'not_found', true);
   END IF;
 
+  -- P2 TOCTOU (Codex): bloquea las líneas del contrato para que ninguna machine_counter
+  -- nueva pueda insertarse (la FK toma FOR KEY SHARE sobre la línea) entre el conteo y el
+  -- DELETE. Sin esto, una lectura concurrente haría fallar la cascada con un error de FK
+  -- crudo (RESTRICT) en vez de un rechazo limpio. No hay corrupción sin él, solo UX fea.
+  PERFORM 1 FROM contract_machines WHERE contract_id = p_contract_id FOR UPDATE;
+
   SELECT count(*) INTO v_incidents
     FROM incidents
     WHERE contract_machine_id IN (SELECT id FROM contract_machines WHERE contract_id = p_contract_id);
@@ -62,8 +68,18 @@ BEGIN
   -- pasaría las otras comprobaciones (p.ej. factura solo-fijo sin lecturas) y el DELETE
   -- abortaría con un error de FK crudo. Además, una factura es un registro contable
   -- INMUTABLE: un contrato con CUALQUIER factura (emise o annulee) nunca debe borrarse.
+  -- Por cabecera (contract_id) O por línea (P2 defensivo de Codex: una invoice_line atada
+  -- por contract_machine_id a una línea de este contrato — aunque su contract_id sea NULL —
+  -- quedaría huérfana al borrarse la línea; no alcanzable por emisión, pero se blinda igual).
+  -- Cuenta facturas (cabeceras) distintas atadas por cualquier vía.
   SELECT count(*) INTO v_invoices
-    FROM invoices WHERE contract_id = p_contract_id;
+    FROM invoices
+    WHERE contract_id = p_contract_id
+       OR id IN (
+         SELECT invoice_id FROM invoice_lines
+         WHERE contract_id = p_contract_id
+            OR contract_machine_id IN (SELECT id FROM contract_machines WHERE contract_id = p_contract_id)
+       );
 
   IF v_incidents > 0 OR v_counters > 0 OR v_maintenance > 0 OR v_invoices > 0 THEN
     RETURN jsonb_build_object(
@@ -165,13 +181,20 @@ BEGIN
   END LOOP;
 
   -- P1-4 (guard del motor): bloquear cambio de cliente si el contrato ya tiene historial.
-  -- PR-D.3: el historial de contadores se mira por contract_id (legacy) O por línea
+  -- PR-D.3: el historial (facturas o relevés) se mira por contract_id (legacy) O por línea
   -- (contract_machine_id), porque la atribución canónica pasó a la línea y Princity ata
-  -- lecturas con contract_id NULL solo por contract_machine_id.
+  -- lecturas con contract_id NULL solo por contract_machine_id. El OR de línea en
+  -- invoice_lines es defensa en profundidad (P2 de Codex): la emisión siempre puebla
+  -- contract_id, pero un snapshot malformado quedaría invisible y permitiría reasignar el
+  -- cliente de un contrato facturado.
   SELECT client_id INTO v_old_client FROM contracts WHERE id = p_contract_id;
   v_new_client := (payload->>'client_id')::bigint;
   IF v_old_client IS DISTINCT FROM v_new_client THEN
-    IF EXISTS (SELECT 1 FROM invoice_lines WHERE contract_id = p_contract_id)
+    IF EXISTS (
+         SELECT 1 FROM invoice_lines
+         WHERE contract_id = p_contract_id
+            OR contract_machine_id IN (SELECT id FROM contract_machines WHERE contract_id = p_contract_id)
+       )
        OR EXISTS (
          SELECT 1 FROM machine_counters
          WHERE contract_id = p_contract_id

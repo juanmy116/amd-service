@@ -72,6 +72,69 @@ async function seedCounter(
   if (ins.error) throw new Error(`seed counter: ${ins.error.message}`)
 }
 
+// Snapshot MALFORMADO (reproducción de Codex por inserción directa, P2 defensivo): una
+// factura con cabecera contract_id NULL + una invoice_line con contract_id NULL pero
+// contract_machine_id apuntando a una línea real del contrato. No es alcanzable por la
+// emisión endurecida (siempre puebla contract_id), pero los guards deben blindarlo: sin el
+// OR por línea en invoice_lines, delete borraría el contrato (dejando líneas de factura
+// huérfanas) y el cambio de cliente quedaría permitido. Prefijo TESTINV (facturas
+// inmutables → cleanup no las barre), idempotente.
+async function seedMalformedInvoiceContract(): Promise<{ contractId: string; lineId: string }> {
+  const cli = await admin.from('clients')
+    .upsert({ nom_client: 'TESTINV D3 MALFORMED' }, { onConflict: 'nom_client' }).select('id').single()
+  if (cli.error) throw new Error(cli.error.message)
+  const clientId = cli.data!.id as number
+
+  const serie = 'TESTINV-D3-MAL'
+  const found = await admin.from('machines').select('numero_serie').eq('numero_serie', serie).maybeSingle()
+  if (!found.data) {
+    const m = await admin.from('machines').insert({ numero_serie: serie, marque: 'TESTINV', modele: 'M', type: 'color' })
+    if (m.error) throw new Error(`seed mal machine: ${m.error.message}`)
+  }
+
+  const num = 'TESTINV-D3-MAL-CONTRAT'
+  let contractId: string
+  const foundC = await admin.from('contracts').select('id').eq('numero_contrat', num).maybeSingle()
+  if (foundC.data) {
+    contractId = foundC.data.id as string
+  } else {
+    const c = await admin.from('contracts')
+      .insert({ numero_contrat: num, client_id: clientId, date_debut: '2026-01-01', statut: 'actif', billing_day: 1 })
+      .select('id').single()
+    if (c.error) throw new Error(`seed mal contract: ${c.error.message}`)
+    contractId = c.data!.id as string
+  }
+
+  let lineId: string
+  const foundL = await admin.from('contract_machines').select('id').eq('contract_id', contractId).maybeSingle()
+  if (foundL.data) {
+    lineId = foundL.data.id as string
+  } else {
+    const l = await admin.from('contract_machines')
+      .insert({ contract_id: contractId, machine_id: serie, date_debut: '2026-01-01', statut: 'actif' })
+      .select('id').single()
+    if (l.error) throw new Error(`seed mal line: ${l.error.message}`)
+    lineId = l.data!.id as string
+  }
+
+  const fnum = 'TESTINV-D3-MAL-0001'
+  const foundInv = await admin.from('invoices').select('id').eq('numero_facture', fnum).maybeSingle()
+  if (!foundInv.data) {
+    const inv = await admin.from('invoices').insert({
+      numero_facture: fnum, client_id: clientId, client_name: 'TESTINV D3 MALFORMED',
+      contract_id: null, period_year: 2026, period_month: 6, total_amount: 1000,
+    }).select('id').single()
+    if (inv.error) throw new Error(`seed mal invoice: ${inv.error.message}`)
+    const line = await admin.from('invoice_lines').insert({
+      invoice_id: inv.data!.id, contract_id: null, contract_machine_id: lineId,
+      numero_contrat: num, machine_label: 'TESTINV mal', plan_name: 'TEST plan', billing_type: 'per_copy',
+    })
+    if (line.error) throw new Error(`seed mal invoice_line: ${line.error.message}`)
+  }
+
+  return { contractId, lineId }
+}
+
 beforeAll(async () => {
   if (!ANON_KEY || !SERVICE_KEY) {
     throw new Error('Faltan ANON_KEY/SERVICE_ROLE_KEY. Ejecuta con `supabase start` y exporta las claves.')
@@ -170,6 +233,16 @@ describe('delete_contract — historial por línea', () => {
     // El contrato no tenía lecturas → la factura es lo único que lo bloquea.
     expect(data.counters).toBe(0)
   })
+
+  it('P2 defensivo: una invoice_line atada por línea (cabecera contract_id NULL) bloquea el borrado', async () => {
+    const { contractId } = await seedMalformedInvoiceContract()
+    const { data, error } = await admin.rpc('delete_contract', { p_contract_id: contractId })
+    // Sin el OR por línea: invoices.contract_id NULL → 0 facturas → borraría el contrato
+    // dejando la invoice_line huérfana. Con el blindaje: la detecta por contract_machine_id.
+    expect(error).toBeNull()
+    expect(data.deleted).toBe(false)
+    expect(data.invoices).toBe(1)
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -218,5 +291,15 @@ describe('update_contract_with_lines — cambio de cliente con historial por lí
     expect(error).toBeNull()
     const after = await admin.from('contracts').select('client_id').eq('id', ctx.contractId).single()
     expect(after.data!.client_id).toBe(target)
+  })
+
+  it('P2 defensivo: una invoice_line atada por línea (cabecera contract_id NULL) bloquea el cambio', async () => {
+    const { contractId } = await seedMalformedInvoiceContract()
+    const target = await otherClient('MALFORMED')
+    const { error } = await admin.rpc('update_contract_with_lines', {
+      p_contract_id: contractId, payload: changeClientPayload(target),
+    })
+    // Sin el OR por línea: invoice_lines.contract_id NULL → guard no ve historial → permite.
+    expect(error?.message).toContain('client_change_forbidden_history')
   })
 })
