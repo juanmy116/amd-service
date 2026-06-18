@@ -10,6 +10,8 @@ on:
       - 'playwright.config.ts'
       - 'src/app/login/**'
       - 'src/app/admin/incidents/**'
+      - 'src/app/admin/facturation/**'
+      - 'src/app/admin/factures/**'
       - 'src/app/tech/**'
       - 'src/proxy.ts'
       - '.github/workflows/e2e.yml'
