@@ -20,6 +20,10 @@ const PLAN = 'TESTINV E2E Fact Plan'
 
 let contractId: string
 
+// Sin retry: el test EMITE una factura inmutable; un reintento re-ejecutaría el seed y
+// chocaría con el contrato ya existente. En CI la BD es efímera (un solo run limpio).
+test.describe.configure({ retries: 0 })
+
 test.beforeAll(async () => {
   // Limpieza best-effort previa (idempotencia local; en CI la BD ya es efímera).
   await admin.from('machine_counters').delete().eq('machine_id', SERIE)
@@ -77,14 +81,15 @@ test('UI de facturación: seleccionar contrato → emitir → ver factura → an
   // 4) Emitir la factura.
   await page.getByRole('button', { name: 'Émettre la facture' }).click()
 
-  // 5) Redirige al detalle de la factura emitida.
+  // 5) Redirige al detalle de la factura emitida. El id va en la URL.
   await page.waitForURL(/\/admin\/factures\/[0-9a-f-]+$/, { timeout: 20_000 })
-  await expect(page.getByText(CLIENT)).toBeVisible()
+  const invoiceId = page.url().split('/').pop()!
+  await expect(page.getByText(CLIENT, { exact: true })).toBeVisible()
   await expect(page.getByText('Télécharger le tableur')).toBeVisible()
 
-  // 6) En BD: la factura existe, status 'emise', total 200·10 + 130·50 = 2000 + 6500...
-  //    (color 130 − 100 = 30 → 30·50 = 1500). Total = 200·10 + 30·50 = 2000 + 1500 = 3500.
-  const issued = await admin.from('invoices').select('id, status, total_amount').eq('contract_id', contractId).single()
+  // 6) En BD: esa factura existe, status 'emise'. Total = ΔB&N·10 + ΔColor·50
+  //    = 200·10 + 30·50 = 2000 + 1500 = 3500 (color: 130 − 100 = 30).
+  const issued = await admin.from('invoices').select('status, total_amount').eq('id', invoiceId).single()
   expect(issued.data!.status).toBe('emise')
   expect(issued.data!.total_amount).toBe(3500)
 
@@ -95,7 +100,7 @@ test('UI de facturación: seleccionar contrato → emitir → ver factura → an
   // 8) La página muestra el estado "Annulée" y en BD queda annulee.
   await expect(page.getByText('Annulée')).toBeVisible({ timeout: 10_000 })
   await expect.poll(async () => {
-    const r = await admin.from('invoices').select('status').eq('id', issued.data!.id).single()
+    const r = await admin.from('invoices').select('status').eq('id', invoiceId).single()
     return r.data?.status
   }, { timeout: 10_000 }).toBe('annulee')
 })
