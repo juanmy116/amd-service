@@ -39,21 +39,34 @@ export default function UploadCounterButton() {
       r === 'ok' ? tally.ok++ : r === 'duplicate' ? tally.duplicates++ : tally.errors++
 
     try {
+      let images: File[]
       if (file.type === 'application/pdf') {
         setPhase({ kind: 'splitting' })
         const { pdfToJpegBlobs } = await import('@/lib/pdfToImages')
         const blobs = await pdfToJpegBlobs(file)
         if (blobs.length === 0) { setPhase({ kind: 'error', message: 'PDF illisible ou vide.' }); return }
-        setPhase({ kind: 'uploading', done: 0, total: blobs.length })
-        for (let i = 0; i < blobs.length; i++) {
-          const img = new File([blobs[i]], `page-${i + 1}.jpg`, { type: 'image/jpeg' })
-          count(await uploadOne(img))
-          setPhase({ kind: 'uploading', done: i + 1, total: blobs.length })
-        }
+        images = blobs.map((b, i) => new File([b], `page-${i + 1}.jpg`, { type: 'image/jpeg' }))
       } else {
-        setPhase({ kind: 'uploading', done: 0, total: 1 })
-        count(await uploadOne(file))
+        images = [file]
       }
+
+      // Subir de CONCURRENCY en CONCURRENCY (no todas a la vez): cada subida espera su OCR, así
+      // nunca hay más de CONCURRENCY lecturas simultáneas y el servicio no se satura (502).
+      const total = images.length
+      let done = 0
+      setPhase({ kind: 'uploading', done: 0, total })
+      const CONCURRENCY = 3
+      let next = 0
+      const worker = async () => {
+        while (next < images.length) {
+          const img = images[next++]
+          count(await uploadOne(img))
+          done++
+          setPhase({ kind: 'uploading', done, total })
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, images.length) }, worker))
+
       setPhase({ kind: 'done', ...tally })
       router.refresh()
     } catch (e) {
@@ -87,8 +100,7 @@ export default function UploadCounterButton() {
         <p className="text-xs text-ink-muted text-right">
           {phase.ok > 0 && <span className="text-green-700">{phase.ok} ajouté(s). </span>}
           {phase.duplicates > 0 && <span className="text-amber-700">{phase.duplicates} doublon(s). </span>}
-          {phase.errors > 0 && <span className="text-accent">{phase.errors} échec(s). </span>}
-          {phase.ok > 0 && <span>Analyse en cours, rafraîchissez dans quelques instants.</span>}
+          {phase.errors > 0 && <span className="text-accent">{phase.errors} échec(s).</span>}
         </p>
       )}
       {phase.kind === 'error' && <p className="text-xs text-accent">{phase.message}</p>}
