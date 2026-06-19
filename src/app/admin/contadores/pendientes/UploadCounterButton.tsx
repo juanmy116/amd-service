@@ -71,7 +71,9 @@ export default function UploadCounterButton() {
       router.refresh()
     } catch (e) {
       console.error('[UploadCounter]', e)
-      setPhase({ kind: 'error', message: 'Échec du traitement du fichier.' })
+      // DIAGNÓSTICO TEMPORAL: mostrar el error real en pantalla para identificar el fallo del PDF.
+      const detail = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
+      setPhase({ kind: 'error', message: `Échec: ${detail}`.slice(0, 300) })
     } finally {
       if (inputRef.current) inputRef.current.value = ''
     }
