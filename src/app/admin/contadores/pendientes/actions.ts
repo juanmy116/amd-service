@@ -2,7 +2,6 @@
 import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
-import { after } from 'next/server'
 import {
   validateCounterUpload, extensionForType, sha256Hex, buildImagePath,
 } from '@/lib/counterUpload'
@@ -99,20 +98,21 @@ export async function uploadCounterImageAction(_p: UploadState, fd: FormData): P
     return { error: 'Erreur lors de l’envoi du fichier. Réessayez.' }
   }
 
-  // Disparar el OCR en SEGUNDO PLANO (after): el OCR (Claude) tarda varios segundos, así que NO
-  // bloqueamos la respuesta — la fila ya está encolada y visible; el resultado aparece al refrescar.
-  // after() garantiza que el fetch corra tras enviar la respuesta (en serverless un fire-and-forget
-  // suelto podría cancelarse). Al subir un PDF de N páginas esto evita N esperas en serie.
-  after(async () => {
+  // Disparar el OCR y ESPERARLO, con reintentos ante saturación transitoria (502/5xx). El cliente
+  // limita la concurrencia (sube de 3 en 3), así nunca se dispara una avalancha de OCR que sature
+  // el servicio. Esperar aquí deja que el cliente marque el ritmo y reintente lo que falle.
+  const ocrUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/parse-counter-image`
+  const ocrHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SECRET_KEY}` }
+  const ocrBody = JSON.stringify({ pending_id: pending.id, image_path: path, content_type: file.type })
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/parse-counter-image`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SECRET_KEY}` },
-        body: JSON.stringify({ pending_id: pending.id, image_path: path, content_type: file.type }),
-      })
-      if (!res.ok) console.error('[uploadCounter] OCR trigger status', res.status, await res.text().catch(() => ''))
-    } catch (e) { console.error('[uploadCounter] trigger parse', e) }
-  })
-
+      const res = await fetch(ocrUrl, { method: 'POST', headers: ocrHeaders, body: ocrBody })
+      if (res.ok) break
+      console.error('[uploadCounter] OCR status', res.status, 'attempt', attempt)
+    } catch (e) { console.error('[uploadCounter] OCR fetch', e, 'attempt', attempt) }
+    if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 800))
+  }
+  // La fila ya está encolada: devolvemos ok aunque el OCR no haya corrido (quedaría en rojo, visible
+  // para revisión). NO devolvemos error para no provocar un reintento que choque con la dedup (doublon).
   return { ok: true }
 }
