@@ -21,10 +21,17 @@ type Phase =
 async function uploadOne(file: File): Promise<'ok' | 'duplicate' | 'error'> {
   const fd = new FormData()
   fd.append('file', file)
-  const res = await uploadCounterImageAction(null, fd)
-  if (res && 'ok' in res) return 'ok'
-  if (res && 'duplicate' in res) return 'duplicate'
-  return 'error'
+  try {
+    const res = await uploadCounterImageAction(null, fd)
+    if (res && 'ok' in res) return 'ok'
+    if (res && 'duplicate' in res) return 'duplicate'
+    return 'error'
+  } catch (e) {
+    // Un fallo de red/servidor en UNA página NO debe romper todo el lote: se cuenta como error
+    // (esa página quedará por subir/reintentar) y el bucle sigue con las demás.
+    console.error('[uploadOne]', e)
+    return 'error'
+  }
 }
 
 export default function UploadCounterButton() {
@@ -50,30 +57,23 @@ export default function UploadCounterButton() {
         images = [file]
       }
 
-      // Subir de CONCURRENCY en CONCURRENCY (no todas a la vez): cada subida espera su OCR, así
-      // nunca hay más de CONCURRENCY lecturas simultáneas y el servicio no se satura (502).
+      // Subir de UNA EN UNA y espaciado: cada subida espera su OCR (~5-10s), y dejamos una pausa
+      // entre páginas. Así el servicio de IA recibe las peticiones a goteo y no nos limita (los
+      // 500/timeout en ráfaga venían de mandar muchas a la vez). Más lento pero fiable.
       const total = images.length
-      let done = 0
       setPhase({ kind: 'uploading', done: 0, total })
-      const CONCURRENCY = 3
-      let next = 0
-      const worker = async () => {
-        while (next < images.length) {
-          const img = images[next++]
-          count(await uploadOne(img))
-          done++
-          setPhase({ kind: 'uploading', done, total })
-        }
+      const GAP_MS = 1200
+      for (let i = 0; i < images.length; i++) {
+        count(await uploadOne(images[i]))
+        setPhase({ kind: 'uploading', done: i + 1, total })
+        if (i < images.length - 1) await new Promise(r => setTimeout(r, GAP_MS))
       }
-      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, images.length) }, worker))
 
       setPhase({ kind: 'done', ...tally })
       router.refresh()
     } catch (e) {
       console.error('[UploadCounter]', e)
-      // DIAGNÓSTICO TEMPORAL: mostrar el error real en pantalla para identificar el fallo del PDF.
-      const detail = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
-      setPhase({ kind: 'error', message: `Échec: ${detail}`.slice(0, 300) })
+      setPhase({ kind: 'error', message: 'Échec du traitement du fichier.' })
     } finally {
       if (inputRef.current) inputRef.current.value = ''
     }
