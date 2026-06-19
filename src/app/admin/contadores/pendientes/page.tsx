@@ -2,6 +2,7 @@ import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Card } from '@/components/ui/Card'
 import PendingList from './PendingList'
+import UploadCounterButton from './UploadCounterButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,9 +34,12 @@ export default async function PendingCountersPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-ink">Compteurs en attente</h1>
-        <p className="text-sm text-ink-muted mt-0.5">Relevés reçus par email, à valider avant import.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-ink">Compteurs en attente</h1>
+          <p className="text-sm text-ink-muted mt-0.5">Relevés reçus par email ou ajoutés manuellement, à valider avant import.</p>
+        </div>
+        <UploadCounterButton />
       </div>
       <Card className="p-0">
         {withUrls.length === 0

@@ -9,6 +9,9 @@ const csp = [
   `img-src 'self' data: blob: https://images.unsplash.com`,
   `connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST}`,
   "font-src 'self'",
+  // pdf.js (troceo de PDF de contadores en /admin/contadores/pendientes) lanza un Web Worker
+  // servido como asset del mismo origen; blob: cubre el fallback del runtime de pdf.js.
+  "worker-src 'self' blob:",
   "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -29,11 +32,13 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
-  // CSV importer (/admin/machines/import) acepta hasta 1 MB. Con el overhead multipart
-  // de FormData, el body real ronda 1.1 MB — el default de 1 MB de Server Actions
-  // rechazaría peticiones legítimas antes de que la validación amistosa corra.
+  // bodySizeLimit es GLOBAL a todas las Server Actions. Dos consumidores marcan el suelo:
+  //  - CSV importer (/admin/machines/import): hasta ~1.1 MB con overhead multipart.
+  //  - Subida manual de contadores (/admin/contadores/pendientes): foto/PDF hasta 10 MB
+  //    (la acción valida MAX_UPLOAD_BYTES=10MB; +overhead multipart → 12 MB de margen).
+  // El default de 1 MB rechazaría estas peticiones legítimas antes de la validación amistosa.
   experimental: {
-    serverActions: { bodySizeLimit: '2mb' },
+    serverActions: { bodySizeLimit: '12mb' },
   },
   images: {
     remotePatterns: [
