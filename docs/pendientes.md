@@ -150,15 +150,16 @@ Nada pendiente. (Historial: `docs/superpowers/specs/2026-06-03-contracts-n-machi
 
 ---
 
-## 6. 🔴 Subir los contadores directamente desde la app (ingesta sin depender de CloudMailin) — PRIORITARIO
+## 6. 🟡 Subir los contadores directamente desde la app (ingesta sin depender de CloudMailin) — INGESTA DIRECTA HECHA; troceo PDF pendiente
 
 > **Qué:** una forma de **subir las fotos/PDF de contadores directamente desde la app** (panel admin y/o PWA del técnico), sin pasar por email → CloudMailin. Las imágenes irían directas a storage + `pending_counter_imports` + `parse-counter-image` (el lector OCR ya existe).
 >
 > **Por qué:** la ingesta actual (email a `admin@test-sav.site` → CloudMailin free → OCR) tiene un tope de **512 KB por correo** (plan gratuito de CloudMailin). Inviable para clientes con muchas máquinas: 2AS tiene **40** y sus lecturas no caben (en la prueba del 2026-06-18 hubo que comprimir y mandar de a pocas). Es un cuello de botella duro de un tercero.
 >
-> **Pasos / consideraciones:**
-> 1. UI de subida (drag&drop / cámara del móvil en la PWA técnico) → sube a storage `counter-images` + crea fila en `pending_counter_imports` + dispara `parse-counter-image`. Reutiliza toda la cola/semáforos/confirmación que ya existen.
-> 2. **Partir PDFs multipágina / lotes:** los reportes vienen como **PDF de 1 hoja por máquina** (escaneado, sin texto; las **Pantum ocupan 2 páginas**). El lector procesa **1 imagen = 1 lectura**, así que hay que separar el PDF en imágenes individuales (idealmente en el servidor al subir, no a mano). Las Pantum de 2 páginas requieren combinar o tratar ambas.
-> 3. Alternativa puente (menos buena): subir el plan de CloudMailin (de pago) — sigue con tope y dependencia de un tercero.
+> **✅ Hecho (PR `feat/subida-directa-contadores`):** botón **"Ajouter une photo / un PDF"** en `/admin/contadores/pendientes`. Server Action `uploadCounterImageAction` (`actions.ts`) + lógica pura testeada `src/lib/counterUpload.ts` (tipos JPG/PNG/WEBP/PDF, tope **10 MB**, hash SHA-256 → reutiliza la dedup `register_counter_duplicate`). Sube a `counter-images`, inserta en `pending_counter_imports` (`source='manual'`) y dispara `parse-counter-image`. `next.config.ts` `bodySizeLimit` subido a **12 MB**. Reutiliza cola/semáforos/confirmación. → **resuelve el tope de 512 KB.**
+>
+> **🔴 Pendiente — Partir PDFs multipágina / lotes:** los reportes vienen como **PDF de 1 hoja por máquina** (escaneado, sin texto; las **Pantum ocupan 2 páginas**). El lector procesa **1 imagen = 1 lectura**; hoy un PDF multipágina se sube entero y el OCR extrae **una sola** lectura. Falta separar el PDF en imágenes individuales (idealmente en el servidor al subir). Las Pantum de 2 páginas requieren combinar o tratar ambas. **Mientras tanto: subir 1 foto/PDF por máquina.**
+>
+> **Pendiente opcional:** misma subida desde la **PWA del técnico** (`/tech`) para que suban en campo (hoy es admin-only).
 >
 > Encaja con la ampliación del "agente de contadores" (capacidades 2-4 sin empezar, ver `project_agente_supervisor_contadores`).
