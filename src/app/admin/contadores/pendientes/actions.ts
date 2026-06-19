@@ -2,6 +2,7 @@
 import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import {
   validateCounterUpload, extensionForType, sha256Hex, buildImagePath,
 } from '@/lib/counterUpload'
@@ -75,7 +76,7 @@ export async function uploadCounterImageAction(_p: UploadState, fd: FormData): P
 
   // Dedup: si el hash ya existe, incrementa el contador en la fila original y avisa (no reprocesa).
   const { data: dup } = await admin.rpc('register_counter_duplicate', { p_hash: hash })
-  if (dup) { revalidatePath('/admin/contadores/pendientes'); return { duplicate: true } }
+  if (dup) return { duplicate: true }
 
   const ext = extensionForType(file.type)
   const now = new Date()
@@ -90,18 +91,28 @@ export async function uploadCounterImageAction(_p: UploadState, fd: FormData): P
   if (insErr) { console.error('[uploadCounter] insert', insErr); return { error: 'Erreur lors de l’enregistrement.' } }
 
   const up = await admin.storage.from('counter-images').upload(path, bytes, { contentType: file.type, upsert: true })
-  if (up.error) console.error('[uploadCounter] upload', up.error)
+  if (up.error) {
+    // Si la subida falla, la fila quedaría reservando el hash → un reintento del MISMO fichero
+    // chocaría con la dedup y nunca se procesaría. Liberamos la fila y pedimos reintentar.
+    console.error('[uploadCounter] upload', up.error)
+    await admin.from('pending_counter_imports').delete().eq('id', pending.id)
+    return { error: 'Erreur lors de l’envoi du fichier. Réessayez.' }
+  }
 
-  // Disparar el OCR y esperarlo: al volver, la fila ya tiene los datos extraídos y aparece
-  // resuelta en la lista. Si falla, la fila queda visible para revisión manual (no rompe la subida).
-  try {
-    await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/parse-counter-image`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SECRET_KEY}` },
-      body: JSON.stringify({ pending_id: pending.id, image_path: path, content_type: file.type }),
-    })
-  } catch (e) { console.error('[uploadCounter] trigger parse', e) }
+  // Disparar el OCR en SEGUNDO PLANO (after): el OCR (Claude) tarda varios segundos, así que NO
+  // bloqueamos la respuesta — la fila ya está encolada y visible; el resultado aparece al refrescar.
+  // after() garantiza que el fetch corra tras enviar la respuesta (en serverless un fire-and-forget
+  // suelto podría cancelarse). Al subir un PDF de N páginas esto evita N esperas en serie.
+  after(async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/parse-counter-image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SECRET_KEY}` },
+        body: JSON.stringify({ pending_id: pending.id, image_path: path, content_type: file.type }),
+      })
+      if (!res.ok) console.error('[uploadCounter] OCR trigger status', res.status, await res.text().catch(() => ''))
+    } catch (e) { console.error('[uploadCounter] trigger parse', e) }
+  })
 
-  revalidatePath('/admin/contadores/pendientes')
   return { ok: true }
 }

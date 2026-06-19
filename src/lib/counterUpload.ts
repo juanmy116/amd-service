@@ -29,7 +29,8 @@ export function validateCounterUpload(file: { type: string; size: number }): Upl
   return { ok: true }
 }
 
-/** Extensión de fichero a partir del content-type (jpeg→jpg vía split, pdf explícito). */
+/** Extensión de fichero a partir del content-type: 'pdf' explícito; el resto = subtipo MIME
+ *  (image/jpeg→'jpeg', image/png→'png'…). Solo afecta al nombre del objeto en el bucket. */
 export function extensionForType(contentType: string): string {
   return contentType === 'application/pdf' ? 'pdf' : contentType.split('/')[1]
 }

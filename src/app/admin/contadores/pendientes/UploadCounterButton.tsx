@@ -8,7 +8,8 @@ import { uploadCounterImageAction } from './actions'
 //  - PDF: se TROCEA en el navegador (1 página = 1 imagen) y se suben todas → N relevés,
 //    cada uno a la cola de revisión. Resuelve el PDF mensual de 2AS (46 páginas, 5 MB) que
 //    ni cabe por email (512 KB) ni en una función serverless (4,5 MB).
-// `capture` deja abrir la cámara en móvil para fotos sueltas.
+// Sin `capture`: el selector nativo deja elegir cámara, galería o PDF (capture forzaría la
+// cámara en móvil y bloquearía elegir el PDF, que es el caso principal).
 
 type Phase =
   | { kind: 'idle' }
@@ -69,7 +70,6 @@ export default function UploadCounterButton() {
         ref={inputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp,application/pdf"
-        capture="environment"
         className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
       />
@@ -84,10 +84,11 @@ export default function UploadCounterButton() {
           : 'Ajouter une photo / un PDF'}
       </button>
       {phase.kind === 'done' && (
-        <p className="text-xs text-ink-muted">
+        <p className="text-xs text-ink-muted text-right">
           {phase.ok > 0 && <span className="text-green-700">{phase.ok} ajouté(s). </span>}
           {phase.duplicates > 0 && <span className="text-amber-700">{phase.duplicates} doublon(s). </span>}
-          {phase.errors > 0 && <span className="text-accent">{phase.errors} échec(s).</span>}
+          {phase.errors > 0 && <span className="text-accent">{phase.errors} échec(s). </span>}
+          {phase.ok > 0 && <span>Analyse en cours, rafraîchissez dans quelques instants.</span>}
         </p>
       )}
       {phase.kind === 'error' && <p className="text-xs text-accent">{phase.message}</p>}
