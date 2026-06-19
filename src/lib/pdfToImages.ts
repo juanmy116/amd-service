@@ -24,7 +24,11 @@ export async function pdfToJpegBlobs(file: File, onProgress?: PdfProgress): Prom
   ).toString()
 
   const data = await file.arrayBuffer()
-  const loadingTask = pdfjs.getDocument({ data })
+  // wasmUrl es OBLIGATORIO en pdf.js v6: los decodificadores de imagen (CCITT/fax, JBIG2, JPEG2000)
+  // viven en módulos WASM. Sin esto, las páginas escaneadas en CCITT (frecuentes en los relevés de
+  // 2AS) se renderizan EN BLANCO → se pierden como "doublons". Los .wasm se copian a /public/pdfjs/wasm
+  // por el script copy:pdf-wasm. La barra final es necesaria (pdf.js le añade el nombre del módulo).
+  const loadingTask = pdfjs.getDocument({ data, wasmUrl: '/pdfjs/wasm/' })
   const pdf = await loadingTask.promise
   const blobs: Blob[] = []
 

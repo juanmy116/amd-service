@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "copy:pdf-wasm": "node -e \"require('fs').cpSync('node_modules/pdfjs-dist/wasm','public/pdfjs/wasm',{recursive:true})\"",
+    "postinstall": "npm run copy:pdf-wasm",
+    "predev": "npm run copy:pdf-wasm",
+    "predev:turbo": "npm run copy:pdf-wasm",
+    "prebuild": "npm run copy:pdf-wasm",
     "dev": "next dev --webpack",
     "dev:turbo": "next dev",
     "build": "next build",

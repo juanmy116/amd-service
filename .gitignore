@@ -63,3 +63,6 @@ playwright-report/
 test-results/
 /playwright/.cache/
 tests/e2e/.seed.json
+
+# Archivos WASM de pdf.js (copiados desde node_modules por copy:pdf-wasm)
+/public/pdfjs/
