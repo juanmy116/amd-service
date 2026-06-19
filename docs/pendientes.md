@@ -150,7 +150,7 @@ Nada pendiente. (Historial: `docs/superpowers/specs/2026-06-03-contracts-n-machi
 
 ---
 
-## 6. 🟡 Subir los contadores directamente desde la app (ingesta sin depender de CloudMailin) — INGESTA DIRECTA HECHA; troceo PDF pendiente
+## 6. ✅ Subir los contadores directamente desde la app (ingesta sin depender de CloudMailin) — INGESTA DIRECTA + TROCEO PDF HECHOS
 
 > **Qué:** una forma de **subir las fotos/PDF de contadores directamente desde la app** (panel admin y/o PWA del técnico), sin pasar por email → CloudMailin. Las imágenes irían directas a storage + `pending_counter_imports` + `parse-counter-image` (el lector OCR ya existe).
 >
@@ -158,8 +158,8 @@ Nada pendiente. (Historial: `docs/superpowers/specs/2026-06-03-contracts-n-machi
 >
 > **✅ Hecho (PR `feat/subida-directa-contadores`):** botón **"Ajouter une photo / un PDF"** en `/admin/contadores/pendientes`. Server Action `uploadCounterImageAction` (`actions.ts`) + lógica pura testeada `src/lib/counterUpload.ts` (tipos JPG/PNG/WEBP/PDF, tope **10 MB**, hash SHA-256 → reutiliza la dedup `register_counter_duplicate`). Sube a `counter-images`, inserta en `pending_counter_imports` (`source='manual'`) y dispara `parse-counter-image`. `next.config.ts` `bodySizeLimit` subido a **12 MB**. Reutiliza cola/semáforos/confirmación. → **resuelve el tope de 512 KB.**
 >
-> **🔴 Pendiente — Partir PDFs multipágina / lotes:** los reportes vienen como **PDF de 1 hoja por máquina** (escaneado, sin texto; las **Pantum ocupan 2 páginas**). El lector procesa **1 imagen = 1 lectura**; hoy un PDF multipágina se sube entero y el OCR extrae **una sola** lectura. Falta separar el PDF en imágenes individuales (idealmente en el servidor al subir). Las Pantum de 2 páginas requieren combinar o tratar ambas. **Mientras tanto: subir 1 foto/PDF por máquina.**
+> **✅ Troceo de PDF multipágina (mismo PR):** el PDF se trocea **en el navegador** con `pdfjs-dist` (`src/lib/pdfToImages.ts`) — 1 página = 1 JPEG (~1654px, q0.85) — y cada página se sube por el mismo flujo de imagen → N relevés a la cola. Se hace en cliente a propósito: en Vercel/serverless renderizar PDF es frágil y choca con el límite de 4,5 MB/petición (el PDF de 2AS son 46 págs / 5 MB). `worker-src 'self' blob:` añadido al CSP; el worker se emite como asset propio. **Formato real verificado (PDF `2AS - mars.pdf`): cada página es un "Page Counter" autocontenido con N° série + 6 contadores → 1 página = 1 máquina.** Las Pantum de 2 páginas / páginas dudosas las absorbe la **revisión humana** de la cola (semáforos): la buena se confirma, la sobrante se rechaza. ⚠️ **Verificación en runtime pendiente**: el render en navegador + calidad de imagen se prueban subiendo el PDF real en el preview de Vercel (build y worker-asset OK, pero canvas/render solo se ejercita en navegador).
 >
-> **Pendiente opcional:** misma subida desde la **PWA del técnico** (`/tech`) para que suban en campo (hoy es admin-only).
+> **Pendiente opcional:** misma subida desde la **PWA del técnico** (`/tech`) para que suban en campo (hoy es admin-only). Verificar también que el OCR coge los **totales** correctos (`B & W Total` / `Colour Total`) y no las filas Copier/Printer, con las primeras lecturas reales.
 >
 > Encaja con la ampliación del "agente de contadores" (capacidades 2-4 sin empezar, ver `project_agente_supervisor_contadores`).

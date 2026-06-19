@@ -9,6 +9,9 @@ const csp = [
   `img-src 'self' data: blob: https://images.unsplash.com`,
   `connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST}`,
   "font-src 'self'",
+  // pdf.js (troceo de PDF de contadores en /admin/contadores/pendientes) lanza un Web Worker
+  // servido como asset del mismo origen; blob: cubre el fallback del runtime de pdf.js.
+  "worker-src 'self' blob:",
   "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",
