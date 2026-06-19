@@ -98,19 +98,25 @@ export async function uploadCounterImageAction(_p: UploadState, fd: FormData): P
     return { error: 'Erreur lors de l’envoi du fichier. Réessayez.' }
   }
 
-  // Disparar el OCR y ESPERARLO, con reintentos ante saturación transitoria (502/5xx). El cliente
-  // limita la concurrencia (sube de 3 en 3), así nunca se dispara una avalancha de OCR que sature
-  // el servicio. Esperar aquí deja que el cliente marque el ritmo y reintente lo que falle.
+  // Disparar el OCR y ESPERARLO, con LÍMITE DE TIEMPO (AbortController) para que NUNCA se cuelgue:
+  // si Claude tarda demasiado o la conexión se queda pendiente, abortamos en vez de esperar para
+  // siempre (eso era lo que paraba el lote entero). El cliente sube de 1 en 1 y espaciado, así no
+  // saturamos el servicio de IA. 2 intentos: cubren un 500/timeout transitorio sin pasarnos de
+  // maxDuration (page.tsx = 60s).
   const ocrUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/parse-counter-image`
   const ocrHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SECRET_KEY}` }
   const ocrBody = JSON.stringify({ pending_id: pending.id, image_path: path, content_type: file.type })
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  const OCR_TIMEOUT_MS = 25000
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), OCR_TIMEOUT_MS)
     try {
-      const res = await fetch(ocrUrl, { method: 'POST', headers: ocrHeaders, body: ocrBody })
-      if (res.ok) break
+      const res = await fetch(ocrUrl, { method: 'POST', headers: ocrHeaders, body: ocrBody, signal: ctrl.signal })
+      if (res.ok) { clearTimeout(timer); break }
       console.error('[uploadCounter] OCR status', res.status, 'attempt', attempt)
     } catch (e) { console.error('[uploadCounter] OCR fetch', e, 'attempt', attempt) }
-    if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 800))
+    finally { clearTimeout(timer) }
+    if (attempt < 2) await new Promise(r => setTimeout(r, 1500))
   }
   // La fila ya está encolada: devolvemos ok aunque el OCR no haya corrido (quedaría en rojo, visible
   // para revisión). NO devolvemos error para no provocar un reintento que choque con la dedup (doublon).
