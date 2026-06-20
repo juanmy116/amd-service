@@ -2,9 +2,7 @@
 import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
-import {
-  validateCounterUpload, extensionForType, sha256Hex, buildImagePath,
-} from '@/lib/counterUpload'
+import { validateCounterUpload, extensionForType, sha256Hex } from '@/lib/counterUpload'
 
 type ActionState = { error: string } | { ok: true } | null
 type UploadState = { error: string } | { ok: true } | { duplicate: true } | null
@@ -50,11 +48,11 @@ export async function rejectPendingAction(_p: ActionState, fd: FormData): Promis
   return { ok: true }
 }
 
-// Subida MANUAL de una foto/PDF de contador desde la app. Resuelve el tope de 512KB de
-// CloudMailin (free): el archivo va directo al bucket (hasta 10MB) y desemboca en la MISMA
-// cola y el MISMO OCR que el email. Reutiliza la dedup por hash (register_counter_duplicate)
-// para que reenviar/resubir el mismo fichero no se procese dos veces.
-export async function uploadCounterImageAction(_p: UploadState, fd: FormData): Promise<UploadState> {
+// Subida MANUAL de un documento de contadores (PDF de varias máquinas o 1 imagen) desde la app.
+// El documento ENTERO se envía al motor `parse-counter-document`, que lo trocea y se lo da a la IA
+// (en 2-3 trozos), extrae TODAS las lecturas y las inserta en la cola. Resuelve los formatos que el
+// método foto-a-foto no podía (Pantum a 2 págs, HP) y evita el límite por minuto de la IA.
+export async function uploadCounterDocumentAction(_p: UploadState, fd: FormData): Promise<UploadState> {
   const { user } = await requireAdmin()
   const file = fd.get('file')
   if (!(file instanceof File)) return { error: 'Aucun fichier.' }
@@ -70,55 +68,35 @@ export async function uploadCounterImageAction(_p: UploadState, fd: FormData): P
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer())
-  const hash = await sha256Hex(bytes)
-  const admin = createAdminClient()
-
-  // Dedup: si el hash ya existe, incrementa el contador en la fila original y avisa (no reprocesa).
-  const { data: dup } = await admin.rpc('register_counter_duplicate', { p_hash: hash })
-  if (dup) return { duplicate: true }
-
+  const docHash = await sha256Hex(bytes)
   const ext = extensionForType(file.type)
   const now = new Date()
-  const path = buildImagePath(hash, ext, now.getUTCFullYear(), now.getUTCMonth() + 1)
+  // Carpeta `manual/` para distinguir los documentos subidos a mano de las fotos del email.
+  // El path es determinista por hash: el MISMO documento → el MISMO path.
+  const path = `manual/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${docHash}.${ext}`
 
-  // Insertar la fila ANTES de subir, para no dejar objetos huérfanos si el insert falla.
-  // El UNIQUE(image_hash_sha256) cierra cualquier carrera con un email idéntico simultáneo.
-  const { data: pending, error: insErr } = await admin.from('pending_counter_imports').insert({
-    image_path: path, image_size_bytes: bytes.length, image_hash_sha256: hash,
-    source: 'manual', email_from: user.email ?? null, email_subject: 'Import manuel',
-  }).select('id').single()
-  if (insErr) { console.error('[uploadCounter] insert', insErr); return { error: 'Erreur lors de l’enregistrement.' } }
+  const admin = createAdminClient()
+
+  // Dedup a nivel de DOCUMENTO: si ya hay filas de este mismo PDF, no re-disparar el motor (evita
+  // volver a pagar las llamadas a la IA). El procesado es asíncrono, así que esto cubre el reenvío
+  // típico (minutos después), no una carrera de milisegundos (el hash por índice ya evita dups intra-lote).
+  const { count } = await admin.from('pending_counter_imports')
+    .select('id', { count: 'exact', head: true }).eq('image_path', path)
+  if (count && count > 0) return { duplicate: true }
 
   const up = await admin.storage.from('counter-images').upload(path, bytes, { contentType: file.type, upsert: true })
-  if (up.error) {
-    // Si la subida falla, la fila quedaría reservando el hash → un reintento del MISMO fichero
-    // chocaría con la dedup y nunca se procesaría. Liberamos la fila y pedimos reintentar.
-    console.error('[uploadCounter] upload', up.error)
-    await admin.from('pending_counter_imports').delete().eq('id', pending.id)
-    return { error: 'Erreur lors de l’envoi du fichier. Réessayez.' }
-  }
+  if (up.error) { console.error('[uploadCounterDoc] upload', up.error); return { error: 'Erreur lors de l’envoi du fichier. Réessayez.' } }
 
-  // Disparar el OCR y ESPERARLO, con LÍMITE DE TIEMPO (AbortController) para que NUNCA se cuelgue:
-  // si Claude tarda demasiado o la conexión se queda pendiente, abortamos en vez de esperar para
-  // siempre (eso era lo que paraba el lote entero). El cliente sube de 1 en 1 y espaciado, así no
-  // saturamos el servicio de IA. 2 intentos: cubren un 500/timeout transitorio sin pasarnos de
-  // maxDuration (page.tsx = 60s).
-  const ocrUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/parse-counter-image`
-  const ocrHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SECRET_KEY}` }
-  const ocrBody = JSON.stringify({ pending_id: pending.id, image_path: path, content_type: file.type })
-  const OCR_TIMEOUT_MS = 25000
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), OCR_TIMEOUT_MS)
-    try {
-      const res = await fetch(ocrUrl, { method: 'POST', headers: ocrHeaders, body: ocrBody, signal: ctrl.signal })
-      if (res.ok) { clearTimeout(timer); break }
-      console.error('[uploadCounter] OCR status', res.status, 'attempt', attempt)
-    } catch (e) { console.error('[uploadCounter] OCR fetch', e, 'attempt', attempt) }
-    finally { clearTimeout(timer) }
-    if (attempt < 2) await new Promise(r => setTimeout(r, 1500))
-  }
-  // La fila ya está encolada: devolvemos ok aunque el OCR no haya corrido (quedaría en rojo, visible
-  // para revisión). NO devolvemos error para no provocar un reintento que choque con la dedup (doublon).
+  // Disparar el motor en segundo plano (la cola se va llenando sola). El motor responde rápido y
+  // hace el trabajo pesado (troceo + N llamadas a la IA) con EdgeRuntime.waitUntil.
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/parse-counter-document`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SECRET_KEY}` },
+      body: JSON.stringify({ document_path: path, content_type: file.type, doc_hash: docHash, uploaded_by: user.email ?? null }),
+    })
+    if (!res.ok) { console.error('[uploadCounterDoc] trigger', res.status, await res.text().catch(() => '')); return { error: 'Erreur lors du lancement de l’analyse.' } }
+  } catch (e) { console.error('[uploadCounterDoc] trigger', e); return { error: 'Erreur lors du lancement de l’analyse.' } }
+
   return { ok: true }
 }

@@ -1,12 +1,10 @@
 // src/lib/counterUpload.ts
 //
-// Lógica pura (sin I/O) de la subida MANUAL de fotos/PDF de contadores desde la app.
-// Replica las mismas reglas que la Edge Function `receive-counter-email` (tipos
-// admitidos, tamaño, hash de bytes y ruta en el bucket) para que la subida directa
-// desemboque en EXACTAMENTE la misma cola que el email. Se aísla aquí para poder
-// testearla sin tocar Supabase ni el runtime de servidor.
+// Lógica pura (sin I/O) de validación de la subida MANUAL de documentos de contadores desde la app
+// (tipos admitidos, tamaño, hash del documento). El documento entero lo procesa la Edge Function
+// `parse-counter-document`. Se aísla aquí para testearla sin tocar Supabase ni el runtime de servidor.
 
-/** Tipos admitidos por el OCR (`parse-counter-image`): imágenes + PDF. */
+/** Tipos admitidos: imágenes + PDF. */
 export const ALLOWED_UPLOAD_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -35,14 +33,8 @@ export function extensionForType(contentType: string): string {
   return contentType === 'application/pdf' ? 'pdf' : contentType.split('/')[1]
 }
 
-/** SHA-256 de los bytes, en hex. Misma huella que el email → la dedup funciona entre ambos canales. */
+/** SHA-256 de los bytes, en hex. Identifica el documento para nombrar el objeto en el bucket. */
 export async function sha256Hex(bytes: BufferSource): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-/** Ruta en el bucket: `AAAA/MM/<hash>.<ext>` — idéntica al esquema del email. */
-export function buildImagePath(hash: string, ext: string, year: number, month: number): string {
-  const mo = String(month).padStart(2, '0')
-  return `${year}/${mo}/${hash}.${ext}`
 }
