@@ -16,7 +16,7 @@ const CHUNK_PAGES = 16
 const OVERLAP = 1
 const GAP_MS = 8000
 
-interface Reading extends CounterExtraction { page?: number }
+interface Reading extends CounterExtraction { page?: number; date_inferred?: boolean }
 
 async function sha256Hex(s: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))
@@ -136,6 +136,14 @@ async function processDocument(documentPath: string, contentType: string, docHas
     if (!prev || (r.confidence ?? 0) > (prev.confidence ?? 0)) bySerial.set(key, r)
   }
   const readings = [...bySerial.values(), ...noSerial]
+
+  // 3-bis) Fecha del LOTE: algunas hojas (Pantum/HP) no imprimen fecha. Heredan la del resto del
+  // mismo PDF (la más reciente) y se marcan `date_inferred` → el RPC las pone 🟡 (V_DATE_INFERRED).
+  const dated = readings.map(r => (r.date_iso ?? '').trim()).filter(Boolean).sort()
+  const batchDate = dated.length ? dated[dated.length - 1] : ''
+  if (batchDate) for (const r of readings) {
+    if (!(r.date_iso ?? '').trim()) { r.date_iso = batchDate; r.date_inferred = true }
+  }
 
   // 4) Insertar cada lectura + match/validación/semáforo (RPC existente). El hash de fila usa el
   // ÍNDICE (no serial:page) → único garantizado, sin colisiones que descarten máquinas sin serial.
