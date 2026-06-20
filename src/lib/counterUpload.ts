@@ -35,14 +35,8 @@ export function extensionForType(contentType: string): string {
   return contentType === 'application/pdf' ? 'pdf' : contentType.split('/')[1]
 }
 
-/** SHA-256 de los bytes, en hex. Misma huella que el email → la dedup funciona entre ambos canales. */
+/** SHA-256 de los bytes, en hex. Identifica el documento para nombrar el objeto en el bucket. */
 export async function sha256Hex(bytes: BufferSource): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-/** Ruta en el bucket: `AAAA/MM/<hash>.<ext>` — idéntica al esquema del email. */
-export function buildImagePath(hash: string, ext: string, year: number, month: number): string {
-  const mo = String(month).padStart(2, '0')
-  return `${year}/${mo}/${hash}.${ext}`
 }

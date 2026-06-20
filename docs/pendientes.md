@@ -160,6 +160,24 @@ Nada pendiente. (Historial: `docs/superpowers/specs/2026-06-03-contracts-n-machi
 >
 > **✅ Troceo de PDF multipágina (mismo PR):** el PDF se trocea **en el navegador** con `pdfjs-dist` (`src/lib/pdfToImages.ts`) — 1 página = 1 JPEG (~1654px, q0.85) — y cada página se sube por el mismo flujo de imagen → N relevés a la cola. Se hace en cliente a propósito: en Vercel/serverless renderizar PDF es frágil y choca con el límite de 4,5 MB/petición (el PDF de 2AS son 46 págs / 5 MB). `worker-src 'self' blob:` añadido al CSP; el worker se emite como asset propio. **Formato real verificado (PDF `2AS - mars.pdf`): cada página es un "Page Counter" autocontenido con N° série + 6 contadores → 1 página = 1 máquina.** Las Pantum de 2 páginas / páginas dudosas las absorbe la **revisión humana** de la cola (semáforos): la buena se confirma, la sobrante se rechaza. ⚠️ **Verificación en runtime pendiente**: el render en navegador + calidad de imagen se prueban subiendo el PDF real en el preview de Vercel (build y worker-asset OK, pero canvas/render solo se ejercita en navegador).
 >
-> **Pendiente opcional:** misma subida desde la **PWA del técnico** (`/tech`) para que suban en campo (hoy es admin-only). Verificar también que el OCR coge los **totales** correctos (`B & W Total` / `Colour Total`) y no las filas Copier/Printer, con las primeras lecturas reales.
+> **Pendiente opcional:** misma subida desde la **PWA del técnico** (`/tech`) para que suban en campo (hoy es admin-only).
 >
 > Encaja con la ampliación del "agente de contadores" (capacidades 2-4 sin empezar, ver `project_agente_supervisor_contadores`).
+
+---
+
+### 6-bis. ✅ REDISEÑO IMPLEMENTADO (2026-06-19): troceo en navegador → **PDF entero a la IA**
+
+> **Estado:** implementado en rama `feat/ingesta-pdf-ia`. Edge Function `parse-counter-document` desplegada (v1). Andamiaje viejo EXTIRPADO (cero rastros: sin `pdfToImages.ts`, sin `pdfjs-dist`, sin scripts wasm, sin `/public/pdfjs/`, sin `worker-src` en CSP, sin `maxDuration`, `buildImagePath` podado). ⏰ Pendiente: gate en prod con el PDF real de 2AS.
+
+
+> **Por qué cambiamos:** el método foto-a-foto (trocear el PDF en 46 imágenes en el navegador + 1 llamada OCR por imagen) dio una cadena larga de problemas en pruebas reales (PRs #106–#111): páginas CCITT en blanco (wasm de pdf.js), saturación/cuelgues del OCR, y el **límite por minuto del servicio de IA** al disparar ~46 llamadas. Además **no podía con los formatos especiales** (Pantum a 2 páginas, HP PageWide en francés).
+>
+> **Prueba decisiva (2026-06-19):** se leyó el PDF `2AS - mars.pdf` ENTERO con el mismo modelo (Claude) → **las ~40 máquinas legibles**, incluidas las CCITT, las Pantum (2 págs) y la HP. El método foto-a-foto se quedaba en 27 y fallaba en los formatos raros.
+>
+> **Nuevo enfoque a implementar:** subir el **PDF entero** → enviarlo a la IA (en 2-3 trozos por el límite por minuto) → devuelve la **lista** de todas las lecturas → entran a la MISMA cola/semáforos/validación. Coste ≈ **$0,30/PDF mensual** (≈ igual que ahora). **Extirpación limpia** del andamiaje viejo: `src/lib/pdfToImages.ts`, dependencia `pdfjs-dist`, script `copy:pdf-wasm` + hooks, `/public/pdfjs/`, `worker-src 'self' blob:` del CSP, y el bucle de subida 1-a-1.
+>
+> ### ⚠️ DECISIÓN EXPLÍCITA — el buzón por EMAIL se queda con el método antiguo (POR AHORA)
+> La ingesta por **email** (CloudMailin → `receive-counter-email` → `parse-counter-image`, **1 foto = 1 lectura**) **NO se toca** en este rediseño: sigue funcionando con el OCR de imagen actual. El rediseño afecta **solo a la subida manual desde la app** (PDF entero).
+>
+> **🔴 PENDIENTE FUTURO (a abordar): el email NO es fiable a largo plazo.** Hereda las mismas debilidades que estamos eliminando en la app: tope de 512 KB de CloudMailin free, 1 foto por correo (inviable para clientes con muchas máquinas), y depende de un tercero. Cuando se estabilice la subida por app, **hay que rediseñar también la ingesta por email** hacia algo más robusto (idealmente el mismo motor "documento entero → IA", o un canal distinto). Mientras tanto, el email queda como vía secundaria/legacy. **No darlo por bueno como solución definitiva.**

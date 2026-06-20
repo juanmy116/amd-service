@@ -5,9 +5,6 @@ import PendingList from './PendingList'
 import UploadCounterButton from './UploadCounterButton'
 
 export const dynamic = 'force-dynamic'
-// La subida manual espera el OCR (varios segundos) con reintentos; damos margen a la Server Action
-// para que no la corte el timeout por defecto de la plataforma.
-export const maxDuration = 60
 
 type Pending = {
   id: string; image_path: string; light: 'green' | 'amber' | 'red'; status: string
