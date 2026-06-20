@@ -29,12 +29,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
-  // bodySizeLimit es GLOBAL a todas las Server Actions. El suelo lo marca la subida manual de
-  // contadores (/admin/contadores/pendientes): el PDF/imagen va entero a la acción, hasta 10 MB
-  // (valida MAX_UPLOAD_BYTES=10MB; +overhead multipart → 12 MB de margen). El CSV importer cabe
-  // de sobra. El default de 1 MB rechazaría estas peticiones legítimas.
+  // bodySizeLimit es GLOBAL a todas las Server Actions. El suelo lo marca el CSV importer
+  // (/admin/machines/import): hasta ~1.1 MB con overhead multipart. La subida manual de contadores
+  // NO pasa por una Server Action (el navegador sube el PDF directo a Supabase con URL firmada,
+  // para esquivar el tope de 4,5 MB de Vercel), así que no influye aquí.
   experimental: {
-    serverActions: { bodySizeLimit: '12mb' },
+    serverActions: { bodySizeLimit: '2mb' },
   },
   images: {
     remotePatterns: [
