@@ -15,6 +15,7 @@ export const VALIDATION_LABELS: Record<string, string> = {
   V_CROSS_COLOR:   'Somme couleur (copie + impression) incohérente',
   V_NONDECR_BW:    'Compteur N&B inférieur au relevé précédent',
   V_NONDECR_COLOR: 'Compteur couleur inférieur au relevé précédent',
+  V_DATE_INFERRED: 'Date déduite du lot (la feuille n’en imprime pas) — à vérifier',
 }
 
 // Códigos que señalan un posible duplicado (se resaltan de forma distinta en la UI).
