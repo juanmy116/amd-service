@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { validateCounterUpload, extensionForType, sha256Hex } from '@/lib/counterUpload'
 
 type ActionState = { error: string } | { ok: true } | null
-type UploadState = { error: string } | { ok: true } | null
+type UploadState = { error: string } | { ok: true } | { duplicate: true } | null
 
 export async function confirmPendingAction(_p: ActionState, fd: FormData): Promise<ActionState> {
   const { user } = await requireAdmin()
@@ -53,7 +53,7 @@ export async function rejectPendingAction(_p: ActionState, fd: FormData): Promis
 // (en 2-3 trozos), extrae TODAS las lecturas y las inserta en la cola. Resuelve los formatos que el
 // método foto-a-foto no podía (Pantum a 2 págs, HP) y evita el límite por minuto de la IA.
 export async function uploadCounterDocumentAction(_p: UploadState, fd: FormData): Promise<UploadState> {
-  await requireAdmin()
+  const { user } = await requireAdmin()
   const file = fd.get('file')
   if (!(file instanceof File)) return { error: 'Aucun fichier.' }
 
@@ -72,9 +72,18 @@ export async function uploadCounterDocumentAction(_p: UploadState, fd: FormData)
   const ext = extensionForType(file.type)
   const now = new Date()
   // Carpeta `manual/` para distinguir los documentos subidos a mano de las fotos del email.
+  // El path es determinista por hash: el MISMO documento → el MISMO path.
   const path = `manual/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${docHash}.${ext}`
 
   const admin = createAdminClient()
+
+  // Dedup a nivel de DOCUMENTO: si ya hay filas de este mismo PDF, no re-disparar el motor (evita
+  // volver a pagar las llamadas a la IA). El procesado es asíncrono, así que esto cubre el reenvío
+  // típico (minutos después), no una carrera de milisegundos (el hash por índice ya evita dups intra-lote).
+  const { count } = await admin.from('pending_counter_imports')
+    .select('id', { count: 'exact', head: true }).eq('image_path', path)
+  if (count && count > 0) return { duplicate: true }
+
   const up = await admin.storage.from('counter-images').upload(path, bytes, { contentType: file.type, upsert: true })
   if (up.error) { console.error('[uploadCounterDoc] upload', up.error); return { error: 'Erreur lors de l’envoi du fichier. Réessayez.' } }
 
@@ -84,7 +93,7 @@ export async function uploadCounterDocumentAction(_p: UploadState, fd: FormData)
     const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/parse-counter-document`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.SUPABASE_SECRET_KEY}` },
-      body: JSON.stringify({ document_path: path, content_type: file.type, doc_hash: docHash }),
+      body: JSON.stringify({ document_path: path, content_type: file.type, doc_hash: docHash, uploaded_by: user.email ?? null }),
     })
     if (!res.ok) { console.error('[uploadCounterDoc] trigger', res.status, await res.text().catch(() => '')); return { error: 'Erreur lors du lancement de l’analyse.' } }
   } catch (e) { console.error('[uploadCounterDoc] trigger', e); return { error: 'Erreur lors du lancement de l’analyse.' } }

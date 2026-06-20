@@ -27,7 +27,11 @@ export default async function PendingCountersPage() {
   const rows = (data ?? []) as Pending[]
   const withUrls = await Promise.all(rows.map(async (r) => {
     const { data: signed } = await admin.storage.from('counter-images').createSignedUrl(r.image_path, 3600)
-    return { ...r, image_url: signed?.signedUrl ?? null }
+    // Las filas de subida manual apuntan a un PDF (varias páginas); las del email son imágenes.
+    // Para el PDF damos la página concreta de la máquina (#page=N) para abrirla en el visor del navegador.
+    const isPdf = r.image_path.toLowerCase().endsWith('.pdf')
+    const page = Number(r.extracted_data?.page) || null
+    return { ...r, image_url: signed?.signedUrl ?? null, is_pdf: isPdf, page }
   }))
 
   const { data: machines } = await admin.from('machines').select('numero_serie, marque, modele').eq('active', true).order('numero_serie')

@@ -8,6 +8,7 @@ type Row = {
   matched_machine_id: string | null; email_from: string | null
   extracted_data: Record<string, unknown>; validation_errors: string[]
   duplicate_count: number; last_duplicate_at: string | null
+  is_pdf: boolean; page: number | null
 }
 type Machine = { numero_serie: string; marque: string; modele: string }
 
@@ -43,7 +44,12 @@ function Detail({ row, machines }: { row: Row; machines: Machine[] }) {
   const d = row.extracted_data
   return (
     <div className="p-5 space-y-4">
-      {row.image_url && <img src={row.image_url} alt="relevé" className="max-h-64 rounded-lg border border-line object-contain" />}
+      {row.image_url && (row.is_pdf
+        ? <a href={row.page ? `${row.image_url}#page=${row.page}` : row.image_url} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline">
+            📄 Voir le relevé{row.page ? ` (page ${row.page})` : ''} →
+          </a>
+        : <img src={row.image_url} alt="relevé" className="max-h-64 rounded-lg border border-line object-contain" />)}
       {row.duplicate_count > 0 && (
         <p className="text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded px-2 py-1.5">
           ⚠️ Photo renvoyée {row.duplicate_count} fois

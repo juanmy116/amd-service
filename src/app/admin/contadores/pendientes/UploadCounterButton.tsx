@@ -11,6 +11,7 @@ type Phase =
   | { kind: 'idle' }
   | { kind: 'uploading' }
   | { kind: 'done' }
+  | { kind: 'duplicate' }
   | { kind: 'error'; message: string }
 
 export default function UploadCounterButton() {
@@ -25,6 +26,7 @@ export default function UploadCounterButton() {
       fd.append('file', file)
       const res = await uploadCounterDocumentAction(null, fd)
       if (res && 'error' in res) { setPhase({ kind: 'error', message: res.error }); return }
+      if (res && 'duplicate' in res) { setPhase({ kind: 'duplicate' }); return }
       setPhase({ kind: 'done' })
       router.refresh()
     } catch (e) {
@@ -57,6 +59,7 @@ export default function UploadCounterButton() {
           Document reçu. <span className="text-green-700">Analyse en cours</span>, rafraîchissez dans 1-2 min.
         </p>
       )}
+      {phase.kind === 'duplicate' && <p className="text-xs text-amber-700 text-right">Document déjà importé — non retraité.</p>}
       {phase.kind === 'error' && <p className="text-xs text-accent text-right">{phase.message}</p>}
     </div>
   )
