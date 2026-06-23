@@ -134,6 +134,8 @@ Punto de entrada universal para los QR físicos de máquinas. Server Component q
 
 El QR imprimible (`/admin/machines/[serie]/qr`) apunta a esta ruta desde PR #18. Los QR anteriores apuntaban directamente a `/tech/scan/` y siguen funcionando para técnicos.
 
+**Impresión en bloque por contrato** (`/admin/contracts/[id]/etiquettes`, Route Handler `GET` admin-only): descarga un PDF con la etiqueta QR de **todas las máquinas activas** del contrato (6 por hoja A4), generado con `pdf-lib` en `src/lib/labels-pdf.ts`. El QR codifica la misma URL `/m/[serie]` (construida con `machineReportUrl` + `appBaseUrl`, helpers compartidos con la etiqueta unitaria). El logo se incluye en la función serverless vía `outputFileTracingIncludes` (build standalone); si no se puede leer, dibuja un respaldo de texto. Botón "Imprimer toutes les étiquettes" en la ficha del contrato.
+
 ### 6b. Formulario Público de Incidentes (`/signaler/[serie]`) ✅ — PR #19 (2026-05-22)
 Ruta pública **sin autenticación** para que cualquier persona abra un incidente escaneando el QR de una máquina.
 
