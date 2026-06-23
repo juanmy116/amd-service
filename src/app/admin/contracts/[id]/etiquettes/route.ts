@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import sharp from 'sharp'
 import { requireAdmin } from '@/lib/auth'
 import { getActiveLinesForContract } from '@/lib/contract-machines'
 import { appBaseUrl } from '@/lib/app-url'
@@ -8,12 +9,15 @@ import { buildLabelsPdf, type MachineLabel } from '@/lib/labels-pdf'
 
 export const runtime = 'nodejs'
 
-// Logo AMD para la cabecera de cada etiqueta. Si no se puede leer (p. ej. el
-// asset no viajó a la función), buildLabelsPdf dibuja un respaldo de texto.
+// Logo AMD blanco para la cabecera roja. El asset es SVG (pdf-lib solo embebe
+// PNG/JPG), así que lo rasterizamos con sharp. Si falla, buildLabelsPdf dibuja
+// un respaldo de texto.
 async function loadLogo(): Promise<Uint8Array | null> {
   try {
-    return await readFile(path.join(process.cwd(), 'public', 'images', 'logos', 'logo-amd.png'))
-  } catch {
+    const svg = await readFile(path.join(process.cwd(), 'public', 'images', 'logos', 'logo-amd-blanco.svg'))
+    return await sharp(svg, { density: 300 }).resize({ width: 600 }).png().toBuffer()
+  } catch (e) {
+    console.error('[etiquettes logo]', e)
     return null
   }
 }
@@ -22,7 +26,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params
   const { supabase } = await requireAdmin()
 
-  // Consultas y lectura del logo en paralelo (independientes entre sí).
+  // Consultas y rasterizado del logo en paralelo (independientes entre sí).
   const [contractRes, lines, logoPng, base] = await Promise.all([
     supabase.from('contracts').select('numero_contrat, clients(id, nom_client)').eq('id', id).single(),
     getActiveLinesForContract(supabase, id),
@@ -47,18 +51,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     marque: l.machines?.marque ?? '',
     modele: l.machines?.modele ?? '',
     numero_serie: l.machine_id,
-    type: l.machines?.type ?? null,
     qrUrl: machineReportUrl(l.machine_id, base),
   }))
 
   let pdf: Uint8Array
   try {
-    pdf = await buildLabelsPdf({
-      labels,
-      client: client ? { id: client.id, nom: client.nom_client } : null,
-      numeroContrat: contract.numero_contrat,
-      logoPng,
-    })
+    pdf = await buildLabelsPdf({ labels, logoPng })
   } catch (e) {
     console.error('[etiquettes pdf]', e)
     return new Response('Erreur lors de la génération du PDF', { status: 500 })

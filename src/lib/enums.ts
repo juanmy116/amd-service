@@ -12,12 +12,6 @@ export type MachineType             = typeof MACHINE_TYPES[number]
 export type MaintenanceFrequency    = typeof MAINTENANCE_FREQUENCIES[number]
 export type ContractMachineStatus   = typeof CONTRACT_MACHINE_STATUSES[number]
 
-// Etiqueta larga del tipo de máquina (formularios, etiquetas, fiches).
-// Los badges compactos usan "N&B" aparte, a propósito.
-export function machineTypeLabel(type: string | null | undefined): string {
-  return type === 'color' ? 'Couleur' : 'Noir & Blanc'
-}
-
 export function parseEnum<T extends string>(
   value: FormDataEntryValue | null | undefined,
   allowed: readonly T[],
