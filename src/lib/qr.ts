@@ -20,3 +20,12 @@ export function extractSerie(raw: string): string {
     return t
   }
 }
+
+/**
+ * URL pública que codifica el QR de una máquina (gateway `/m/<serie>`).
+ * Inversa de `extractSerie`. Función pura. `baseUrl` debe ser absoluta
+ * (ver `appBaseUrl` en `app-url.ts`).
+ */
+export function machineReportUrl(numeroSerie: string, baseUrl: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/m/${encodeURIComponent(numeroSerie)}`
+}

@@ -29,6 +29,13 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  // El generador de etiquetas QR (/admin/contracts/[id]/etiquettes) lee el logo
+  // blanco desde public/ con fs (y lo rasteriza con sharp). En el build
+  // standalone public/ no se traza solo: hay que incluir el asset explícitamente
+  // para que viaje a la función serverless.
+  outputFileTracingIncludes: {
+    '/admin/contracts/[id]/etiquettes': ['./public/images/logos/logo-amd-blanco.svg'],
+  },
   // bodySizeLimit es GLOBAL a todas las Server Actions. El suelo lo marca el CSV importer
   // (/admin/machines/import): hasta ~1.1 MB con overhead multipart. La subida manual de contadores
   // NO pasa por una Server Action (el navegador sube el PDF directo a Supabase con URL firmada,

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import QRCode from 'qrcode'
 import PrintButtons from './print-buttons'
+import { machineReportUrl } from '@/lib/qr'
+import { appBaseUrl } from '@/lib/app-url'
 
 export default async function MachineQrPage({
   params,
@@ -20,7 +22,7 @@ export default async function MachineQrPage({
 
   if (!machine) notFound()
 
-  const qrUrl = `${process.env.NEXT_PUBLIC_APP_URL}/m/${encodeURIComponent(numero_serie)}`
+  const qrUrl = machineReportUrl(numero_serie, await appBaseUrl())
 
   // QR vectorial (SVG) con corrección de errores alta (H): nítido a cualquier
   // tamaño de impresión y tolerante a desgaste/suciedad de la etiqueta física.
