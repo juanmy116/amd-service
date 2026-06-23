@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
+import { QrCode } from 'lucide-react'
 import ContractForm, { type BillingPlanOption } from '@/components/admin/ContractForm'
 import ReplaceMachineModal from '@/components/admin/ReplaceMachineModal'
 import TerminateContractModal from '@/components/admin/TerminateContractModal'
@@ -91,6 +92,28 @@ export default async function EditContractPage({
         contractId={contract.id}
         deleteAction={deleteContractAction}
       />
+
+      {initialLines.length > 0 && (
+        <section className="rounded-xl bg-surface border border-line p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-semibold text-ink mb-1">Étiquettes QR</h2>
+              <p className="text-sm text-ink-muted">
+                Télécharge un PDF avec les étiquettes de toutes les machines ({initialLines.length})
+                de ce contrat, prêtes à imprimer (6 par page).
+              </p>
+            </div>
+            <a
+              href={`/admin/contracts/${contract.id}/etiquettes`}
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+              style={{ backgroundColor: '#BF0D0D' }}
+            >
+              <QrCode className="w-4 h-4" />
+              Imprimer toutes les étiquettes
+            </a>
+          </div>
+        </section>
+      )}
 
       {initialLines.length > 0 && (
         <section className="rounded-xl bg-surface border border-line p-6">
