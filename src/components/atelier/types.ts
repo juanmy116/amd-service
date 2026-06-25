@@ -12,6 +12,10 @@ export type AtelierIncident = {
   clientName: string | null
   technicianId: string | null
   technicianName: string | null
+  /** Descripción del problema (para dar contexto al despachador al asignar). */
+  description: string | null
+  /** URL firmada de la foto adjunta por el cliente, o null si no hay. */
+  photoUrl: string | null
 }
 
 export type AtelierMaintenanceVisit = {

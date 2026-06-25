@@ -27,8 +27,9 @@ export async function prepareIncidentPhotoUploadAction(
 
   const ext = extensionForType(type)
   const now = new Date()
-  // Ruta determinista por hash: el MISMO fichero → la MISMA ruta.
-  const path = `incidents/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${hash}.${ext}`
+  // Ruta namespaced por usuario: evita que dos clientes que suban la MISMA imagen
+  // (mismo hash) colisionen en el mismo objeto. Determinista por (usuario, fichero).
+  const path = `incidents/${user.id}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${hash}.${ext}`
 
   const admin = createAdminClient()
   const { data, error } = await admin.storage

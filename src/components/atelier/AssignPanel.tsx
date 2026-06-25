@@ -6,6 +6,8 @@ type Props = {
   open: boolean
   title: string
   subtitle: string
+  description?: string | null
+  photoUrl?: string | null
   technicians: Technician[]
   currentTechnicianId: string | null
   busy: boolean
@@ -23,7 +25,7 @@ function initials(name: string): string {
 }
 
 export default function AssignPanel({
-  open, title, subtitle, technicians, currentTechnicianId, busy, onSelect, onClose,
+  open, title, subtitle, description, photoUrl, technicians, currentTechnicianId, busy, onSelect, onClose,
 }: Props) {
   if (!open) return null
 
@@ -35,6 +37,26 @@ export default function AssignPanel({
           <p className="text-xs font-semibold uppercase tracking-wider text-white/40">{subtitle}</p>
           <p className="text-lg font-semibold text-white mt-1">{title}</p>
         </div>
+
+        {/* Contexto del problema para el despachador: descripción + foto del cliente */}
+        {(description || photoUrl) && (
+          <div className="px-6 py-4 border-b border-chrome-line space-y-3">
+            {description && (
+              <p className="text-sm text-white/70 whitespace-pre-wrap line-clamp-4">{description}</p>
+            )}
+            {photoUrl && (
+              <a
+                href={photoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full overflow-hidden rounded-lg border border-chrome-line hover:opacity-90 transition-opacity"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoUrl} alt="Photo signalée par le client" className="w-full max-h-48 object-cover" />
+              </a>
+            )}
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {technicians.map((tech) => {
