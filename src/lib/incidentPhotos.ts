@@ -30,6 +30,12 @@ export const PHOTO_ERROR_MESSAGES: Record<PhotoValidationError, string> = {
   too_large: 'Image trop volumineuse (max 10 Mo).',
 }
 
+/** El hash que el cliente envía nombra el objeto en el bucket. Validar que sea un SHA-256 hex
+ *  (64 chars) evita path traversal (`../`) en la ruta de subida. */
+export function isSha256Hex(s: string): boolean {
+  return /^[0-9a-f]{64}$/.test(s)
+}
+
 /** Valida tipo MIME y tamaño de la foto antes de subirla. */
 export function validateIncidentPhoto(file: { type: string; size: number }): PhotoValidation {
   if (!ALLOWED_PHOTO_TYPES.has(file.type)) return { ok: false, error: 'type' }

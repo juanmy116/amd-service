@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { INCIDENT_CATEGORIES, INCIDENT_PRIORITIES, parseEnum } from '@/lib/enums'
-import { validateIncidentPhoto, extensionForType, PHOTO_ERROR_MESSAGES } from '@/lib/incidentPhotos'
+import { validateIncidentPhoto, extensionForType, PHOTO_ERROR_MESSAGES, isSha256Hex } from '@/lib/incidentPhotos'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -21,6 +21,8 @@ export async function prepareIncidentPhotoUploadAction(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Session expirée.' }
+
+  if (!isSha256Hex(hash)) return { error: 'Requête invalide.' }
 
   const valid = validateIncidentPhoto({ type, size })
   if (!valid.ok) return { error: PHOTO_ERROR_MESSAGES[valid.error] }

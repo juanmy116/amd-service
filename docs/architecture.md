@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-06-25 — **foto adjunta a la incidencia del cliente** (el cliente adjunta una foto opcional al abrir la incidencia; la ven técnico, admin y cliente; bucket `incident-photos`, migración `20260625100000`). Histórico 2026-06-15: **tests RLS de cobertura completa** (88 tests de aislamiento por rol sobre todas las tablas sensibles, PR #93), **migración `middleware` → `proxy`** (convención Next.js 16, PR #94) y `main` protegida en GitHub (required check `typecheck · test · build`). Config de prod cerrada: `COMMERCIAL_EMAIL`, `NEXT_PUBLIC_APP_URL`. Histórico previo (2026-06-11): 3 capas de tests montadas (unit + aislamiento RLS + E2E Playwright, ver §Testing), endurecimiento RLS de `maintenance_visits` + `auth_rls_initplan`, borrado/terminación atómicos de contrato (`delete_contract`/`terminate_contract`), cabos de auditoría cerrados y reconstrucción limpia de la BD arreglada (P0-1). PRs #74–#85.
+> Última actualización: 2026-06-25 — **foto adjunta a la incidencia** (el cliente adjunta una foto opcional al abrir la incidencia desde el portal **o desde el formulario público del QR `/signaler`**; la ven técnico, admin y cliente; bucket `incident-photos`, migración `20260625100000`). Histórico 2026-06-15: **tests RLS de cobertura completa** (88 tests de aislamiento por rol sobre todas las tablas sensibles, PR #93), **migración `middleware` → `proxy`** (convención Next.js 16, PR #94) y `main` protegida en GitHub (required check `typecheck · test · build`). Config de prod cerrada: `COMMERCIAL_EMAIL`, `NEXT_PUBLIC_APP_URL`. Histórico previo (2026-06-11): 3 capas de tests montadas (unit + aislamiento RLS + E2E Playwright, ver §Testing), endurecimiento RLS de `maintenance_visits` + `auth_rls_initplan`, borrado/terminación atómicos de contrato (`delete_contract`/`terminate_contract`), cabos de auditoría cerrados y reconstrucción limpia de la BD arreglada (P0-1). PRs #74–#85.
 
 ---
 
@@ -830,7 +830,14 @@ propio cliente en la ficha de detalle (componente compartido `src/components/Inc
 > una URL firmada (`prepareIncidentPhotoUploadAction` → `createSignedUploadUrl`), esquivando el tope
 > de 4,5 MB de las Server Actions de Vercel — mismo patrón que `counter-images`. La lectura usa
 > signed URLs TTL 1h generadas server-side con el admin client. Validación (solo imágenes JPG/PNG/WEBP,
-> ≤10 MB) en `src/lib/incidentPhotos.ts`.
+> ≤10 MB, hash `isSha256Hex` anti path-traversal) en `src/lib/incidentPhotos.ts`. Componente de subida
+> compartido `src/components/IncidentPhotoUpload.tsx` (prop `prepareAction`).
+>
+> **Dos flujos de entrada:** (1) **portal del cliente** (`/portal/incidents/new`, autenticado, path
+> `incidents/{user_id}/…`); (2) **formulario público del QR** (`/signaler/[serie]`, anónimo, path
+> `incidents/public/…`): `preparePublicIncidentPhotoUploadAction` protegida con rate limit
+> `public_photo_upload` (6/h por IP+serie); `submitPublicIncident` asocia la foto (`uploaded_by=null`)
+> validando el path con un regex estricto. La foto la ven admin y el técnico asignado.
 >
 > **Limpieza de huérfanas (cron):** la foto se sube antes de enviar el formulario; un form abandonado
 > deja un objeto sin fila. La Edge Function `cleanup-orphan-incident-photos` (cron diario 02:30 UTC,

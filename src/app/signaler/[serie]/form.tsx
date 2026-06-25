@@ -1,7 +1,8 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import { submitPublicIncident } from './actions'
+import { submitPublicIncident, preparePublicIncidentPhotoUploadAction } from './actions'
+import IncidentPhotoUpload from '@/components/IncidentPhotoUpload'
 
 interface Machine {
   numero_serie: string
@@ -121,6 +122,12 @@ export default function SignalerForm({ machine }: { machine: Machine }) {
           />
           <p className="text-xs text-gray-400 text-right mt-1">{charCount}/500</p>
         </div>
+
+        <IncidentPhotoUpload
+          prepareAction={(hash, type, size) =>
+            preparePublicIncidentPhotoUploadAction(machine.numero_serie, hash, type, size)
+          }
+        />
 
         {state && 'error' in state && (
           <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{state.error}</p>
