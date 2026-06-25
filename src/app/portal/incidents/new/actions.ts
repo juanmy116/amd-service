@@ -1,47 +1,25 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { INCIDENT_CATEGORIES, INCIDENT_PRIORITIES, parseEnum } from '@/lib/enums'
-import { validateIncidentPhoto, extensionForType, PHOTO_ERROR_MESSAGES, isSha256Hex } from '@/lib/incidentPhotos'
+import { createIncidentPhotoUploadUrl, type PrepareUploadResult } from '@/lib/incidentPhotoUpload'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
 
 // Paso previo (opcional): el navegador pide una URL firmada para subir la foto DIRECTO a
-// Storage, sin pasar por la Server Action (Vercel topa el body a 4,5 MB). Devuelve la ruta
-// determinista por hash + el token de subida. Mismo patrón que prepareCounterUploadAction.
-type PrepareState = { ok: true; path: string; token: string } | { error: string }
-
+// Storage, sin pasar por la Server Action (Vercel topa el body a 4,5 MB). Ruta namespaced por
+// usuario (`incidents/<user.id>/…`) para que dos clientes con la misma imagen no colisionen.
 export async function prepareIncidentPhotoUploadAction(
   hash: string,
   type: string,
   size: number,
-): Promise<PrepareState> {
+): Promise<PrepareUploadResult> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Session expirée.' }
 
-  if (!isSha256Hex(hash)) return { error: 'Requête invalide.' }
-
-  const valid = validateIncidentPhoto({ type, size })
-  if (!valid.ok) return { error: PHOTO_ERROR_MESSAGES[valid.error] }
-
-  const ext = extensionForType(type)
-  const now = new Date()
-  // Ruta namespaced por usuario: evita que dos clientes que suban la MISMA imagen
-  // (mismo hash) colisionen en el mismo objeto. Determinista por (usuario, fichero).
-  const path = `incidents/${user.id}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${hash}.${ext}`
-
-  const admin = createAdminClient()
-  const { data, error } = await admin.storage
-    .from('incident-photos')
-    .createSignedUploadUrl(path, { upsert: true })
-  if (error || !data) {
-    console.error('[prepareIncidentPhotoUpload]', error)
-    return { error: "Erreur lors de la préparation de l'envoi." }
-  }
-  return { ok: true, path, token: data.token }
+  return createIncidentPhotoUploadUrl(user.id, hash, type, size)
 }
 
 export async function createPortalIncidentAction(
@@ -90,9 +68,11 @@ export async function createPortalIncidentAction(
   }
 
   // Foto adjunta (opcional): el navegador ya la subió a Storage y nos pasa su ruta.
-  // Si falla la asociación, NO bloqueamos: la incidencia ya está creada.
+  // Exigimos que la ruta esté namespaced bajo el propio usuario (`incidents/<user.id>/…`) —
+  // la RLS de incident_photos no valida storage_path, así que sin esto un cliente podría asociar
+  // a su incidencia la foto de otro (IDOR). Si falla, NO bloqueamos: la incidencia ya está creada.
   const photoPath = ((formData.get('photo_path') as string) ?? '').trim()
-  if (photoPath) {
+  if (photoPath.startsWith(`incidents/${user!.id}/`)) {
     const { error: photoErr } = await supabase.from('incident_photos').insert({
       incident_id: incident.id,
       uploaded_by: user!.id,

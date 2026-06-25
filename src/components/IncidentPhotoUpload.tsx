@@ -126,6 +126,9 @@ export default function IncidentPhotoUpload({ prepareAction }: { prepareAction: 
       )}
 
       {phase.kind === 'error' && <p className="mt-1.5 text-xs text-red-600">{phase.message}</p>}
+      <p className="mt-1.5 text-xs text-gray-500">
+        Une photo du problème aide le technicien à préparer son intervention.
+      </p>
     </div>
   )
 }
