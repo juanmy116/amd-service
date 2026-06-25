@@ -4,7 +4,8 @@ import { useActionState } from 'react'
 import Link from 'next/link'
 import { Loader2, ArrowLeft, QrCode, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import PhotoUpload from './PhotoUpload'
+import IncidentPhotoUpload from '@/components/IncidentPhotoUpload'
+import { prepareIncidentPhotoUploadAction } from './actions'
 
 type FormState = { error: string } | null
 type ContractOption = { id: string; label: string }
@@ -119,7 +120,7 @@ export default function NewIncidentForm({ action, contracts, preselectedContract
           </div>
 
           {/* Photo (facultatif) */}
-          <PhotoUpload />
+          <IncidentPhotoUpload prepareAction={prepareIncidentPhotoUploadAction} />
 
           {/* Catégorie */}
           <div>

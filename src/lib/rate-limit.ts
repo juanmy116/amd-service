@@ -25,6 +25,10 @@ export const rateLimiters = {
   contact:                build(3,  '1 h',  'contact'),
   public_incident_hourly: build(2,  '1 h',  'pub_inc_h'),
   public_incident_daily:  build(5,  '24 h', 'pub_inc_d'),
+  // Subida de foto en el formulario público del QR. Cupo propio (separado del envío del
+  // formulario) para que adjuntar foto no agote el de public_incident_*, y para acotar el
+  // abuso del endpoint anónimo de URL firmada.
+  public_photo_upload:    build(6,  '1 h',  'pub_photo'),
 }
 
 export type RateLimiterKey = keyof typeof rateLimiters

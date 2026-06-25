@@ -4,11 +4,17 @@ import { useRef, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { ImagePlus, Loader2, X, Check } from 'lucide-react'
 import { sha256Hex, validateIncidentPhoto, PHOTO_ERROR_MESSAGES } from '@/lib/incidentPhotos'
-import { prepareIncidentPhotoUploadAction } from './actions'
 
-// Subida de la foto adjunta a la incidencia. El navegador la sube DIRECTO a Supabase Storage
-// con una URL firmada que da el servidor (Vercel topa el body de las Server Actions a 4,5 MB).
-// Tras la subida, la ruta queda en un <input hidden name="photo_path"> que el formulario envía.
+// Subida de la foto adjunta a una incidencia, compartida por el formulario del portal
+// (`/portal/incidents/new`) y el público del QR (`/signaler/[serie]`). El navegador sube la
+// imagen DIRECTO a Supabase Storage con una URL firmada que da el servidor (Vercel topa el body
+// de las Server Actions a 4,5 MB). Tras la subida, la ruta queda en <input hidden name="photo_path">.
+//
+// `prepareAction` es la Server Action que valida + genera el token (varía según el flujo: la del
+// portal exige sesión; la pública aplica rate limit por IP).
+
+type PrepareResult = { ok: true; path: string; token: string } | { error: string }
+type PrepareAction = (hash: string, type: string, size: number) => Promise<PrepareResult>
 
 type Phase =
   | { kind: 'idle' }
@@ -16,7 +22,7 @@ type Phase =
   | { kind: 'done'; path: string; previewUrl: string }
   | { kind: 'error'; message: string }
 
-export default function PhotoUpload() {
+export default function IncidentPhotoUpload({ prepareAction }: { prepareAction: PrepareAction }) {
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -37,7 +43,7 @@ export default function PhotoUpload() {
       const hash = await sha256Hex(await file.arrayBuffer())
 
       // 2) Pedir al servidor la URL firmada (valida + genera el token).
-      const prep = await prepareIncidentPhotoUploadAction(hash, file.type, file.size)
+      const prep = await prepareAction(hash, file.type, file.size)
       if ('error' in prep) { setPhase({ kind: 'error', message: prep.error }); return }
 
       // 3) Subir la imagen DIRECTO a Supabase Storage (no pasa por Vercel).
@@ -49,14 +55,14 @@ export default function PhotoUpload() {
         .from('incident-photos')
         .uploadToSignedUrl(prep.path, prep.token, file, { contentType: file.type, upsert: true })
       if (upErr) {
-        console.error('[PhotoUpload] uploadToSignedUrl', upErr)
+        console.error('[IncidentPhotoUpload] uploadToSignedUrl', upErr)
         setPhase({ kind: 'error', message: "Échec de l'envoi de l'image." })
         return
       }
 
       setPhase({ kind: 'done', path: prep.path, previewUrl: URL.createObjectURL(file) })
     } catch (e) {
-      console.error('[PhotoUpload]', e)
+      console.error('[IncidentPhotoUpload]', e)
       setPhase({ kind: 'error', message: "Échec de l'envoi de l'image." })
     } finally {
       if (inputRef.current) inputRef.current.value = ''
@@ -70,8 +76,8 @@ export default function PhotoUpload() {
 
   return (
     <div>
-      <label className="block text-sm font-medium text-ink-soft mb-1.5">
-        Photo <span className="text-ink-muted font-normal">(facultatif)</span>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Photo <span className="text-gray-400 font-normal text-xs">(optionnel)</span>
       </label>
 
       {/* Campo que viaja con el formulario: la ruta de la foto en Storage. */}
@@ -91,16 +97,16 @@ export default function PhotoUpload() {
       />
 
       {phase.kind === 'done' ? (
-        <div className="flex items-center gap-3 p-3 rounded-lg border border-line">
+        <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-200">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={phase.previewUrl} alt="Aperçu" className="w-16 h-16 rounded-md object-cover shrink-0" />
-          <span className="flex items-center gap-1.5 text-sm text-success">
+          <span className="flex items-center gap-1.5 text-sm text-green-600">
             <Check size={15} /> Image ajoutée
           </span>
           <button
             type="button"
             onClick={reset}
-            className="ml-auto flex items-center justify-center w-8 h-8 rounded-lg border border-line text-ink-soft hover:bg-neutral-soft transition-colors"
+            className="ml-auto flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
             aria-label="Retirer l'image"
           >
             <X size={15} />
@@ -111,7 +117,7 @@ export default function PhotoUpload() {
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={phase.kind === 'uploading'}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-dashed border-line text-sm font-medium text-ink-soft hover:border-ink-muted hover:bg-neutral-soft transition-colors disabled:opacity-60"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-dashed border-gray-300 text-sm font-medium text-gray-600 hover:border-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-60"
         >
           {phase.kind === 'uploading'
             ? <><Loader2 size={15} className="animate-spin" /> Envoi…</>
@@ -119,10 +125,7 @@ export default function PhotoUpload() {
         </button>
       )}
 
-      {phase.kind === 'error' && <p className="mt-1.5 text-xs text-accent">{phase.message}</p>}
-      <p className="mt-1.5 text-xs text-ink-muted">
-        Une photo du problème aide le technicien à préparer son intervention.
-      </p>
+      {phase.kind === 'error' && <p className="mt-1.5 text-xs text-red-600">{phase.message}</p>}
     </div>
   )
 }

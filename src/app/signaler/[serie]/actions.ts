@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import { sendEmail } from '@/lib/email'
+import { validateIncidentPhoto, extensionForType, PHOTO_ERROR_MESSAGES, isSha256Hex } from '@/lib/incidentPhotos'
 
 type State =
   | { error: string }
@@ -41,6 +42,43 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
+}
+
+// Paso previo (opcional) del flujo público: el navegador pide una URL firmada para subir la
+// foto DIRECTO a Storage (sin pasar por la Server Action, que topa a 4,5 MB en Vercel). Es un
+// endpoint ANÓNIMO → se protege con rate limit por IP+serie y validación de tipo/tamaño; el
+// cron `cleanup-orphan-incident-photos` borra lo que nunca se asocie a una incidencia.
+type PrepareState = { ok: true; path: string; token: string } | { error: string }
+
+export async function preparePublicIncidentPhotoUploadAction(
+  serie: string, hash: string, type: string, size: number
+): Promise<PrepareState> {
+  const cleanSerie = sanitizeText(serie, 100)
+  if (!cleanSerie) return { error: 'Équipement non identifié.' }
+
+  if (!isSha256Hex(hash)) return { error: 'Requête invalide.' }
+
+  const valid = validateIncidentPhoto({ type, size })
+  if (!valid.ok) return { error: PHOTO_ERROR_MESSAGES[valid.error] }
+
+  const ip = await getClientIp()
+  const ok = await checkRateLimit('public_photo_upload', `${ip}:${cleanSerie}`)
+  if (!ok) return { error: 'Trop de tentatives. Réessayez plus tard.' }
+
+  const ext = extensionForType(type)
+  const now = new Date()
+  // Path público (sin user.id; el flujo es anónimo). Determinista por hash.
+  const path = `incidents/public/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${hash}.${ext}`
+
+  const admin = createAdminClient()
+  const { data, error } = await admin.storage
+    .from('incident-photos')
+    .createSignedUploadUrl(path, { upsert: true })
+  if (error || !data) {
+    console.error('[signaler] prepare photo', error)
+    return { error: "Erreur lors de la préparation de l'envoi." }
+  }
+  return { ok: true, path, token: data.token }
 }
 
 export async function submitPublicIncident(
@@ -102,12 +140,26 @@ export async function submitPublicIncident(
       contact_email: contactEmail || null,
       source:        'public',
     } as any)
-    .select('numero_incident')
+    .select('id, numero_incident')
     .single()
 
   if (insertError || !incident) {
     console.error('[signaler] insert error', insertError)
     return { error: 'Une erreur est survenue. Veuillez réessayer.' }
+  }
+
+  // Foto adjunta (opcional): el navegador ya la subió a Storage y nos pasa su ruta.
+  // Validamos el patrón EXACTO que genera preparePublicIncidentPhotoUploadAction (no solo el
+  // prefijo) para rechazar rutas arbitrarias. Si falla, no bloqueamos (la incidencia ya existe).
+  const photoPath = sanitizeText(formData.get('photo_path'), 300)
+  const PUBLIC_PHOTO_PATH = /^incidents\/public\/\d{4}\/\d{2}\/[0-9a-f]{64}\.(jpeg|png|webp)$/
+  if (PUBLIC_PHOTO_PATH.test(photoPath)) {
+    const { error: photoErr } = await admin.from('incident_photos').insert({
+      incident_id: incident.id,
+      uploaded_by: null,
+      storage_path: photoPath,
+    })
+    if (photoErr) console.error('[signaler] photo', photoErr)
   }
 
   await sendEmail({
