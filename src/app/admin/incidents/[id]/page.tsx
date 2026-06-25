@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import IncidentForm from '@/components/admin/IncidentForm'
+import IncidentPhotos from '@/components/IncidentPhotos'
 import { updateIncidentAction, deleteIncidentAction } from './actions'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -87,6 +88,11 @@ export default async function EditIncidentPage({
         deleteAction={deleteIncidentAction}
         contextInfo={contextInfo}
       />
+
+      {/* Photo signalée par le client */}
+      <div className="px-8 pb-4 max-w-3xl">
+        <IncidentPhotos incidentId={incident.id} />
+      </div>
 
       {/* Contact public (incidente via QR sin autenticación) */}
       {incident.contact_name && (

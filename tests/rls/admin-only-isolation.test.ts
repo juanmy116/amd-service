@@ -4,8 +4,10 @@ import { expectEmpty } from './assert'
 import { seedTenants, SC } from './scenario'
 
 // Aislamiento RLS de tablas INTERNAS admin-only: leads, princity_api_logs,
-// princity_health, pending_counter_imports, csat_responses, incident_photos.
+// princity_health, pending_counter_imports, csat_responses.
 // Ningún rol externo (client/technician/anon) debe poder leerlas; solo el admin.
+// (incident_photos NO es admin-only: cliente y técnico ven las fotos de sus
+//  incidencias → su aislamiento vive en incident-photos-isolation.test.ts).
 // Cada caso siembra una fila con service_role y comprueba la visibilidad por rol.
 
 const admin = adminClient()
@@ -32,7 +34,6 @@ beforeAll(async () => {
       image_path: '2026/06/test-rls.jpg', image_size_bytes: 1000, image_hash_sha256: 'TEST-pci-rls',
     }),
     admin.from('csat_responses').insert({ incident_id: incidentAId, token: 'TEST-csat-token', rating: 5 }),
-    admin.from('incident_photos').insert({ incident_id: incidentAId, storage_path: 'TEST/photo.jpg' }),
   ])
   const failed = seeds.find((s) => s.error)
   if (failed?.error) throw new Error(`seed admin-only: ${failed.error.message}`)
@@ -49,7 +50,6 @@ const cases: { table: string; column: string; value: string }[] = [
   { table: 'princity_health', column: 'function_name', value: 'TEST-fn' },
   { table: 'pending_counter_imports', column: 'image_hash_sha256', value: 'TEST-pci-rls' },
   { table: 'csat_responses', column: 'token', value: 'TEST-csat-token' },
-  { table: 'incident_photos', column: 'storage_path', value: 'TEST/photo.jpg' },
 ]
 
 describe.each(cases)('RLS admin-only — $table', ({ table, column, value }) => {

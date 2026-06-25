@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import InterventionForm from './intervention-form'
+import IncidentPhotos from '@/components/IncidentPhotos'
 import { submitInterventionAction } from './actions'
 
 export default async function TechIncidentPage({
@@ -73,6 +74,7 @@ export default async function TechIncidentPage({
       machineLocation={machineLocation}
       contractNumber={contractNumber}
       checkedParts={checkedParts}
+      photos={<IncidentPhotos incidentId={incident.id} />}
     />
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, MapPin, Building2, FileText } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
@@ -34,10 +34,12 @@ type Props = {
   contractNumber: string | null
   /** part_id → cantidad ya registrada (para precargar el formulario) */
   checkedParts: Map<number, number>
+  /** Galería de fotos del cliente (Server Component pasado como slot). */
+  photos?: ReactNode
 }
 
 export default function InterventionForm({
-  incident, boundAction, clientName, machineName, machineLocation, contractNumber, checkedParts,
+  incident, boundAction, clientName, machineName, machineLocation, contractNumber, checkedParts, photos,
 }: Props) {
   const [state, formAction, pending] = useActionState(boundAction, null)
 
@@ -94,6 +96,9 @@ export default function InterventionForm({
           </div>
         )}
       </Card>
+
+      {/* Photo signalée par le client */}
+      {photos}
 
       {/* Formulaire intervention */}
       <form action={formAction} className="space-y-5">
