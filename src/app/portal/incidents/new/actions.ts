@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { INCIDENT_CATEGORIES, INCIDENT_PRIORITIES, parseEnum } from '@/lib/enums'
-import { createIncidentPhotoUploadUrl, type PrepareUploadResult } from '@/lib/incidentPhotoUpload'
+import { createIncidentPhotoUploadUrl, incidentPhotoExists, type PrepareUploadResult } from '@/lib/incidentPhotoUpload'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -70,9 +70,10 @@ export async function createPortalIncidentAction(
   // Foto adjunta (opcional): el navegador ya la subió a Storage y nos pasa su ruta.
   // Exigimos que la ruta esté namespaced bajo el propio usuario (`incidents/<user.id>/…`) —
   // la RLS de incident_photos no valida storage_path, así que sin esto un cliente podría asociar
-  // a su incidencia la foto de otro (IDOR). Si falla, NO bloqueamos: la incidencia ya está creada.
+  // a su incidencia la foto de otro (IDOR) — y que el objeto exista (evita filas rotas si el cron
+  // de huérfanas lo borró). Si falla, NO bloqueamos: la incidencia ya está creada.
   const photoPath = ((formData.get('photo_path') as string) ?? '').trim()
-  if (photoPath.startsWith(`incidents/${user!.id}/`)) {
+  if (photoPath.startsWith(`incidents/${user!.id}/`) && await incidentPhotoExists(photoPath)) {
     const { error: photoErr } = await supabase.from('incident_photos').insert({
       incident_id: incident.id,
       uploaded_by: user!.id,

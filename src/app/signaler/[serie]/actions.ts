@@ -3,7 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import { sendEmail } from '@/lib/email'
-import { createIncidentPhotoUploadUrl, type PrepareUploadResult } from '@/lib/incidentPhotoUpload'
+import { createIncidentPhotoUploadUrl, incidentPhotoExists, type PrepareUploadResult } from '@/lib/incidentPhotoUpload'
 
 type State =
   | { error: string }
@@ -58,8 +58,10 @@ export async function preparePublicIncidentPhotoUploadAction(
   const ok = await checkRateLimit('public_photo_upload', `${ip}:${cleanSerie}`)
   if (!ok) return { error: 'Trop de tentatives. Réessayez plus tard.' }
 
-  // Path público (sin user.id; el flujo es anónimo).
-  return createIncidentPhotoUploadUrl('public', hash, type, size)
+  // Path público con un UUID aleatorio generado en el servidor: solo se entrega a quien hace la
+  // subida, así un atacante no puede construir la ruta de la foto de otro reporte (el flujo es
+  // anónimo, no hay user.id que aísle).
+  return createIncidentPhotoUploadUrl(`public/${crypto.randomUUID()}`, hash, type, size)
 }
 
 export async function submitPublicIncident(
@@ -130,11 +132,13 @@ export async function submitPublicIncident(
   }
 
   // Foto adjunta (opcional): el navegador ya la subió a Storage y nos pasa su ruta.
-  // Validamos el patrón EXACTO que genera preparePublicIncidentPhotoUploadAction (no solo el
-  // prefijo) para rechazar rutas arbitrarias. Si falla, no bloqueamos (la incidencia ya existe).
+  // Validamos el patrón EXACTO que genera preparePublicIncidentPhotoUploadAction (incluido el
+  // UUID aleatorio) para rechazar rutas arbitrarias, y que el objeto exista (evita filas rotas si
+  // el cron de huérfanas lo borró). Si falla, no bloqueamos (la incidencia ya existe).
   const photoPath = sanitizeText(formData.get('photo_path'), 300)
-  const PUBLIC_PHOTO_PATH = /^incidents\/public\/\d{4}\/\d{2}\/[0-9a-f]{64}\.(jpeg|png|webp)$/
-  if (PUBLIC_PHOTO_PATH.test(photoPath)) {
+  const PUBLIC_PHOTO_PATH =
+    /^incidents\/public\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/\d{4}\/\d{2}\/[0-9a-f]{64}\.(jpeg|png|webp)$/
+  if (PUBLIC_PHOTO_PATH.test(photoPath) && await incidentPhotoExists(photoPath)) {
     const { error: photoErr } = await admin.from('incident_photos').insert({
       incident_id: incident.id,
       uploaded_by: null,

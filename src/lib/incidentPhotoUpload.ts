@@ -36,3 +36,19 @@ export async function createIncidentPhotoUploadUrl(
   }
   return { ok: true, path, token: data.token }
 }
+
+// ¿Existe el objeto en el bucket? Se usa antes de asociar una foto a una incidencia: evita
+// crear una fila incident_photos que apunte a un objeto inexistente (p.ej. el cron de huérfanas
+// lo borró tras 24 h con el formulario abandonado, o una ruta manipulada que nunca se subió).
+export async function incidentPhotoExists(path: string): Promise<boolean> {
+  try {
+    const admin = createAdminClient()
+    const { error } = await admin.storage.from('incident-photos').createSignedUrl(path, 60)
+    return !error
+  } catch (e) {
+    // Un fallo transitorio (red) no debe romper el alta de la incidencia (que ya está creada):
+    // ante la duda, no asociar la foto.
+    console.error('[incidentPhotoExists]', e)
+    return false
+  }
+}
