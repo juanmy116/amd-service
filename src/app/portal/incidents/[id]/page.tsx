@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
+import IncidentPhotos from '@/components/IncidentPhotos'
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
   nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success', fermé: 'neutral',
@@ -127,6 +128,9 @@ export default async function PortalIncidentDetailPage({
           </div>
         </div>
       </Card>
+
+      {/* Photo jointe par le client */}
+      <IncidentPhotos incidentId={id} title="Photo jointe" />
 
       {/* Rapport technicien */}
       {incident.rapport_intervention && (

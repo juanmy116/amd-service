@@ -4,6 +4,7 @@ import { useActionState } from 'react'
 import Link from 'next/link'
 import { Loader2, ArrowLeft, QrCode, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import PhotoUpload from './PhotoUpload'
 
 type FormState = { error: string } | null
 type ContractOption = { id: string; label: string }
@@ -116,6 +117,9 @@ export default function NewIncidentForm({ action, contracts, preselectedContract
               className={`${inputClass} resize-none`}
             />
           </div>
+
+          {/* Photo (facultatif) */}
+          <PhotoUpload />
 
           {/* Catégorie */}
           <div>

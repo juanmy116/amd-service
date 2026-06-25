@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-06-15 — **tests RLS de cobertura completa** (88 tests de aislamiento por rol sobre todas las tablas sensibles, PR #93), **migración `middleware` → `proxy`** (convención Next.js 16, PR #94) y `main` protegida en GitHub (required check `typecheck · test · build`). Config de prod cerrada: `COMMERCIAL_EMAIL`, `NEXT_PUBLIC_APP_URL`. Histórico previo (2026-06-11): 3 capas de tests montadas (unit + aislamiento RLS + E2E Playwright, ver §Testing), endurecimiento RLS de `maintenance_visits` + `auth_rls_initplan`, borrado/terminación atómicos de contrato (`delete_contract`/`terminate_contract`), cabos de auditoría cerrados y reconstrucción limpia de la BD arreglada (P0-1). PRs #74–#85.
+> Última actualización: 2026-06-25 — **foto adjunta a la incidencia del cliente** (el cliente adjunta una foto opcional al abrir la incidencia; la ven técnico, admin y cliente; bucket `incident-photos`, migración `20260625100000`). Histórico 2026-06-15: **tests RLS de cobertura completa** (88 tests de aislamiento por rol sobre todas las tablas sensibles, PR #93), **migración `middleware` → `proxy`** (convención Next.js 16, PR #94) y `main` protegida en GitHub (required check `typecheck · test · build`). Config de prod cerrada: `COMMERCIAL_EMAIL`, `NEXT_PUBLIC_APP_URL`. Histórico previo (2026-06-11): 3 capas de tests montadas (unit + aislamiento RLS + E2E Playwright, ver §Testing), endurecimiento RLS de `maintenance_visits` + `auth_rls_initplan`, borrado/terminación atómicos de contrato (`delete_contract`/`terminate_contract`), cabos de auditoría cerrados y reconstrucción limpia de la BD arreglada (P0-1). PRs #74–#85.
 
 ---
 
@@ -813,15 +813,29 @@ Escritura vía RPC `set_incident_parts(p_incident_id, p_parts jsonb)` (`SECURITY
 ---
 
 ### Tabla: `incident_photos`
-Fotos adjuntas a una intervención.
+Foto adjunta a una incidencia. El cliente puede adjuntar **una foto (opcional)** al abrir la
+incidencia desde el portal (`/portal/incidents/new`); la ven el técnico asignado, el admin y el
+propio cliente en la ficha de detalle (componente compartido `src/components/IncidentPhotos.tsx`).
 
 | Campo | Tipo | Notas |
 |---|---|---|
 | `id` | UUID PK | |
-| `incident_id` | UUID | FK → incidents |
+| `incident_id` | UUID | FK → incidents, `ON DELETE CASCADE` |
 | `uploaded_by` | UUID | FK → profiles, nullable |
-| `storage_path` | text | ruta en Supabase Storage |
+| `storage_path` | text | ruta en el bucket `incident-photos`: `incidents/{year}/{month}/{sha256}.{ext}` |
 | `created_at` | timestamptz | |
+
+> **Bucket `incident-photos`** (privado, migración `20260625100000_incident_photos`): política
+> `incident_photos_service_all` (service_role). El navegador sube la foto **directa a Storage** con
+> una URL firmada (`prepareIncidentPhotoUploadAction` → `createSignedUploadUrl`), esquivando el tope
+> de 4,5 MB de las Server Actions de Vercel — mismo patrón que `counter-images`. La lectura usa
+> signed URLs TTL 1h generadas server-side con el admin client. Validación (solo imágenes JPG/PNG/WEBP,
+> ≤10 MB) en `src/lib/incidentPhotos.ts`.
+>
+> **RLS de la tabla** (la autorización vive aquí, no en Storage): `admin_all_incident_photos` (admin),
+> `client_incident_photos_select`/`_insert` (cliente, vía `auth_client_contract_machine_ids()`;
+> el INSERT exige `uploaded_by = auth.uid()`), `tech_incident_photos_select` (técnico, vía
+> `auth_tech_incident_ids()` — mismo patrón que `incident_parts`/`incident_history`).
 
 ---
 
@@ -1311,7 +1325,7 @@ Hallazgos P0 confirmados con SQL real contra producción y corregidos en el PR W
 Montadas en 2026-06-11 (cierra el plan de tests de `docs/pendientes.md` §1). Cada capa tiene su comando y, las de integración, su propio job de CI que levanta un **Supabase local efímero (Docker)** — separados del CI normal porque éste no tiene Supabase.
 
 - **Unit (vitest)** — `npm test`. Lógica pura en `src/lib` (`billing`, `invoicing`, `counters`, `qr`, `incident`). `include: src/**/*.test.ts`. Corre en el CI normal (`ci.yml`: typecheck + test + build).
-- **Aislamiento RLS (vitest + Supabase local)** — `npm run test:rls` (config `vitest.rls.config.ts`, `tests/rls/`). **Cobertura completa (88 tests, PR #93):** parque (machines/contracts/contract_machines/clients/machine_counters), facturación (invoices/invoice_lines/billing_plans), mantenimiento (visits/plans), perfiles (visibilidad + escalada de privilegios bloqueada) y tablas internas admin-only (leads, princity_*, pending_counter_imports, csat_responses, incident_photos). Job `.github/workflows/rls.yml`: `supabase start` → **grant a `service_role` Y `authenticated`** (replica los default privileges de prod; sin el grant a `authenticated`, las tablas nuevas darían 0 filas por permiso denegado en vez de por RLS) + re-aplica la restricción de columna de `profiles` → tests firmando como cada rol. Escenario base reutilizable en `tests/rls/scenario.ts` (2 clientes + 2 técnicos + admin); aserción anti-falso-verde `expectEmpty` en `tests/rls/assert.ts` (exige `error===null` + 0 filas; vive aparte de `helpers.ts` porque éste lo reutiliza Playwright, que no corre bajo vitest). Helpers en `tests/rls/helpers.ts` (crear usuarios por rol, sign-in, fixtures, cleanup `*.test`).
+- **Aislamiento RLS (vitest + Supabase local)** — `npm run test:rls` (config `vitest.rls.config.ts`, `tests/rls/`). **Cobertura completa (88 tests, PR #93):** parque (machines/contracts/contract_machines/clients/machine_counters), facturación (invoices/invoice_lines/billing_plans), mantenimiento (visits/plans), perfiles (visibilidad + escalada de privilegios bloqueada) y tablas internas admin-only (leads, princity_*, pending_counter_imports, csat_responses). Aislamiento de `incident_photos` por rol (cliente dueño / técnico asignado / ajenos) en `tests/rls/incident-photos-isolation.test.ts`. Job `.github/workflows/rls.yml`: `supabase start` → **grant a `service_role` Y `authenticated`** (replica los default privileges de prod; sin el grant a `authenticated`, las tablas nuevas darían 0 filas por permiso denegado en vez de por RLS) + re-aplica la restricción de columna de `profiles` → tests firmando como cada rol. Escenario base reutilizable en `tests/rls/scenario.ts` (2 clientes + 2 técnicos + admin); aserción anti-falso-verde `expectEmpty` en `tests/rls/assert.ts` (exige `error===null` + 0 filas; vive aparte de `helpers.ts` porque éste lo reutiliza Playwright, que no corre bajo vitest). Helpers en `tests/rls/helpers.ts` (crear usuarios por rol, sign-in, fixtures, cleanup `*.test`).
 - **E2E (Playwright + app + Supabase local)** — `npm run test:e2e` (`playwright.config.ts`, `tests/e2e/`). Job `.github/workflows/e2e.yml`: `supabase start` → grants a los 3 roles → `build`+`start` → Chromium. Specs: login por rol + recorrido SAV (admin asigna → `assigné` → técnico ve en `/tech` → `/tech/scan/<serie>` → `en_cours` + `incident_history`). Reutiliza los helpers de RLS.
 - **Notas de reproducibilidad (aprendidas al montar los tests):** (1) la cadena de migraciones **ahora sí se reconstruye desde cero** — se arregló un `REVOKE` sobre funciones legacy inexistentes (`20260508182457`, con `to_regprocedure` condicional) que abortaba `db reset` (cerró de verdad el P0-1, que estaba mal dado por resuelto). (2) El Postgres local del CLI no reproduce las **default privileges** de Supabase → los jobs otorgan grants explícitos (RLS solo `service_role`; E2E los 3 roles, porque los **embeddings de PostgREST** como `/tech/incidents` necesitan `GRANT SELECT` a `authenticated`). El aislamiento lo garantizan las RLS policies, no estos grants.
 
