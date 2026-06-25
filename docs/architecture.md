@@ -830,14 +830,21 @@ propio cliente en la ficha de detalle (componente compartido `src/components/Inc
 > una URL firmada (`prepareIncidentPhotoUploadAction` → `createSignedUploadUrl`), esquivando el tope
 > de 4,5 MB de las Server Actions de Vercel — mismo patrón que `counter-images`. La lectura usa
 > signed URLs TTL 1h generadas server-side con el admin client. Validación (solo imágenes JPG/PNG/WEBP,
-> ≤10 MB, hash `isSha256Hex` anti path-traversal) en `src/lib/incidentPhotos.ts`. Componente de subida
-> compartido `src/components/IncidentPhotoUpload.tsx` (prop `prepareAction`).
+> ≤10 MB, hash `isSha256Hex` anti path-traversal) en `src/lib/incidentPhotos.ts`. La preparación de la
+> URL firmada la centraliza el helper server-only `createIncidentPhotoUploadUrl(prefix, …)` en
+> `src/lib/incidentPhotoUpload.ts` (lo comparten ambos flujos). Componente de subida compartido
+> `src/components/IncidentPhotoUpload.tsx` (prop `prepareAction`).
 >
 > **Dos flujos de entrada:** (1) **portal del cliente** (`/portal/incidents/new`, autenticado, path
 > `incidents/{user_id}/…`); (2) **formulario público del QR** (`/signaler/[serie]`, anónimo, path
-> `incidents/public/…`): `preparePublicIncidentPhotoUploadAction` protegida con rate limit
-> `public_photo_upload` (6/h por IP+serie); `submitPublicIncident` asocia la foto (`uploaded_by=null`)
-> validando el path con un regex estricto. La foto la ven admin y el técnico asignado.
+> `incidents/public/{uuid}/…` con UUID aleatorio server-generado): `preparePublicIncidentPhotoUploadAction`
+> protegida con rate limit `public_photo_upload` (6/h por IP+serie). La foto la ven admin y el técnico asignado.
+>
+> **Modelo de seguridad de la asociación foto↔incidencia** (la RLS NO valida `storage_path`): al asociar,
+> el portal exige que el path empiece por `incidents/{user.id}/` (anti-IDOR entre clientes) y el público
+> lo valida con un regex estricto del patrón con UUID; ambos comprueban además que el objeto exista en
+> Storage (`incidentPhotoExists`, evita filas rotas si el cron de huérfanas ya lo borró). El UUID del path
+> público (solo entregado a quien sube) impide construir la ruta de la foto de otro reporte.
 >
 > **Limpieza de huérfanas (cron):** la foto se sube antes de enviar el formulario; un form abandonado
 > deja un objeto sin fila. La Edge Function `cleanup-orphan-incident-photos` (cron diario 02:30 UTC,
