@@ -43,7 +43,7 @@ export default async function AtelierPage() {
     admin
       .from('incidents')
       .select(`
-        id, numero_incident, title, status, priority, resolved_at, assigned_to,
+        id, numero_incident, title, description, status, priority, resolved_at, assigned_to,
         contract_machines ( contracts ( clients ( nom_client ) ) ),
         profiles!assigned_to ( full_name )
       `)
@@ -71,6 +71,7 @@ export default async function AtelierPage() {
     id: string
     numero_incident: string
     title: string
+    description: string | null
     status: string
     priority: string
     resolved_at: string | null
@@ -83,18 +84,44 @@ export default async function AtelierPage() {
   const resolvedThisWeek = (i: IncRow) =>
     i.resolved_at !== null && new Date(i.resolved_at).getTime() >= weekStart
 
-  const boardIncidents: AtelierIncident[] = rawIncidents
-    .filter((i) => i.status !== 'résolu' || resolvedThisWeek(i))
-    .map((i) => ({
-      id: i.id,
-      numeroIncident: i.numero_incident,
-      title: i.title,
-      status: i.status,
-      priority: i.priority,
-      clientName: i.contract_machines?.contracts?.clients?.nom_client ?? null,
-      technicianId: i.assigned_to,
-      technicianName: i.profiles?.full_name ?? null,
-    }))
+  const visibleIncidents = rawIncidents.filter((i) => i.status !== 'résolu' || resolvedThisWeek(i))
+
+  // Fotos adjuntas por el cliente: una sola query + firma en lote (no en serie).
+  // Solo se firman las incidencias del tablero que tengan foto, así el auto-refresh
+  // de 30s no genera URLs de más.
+  const photoUrlByIncident = new Map<string, string>()
+  const { data: photoRows } = await admin
+    .from('incident_photos')
+    .select('incident_id, storage_path, created_at')
+    .in('incident_id', visibleIncidents.map((i) => i.id))
+    .order('created_at', { ascending: true })
+  if (photoRows && photoRows.length > 0) {
+    // Una foto por incidencia (la primera). Firma en lote.
+    const firstPathByIncident = new Map<string, string>()
+    for (const r of photoRows) {
+      if (!firstPathByIncident.has(r.incident_id)) firstPathByIncident.set(r.incident_id, r.storage_path)
+    }
+    const paths = [...firstPathByIncident.values()]
+    const { data: signed } = await admin.storage.from('incident-photos').createSignedUrls(paths, 3600)
+    const urlByPath = new Map((signed ?? []).map((s) => [s.path, s.signedUrl]))
+    for (const [incidentId, path] of firstPathByIncident) {
+      const url = urlByPath.get(path)
+      if (url) photoUrlByIncident.set(incidentId, url)
+    }
+  }
+
+  const boardIncidents: AtelierIncident[] = visibleIncidents.map((i) => ({
+    id: i.id,
+    numeroIncident: i.numero_incident,
+    title: i.title,
+    status: i.status,
+    priority: i.priority,
+    clientName: i.contract_machines?.contracts?.clients?.nom_client ?? null,
+    technicianId: i.assigned_to,
+    technicianName: i.profiles?.full_name ?? null,
+    description: i.description,
+    photoUrl: photoUrlByIncident.get(i.id) ?? null,
+  }))
 
   const openIncidents = rawIncidents.filter((i) => i.status !== 'résolu')
   const kpis = {

@@ -215,6 +215,8 @@ export default function AtelierKanban({
         open={selected !== null}
         title={selected ? `${selected.numeroIncident} · ${selected.title}` : ''}
         subtitle="Assigner l'incident à"
+        description={selected?.description ?? null}
+        photoUrl={selected?.photoUrl ?? null}
         technicians={technicians}
         currentTechnicianId={selected?.technicianId ?? null}
         busy={busy}

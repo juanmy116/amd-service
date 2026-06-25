@@ -822,7 +822,7 @@ propio cliente en la ficha de detalle (componente compartido `src/components/Inc
 | `id` | UUID PK | |
 | `incident_id` | UUID | FK → incidents, `ON DELETE CASCADE` |
 | `uploaded_by` | UUID | FK → profiles, nullable |
-| `storage_path` | text | ruta en el bucket `incident-photos`: `incidents/{year}/{month}/{sha256}.{ext}` |
+| `storage_path` | text | ruta en `incident-photos`: `incidents/{user_id}/{year}/{month}/{sha256}.{ext}` (namespaced por usuario para que dos clientes con la misma imagen no colisionen) |
 | `created_at` | timestamptz | |
 
 > **Bucket `incident-photos`** (privado, migración `20260625100000_incident_photos`): política
@@ -831,6 +831,15 @@ propio cliente en la ficha de detalle (componente compartido `src/components/Inc
 > de 4,5 MB de las Server Actions de Vercel — mismo patrón que `counter-images`. La lectura usa
 > signed URLs TTL 1h generadas server-side con el admin client. Validación (solo imágenes JPG/PNG/WEBP,
 > ≤10 MB) en `src/lib/incidentPhotos.ts`.
+>
+> **Limpieza de huérfanas (cron):** la foto se sube antes de enviar el formulario; un form abandonado
+> deja un objeto sin fila. La Edge Function `cleanup-orphan-incident-photos` (cron diario 02:30 UTC,
+> migración `20260625110000`) borra los objetos del bucket sin fila en `incident_photos` y con > 24 h,
+> vía la RPC `orphan_incident_photo_paths()` (SECURITY DEFINER, service_role).
+>
+> **Vista del despachador (Atelier):** el `AssignPanel` de `/atelier` muestra la foto del cliente + la
+> descripción del problema al asignar (cargadas server-side con el admin client en `atelier/page.tsx`,
+> firma en lote con `createSignedUrls`). No requiere policy RLS: el Atelier ya lee todo con service_role.
 >
 > **RLS de la tabla** (la autorización vive aquí, no en Storage): `admin_all_incident_photos` (admin),
 > `client_incident_photos_select`/`_insert` (cliente, vía `auth_client_contract_machine_ids()`;
