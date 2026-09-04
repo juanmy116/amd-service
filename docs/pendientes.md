@@ -6,6 +6,21 @@
 
 ---
 
+## ✋ Capa 2 del candado de facturación — confirmación antes de emitir «Émettre»/«Forcer»
+
+> **Qué:** hoy los botones **«Émettre la facture»** y **«Forcer la facturation»** (`src/components/admin/ContractInvoicePreview.tsx`) emiten una factura **real, definitiva e inmutable en un solo clic**, sin diálogo de confirmación. El único freno actual es la **Capa 1** (candado global `billing_settings`, 2026-09-04) que mantiene la facturación APAGADA durante la fase de prueba del SAV.
+>
+> **Cuándo retomar:** **antes de ENCENDER la facturación** (antes de `UPDATE public.billing_settings SET billing_enabled = true`). Una vez encendida, un clic accidental de un admin emite una factura de verdad → hay que interponer una confirmación.
+>
+> **Cómo (propuesta):** modal de confirmación (usar `@headlessui/react`, ya es dependencia) al pulsar «Émettre»/«Forcer», que:
+> 1. Recuerde que la factura es **irreversible** (solo se puede anular, no borrar) e indique cliente, contrato, mes y total.
+> 2. Exija una acción deliberada extra (p. ej. escribir `EMETTRE`, o un segundo clic explícito «Confirmer l'émission»).
+> 3. Para «Forcer», remarque además que hay **máquinas sin relevé** que se facturarán al forfait (estimadas).
+>
+> **Por qué pendiente:** decisión consciente (2026-09-04). Con la Capa 1 apagando la facturación durante la prueba, la confirmación no es urgente; se implementa como paso previo a encender. Ver memoria del candado y `docs/architecture.md` (§Sistema de Facturación → Candado de facturación).
+
+---
+
 ## ⏰ Verificar el agente de anomalías cuando empiecen a entrar datos reales
 
 > **Qué:** las Fases 0-3 del *historial de piezas + agente de anomalías* (spec `docs/superpowers/specs/2026-06-15-historial-piezas-anomalias-design.md`) están en prod, pero el agente **no produce alertas hasta que haya datos**: hoy (2026-06-16) hay **0 lecturas de contador** cargadas y casi ningún cambio de pieza registrado.
