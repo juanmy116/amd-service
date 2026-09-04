@@ -8,6 +8,7 @@ import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Json } from '@/lib/supabase/types'
 import { buildContractInvoiceDraft } from '@/lib/invoicing'
+import { isBillingEnabled } from '@/lib/billing-lock'
 import { redirect } from 'next/navigation'
 
 const EMIT_ERROR_LABEL: Record<string, string> = {
@@ -23,6 +24,9 @@ const EMIT_ERROR_LABEL: Record<string, string> = {
   invalid_period:          'Période invalide.',
   invalid_payload:         'Données invalides.',
   forbidden:               'Action non autorisée.',
+  // Capa 1 — candado de facturación (fase de prueba del SAV). Lo levanta el guard de la acción y,
+  // como última barrera, el trigger BEFORE INSERT en `invoices` (que también lanza 'billing_disabled').
+  billing_disabled:        'Facturation désactivée : phase de test du SAV en cours.',
   // PR-D.1 — endurecimiento de la emisión (validaciones server-side).
   billing_sequence_mismatch: 'Mois hors séquence : facturez d’abord le mois précédent.',
   line_without_cm:           'Ligne sans poste (cm_id) : données incohérentes.',
@@ -40,6 +44,13 @@ export type EmitState = { error: string } | null
 
 export async function emitContractInvoiceAction(_prev: EmitState, fd: FormData): Promise<EmitState> {
   const { user } = await requireAdmin()
+
+  // Capa 1 — candado de facturación: durante la fase de prueba del SAV, la emisión está APAGADA.
+  // Corte temprano con mensaje claro; la barrera dura (trigger en BD) rechaza igualmente si se llega.
+  if (!(await isBillingEnabled())) {
+    return { error: EMIT_ERROR_LABEL.billing_disabled }
+  }
+
   const contract_id = ((fd.get('contract_id') as string) ?? '').trim()
   const year  = Number(fd.get('year'))
   const month = Number(fd.get('month'))

@@ -10,6 +10,7 @@ type Props = {
   draft: ContractDraft | null
   alreadyIssued: string | null
   technicalError?: boolean
+  billingEnabled: boolean
 }
 
 function formatDate(iso: string): string {
@@ -22,7 +23,7 @@ function entryKey(e: { contract_id: string; period_year: number; period_month: n
   return `${e.contract_id}|${e.period_year}|${e.period_month}`
 }
 
-export default function ContractInvoicePreview({ entries, selected, draft, alreadyIssued, technicalError }: Props) {
+export default function ContractInvoicePreview({ entries, selected, draft, alreadyIssued, technicalError, billingEnabled }: Props) {
   const [emitState, emitAction] = useActionState(emitContractInvoiceAction, null)
 
   function selectEntry(key: string) {
@@ -41,6 +42,15 @@ export default function ContractInvoicePreview({ entries, selected, draft, alrea
 
   return (
     <div className="space-y-6">
+      {!billingEnabled && (
+        <div className="px-4 py-3 rounded-lg bg-warning-soft border border-warning/30 text-sm text-warning flex items-start gap-2">
+          <span aria-hidden>🔒</span>
+          <span>
+            <strong>Facturation désactivée</strong> — phase de test du SAV en cours. L&apos;aperçu reste
+            disponible pour vérifier les montants, mais l&apos;émission des factures est bloquée.
+          </span>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <select
           value={selected ? entryKey(selected) : ''}
@@ -121,7 +131,7 @@ export default function ContractInvoicePreview({ entries, selected, draft, alrea
             </div>
           </div>
 
-          {!alreadyIssued && (
+          {!alreadyIssued && billingEnabled && (
             <form action={emitAction} className="flex flex-wrap items-center justify-end gap-3">
               <input type="hidden" name="contract_id" value={draft.contract_id} />
               <input type="hidden" name="year" value={draft.period_year} />

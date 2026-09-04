@@ -19,6 +19,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/rls/**/*.test.ts'],
+    // Capa 1 — abre el candado de facturación una vez (arranca apagado por migración).
+    globalSetup: ['./tests/rls/global-setup.ts'],
     testTimeout: 30_000,
     hookTimeout: 90_000,
     fileParallelism: false, // los tests comparten fixtures en la misma BD

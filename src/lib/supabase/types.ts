@@ -94,6 +94,27 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_settings: {
+        Row: {
+          billing_enabled: boolean
+          id: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          billing_enabled?: boolean
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          billing_enabled?: boolean
+          id?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       client_profiles: {
         Row: {
           client_id: number
