@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/auth'
+import { requireBilling } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import { formatPrice } from '@/lib/billing'
@@ -18,7 +18,7 @@ type InvoiceRow = {
 }
 
 export default async function FacturesPage() {
-  await requireAdmin()
+  await requireBilling()
   const admin = createAdminClient()
   const { data: invoices, error } = await admin
     .from('invoices')

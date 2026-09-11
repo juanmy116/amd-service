@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/auth'
+import { requireBilling } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -8,7 +8,7 @@ import { updateBillingPlanAction } from './actions'
 import type { BillingPlan } from '@/lib/billing'
 
 export default async function EditBillingPlanPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdmin()
+  await requireBilling()
   const { id } = await params
   const admin = createAdminClient()
   const { data: plan } = await admin.from('billing_plans').select('*').eq('id', id).single()

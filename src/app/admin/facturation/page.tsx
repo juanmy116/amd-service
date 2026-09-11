@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/auth'
+import { requireBilling } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildContractInvoiceDraft, listReadyToBill, BillingDataError, type ContractDraft, type ReadyToBillEntry } from '@/lib/invoicing'
 import { isBillingEnabled } from '@/lib/billing-lock'
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 export default async function FacturationPage({
   searchParams,
 }: { searchParams: Promise<{ contract?: string; year?: string; month?: string }> }) {
-  await requireAdmin()
+  await requireBilling()
   const sp = await searchParams
   const billingEnabled = await isBillingEnabled()
 

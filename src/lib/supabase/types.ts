@@ -1609,6 +1609,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          can_bill: boolean
           created_at: string
           full_name: string | null
           id: string
@@ -1617,6 +1618,7 @@ export type Database = {
           role: Database["public"]["Enums"]["user_role"]
         }
         Insert: {
+          can_bill?: boolean
           created_at?: string
           full_name?: string | null
           id: string
@@ -1625,6 +1627,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
         }
         Update: {
+          can_bill?: boolean
           created_at?: string
           full_name?: string | null
           id?: string
@@ -1745,6 +1748,7 @@ export type Database = {
         }
         Returns: Json
       }
+      can_bill: { Args: never; Returns: boolean }
       create_contract_with_lines: { Args: { payload: Json }; Returns: Json }
       delete_contract: { Args: { p_contract_id: string }; Returns: Json }
       emit_contract_invoice: { Args: { p_payload: Json }; Returns: string }

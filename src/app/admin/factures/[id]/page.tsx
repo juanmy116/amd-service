@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/auth'
+import { requireBilling } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -25,7 +25,7 @@ export default async function FactureDetailPage({
   params: Promise<{ id: string }>
   searchParams: Promise<{ sent?: string; error?: string }>
 }) {
-  await requireAdmin()
+  await requireBilling()
   const { id } = await params
   const { sent, error } = await searchParams
   const admin = createAdminClient()

@@ -39,6 +39,32 @@ export function requireTechnician() {
   return requireRole(['admin', 'technician'])
 }
 
+// Facturación: exige ser admin Y tener el permiso `can_bill` (migración 20260911130000).
+// Un admin del SAV sin el permiso gestiona todo lo demás con normalidad, pero no ve ni opera nada
+// de facturación (planes tarifarios, informe mensual, facturas emitidas). Aterriza en /admin, no en
+// /dashboard: sigue siendo admin, solo que esta sección no es suya.
+export async function requireBilling(): Promise<AuthContext> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, full_name, can_bill')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile) redirect('/login')
+  if (profile.role !== 'admin') redirect('/dashboard')
+  if (profile.can_bill !== true) redirect('/admin')
+
+  return {
+    user,
+    profile: { role: profile.role as Role, full_name: profile.full_name },
+    supabase,
+  }
+}
+
 export type DispatcherContext = {
   user: User
   profile: { role: Role; full_name: string | null; isDispatcher: boolean }

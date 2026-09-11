@@ -50,9 +50,11 @@ const NAV_GROUPS = [
   },
 ]
 
-export default function Sidebar({ fullName }: { fullName: string | null }) {
+export default function Sidebar({ fullName, canBill }: { fullName: string | null; canBill: boolean }) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  // Sin el permiso `can_bill` la facturación no existe para este admin (ver requireBilling()).
+  const groups = canBill ? NAV_GROUPS : NAV_GROUPS.filter((g) => g.label !== 'Facturation')
 
   return (
     <aside
@@ -97,7 +99,7 @@ export default function Sidebar({ fullName }: { fullName: string | null }) {
           </button>
         )}
 
-        {NAV_GROUPS.map((group) => (
+        {groups.map((group) => (
           <div key={group.label} className="mb-1">
             {!collapsed && (
               <p className="px-3 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-chrome-fg">
