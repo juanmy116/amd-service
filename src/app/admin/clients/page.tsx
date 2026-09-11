@@ -1,11 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Users, Plus } from 'lucide-react'
 import SearchFilters from '@/components/admin/SearchFilters'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { buttonClasses } from '@/components/ui/Button'
-import { getQuartiers } from '@/lib/quartiers.server'
+import { getQuartiersForFilter } from '@/lib/quartiers.server'
 import {
   sanitizeSearchQuery,
   buildSafeOr,
@@ -27,15 +28,26 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
   const activeFilter = parseBooleanParam(firstParam(sp.active))
 
   const supabase = await createClient()
-  const quartierOptions = await getQuartiers()
+  // El catálogo incluye las zonas desactivadas: sin ellas no habría forma de listar los
+  // clientes que siguen asignados a una. Se marcan en la etiqueta.
+  const quartierOptions = await getQuartiersForFilter()
 
-  // Se valida contra el catálogo, como `q` y `active` se validan con sus helpers: un código
-  // inventado (o un `?quartier=` vacío) no debe dar una lista vacía sin explicación.
+  // Se valida contra el catálogo, como `q` y `active` se validan con sus helpers. Si el código
+  // no existe (marcador antiguo de una zona borrada) se limpia la URL en vez de dejar el
+  // desplegable en blanco mostrando la lista entera, que confunde más que ayuda.
   const rawQuartier = firstParam(sp.quartier)
-  const quartierFilter =
-    rawQuartier === NO_QUARTIER || quartierOptions.some((qt) => qt.code === rawQuartier)
-      ? rawQuartier
-      : null
+  const quartierIsValid =
+    rawQuartier === null ||
+    rawQuartier === NO_QUARTIER ||
+    quartierOptions.some((qt) => qt.code === rawQuartier)
+  if (!quartierIsValid) {
+    const clean = new URLSearchParams()
+    if (q) clean.set('q', q)
+    if (activeFilter !== null) clean.set('active', String(activeFilter))
+    const qs = clean.toString()
+    redirect(qs ? `/admin/clients?${qs}` : '/admin/clients')
+  }
+  const quartierFilter = rawQuartier
 
   let query = supabase
     .from('clients')
@@ -87,7 +99,10 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
             label: 'Tous les quartiers',
             options: [
               { value: NO_QUARTIER, label: 'Sans quartier' },
-              ...quartierOptions.map((qt) => ({ value: qt.code, label: qt.label })),
+              ...quartierOptions.map((qt) => ({
+                value: qt.code,
+                label: qt.active ? qt.label : `${qt.label} (désactivé)`,
+              })),
             ],
           },
         ]}

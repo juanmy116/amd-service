@@ -1,18 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { toQuartiers, type Quartier } from '@/lib/quartiers'
 
-/**
- * Catálogo COMPLETO de quartiers (activos e inactivos), ordenado, para los desplegables de
- * /admin y el mapa de /atelier. Se consulta con el cliente de sesión: la policy
- * `quartiers_select_authenticated` lo permite.
- *
- * Devuelve también los inactivos a propósito: quien filtra es `selectableQuartiers()`, que
- * conserva la zona ya asignada a un registro aunque se haya desactivado.
- *
- * Si la consulta falla, LANZA en vez de devolver []. Una lista vacía haría que el `<select>`
- * enviara '' y que guardar cualquier otro campo borrase el quartier del registro.
- */
-export async function getQuartiers(): Promise<Quartier[]> {
+async function fetchQuartiers(): Promise<{ data: Quartier[]; error: boolean }> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('quartiers')
@@ -21,8 +10,31 @@ export async function getQuartiers(): Promise<Quartier[]> {
 
   if (error) {
     console.error('[quartiers]', error)
-    throw new Error('DATA_FETCH_ERROR')
+    return { data: [], error: true }
   }
+  return { data: toQuartiers(data), error: false }
+}
 
-  return toQuartiers(data)
+/**
+ * Catálogo COMPLETO de quartiers (activos e inactivos) para las pantallas que GUARDAN:
+ * fichas de cliente y de máquina. Quien filtra es `selectableQuartiers()`, que conserva la
+ * zona ya asignada al registro aunque se haya desactivado.
+ *
+ * LANZA si la consulta falla. Es deliberado: con una lista vacía el `<select>` enviaría ''
+ * y guardar cualquier otro campo borraría el quartier del registro. Mejor no pintar el
+ * formulario que corromper el dato en silencio.
+ */
+export async function getQuartiers(): Promise<Quartier[]> {
+  const { data, error } = await fetchQuartiers()
+  if (error) throw new Error('DATA_FETCH_ERROR')
+  return data
+}
+
+/**
+ * Igual, pero para pantallas de SOLO LECTURA (listados): si el catálogo falla devuelve []
+ * y la página se pinta sin opciones de filtro, en vez de tumbar toda la lista de clientes.
+ */
+export async function getQuartiersForFilter(): Promise<Quartier[]> {
+  const { data } = await fetchQuartiers()
+  return data
 }
