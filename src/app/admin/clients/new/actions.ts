@@ -21,6 +21,7 @@ export async function createClientAction(
   const telephone  = str(formData, 'telephone')
   const adresse    = str(formData, 'adresse')
   const ville      = str(formData, 'ville')
+  const quartier_code = str(formData, 'quartier_code') || null
 
   if (!nom_client) return { error: 'Le nom du client est obligatoire.' }
   if (!ninea)      return { error: 'Le NINEA est obligatoire.' }
@@ -30,7 +31,7 @@ export async function createClientAction(
   if (!ville)      return { error: 'La ville est obligatoire.' }
 
   const { error } = await supabase.from('clients').insert({
-    nom_client, ninea, email, telephone, adresse, ville,
+    nom_client, ninea, email, telephone, adresse, ville, quartier_code,
     active: formData.get('active') === 'on',
   })
 

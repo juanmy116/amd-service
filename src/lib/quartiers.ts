@@ -15,6 +15,27 @@ export type Quartier = {
   sortOrder: number
 }
 
+/** Fila tal cual viene de la tabla `quartiers` (snake_case). */
+export type QuartierRow = {
+  code: string
+  label: string
+  ville: string
+  lat: number
+  lng: number
+  sort_order: number
+}
+
+export function toQuartiers(rows: QuartierRow[] | null): Quartier[] {
+  return (rows ?? []).map((r) => ({
+    code: r.code,
+    label: r.label,
+    ville: r.ville,
+    lat: r.lat,
+    lng: r.lng,
+    sortOrder: r.sort_order,
+  }))
+}
+
 export type QuartierGroup = {
   ville: string
   quartiers: Quartier[]

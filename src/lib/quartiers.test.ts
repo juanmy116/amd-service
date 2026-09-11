@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveQuartierCode, groupByVille, type Quartier } from './quartiers'
+import { resolveQuartierCode, groupByVille, toQuartiers, type Quartier } from './quartiers'
 
 const QUARTIERS: Quartier[] = [
   { code: 'plateau',  label: 'Plateau',  ville: 'Dakar', lat: 14.669, lng: -17.43,  sortOrder: 10 },
@@ -47,5 +47,19 @@ describe('groupByVille', () => {
 
   it('con lista vacía devuelve lista vacía', () => {
     expect(groupByVille([])).toEqual([])
+  })
+})
+
+describe('toQuartiers', () => {
+  it('convierte sort_order a sortOrder', () => {
+    expect(toQuartiers([
+      { code: 'plateau', label: 'Plateau', ville: 'Dakar', lat: 14.669, lng: -17.43, sort_order: 10 },
+    ])).toEqual([
+      { code: 'plateau', label: 'Plateau', ville: 'Dakar', lat: 14.669, lng: -17.43, sortOrder: 10 },
+    ])
+  })
+
+  it('con null devuelve lista vacía (la consulta puede fallar)', () => {
+    expect(toQuartiers(null)).toEqual([])
   })
 })

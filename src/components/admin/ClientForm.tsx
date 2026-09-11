@@ -4,6 +4,8 @@ import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import QuartierSelect from '@/components/admin/QuartierSelect'
+import type { Quartier } from '@/lib/quartiers'
 
 type FormState = { error: string } | null
 
@@ -14,6 +16,7 @@ type ClientData = {
   telephone?: string | null
   adresse?: string | null
   ville?: string | null
+  quartier_code?: string | null
   active?: boolean
 }
 
@@ -23,12 +26,13 @@ type Props = {
   title:         string
   clientId?:     number
   deleteAction?: (formData: FormData) => Promise<void>
+  quartiers:     Quartier[]
 }
 
 const inputClass =
   'w-full px-3.5 py-2.5 rounded-lg border border-line text-ink text-sm placeholder-ink-muted bg-card focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent'
 
-export default function ClientForm({ action, defaultValues, title, clientId, deleteAction }: Props) {
+export default function ClientForm({ action, defaultValues, title, clientId, deleteAction, quartiers }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
   const [confirming, setConfirming] = useState(false)
 
@@ -169,6 +173,14 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
               className={inputClass}
             />
           </div>
+
+          {/* Row 3-bis: quartier — alimenta la carte du kiosque Atelier */}
+          <QuartierSelect
+            quartiers={quartiers}
+            defaultValue={defaultValues?.quartier_code}
+            label="Quartier"
+            hint="Sert à situer les pannes de ce client sur la carte de l'atelier."
+          />
 
           {/* Row 4: ville + statut */}
           <div className="grid grid-cols-2 gap-4">
