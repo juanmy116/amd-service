@@ -13,6 +13,8 @@ import {
 } from '@/lib/search'
 
 const SEARCH_COLUMNS = ['nom_client', 'ninea', 'ville'] as const
+/** Valor del filtro de quartier que significa «los que aún no tienen ninguno». */
+const NO_QUARTIER = 'none'
 const RESULT_LIMIT = 200
 const TH = 'text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-6 py-2.5'
 
@@ -22,22 +24,33 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
   const sp = await searchParams
   const q = sanitizeSearchQuery(firstParam(sp.q))
   const activeFilter = parseBooleanParam(firstParam(sp.active))
+  const quartierFilter = firstParam(sp.quartier)
 
   const supabase = await createClient()
 
   let query = supabase
     .from('clients')
-    .select('id, nom_client, ninea, ville, active')
+    .select('id, nom_client, ninea, ville, active, quartier_code, quartiers(label)')
     .order('nom_client')
     .limit(RESULT_LIMIT)
 
   if (q) query = query.or(buildSafeOr(SEARCH_COLUMNS, q))
   if (activeFilter !== null) query = query.eq('active', activeFilter)
+  if (quartierFilter === NO_QUARTIER) query = query.is('quartier_code', null)
+  else if (quartierFilter) query = query.eq('quartier_code', quartierFilter)
 
   const { data: clients, error } = await query
   if (error) { console.error('[clients]', error); throw new Error('DATA_FETCH_ERROR') }
+
+  // Catálogo para las opciones del filtro (la policy de quartiers permite leerlo a cualquier
+  // usuario autenticado).
+  const { data: quartierOptions } = await supabase
+    .from('quartiers')
+    .select('code, label')
+    .eq('active', true)
+    .order('sort_order')
   const count = clients?.length ?? 0
-  const hasFilters = q !== null || activeFilter !== null
+  const hasFilters = q !== null || activeFilter !== null || quartierFilter !== null
 
   return (
     <div className="p-8">
@@ -68,6 +81,14 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
               { value: 'false', label: 'Inactifs' },
             ],
           },
+          {
+            param: 'quartier',
+            label: 'Tous les quartiers',
+            options: [
+              { value: NO_QUARTIER, label: 'Sans quartier' },
+              ...(quartierOptions ?? []).map((qt) => ({ value: qt.code, label: qt.label })),
+            ],
+          },
         ]}
       />
 
@@ -96,6 +117,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
                 <th className={TH}>Nom du client</th>
                 <th className={TH}>NINEA</th>
                 <th className={TH}>Ville</th>
+                <th className={TH}>Quartier</th>
                 <th className={TH}>Statut</th>
                 <th className="px-6 py-2.5" />
               </tr>
@@ -113,6 +135,9 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
                   </td>
                   <td className="px-6 py-4 text-sm text-ink-muted font-mono">{client.ninea ?? '—'}</td>
                   <td className="px-6 py-4 text-sm text-ink-soft">{client.ville ?? '—'}</td>
+                  <td className="px-6 py-4 text-sm text-ink-soft">
+                    {client.quartiers?.label ?? <span className="text-ink-muted">—</span>}
+                  </td>
                   <td className="px-6 py-4">
                     <Badge variant={client.active ? 'success' : 'neutral'}>
                       {client.active ? 'Actif' : 'Inactif'}
