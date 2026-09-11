@@ -21,6 +21,7 @@ const TECH = 'bp-tech@rls.test'     // técnico, control
 // trigger) y su cliente quedaría pegado por la FK RESTRICT. Mismo patrón que billing-isolation.
 const INV_CLIENT = 'TESTINV Permiso'
 let invoiceId: string
+let invClientId: number
 
 beforeAll(async () => {
   if (!ANON_KEY || !SERVICE_KEY) {
@@ -44,6 +45,7 @@ beforeAll(async () => {
   const { data: cli, error: cErr } = await admin.from('clients')
     .upsert({ nom_client: INV_CLIENT }, { onConflict: 'nom_client' }).select('id').single()
   if (cErr) throw new Error(`seed client: ${cErr.message}`)
+  invClientId = cli!.id as number
 
   const found = await admin.from('invoices').select('id').eq('numero_facture', 'TESTPERM-0001').maybeSingle()
   if (found.data) {
@@ -81,10 +83,12 @@ describe('admin SIN can_bill (admin del SAV)', () => {
   it('no puede crear una factura', async () => {
     const sav = await signInAs(SAV)
     const { error } = await sav.from('invoices').insert({
-      numero_facture: 'TESTPERM-HACK', client_id: 1, client_name: 'X',
+      numero_facture: 'TESTPERM-HACK', client_id: invClientId, client_name: INV_CLIENT,
       period_year: 2026, period_month: 9, total_amount: 1,
     })
-    expect(error).not.toBeNull()
+    // Datos válidos a propósito: así el único motivo posible de rechazo es la policy RLS
+    // (42501), no una FK ni un CHECK — si no, el test pasaría por la razón equivocada.
+    expect(error?.code).toBe('42501')
   })
 
   it('SÍ lee los planes tarifarios (los necesita la página de contratos)', async () => {
@@ -97,8 +101,8 @@ describe('admin SIN can_bill (admin del SAV)', () => {
   it('no puede crear un plan tarifario', async () => {
     const sav = await signInAs(SAV)
     const { error } = await sav.from('billing_plans')
-      .insert({ name: 'TEST Plan intruso', type: 'per_copy', price_bw: 1 })
-    expect(error).not.toBeNull()
+      .insert({ name: 'TEST Plan intruso', type: 'per_copy', price_bw: 1, price_color: 5 })
+    expect(error?.code).toBe('42501')
   })
 
   it('no puede modificar un plan tarifario existente', async () => {
@@ -125,7 +129,7 @@ describe('admin CON can_bill', () => {
   it('puede crear un plan tarifario', async () => {
     const biller = await signInAs(BILLER)
     const { error } = await biller.from('billing_plans')
-      .insert({ name: 'TEST Plan del facturador', type: 'per_copy', price_bw: 7 })
+      .insert({ name: 'TEST Plan del facturador', type: 'per_copy', price_bw: 7, price_color: 35 })
     expect(error).toBeNull()
   })
 })
