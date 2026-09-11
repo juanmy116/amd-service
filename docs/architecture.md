@@ -235,6 +235,17 @@ Route handler que recibe el formulario de contacto del sitio web público y capt
 - Cuenta especial «Atelier»: rol `technician` + flag `profiles.is_dispatcher` → un *dispatcher* puede asignar incidencias y visitas de mantenimiento a los técnicos sin ser admin
 - Las Server Actions de despacho validan `admin OR is_dispatcher` y escriben vía `createAdminClient()`; el proxy (`src/proxy.ts`) protege `/atelier` y `/dashboard` redirige ahí a los dispatchers
 
+#### 11-bis. Ubicación por quartier (entrega 1 del rediseño del kiosko, 2026-09-11)
+
+Base de datos de la futura **carte de Dakar** del kiosko (diseño completo en `docs/superpowers/specs/2026-09-11-atelier-dashboard-carte-design.md`).
+
+- Tabla **`quartiers`** (`code` PK, `label`, `ville`, `lat`, `lng`, `sort_order`, `active`): catálogo de zonas **y** fuente de las coordenadas con las que el mapa pinta cada burbuja. 21 filas sembradas por migración: 13 barrios de Dakar (Plateau, Médina, Point E, Mermoz, Liberté, Ouakam, Almadies, Yoff, Parcelles, Hann, Pikine, Keur Massar, Rufisque) + Diamniadio, Thiès, Mbour, Diass, Touba, Kaolack, Saint-Louis y Ziguinchor. Añadir una zona es un `INSERT`, sin desplegar código.
+- **RLS:** `quartiers_select_authenticated` (cualquier autenticado lee — el kiosko usa cuenta `technician` + `is_dispatcher`) y `quartiers_admin_all` (solo admin escribe). Cubierto por `tests/rls/quartiers-isolation.test.ts`.
+- **`clients.quartier_code`** y **`machines.quartier_code`** (ambas FK a `quartiers.code`, nullable). La de máquina solo se rellena si esa máquina está en **otra sede** que su cliente.
+- Regla de resolución, en `src/lib/quartiers.ts`: `resolveQuartierCode(machine, client)` = quartier de la máquina ?? quartier del cliente ?? `null` (→ «Sans quartier», no se pinta en el mapa).
+- **Relleno automático** (`20260911150100_quartiers_backfill.sql`): deduce el quartier del texto de `adresse`. Medido contra los 68 clientes activos → **63 clasificados, 5 sin deducir**. Solo toca filas con `quartier_code IS NULL`, así que es reejecutable y no pisa correcciones manuales. ⚠️ El primer `WHEN` es el del aeropuerto **a propósito**: «AEROPORT» hoy es el **AIBD, en Diass** (no el antiguo LSS de Yoff), y sin esa regla delante 2AS y 2AS TECHNCS caerían a 45 km de su sitio.
+- **UI:** desplegable `QuartierSelect` (agrupado por ciudad) en la ficha de cliente —justo bajo la dirección— y en la de máquina («si différent du client»); columna `Quartier` y filtro `Sans quartier` en `/admin/clients`. El catálogo se carga con `getQuartiers()` (`src/lib/quartiers.server.ts`).
+
 ### 12. Sistema de Facturación (`/admin/billing-plans`, `/admin/facturation`, `/admin/factures`) ✅ — sesión 28-29 (núcleo Tasks 1-11)
 
 Emisor de **facturas inmutables**, a partir del consumo real de contadores. Tres pantallas + un export. Tras el rediseño del core (Bloques A–E + 0/C, 2026-06-09), el flujo activo factura **por contrato y ciclo de aniversario** (regla 9); el detalle por bloque está en §Jerarquía de Datos (Bloques A/B/D/E/C/0). Esta sección resume la capa de aplicación.

@@ -32,7 +32,8 @@ export async function createMachineAction(
     marque,
     modele,
     type,
-    localisation: str(formData, 'localisation') || null,
+    localisation:  str(formData, 'localisation') || null,
+    quartier_code: str(formData, 'quartier_code') || null,
     active:      formData.get('active') === 'on',
   })
 

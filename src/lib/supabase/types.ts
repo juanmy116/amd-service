@@ -159,6 +159,7 @@ export type Database = {
           princity_company_id: string | null
           princity_id: number | null
           princity_prefix: string | null
+          quartier_code: string | null
           telephone: string | null
           ville: string | null
         }
@@ -172,6 +173,7 @@ export type Database = {
           princity_company_id?: string | null
           princity_id?: number | null
           princity_prefix?: string | null
+          quartier_code?: string | null
           telephone?: string | null
           ville?: string | null
         }
@@ -185,10 +187,19 @@ export type Database = {
           princity_company_id?: string | null
           princity_id?: number | null
           princity_prefix?: string | null
+          quartier_code?: string | null
           telephone?: string | null
           ville?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_quartier_code_fkey"
+            columns: ["quartier_code"]
+            isOneToOne: false
+            referencedRelation: "quartiers"
+            referencedColumns: ["code"]
+          },
+        ]
       }
       contract_machine_override_versions: {
         Row: {
@@ -1107,6 +1118,7 @@ export type Database = {
           numero_serie: string
           princity_device_id: string | null
           princity_pending: boolean
+          quartier_code: string | null
           type: Database["public"]["Enums"]["machine_type"] | null
         }
         Insert: {
@@ -1117,6 +1129,7 @@ export type Database = {
           numero_serie: string
           princity_device_id?: string | null
           princity_pending?: boolean
+          quartier_code?: string | null
           type?: Database["public"]["Enums"]["machine_type"] | null
         }
         Update: {
@@ -1127,9 +1140,18 @@ export type Database = {
           numero_serie?: string
           princity_device_id?: string | null
           princity_pending?: boolean
+          quartier_code?: string | null
           type?: Database["public"]["Enums"]["machine_type"] | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "machines_quartier_code_fkey"
+            columns: ["quartier_code"]
+            isOneToOne: false
+            referencedRelation: "quartiers"
+            referencedColumns: ["code"]
+          },
+        ]
       }
       maintenance_parts: {
         Row: {
@@ -1634,6 +1656,36 @@ export type Database = {
           is_dispatcher?: boolean
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: []
+      }
+      quartiers: {
+        Row: {
+          active: boolean
+          code: string
+          label: string
+          lat: number
+          lng: number
+          sort_order: number
+          ville: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          label: string
+          lat: number
+          lng: number
+          sort_order?: number
+          ville: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          label?: string
+          lat?: number
+          lng?: number
+          sort_order?: number
+          ville?: string
         }
         Relationships: []
       }

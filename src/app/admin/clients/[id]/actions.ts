@@ -18,6 +18,7 @@ export async function updateClientAction(
   const telephone  = ((formData.get('telephone')  as string) ?? '').trim()
   const adresse    = ((formData.get('adresse')    as string) ?? '').trim()
   const ville      = ((formData.get('ville')      as string) ?? '').trim()
+  const quartier_code = ((formData.get('quartier_code') as string) ?? '').trim() || null
 
   if (!nom_client) return { error: 'Le nom du client est obligatoire.' }
   if (!ninea)      return { error: 'Le NINEA est obligatoire.' }
@@ -27,7 +28,7 @@ export async function updateClientAction(
   if (!ville)      return { error: 'La ville est obligatoire.' }
 
   const { error } = await supabase.from('clients').update({
-    nom_client, ninea, email, telephone, adresse, ville,
+    nom_client, ninea, email, telephone, adresse, ville, quartier_code,
     active: formData.get('active') === 'on',
   }).eq('id', id)
 

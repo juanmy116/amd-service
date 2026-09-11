@@ -26,7 +26,8 @@ export async function updateMachineAction(
     marque,
     modele,
     type,
-    localisation: (formData.get('localisation') as string).trim() || null,
+    localisation:  ((formData.get('localisation') as string) ?? '').trim() || null,
+    quartier_code: ((formData.get('quartier_code') as string) ?? '').trim() || null,
     active: formData.get('active') === 'on',
   }).eq('numero_serie', serie)
 

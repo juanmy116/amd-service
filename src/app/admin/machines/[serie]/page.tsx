@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import MachineForm from '@/components/admin/MachineForm'
+import { getQuartiers } from '@/lib/quartiers.server'
 import { updateMachineAction, deleteMachineAction } from './actions'
 
 export default async function EditMachinePage({
@@ -20,6 +21,8 @@ export default async function EditMachinePage({
 
   if (!machine) notFound()
 
+  const quartiers = await getQuartiers()
+
   const boundUpdateAction = updateMachineAction.bind(null, machine.numero_serie)
 
   return (
@@ -30,6 +33,7 @@ export default async function EditMachinePage({
       isEdit
       machineId={machine.numero_serie}
       deleteAction={deleteMachineAction}
+      quartiers={quartiers}
     />
   )
 }
