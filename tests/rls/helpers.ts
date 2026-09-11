@@ -25,6 +25,14 @@ export function anonClient(): SupabaseClient {
   return createClient(URL, ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
 }
 
+// Capa 1 — candado de facturación: por migración arranca APAGADO (billing_settings.billing_enabled
+// = false), lo que bloquea TODO INSERT en `invoices` vía trigger. Las suites que emiten facturas lo
+// abren (globalSetup RLS y global-setup de Playwright). Idempotente; escribe con service_role.
+export async function enableBilling(admin: SupabaseClient): Promise<void> {
+  const { error } = await admin.from('billing_settings').update({ billing_enabled: true }).eq('id', true)
+  if (error) throw new Error(`enableBilling: ${error.message}`)
+}
+
 export type Role = 'admin' | 'technician' | 'client'
 
 // Crea un usuario auth confirmado y le fija el rol en su profile (el trigger

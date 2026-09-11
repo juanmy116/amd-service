@@ -1,6 +1,7 @@
 import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildContractInvoiceDraft, listReadyToBill, BillingDataError, type ContractDraft, type ReadyToBillEntry } from '@/lib/invoicing'
+import { isBillingEnabled } from '@/lib/billing-lock'
 import ContractInvoicePreview from '@/components/admin/ContractInvoicePreview'
 
 export const dynamic = 'force-dynamic'
@@ -10,6 +11,7 @@ export default async function FacturationPage({
 }: { searchParams: Promise<{ contract?: string; year?: string; month?: string }> }) {
   await requireAdmin()
   const sp = await searchParams
+  const billingEnabled = await isBillingEnabled()
 
   // FORMA B: la pantalla lista las TANDAS listas para facturar (contrato + mes con lecturas, no
   // facturado aún). El periodo real (fechas de lectura) y el total los calcula el draft.
@@ -51,7 +53,7 @@ export default async function FacturationPage({
         <h1 className="text-xl font-bold text-ink">Rapport de facturation</h1>
         <p className="text-sm text-ink-muted mt-0.5">Une facture par contrat et par mois, sur la période réelle entre relevés. Émettez pour figer la facture.</p>
       </div>
-      <ContractInvoicePreview entries={entries} selected={selected} draft={draft} alreadyIssued={alreadyIssued} technicalError={technicalError} />
+      <ContractInvoicePreview entries={entries} selected={selected} draft={draft} alreadyIssued={alreadyIssued} technicalError={technicalError} billingEnabled={billingEnabled} />
     </div>
   )
 }
