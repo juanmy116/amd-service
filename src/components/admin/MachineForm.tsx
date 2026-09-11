@@ -4,6 +4,8 @@ import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, ArrowLeft, Trash2, AlertTriangle, Gauge, Package } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import QuartierSelect from '@/components/admin/QuartierSelect'
+import type { Quartier } from '@/lib/quartiers'
 
 type FormState = { error: string } | null
 
@@ -13,6 +15,7 @@ type MachineData = {
   modele?: string
   type?: 'color' | 'noir_blanc' | null
   localisation?: string | null
+  quartier_code?: string | null
   active?: boolean
 }
 
@@ -23,6 +26,7 @@ type Props = {
   isEdit?: boolean
   machineId?: string
   deleteAction?: (formData: FormData) => Promise<void>
+  quartiers: Quartier[]
 }
 
 const inputClass =
@@ -31,7 +35,7 @@ const inputClass =
 const selectClass =
   'w-full px-3.5 py-2.5 rounded-lg border border-line text-ink text-sm bg-card focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent'
 
-export default function MachineForm({ action, defaultValues, title, isEdit, machineId, deleteAction }: Props) {
+export default function MachineForm({ action, defaultValues, title, isEdit, machineId, deleteAction, quartiers }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
   const [confirming, setConfirming] = useState(false)
 
@@ -193,6 +197,14 @@ export default function MachineForm({ action, defaultValues, title, isEdit, mach
               />
             </div>
           </div>
+
+          {/* Quartier propre: seulement si la machine est sur un autre site que le client */}
+          <QuartierSelect
+            quartiers={quartiers}
+            defaultValue={defaultValues?.quartier_code}
+            label="Quartier (si différent du client)"
+            hint="Laisser vide si la machine est au même endroit que le client."
+          />
 
           {/* Statut */}
           <div>
