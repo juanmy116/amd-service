@@ -1,6 +1,6 @@
 'use client'
 
-import { groupByVille, type Quartier } from '@/lib/quartiers'
+import { groupByVille, selectableQuartiers, type Quartier } from '@/lib/quartiers'
 
 type Props = {
   quartiers: Quartier[]
@@ -21,7 +21,9 @@ export default function QuartierSelect({
   label,
   hint,
 }: Props) {
-  const groups = groupByVille(quartiers)
+  // Solo las zonas activas, más la que el registro ya tiene aunque esté desactivada:
+  // si no apareciera, guardar el formulario la borraría sin avisar.
+  const groups = groupByVille(selectableQuartiers(quartiers, defaultValue))
 
   return (
     <div>
@@ -31,7 +33,9 @@ export default function QuartierSelect({
         {groups.map((group) => (
           <optgroup key={group.ville} label={group.ville}>
             {group.quartiers.map((q) => (
-              <option key={q.code} value={q.code}>{q.label}</option>
+              <option key={q.code} value={q.code}>
+                {q.active ? q.label : `${q.label} (désactivé)`}
+              </option>
             ))}
           </optgroup>
         ))}

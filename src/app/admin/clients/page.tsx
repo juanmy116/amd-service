@@ -5,6 +5,7 @@ import SearchFilters from '@/components/admin/SearchFilters'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { buttonClasses } from '@/components/ui/Button'
+import { getQuartiers } from '@/lib/quartiers.server'
 import {
   sanitizeSearchQuery,
   buildSafeOr,
@@ -24,9 +25,17 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
   const sp = await searchParams
   const q = sanitizeSearchQuery(firstParam(sp.q))
   const activeFilter = parseBooleanParam(firstParam(sp.active))
-  const quartierFilter = firstParam(sp.quartier)
 
   const supabase = await createClient()
+  const quartierOptions = await getQuartiers()
+
+  // Se valida contra el catálogo, como `q` y `active` se validan con sus helpers: un código
+  // inventado (o un `?quartier=` vacío) no debe dar una lista vacía sin explicación.
+  const rawQuartier = firstParam(sp.quartier)
+  const quartierFilter =
+    rawQuartier === NO_QUARTIER || quartierOptions.some((qt) => qt.code === rawQuartier)
+      ? rawQuartier
+      : null
 
   let query = supabase
     .from('clients')
@@ -41,14 +50,6 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
 
   const { data: clients, error } = await query
   if (error) { console.error('[clients]', error); throw new Error('DATA_FETCH_ERROR') }
-
-  // Catálogo para las opciones del filtro (la policy de quartiers permite leerlo a cualquier
-  // usuario autenticado).
-  const { data: quartierOptions } = await supabase
-    .from('quartiers')
-    .select('code, label')
-    .eq('active', true)
-    .order('sort_order')
   const count = clients?.length ?? 0
   const hasFilters = q !== null || activeFilter !== null || quartierFilter !== null
 
@@ -86,7 +87,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
             label: 'Tous les quartiers',
             options: [
               { value: NO_QUARTIER, label: 'Sans quartier' },
-              ...(quartierOptions ?? []).map((qt) => ({ value: qt.code, label: qt.label })),
+              ...quartierOptions.map((qt) => ({ value: qt.code, label: qt.label })),
             ],
           },
         ]}

@@ -13,6 +13,8 @@ export type Quartier = {
   lat: number
   lng: number
   sortOrder: number
+  /** Una zona desactivada ya no se ofrece para asignar, pero las que la tienen la conservan. */
+  active: boolean
 }
 
 /** Fila tal cual viene de la tabla `quartiers` (snake_case). */
@@ -23,6 +25,7 @@ export type QuartierRow = {
   lat: number
   lng: number
   sort_order: number
+  active: boolean
 }
 
 export function toQuartiers(rows: QuartierRow[] | null): Quartier[] {
@@ -33,6 +36,7 @@ export function toQuartiers(rows: QuartierRow[] | null): Quartier[] {
     lat: r.lat,
     lng: r.lng,
     sortOrder: r.sort_order,
+    active: r.active,
   }))
 }
 
@@ -46,6 +50,20 @@ export function resolveQuartierCode(
   clientQuartierCode: string | null | undefined
 ): string | null {
   return machineQuartierCode ?? clientQuartierCode ?? null
+}
+
+/**
+ * Opciones que debe ofrecer el desplegable: las zonas activas MÁS la que el registro tiene
+ * asignada aunque esté desactivada.
+ *
+ * Sin esto, editar un cliente cuya zona se desactivó borraría su `quartier_code` en silencio:
+ * el `<select>` no tendría esa opción, enviaría '' y el UPDATE guardaría null.
+ */
+export function selectableQuartiers(all: Quartier[], currentCode: string | null | undefined): Quartier[] {
+  const active = all.filter((q) => q.active)
+  if (!currentCode || active.some((q) => q.code === currentCode)) return active
+  const current = all.find((q) => q.code === currentCode)
+  return current ? [...active, current] : active
 }
 
 /** Agrupa por ciudad para pintar los `<optgroup>` del desplegable, respetando `sortOrder`. */
