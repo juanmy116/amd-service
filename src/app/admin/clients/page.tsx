@@ -30,7 +30,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
   const supabase = await createClient()
   // El catálogo incluye las zonas desactivadas: sin ellas no habría forma de listar los
   // clientes que siguen asignados a una. Se marcan en la etiqueta.
-  const quartierOptions = await getQuartiersForFilter()
+  const { quartiers: quartierOptions, unavailable: quartiersUnavailable } = await getQuartiersForFilter()
 
   // Se valida contra el catálogo, como `q` y `active` se validan con sus helpers. Si el código
   // no existe (marcador antiguo de una zona borrada) se limpia la URL en vez de dejar el
@@ -39,11 +39,18 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
   const quartierIsValid =
     rawQuartier === null ||
     rawQuartier === NO_QUARTIER ||
+    // Si no se pudo LEER el catálogo no se puede juzgar el código: se respeta el filtro.
+    quartiersUnavailable ||
     quartierOptions.some((qt) => qt.code === rawQuartier)
   if (!quartierIsValid) {
+    // Se conservan el resto de parámetros tal cual venían (igual que hace SearchFilters);
+    // solo se quita el quartier desconocido.
     const clean = new URLSearchParams()
-    if (q) clean.set('q', q)
-    if (activeFilter !== null) clean.set('active', String(activeFilter))
+    for (const [key, value] of Object.entries(sp)) {
+      if (key === 'quartier') continue
+      const single = firstParam(value)
+      if (single !== null) clean.set(key, single)
+    }
     const qs = clean.toString()
     redirect(qs ? `/admin/clients?${qs}` : '/admin/clients')
   }

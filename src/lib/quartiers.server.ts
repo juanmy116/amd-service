@@ -31,10 +31,15 @@ export async function getQuartiers(): Promise<Quartier[]> {
 }
 
 /**
- * Igual, pero para pantallas de SOLO LECTURA (listados): si el catálogo falla devuelve []
- * y la página se pinta sin opciones de filtro, en vez de tumbar toda la lista de clientes.
+ * Igual, pero para pantallas de SOLO LECTURA (listados): si el catálogo falla devuelve la
+ * lista vacía y la página se pinta sin opciones de filtro, en vez de tumbar toda la lista.
+ *
+ * Devuelve además `unavailable` para que quien llame pueda distinguir «no hay zonas» de
+ * «no he podido leerlas». Sin esa distinción, un fallo del catálogo haría pasar por inválido
+ * a cualquier filtro legítimo. Pasa de verdad justo después de un `db push`: PostgREST tarda
+ * un momento en refrescar su caché de esquema y hasta entonces la tabla «no existe».
  */
-export async function getQuartiersForFilter(): Promise<Quartier[]> {
-  const { data } = await fetchQuartiers()
-  return data
+export async function getQuartiersForFilter(): Promise<{ quartiers: Quartier[]; unavailable: boolean }> {
+  const { data, error } = await fetchQuartiers()
+  return { quartiers: data, unavailable: error }
 }
