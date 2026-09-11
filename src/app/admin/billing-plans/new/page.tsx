@@ -1,11 +1,11 @@
-import { requireAdmin } from '@/lib/auth'
+import { requireBilling } from '@/lib/auth'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import BillingPlanForm from '@/components/admin/BillingPlanForm'
 import { createBillingPlanAction } from './actions'
 
 export default async function NewBillingPlanPage() {
-  await requireAdmin()
+  await requireBilling()
   return (
     <div className="p-6 max-w-xl mx-auto space-y-6">
       <div className="flex items-center gap-3">

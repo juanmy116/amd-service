@@ -1,5 +1,5 @@
 'use server'
-import { requireAdmin } from '@/lib/auth'
+import { requireBilling } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { validateTiers, TIERED_TYPES, type BillingType, type BillingTier } from '@/lib/billing'
 
@@ -7,7 +7,7 @@ type FormState = { error: string } | null
 const VALID: BillingType[] = ['per_copy', 'hybrid', 'hybrid_tiered', 'tiered_total']
 
 export async function updateBillingPlanAction(id: string, _p: FormState, fd: FormData): Promise<FormState> {
-  const { supabase } = await requireAdmin()
+  const { supabase } = await requireBilling()
   const name = (fd.get('name') as string).trim()
   const type = fd.get('type') as BillingType
   if (!name) return { error: 'Le nom est obligatoire.' }
@@ -52,7 +52,7 @@ export async function updateBillingPlanAction(id: string, _p: FormState, fd: For
 export async function toggleBillingPlanAction(fd: FormData): Promise<void> {
   const id = fd.get('id') as string
   const active = fd.get('active') === 'true'
-  const { supabase } = await requireAdmin()
+  const { supabase } = await requireBilling()
   const { error } = await supabase.from('billing_plans').update({ active: !active }).eq('id', id)
   if (error) console.error('[toggleBillingPlan]', error)
   redirect('/admin/billing-plans')

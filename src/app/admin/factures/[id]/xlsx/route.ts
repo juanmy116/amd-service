@@ -1,11 +1,11 @@
-import { requireAdmin } from '@/lib/auth'
+import { requireBilling } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildInvoiceWorkbook, type InvoiceHeader, type InvoiceLineRow } from '@/lib/invoice-xlsx'
 
 export const runtime = 'nodejs'   // N5: ExcelJS y Buffer son Node-only
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  await requireAdmin()
+  await requireBilling()
   const { id } = await params
   const admin = createAdminClient()
   const { data: inv, error: invErr } = await admin.from('invoices').select('*').eq('id', id).single()

@@ -49,7 +49,10 @@ export async function createUserWithRole(
   })
   if (error) throw new Error(`createUser(${email}): ${error.message}`)
   const uid = data.user!.id
-  const { error: upErr } = await admin.from('profiles').update({ role }).eq('id', uid)
+  // Los admin de las suites son admin COMPLETOS (con facturación), que es el comportamiento
+  // histórico. El admin sin `can_bill` se prueba aparte en billing-permission.test.ts.
+  const { error: upErr } = await admin.from('profiles')
+    .update({ role, can_bill: role === 'admin' }).eq('id', uid)
   if (upErr) throw new Error(`set role(${email}): ${upErr.message}`)
   return uid
 }

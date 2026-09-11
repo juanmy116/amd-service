@@ -4,7 +4,7 @@
 // de emisión desde WP-3 (la vía legacy por cliente/mes — actions.ts/emitInvoiceAction — fue eliminada).
 // Usa la RPC emit_contract_invoice (validación de coherencia + dedup por mes en BD). El draft lo calcula el servidor.
 
-import { requireAdmin } from '@/lib/auth'
+import { requireBilling } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Json } from '@/lib/supabase/types'
 import { buildContractInvoiceDraft } from '@/lib/invoicing'
@@ -43,7 +43,7 @@ const EMIT_ERROR_LABEL: Record<string, string> = {
 export type EmitState = { error: string } | null
 
 export async function emitContractInvoiceAction(_prev: EmitState, fd: FormData): Promise<EmitState> {
-  const { user } = await requireAdmin()
+  const { user } = await requireBilling()
 
   // Capa 1 — candado de facturación: durante la fase de prueba del SAV, la emisión está APAGADA.
   // Corte temprano con mensaje claro; la barrera dura (trigger en BD) rechaza igualmente si se llega.

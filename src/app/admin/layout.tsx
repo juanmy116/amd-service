@@ -12,7 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, full_name')
+    .select('role, full_name, can_bill')
     .eq('id', user.id)
     .single()
 
@@ -20,7 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex h-screen overflow-hidden bg-page">
-      <Sidebar fullName={profile.full_name} />
+      <Sidebar fullName={profile.full_name} canBill={profile.can_bill === true} />
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>

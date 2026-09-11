@@ -1,5 +1,5 @@
 'use server'
-import { requireAdmin } from '@/lib/auth'
+import { requireBilling } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { buildInvoiceWorkbook, type InvoiceHeader, type InvoiceLineRow } from '@/lib/invoice-xlsx'
 
@@ -12,7 +12,7 @@ function failRedirect(id: string, message: string): never {
 }
 
 export async function annulInvoiceAction(id: string, fd: FormData): Promise<void> {
-  const { user, supabase } = await requireAdmin()
+  const { user, supabase } = await requireBilling()
   const reason = (fd.get('reason') as string)?.trim() || null
   const { data, error } = await supabase.from('invoices')
     .update({ status: 'annulee', annulled_by: user.id, annulled_at: new Date().toISOString(), annulation_reason: reason })
@@ -24,7 +24,7 @@ export async function annulInvoiceAction(id: string, fd: FormData): Promise<void
 }
 
 export async function emailInvoiceAction(id: string): Promise<void> {
-  const { supabase } = await requireAdmin()
+  const { supabase } = await requireBilling()
   const recipients = (process.env.BILLING_NOTIFY_EMAILS ?? '').split(',').map(s => s.trim()).filter(Boolean)
   if (recipients.length === 0) failRedirect(id, 'BILLING_NOTIFY_EMAILS non configurée.')
 

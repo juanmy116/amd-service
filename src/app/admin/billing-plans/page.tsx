@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/auth'
+import { requireBilling } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import { BILLING_TYPE_LABEL, type BillingPlan } from '@/lib/billing'
@@ -6,7 +6,7 @@ import { toggleBillingPlanAction } from './[id]/actions'
 import { Card } from '@/components/ui/Card'
 
 export default async function BillingPlansPage() {
-  await requireAdmin()
+  await requireBilling()
   const admin = createAdminClient()
   const { data: plans, error } = await admin.from('billing_plans').select('*').order('name')
   if (error) { console.error('[billing-plans]', error); throw new Error('DATA_FETCH_ERROR') }
