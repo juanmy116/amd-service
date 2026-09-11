@@ -288,6 +288,11 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 Diccionario verificado contra la base real de producción: 51/68 con los patrones de barrio, ~90 % añadiendo calles del Plateau y los casos sueltos (Gueule Tapée, Cambérène, Mbao, Grand Moulin/Port, Centenaire, Sipres).
 
+> **Corrección aplicada durante la ejecución (2026-09-11):** la primera versión mandaba `%AEROPORT%`
+> a Yoff. En Senegal el aeropuerto es hoy el **AIBD, en Diass**, así que `2AS` y `2AS TECHNCS`
+> caían a 45 km de su sitio. La regla del aeropuerto pasa a ser el **primer** `WHEN` y resuelve a
+> `diass`. Resultado medido contra prod: **63/68 clasificados, 5 sin deducir**.
+
 > El diccionario vive en SQL, no en TypeScript, así que su prueba **es** la consulta del Step 3
 > contra los datos reales: es el único sitio donde se puede medir si acierta. No hay test de vitest
 > para esto, y es deliberado (un test contra direcciones inventadas no probaría nada).
