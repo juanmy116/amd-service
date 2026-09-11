@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { TablesUpdate } from '@/lib/supabase/types'
+import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
 
 async function requireDispatcherActor(): Promise<{ userId: string } | null> {
   const supabase = await createClient()
@@ -68,4 +69,30 @@ export async function assignMaintenanceVisitAction(
   if (error) return { error: error.message }
 
   return {}
+}
+
+/**
+ * Cambia el estado desde la ficha del kiosko.
+ *
+ * En la vista carte ya no se arrastran tarjetas entre columnas, así que aquí no llega el estado
+ * anterior: se lee de la base y se delega en la acción de /admin/incidents, que es la que sabe
+ * de historial, `resolved_at` y envío del CSAT. Nada de duplicar esas reglas.
+ */
+export async function setIncidentStatusAction(
+  incidentId: string,
+  newStatus: string
+): Promise<{ error?: string }> {
+  const actor = await requireDispatcherActor()
+  if (!actor) return { error: 'Non autorisé' }
+
+  const admin = createAdminClient()
+  const { data: incident } = await admin
+    .from('incidents')
+    .select('status')
+    .eq('id', incidentId)
+    .single()
+  if (!incident) return { error: 'Incident introuvable' }
+  if (incident.status === newStatus) return {}
+
+  return updateIncidentStatusAction(incidentId, incident.status, newStatus)
 }

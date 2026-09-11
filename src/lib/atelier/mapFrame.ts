@@ -33,14 +33,20 @@ export type Point = { x: number; y: number }
 /**
  * Posición de unas coordenadas dentro de la imagen, en porcentaje (0–100).
  * El CSS las usa tal cual con `left: x%` / `top: y%`.
+ *
+ * Se redondea a 4 decimales a propósito: sin ello React avisa de desajuste al hidratar, porque
+ * el servidor escribe «40.62499999999898%» y el navegador lo reescribe como «40.625%». Cuatro
+ * decimales son 0,0001 % de 1200 px, o sea un diezmilésimo de píxel: no se pierde precisión.
  */
 export function latLngToPercent(lat: number, lng: number, frame: MapFrame): Point {
   const x = EARTH_RADIUS * (lng * Math.PI / 180)
   const y = EARTH_RADIUS * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2))
 
+  const round = (n: number) => Math.round(n * 10_000) / 10_000
+
   return {
-    x: ((x - frame.xmin) / (frame.xmax - frame.xmin)) * 100,
-    y: ((frame.ymax - y) / (frame.ymax - frame.ymin)) * 100,
+    x: round(((x - frame.xmin) / (frame.xmax - frame.xmin)) * 100),
+    y: round(((frame.ymax - y) / (frame.ymax - frame.ymin)) * 100),
   }
 }
 

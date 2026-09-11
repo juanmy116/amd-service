@@ -33,6 +33,12 @@ describe('latLngToPercent', () => {
     expect(este.x).toBeGreaterThan(oeste.x)
     expect(norte.y).toBeLessThan(sur.y)
   })
+
+  it('redondea a 4 decimales (si no, React se queja al hidratar)', () => {
+    const { x, y } = latLngToPercent(14.669, -17.43, DAKAR_FRAME)
+    expect(String(x).split('.')[1]?.length ?? 0).toBeLessThanOrEqual(4)
+    expect(String(y).split('.')[1]?.length ?? 0).toBeLessThanOrEqual(4)
+  })
 })
 
 describe('isInsideFrame', () => {

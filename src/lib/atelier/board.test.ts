@@ -34,7 +34,7 @@ const inc = (over: Partial<BoardIncident>): BoardIncident => ({
 const visit = (over: Partial<BoardMaintenance>): BoardMaintenance => ({
   id: 'v1',
   scheduledDate: '2026-09-11',
-  status: 'planifiee',
+  status: 'planifié',
   clientName: 'Client',
   machineLabel: 'Ricoh MP C2051',
   quartierCode: 'plateau',
@@ -149,7 +149,7 @@ describe('groupMaintenancesByDay', () => {
 
   it('una visita pasada YA HECHA no cuenta como atrasada', () => {
     const groups = groupMaintenancesByDay([
-      visit({ id: 'hecha', scheduledDate: '2026-09-08', status: 'effectuee' }),
+      visit({ id: 'hecha', scheduledDate: '2026-09-08', status: 'fait' }),
     ], hoy)
     expect(groups).toHaveLength(0)
   })

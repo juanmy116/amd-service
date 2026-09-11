@@ -77,8 +77,11 @@ export function countByQuartier(items: { quartierCode: string | null }[]): Map<s
 
 // ─── Columna de maintenances ──────────────────────────────────────────────────
 
-/** Una visita pasada solo es «atrasada» si además sigue sin hacerse. */
-const DONE_STATUSES = new Set(['effectuee', 'annulee'])
+/**
+ * Una visita pasada solo es «atrasada» si además sigue sin hacerse.
+ * Valores reales de la columna (CHECK en BD): 'planifié' · 'fait' · 'en_retard'.
+ */
+const DONE_STATUSES = new Set(['fait'])
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10)
@@ -94,7 +97,7 @@ function shiftDays(d: Date, days: number): Date {
  * Ventana que se consulta: 7 días hacia delante y 90 hacia atrás.
  *
  * Los 90 días de atrás son para recoger las visitas atrasadas sin hacer, no para mostrar
- * historial: `groupMaintenancesByDay` descarta las que ya están hechas o anuladas. El tope
+ * historial: `groupMaintenancesByDay` descarta las que ya están hechas. El tope
  * evita arrastrar visitas olvidadas de hace un año, que no dicen nada al despachador.
  */
 export function maintenanceWindow(today: Date): { from: string; to: string } {
