@@ -2,7 +2,7 @@
 
 import { X, Printer, MapPin, CalendarDays } from 'lucide-react'
 import type { BoardMaintenance } from '@/lib/atelier/board'
-import type { Technician } from '@/app/atelier/data'
+import type { Technician } from './types'
 
 type Props = {
   visit: BoardMaintenance

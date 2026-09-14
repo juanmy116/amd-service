@@ -10,7 +10,7 @@ import MaintenanceDetail from './MaintenanceDetail'
 import { filterByQuartier, type BoardIncident, type BoardMaintenance } from '@/lib/atelier/board'
 import { assignIncidentAction, assignMaintenanceVisitAction, setIncidentStatusAction } from '@/app/atelier/actions'
 import type { Quartier } from '@/lib/quartiers'
-import type { Technician } from '@/app/atelier/data'
+import type { Technician } from './types'
 
 type Props = {
   incidents: BoardIncident[]

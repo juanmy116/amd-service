@@ -12,7 +12,7 @@ import {
 import type { Quartier } from '@/lib/quartiers'
 
 /** Una selección del mapa: qué zonas incluye y cómo se llama lo seleccionado. */
-export type QuartierSelection = { label: string; codes: string[] }
+export type QuartierSelection = { id: string; label: string; codes: string[] }
 
 type Props = {
   incidents: BoardIncident[]
@@ -61,14 +61,21 @@ export default function AtelierMap({ incidents, maintenances, quartiers, selecte
       dakarZones.filter(({ point }) => !isInsideFrame(point)).map(({ quartier }) => quartier.code)
     )
 
-    const groups = new Map<string, { label: string; codes: string[]; count: number }>()
+    const groups = new Map<string, { id: string; label: string; codes: string[]; count: number }>()
     for (const q of quartiers) {
       const count = (panneCounts.get(q.code) ?? 0) + (maintCounts.get(q.code) ?? 0)
       if (count === 0) continue
       if (q.ville === DAKAR && !outsideDakar.has(q.code)) continue // ya tiene burbuja
 
+      // La clave agrupa; la etiqueta solo se pinta. Son espacios distintos (una ciudad puede
+      // llamarse igual que el barrio de otra), así que la identidad va por clave.
       const key = outsideDakar.has(q.code) ? q.code : q.ville
-      const entry = groups.get(key) ?? { label: outsideDakar.has(q.code) ? q.label : q.ville, codes: [], count: 0 }
+      const entry = groups.get(key) ?? {
+        id: key,
+        label: outsideDakar.has(q.code) ? q.label : q.ville,
+        codes: [],
+        count: 0,
+      }
       entry.codes.push(q.code)
       entry.count += count
       groups.set(key, entry)
@@ -79,13 +86,16 @@ export default function AtelierMap({ incidents, maintenances, quartiers, selecte
   const orphanCount = countOf(NO_QUARTIER)
   const totalCount = incidents.length + maintenances.filter(isPendingMaintenance).length
 
+  // Ojo: las clases van LITERALES. Tailwind rastrea el código buscando cadenas completas,
+  // así que una construida con plantilla (`bg-${tone}/20`) no acaba nunca en el CSS y el chip
+  // seleccionado se quedaría sin su relleno de color.
+  const CHIP_BASE = 'rounded-full border px-3 py-1 text-xs font-bold transition-colors'
+  const CHIP_OFF = 'border-white/10 bg-white/5 text-white/70 hover:text-white'
+  const CHIP_ON = 'border-accent/50 bg-accent/20 text-white'
+  const CHIP_ON_WARNING = 'border-warning/50 bg-warning/20 text-white'
+
   const chipClass = (active: boolean, tone: 'accent' | 'warning' = 'accent') =>
-    [
-      'rounded-full border px-3 py-1 text-xs font-bold transition-colors',
-      active
-        ? `border-${tone}/50 bg-${tone}/20 text-white`
-        : 'border-white/10 bg-white/5 text-white/70 hover:text-white',
-    ].join(' ')
+    [CHIP_BASE, active ? (tone === 'warning' ? CHIP_ON_WARNING : CHIP_ON) : CHIP_OFF].join(' ')
 
   return (
     <section className="flex flex-1 flex-col min-h-0 gap-2">
@@ -122,7 +132,9 @@ export default function AtelierMap({ incidents, maintenances, quartiers, selecte
             <button
               key={quartier.code}
               type="button"
-              onClick={() => onSelect(active ? null : { label: quartier.label, codes: [quartier.code] })}
+              onClick={() =>
+                onSelect(active ? null : { id: quartier.code, label: quartier.label, codes: [quartier.code] })
+              }
               className="absolute -translate-x-1/2 -translate-y-1/2 transition-transform hover:scale-110 focus:outline-none"
               style={{ left: `${point.x}%`, top: `${point.y}%` }}
               title={`${quartier.label} — ${pannes} panne(s), ${maints} maintenance(s)`}
@@ -166,12 +178,14 @@ export default function AtelierMap({ incidents, maintenances, quartiers, selecte
         </button>
 
         {chips.map((chip) => {
-          const active = selected?.label === chip.label
+          const active = selected?.id === chip.id
           return (
             <button
-              key={chip.label}
+              key={chip.id}
               type="button"
-              onClick={() => onSelect(active ? null : { label: chip.label, codes: chip.codes })}
+              onClick={() =>
+                onSelect(active ? null : { id: chip.id, label: chip.label, codes: chip.codes })
+              }
               className={chipClass(active)}
             >
               {chip.label} <span className="text-accent">{chip.count}</span>
@@ -184,12 +198,12 @@ export default function AtelierMap({ incidents, maintenances, quartiers, selecte
             type="button"
             onClick={() =>
               onSelect(
-                selected?.codes[0] === NO_QUARTIER
+                selected?.id === NO_QUARTIER
                   ? null
-                  : { label: 'Sans quartier', codes: [NO_QUARTIER] }
+                  : { id: NO_QUARTIER, label: 'Sans quartier', codes: [NO_QUARTIER] }
               )
             }
-            className={chipClass(selected?.codes[0] === NO_QUARTIER, 'warning')}
+            className={chipClass(selected?.id === NO_QUARTIER, 'warning')}
             title="Ces avis n'ont pas de quartier: à compléter dans /admin/clients"
           >
             Sans quartier <span className="text-warning">{orphanCount}</span>

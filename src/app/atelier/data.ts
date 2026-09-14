@@ -2,8 +2,6 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveQuartierCode, toQuartiers, type Quartier } from '@/lib/quartiers'
 import type { AtelierIncident, AtelierMaintenanceVisit, Technician } from '@/components/atelier/types'
-
-export type { Technician }
 import {
   LIVE_STATUSES,
   maintenanceWindow,
@@ -103,9 +101,13 @@ export async function getBoardData(now = new Date()): Promise<BoardData> {
       .lte('scheduled_date', to),
     admin.from('profiles').select('id, full_name').eq('role', 'technician').neq('is_dispatcher', true).order('full_name'),
     admin.from('quartiers').select('code, label, ville, lat, lng, sort_order, active').order('sort_order'),
+    // «Résolus cette semaine»: las que se resolvieron esta semana y SIGUEN resueltas o ya
+    // cerradas. El filtro por estado importa porque `resolved_at` no se limpia al reabrir una
+    // incidencia: sin él, una reabierta contaría a la vez como «en cours» y como «résolu».
     admin
       .from('incidents')
       .select('id', { count: 'exact', head: true })
+      .in('status', ['résolu', 'fermé'])
       .gte('resolved_at', new Date(startOfWeek(now)).toISOString()),
   ])
 

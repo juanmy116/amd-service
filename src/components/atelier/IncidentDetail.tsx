@@ -2,7 +2,7 @@
 
 import { X, Phone, Printer, MapPin } from 'lucide-react'
 import { waitingLabel, type BoardIncident } from '@/lib/atelier/board'
-import type { Technician } from '@/app/atelier/data'
+import type { Technician } from './types'
 
 type Props = {
   incident: BoardIncident
