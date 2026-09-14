@@ -24,6 +24,13 @@ type Props = {
 
 const DAKAR = 'Dakar'
 
+/**
+ * Las medidas de las burbujas se expresan en `rem` para que crezcan con el tamaño base del
+ * kiosko (ver `src/app/atelier/layout.tsx`). En píxeles fijos se quedarían pequeñas al agrandar
+ * el texto, y el mapa perdería peso frente a las columnas.
+ */
+const rem = (px: number) => `${px / 16}rem`
+
 export default function AtelierMap({ incidents, maintenances, quartiers, selected, onSelect }: Props) {
   const panneCounts = useMemo(() => countByQuartier(incidents), [incidents])
 
@@ -142,10 +149,10 @@ export default function AtelierMap({ incidents, maintenances, quartiers, selecte
               <span
                 className="flex items-center justify-center rounded-full font-extrabold text-white shadow-lg"
                 style={{
-                  width: radius * 2,
-                  height: radius * 2,
+                  width: rem(radius * 2),
+                  height: rem(radius * 2),
                   background: hasPannes ? '#BF0D0D' : '#2563EB',
-                  fontSize: Math.max(14, radius * 0.8),
+                  fontSize: rem(Math.max(14, radius * 0.8)),
                   boxShadow: `0 0 0 ${active ? 6 : 10}px ${hasPannes ? 'rgba(191,13,13,.22)' : 'rgba(37,99,235,.22)'}${active ? ', 0 0 0 3px #fff' : ''}`,
                 }}
               >
