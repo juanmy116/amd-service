@@ -8,6 +8,7 @@ import {
   maintenanceWindow,
   groupMaintenancesByDay,
   isPendingMaintenance,
+  findNewIncidents,
   waitingLabel,
   type BoardIncident,
   type BoardMaintenance,
@@ -205,5 +206,26 @@ describe('waitingLabel', () => {
 describe('LIVE_STATUSES', () => {
   it('son las tres de trabajo vivo: ni résolu ni fermé', () => {
     expect(LIVE_STATUSES).toEqual(['nouveau', 'assigné', 'en_cours'])
+  })
+})
+
+describe('findNewIncidents', () => {
+  const a = inc({ id: 'a' })
+  const b = inc({ id: 'b' })
+
+  it('en la primera carga no hay nada nuevo: el kiosko no debe sonar al encenderse', () => {
+    expect(findNewIncidents([a, b], null)).toEqual([])
+  })
+
+  it('detecta la que no estaba en el refresco anterior', () => {
+    expect(findNewIncidents([a, b], new Set(['a'])).map((i) => i.id)).toEqual(['b'])
+  })
+
+  it('sin novedades devuelve lista vacía', () => {
+    expect(findNewIncidents([a, b], new Set(['a', 'b']))).toEqual([])
+  })
+
+  it('que desaparezca una (resuelta) no cuenta como novedad', () => {
+    expect(findNewIncidents([a], new Set(['a', 'b']))).toEqual([])
   })
 })

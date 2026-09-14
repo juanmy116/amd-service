@@ -179,3 +179,22 @@ export function waitingLabel(createdAt: string, now: Date): { text: string; urge
   if (elapsed >= HOUR) return { text: `il y a ${Math.floor(elapsed / HOUR)} h`, urgent }
   return { text: `il y a ${Math.max(0, Math.floor(elapsed / MINUTE))} min`, urgent }
 }
+
+// ─── Aviso de avería nueva ────────────────────────────────────────────────────
+
+/**
+ * Qué incidencias son NUEVAS respecto al refresco anterior.
+ *
+ * El kiosko se recarga cada 30 s; comparando los identificadores con los de la vuelta
+ * anterior se sabe qué ha entrado sin necesidad de conexión permanente con la base.
+ *
+ * `known === null` significa «primera carga»: ahí no hay nada nuevo que anunciar, o el
+ * kiosko sonaría al encenderse y cada vez que alguien abriera la pantalla.
+ */
+export function findNewIncidents(
+  incidents: BoardIncident[],
+  known: Set<string> | null
+): BoardIncident[] {
+  if (known === null) return []
+  return incidents.filter((i) => !known.has(i.id))
+}

@@ -7,7 +7,8 @@ import MaintenanceList from './MaintenanceList'
 import AtelierMap, { type QuartierSelection } from './AtelierMap'
 import IncidentDetail from './IncidentDetail'
 import MaintenanceDetail from './MaintenanceDetail'
-import { filterByQuartier, type BoardIncident, type BoardMaintenance } from '@/lib/atelier/board'
+import NewIncidentAlert from './NewIncidentAlert'
+import { filterByQuartier, findNewIncidents, type BoardIncident, type BoardMaintenance } from '@/lib/atelier/board'
 import { assignIncidentAction, assignMaintenanceVisitAction, setIncidentStatusAction } from '@/app/atelier/actions'
 import type { Quartier } from '@/lib/quartiers'
 import type { Technician } from './types'
@@ -44,10 +45,26 @@ export default function AtelierBoard({
   const [busy, setBusy] = useState(false)
   const [now, setNow] = useState(() => new Date(serverNow))
 
+  // Identificadores vistos en el refresco anterior: con ellos se sabe qué ha entrado nuevo.
+  // `null` en la primera carga, para que el kiosko no suene al encenderse.
+  const knownIds = useRef<Set<string> | null>(null)
+  const [alert, setAlert] = useState<{ count: number; numero: string | null; at: number }>(
+    { count: 0, numero: null, at: 0 }
+  )
+
   const lastInteraction = useRef(Date.now())
   const touch = useCallback(() => { lastInteraction.current = Date.now() }, [])
 
   const isIdle = selection === null && quartierFilter === null && statusFilter === null
+
+  // Averías nuevas desde el último refresco → campana + cartel (ver NewIncidentAlert).
+  useEffect(() => {
+    const nuevas = findNewIncidents(incidents, knownIds.current)
+    knownIds.current = new Set(incidents.map((i) => i.id))
+    if (nuevas.length === 0) return
+    // `at` fuerza un cambio de estado aunque entren dos veces seguidas el mismo número de avisos.
+    setAlert({ count: nuevas.length, numero: nuevas[nuevas.length - 1]!.numeroIncident, at: Date.now() })
+  }, [incidents])
 
   // El reloj de las tarjetas («il y a 40 min») se refresca cada minuto sin tocar el servidor.
   useEffect(() => {
@@ -131,6 +148,8 @@ export default function AtelierBoard({
           />
         )}
       </div>
+
+      <NewIncidentAlert newCount={alert.count} lastNumero={alert.numero} at={alert.at} />
 
       <MaintenanceList
         maintenances={visibleMaintenances}
