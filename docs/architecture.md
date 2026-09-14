@@ -234,6 +234,7 @@ Route handler que recibe el formulario de contacto del sitio web público y capt
 - Muestra todas las incidencias en Kanban (drag & drop = cambia estado) + mini-tablero de mantenimientos lun–vie + 4 tarjetas KPI
 - Cuenta especial «Atelier»: rol `technician` + flag `profiles.is_dispatcher` → un *dispatcher* puede asignar incidencias y visitas de mantenimiento a los técnicos sin ser admin
 - Las Server Actions de despacho validan `admin OR is_dispatcher` y escriben vía `createAdminClient()`; el proxy (`src/proxy.ts`) protege `/atelier` y `/dashboard` redirige ahí a los dispatchers
+- **Montaje del kiosko (Raspberry Pi 3 + DietPi):** `docs/kiosque-atelier-raspberry.md` — instalación, arranque automático, opción que permite el aviso sonoro y reinicio nocturno
 
 #### 11-bis. Ubicación por quartier (entrega 1 del rediseño del kiosko, 2026-09-11)
 
