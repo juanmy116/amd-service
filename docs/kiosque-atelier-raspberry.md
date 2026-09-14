@@ -54,7 +54,8 @@ Dejar configurado:
 
 - **Security Options** → cambiar la contraseña de `root` y de `dietpi` (la de fábrica la conoce
   todo el mundo, y esta máquina va a tener la sesión de AMD abierta).
-- **Display Options** → **Screen blanking: off**. Sin esto la TV se queda negra a los 10 minutos.
+- *(El apagado automático de la pantalla NO se configura aquí: en este punto todavía no hay
+  entorno gráfico. Se resuelve en el paso 4, dentro del script del navegador.)*
 - **Language/Regional Options** → zona horaria **Africa/Dakar**. Importa: el kiosko marca
   «il y a 3 j» y agrupa los mantenimientos por día.
 - **Network Options** → si es wifi, marcar que no se apague por ahorro de energía.
@@ -107,6 +108,20 @@ Qué hace cada una, por orden de importancia:
 | `--no-first-run` · `--disable-infobars` | Quitan carteles de bienvenida y avisos |
 | `--check-for-update-interval` | Que no se ponga a buscar actualizaciones en mitad del día |
 
+### Que la TV no se apague sola
+
+En el **mismo script**, antes de la línea que lanza Chromium, añadir:
+
+```sh
+xset s off          # sin salvapantallas
+xset s noblank      # que no ponga la pantalla en negro
+xset -dpms          # sin ahorro de energía del monitor
+```
+
+Sin esto, a los 10 minutos sin tocar nada la TV se queda negra y el taller pierde el tablero.
+(En `dietpi-config` no aparece la opción hasta que hay entorno gráfico; esta es la forma que
+funciona en un kiosko.)
+
 > **No usar `-nocursor`.** Se ve en muchos tutoriales, pero esconde el ratón *siempre* y aquí el
 > despachador lo necesita. Para que el puntero desaparezca solo cuando nadie lo mueve:
 >
@@ -152,7 +167,7 @@ crontab -e
 - [ ] **La campana suena**: pedir a alguien que abra una incidencia de prueba desde el portal, o
       escanear el QR de una máquina. Debe sonar y salir el cartel rojo en menos de 30 segundos.
       Si aparece el botón «Activer le son», es que falta la opción del punto 4.
-- [ ] A los 10 minutos la pantalla **no** se apaga.
+- [ ] A los 10 minutos sin tocar nada la pantalla **no** se apaga.
 - [ ] Desenchufar y volver a enchufar: arranca solo otra vez.
 
 ---
@@ -161,7 +176,7 @@ crontab -e
 
 | Síntoma | Causa casi segura |
 |---|---|
-| Pantalla negra a los minutos | Falta apagar el *screen blanking* (paso 2) |
+| Pantalla negra a los minutos | Faltan las tres líneas de `xset` en el script (paso 4) |
 | Pide la contraseña cada mañana | El perfil de Chromium se borra, o arranca en incógnito (paso 5) |
 | No suena la campana, sale «Activer le son» | Falta `--autoplay-policy` (paso 4) |
 | Las horas y los días no cuadran | Zona horaria distinta de Africa/Dakar (paso 2) |
