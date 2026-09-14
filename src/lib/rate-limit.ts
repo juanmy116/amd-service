@@ -61,6 +61,23 @@ export async function checkRateLimit(key: RateLimiterKey, identifier: string): P
     }
     return true
   }
-  const { success } = await limiter.limit(identifier)
-  return success
+  try {
+    const { success } = await limiter.limit(identifier)
+    return success
+  } catch (error) {
+    // El backend ESTÁ configurado pero no responde (caído, borrado, sin red...). Aquí se permite
+    // la petición a propósito, en vez de propagar el error:
+    //
+    // Pasó de verdad el 2026-09-14. La base gratuita de Upstash se borró por inactividad, su
+    // host dejó de resolver, `limiter.limit()` empezó a lanzar y la Server Action de login
+    // reventaba con un 500 («ERROR 3227098399» en pantalla). Resultado: NADIE podía entrar en la
+    // aplicación —admins, técnicos, clientes y el kiosko del taller—, ni con la contraseña
+    // correcta. Solo seguían dentro quienes ya tenían la sesión iniciada.
+    //
+    // Un limitador caído no puede dejar a la empresa fuera de su propia aplicación. Supabase Auth
+    // mantiene sus propios límites de intentos, así que el hueco de protección es acotado, y el
+    // error se registra para que se vea en los logs de Vercel.
+    console.error(`[rate-limit] ${key}: el backend no responde → se permite la petición`, error)
+    return true
+  }
 }
