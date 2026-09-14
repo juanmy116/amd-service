@@ -2,59 +2,96 @@
 
 import { useMemo } from 'react'
 import { DAKAR_FRAME, bubbleRadius, isInsideFrame, latLngToPercent } from '@/lib/atelier/mapFrame'
-import { NO_QUARTIER, countByQuartier, type BoardIncident, type BoardMaintenance } from '@/lib/atelier/board'
+import {
+  NO_QUARTIER,
+  countByQuartier,
+  isPendingMaintenance,
+  type BoardIncident,
+  type BoardMaintenance,
+} from '@/lib/atelier/board'
 import type { Quartier } from '@/lib/quartiers'
+
+/** Una selección del mapa: qué zonas incluye y cómo se llama lo seleccionado. */
+export type QuartierSelection = { label: string; codes: string[] }
 
 type Props = {
   incidents: BoardIncident[]
   maintenances: BoardMaintenance[]
   quartiers: Quartier[]
-  selectedQuartier: string | null
-  onSelectQuartier: (code: string | null) => void
+  selected: QuartierSelection | null
+  onSelect: (selection: QuartierSelection | null) => void
 }
 
 const DAKAR = 'Dakar'
 
-export default function AtelierMap({
-  incidents, maintenances, quartiers, selectedQuartier, onSelectQuartier,
-}: Props) {
+export default function AtelierMap({ incidents, maintenances, quartiers, selected, onSelect }: Props) {
   const panneCounts = useMemo(() => countByQuartier(incidents), [incidents])
-  const maintCounts = useMemo(() => countByQuartier(maintenances), [maintenances])
 
-  // Burbujas: solo las zonas de Dakar que caen dentro de la foto y tienen algo que enseñar.
-  const bubbles = quartiers
-    .filter((q) => q.ville === DAKAR)
-    .map((q) => {
-      const point = latLngToPercent(q.lat, q.lng, DAKAR_FRAME)
-      return { quartier: q, point, pannes: panneCounts.get(q.code) ?? 0, maints: maintCounts.get(q.code) ?? 0 }
-    })
-    .filter((b) => isInsideFrame(b.point) && (b.pannes > 0 || b.maints > 0))
+  // Solo lo PENDIENTE: la columna esconde las visitas ya hechas, así que contarlas aquí
+  // pintaría burbujas que al pulsarlas no enseñan nada.
+  const maintCounts = useMemo(
+    () => countByQuartier(maintenances.filter(isPendingMaintenance)),
+    [maintenances]
+  )
 
-  // Chips: las otras ciudades con avisos, más los que no se pueden situar.
-  const cityChips = useMemo(() => {
-    const byCity = new Map<string, { codes: string[]; count: number }>()
+  const countOf = (code: string) => (panneCounts.get(code) ?? 0) + (maintCounts.get(code) ?? 0)
+
+  const dakarZones = useMemo(
+    () => quartiers
+      .filter((q) => q.ville === DAKAR)
+      .map((q) => ({ quartier: q, point: latLngToPercent(q.lat, q.lng, DAKAR_FRAME) })),
+    [quartiers]
+  )
+
+  // Burbujas: zonas de Dakar dentro de la foto y con algo que enseñar.
+  const bubbles = dakarZones
+    .filter(({ point }) => isInsideFrame(point))
+    .map(({ quartier, point }) => ({
+      quartier, point,
+      pannes: panneCounts.get(quartier.code) ?? 0,
+      maints: maintCounts.get(quartier.code) ?? 0,
+    }))
+    .filter((b) => b.pannes > 0 || b.maints > 0)
+
+  // Chips: una ciudad = todas sus zonas (si Thiès tuviera dos barrios, el chip los agrupa).
+  // Se añaden también las zonas de Dakar que caen FUERA del encuadre de la foto: sin chip,
+  // sus avisos serían inalcanzables desde el mapa.
+  const chips = useMemo(() => {
+    const outsideDakar = new Set(
+      dakarZones.filter(({ point }) => !isInsideFrame(point)).map(({ quartier }) => quartier.code)
+    )
+
+    const groups = new Map<string, { label: string; codes: string[]; count: number }>()
     for (const q of quartiers) {
       const count = (panneCounts.get(q.code) ?? 0) + (maintCounts.get(q.code) ?? 0)
       if (count === 0) continue
-      const entry = byCity.get(q.ville) ?? { codes: [], count: 0 }
+      if (q.ville === DAKAR && !outsideDakar.has(q.code)) continue // ya tiene burbuja
+
+      const key = outsideDakar.has(q.code) ? q.code : q.ville
+      const entry = groups.get(key) ?? { label: outsideDakar.has(q.code) ? q.label : q.ville, codes: [], count: 0 }
       entry.codes.push(q.code)
       entry.count += count
-      byCity.set(q.ville, entry)
+      groups.set(key, entry)
     }
-    return [...byCity.entries()]
-      .filter(([ville]) => ville !== DAKAR)
-      .map(([ville, { codes, count }]) => ({ ville, code: codes[0]!, count }))
-      .sort((a, b) => b.count - a.count)
-  }, [quartiers, panneCounts, maintCounts])
+    return [...groups.values()].sort((a, b) => b.count - a.count)
+  }, [quartiers, dakarZones, panneCounts, maintCounts])
 
-  const orphanCount = (panneCounts.get(NO_QUARTIER) ?? 0) + (maintCounts.get(NO_QUARTIER) ?? 0)
-  const dakarCount = bubbles.reduce((sum, b) => sum + b.pannes + b.maints, 0)
+  const orphanCount = countOf(NO_QUARTIER)
+  const totalCount = incidents.length + maintenances.filter(isPendingMaintenance).length
+
+  const chipClass = (active: boolean, tone: 'accent' | 'warning' = 'accent') =>
+    [
+      'rounded-full border px-3 py-1 text-xs font-bold transition-colors',
+      active
+        ? `border-${tone}/50 bg-${tone}/20 text-white`
+        : 'border-white/10 bg-white/5 text-white/70 hover:text-white',
+    ].join(' ')
 
   return (
     <section className="flex flex-1 flex-col min-h-0 gap-2">
       <div className="flex items-center justify-between px-1 shrink-0">
         <span className="text-sm font-bold uppercase tracking-wide text-white">
-          {selectedQuartier ? 'Zone filtrée' : 'Dakar'}
+          {selected ? selected.label : 'Dakar'}
         </span>
         <div className="flex items-center gap-4 text-xs font-semibold text-white/50">
           <span className="flex items-center gap-1.5">
@@ -76,7 +113,7 @@ export default function AtelierMap({
         />
 
         {bubbles.map(({ quartier, point, pannes, maints }) => {
-          const active = selectedQuartier === quartier.code
+          const active = selected?.codes.includes(quartier.code) ?? false
           const total = pannes + maints
           const radius = bubbleRadius(total)
           const hasPannes = pannes > 0
@@ -85,7 +122,7 @@ export default function AtelierMap({
             <button
               key={quartier.code}
               type="button"
-              onClick={() => onSelectQuartier(active ? null : quartier.code)}
+              onClick={() => onSelect(active ? null : { label: quartier.label, codes: [quartier.code] })}
               className="absolute -translate-x-1/2 -translate-y-1/2 transition-transform hover:scale-110 focus:outline-none"
               style={{ left: `${point.x}%`, top: `${point.y}%` }}
               title={`${quartier.label} — ${pannes} panne(s), ${maints} maintenance(s)`}
@@ -121,47 +158,38 @@ export default function AtelierMap({
         </p>
       </div>
 
-      {/* Chips: Dakar (para deshacer el filtro), otras ciudades y los avisos sin ubicar */}
+      {/* «Tout» quita el filtro y por eso cuenta TODO, incluidas las otras ciudades y los
+          avisos sin ubicar: si contara solo Dakar, el número no cuadraría con las listas. */}
       <div className="flex flex-wrap gap-2 shrink-0">
-        <button
-          type="button"
-          onClick={() => onSelectQuartier(null)}
-          className={[
-            'rounded-full border px-3 py-1 text-xs font-bold transition-colors',
-            selectedQuartier === null
-              ? 'border-accent/50 bg-accent/20 text-white'
-              : 'border-white/10 bg-white/5 text-white/70 hover:text-white',
-          ].join(' ')}
-        >
-          Tout Dakar <span className="text-accent">{dakarCount}</span>
+        <button type="button" onClick={() => onSelect(null)} className={chipClass(selected === null)}>
+          Tout <span className="text-accent">{totalCount}</span>
         </button>
 
-        {cityChips.map((chip) => (
-          <button
-            key={chip.ville}
-            type="button"
-            onClick={() => onSelectQuartier(selectedQuartier === chip.code ? null : chip.code)}
-            className={[
-              'rounded-full border px-3 py-1 text-xs font-bold transition-colors',
-              selectedQuartier === chip.code
-                ? 'border-accent/50 bg-accent/20 text-white'
-                : 'border-white/10 bg-white/5 text-white/70 hover:text-white',
-            ].join(' ')}
-          >
-            {chip.ville} <span className="text-accent">{chip.count}</span>
-          </button>
-        ))}
+        {chips.map((chip) => {
+          const active = selected?.label === chip.label
+          return (
+            <button
+              key={chip.label}
+              type="button"
+              onClick={() => onSelect(active ? null : { label: chip.label, codes: chip.codes })}
+              className={chipClass(active)}
+            >
+              {chip.label} <span className="text-accent">{chip.count}</span>
+            </button>
+          )
+        })}
 
         {orphanCount > 0 && (
           <button
             type="button"
-            onClick={() => onSelectQuartier(selectedQuartier === NO_QUARTIER ? null : NO_QUARTIER)}
-            className={[
-              'rounded-full border px-3 py-1 text-xs font-bold transition-colors',
-              selectedQuartier === NO_QUARTIER
-                ? 'border-warning/50 bg-warning/20 text-white'
-                : 'border-white/10 bg-white/5 text-white/50 hover:text-white',
-            ].join(' ')}
+            onClick={() =>
+              onSelect(
+                selected?.codes[0] === NO_QUARTIER
+                  ? null
+                  : { label: 'Sans quartier', codes: [NO_QUARTIER] }
+              )
+            }
+            className={chipClass(selected?.codes[0] === NO_QUARTIER, 'warning')}
             title="Ces avis n'ont pas de quartier: à compléter dans /admin/clients"
           >
             Sans quartier <span className="text-warning">{orphanCount}</span>

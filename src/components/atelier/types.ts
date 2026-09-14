@@ -27,10 +27,3 @@ export type AtelierMaintenanceVisit = {
   technicianId: string | null
   technicianName: string | null
 }
-
-export type AtelierKpis = {
-  sansAssigner: number
-  enCours: number
-  urgentes: number
-  resolusSemaine: number
-}

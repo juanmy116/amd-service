@@ -1,7 +1,9 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveQuartierCode, toQuartiers, type Quartier } from '@/lib/quartiers'
-import type { AtelierIncident, AtelierMaintenanceVisit } from '@/components/atelier/types'
+import type { AtelierIncident, AtelierMaintenanceVisit, Technician } from '@/components/atelier/types'
+
+export type { Technician }
 import {
   LIVE_STATUSES,
   maintenanceWindow,
@@ -17,14 +19,46 @@ import {
  * cuenta de dispatcher, y la autorización la hace `requireDispatcher()` antes de llamar aquí.
  */
 
-export type Technician = { id: string; fullName: string }
-
 export type BoardData = {
   incidents: BoardIncident[]
   maintenances: BoardMaintenance[]
   quartiers: Quartier[]
   technicians: Technician[]
   kpis: { sansTechnicien: number; enCours: number; urgentes: number; resolusSemaine: number }
+}
+
+/**
+ * Firma la PRIMERA foto de cada incidencia, en un solo lote.
+ * Compartido por las dos vistas: el kanban también enseña la foto al abrir una tarjeta.
+ */
+async function signFirstPhotos(
+  admin: ReturnType<typeof createAdminClient>,
+  incidentIds: string[]
+): Promise<Map<string, string>> {
+  const urls = new Map<string, string>()
+  if (incidentIds.length === 0) return urls
+
+  const { data: photoRows } = await admin
+    .from('incident_photos')
+    .select('incident_id, storage_path, created_at')
+    .in('incident_id', incidentIds)
+    .order('created_at', { ascending: true })
+
+  const firstPathByIncident = new Map<string, string>()
+  for (const r of photoRows ?? []) {
+    if (!firstPathByIncident.has(r.incident_id)) firstPathByIncident.set(r.incident_id, r.storage_path)
+  }
+  if (firstPathByIncident.size === 0) return urls
+
+  const { data: signed } = await admin.storage
+    .from('incident-photos')
+    .createSignedUrls([...firstPathByIncident.values()], 3600)
+  const urlByPath = new Map((signed ?? []).map((s) => [s.path, s.signedUrl]))
+  for (const [incidentId, path] of firstPathByIncident) {
+    const url = urlByPath.get(path)
+    if (url) urls.set(incidentId, url)
+  }
+  return urls
 }
 
 /** Lunes de la semana en curso, para el contador de resueltas. */
@@ -40,7 +74,7 @@ export async function getBoardData(now = new Date()): Promise<BoardData> {
   const admin = createAdminClient()
   const { from, to } = maintenanceWindow(now)
 
-  const [incidentsRes, visitsRes, techsRes, quartiersRes] = await Promise.all([
+  const [incidentsRes, visitsRes, techsRes, quartiersRes, resolvedCountRes] = await Promise.all([
     admin
       .from('incidents')
       .select(`
@@ -52,7 +86,7 @@ export async function getBoardData(now = new Date()): Promise<BoardData> {
         ),
         profiles!assigned_to ( full_name )
       `)
-      .neq('status', 'fermé')
+      .in('status', LIVE_STATUSES)
       .order('created_at', { ascending: true })
       .limit(400),
     admin
@@ -69,9 +103,13 @@ export async function getBoardData(now = new Date()): Promise<BoardData> {
       .lte('scheduled_date', to),
     admin.from('profiles').select('id, full_name').eq('role', 'technician').neq('is_dispatcher', true).order('full_name'),
     admin.from('quartiers').select('code, label, ville, lat, lng, sort_order, active').order('sort_order'),
+    admin
+      .from('incidents')
+      .select('id', { count: 'exact', head: true })
+      .gte('resolved_at', new Date(startOfWeek(now)).toISOString()),
   ])
 
-  const rawIncidents = incidentsRes.data ?? []
+  const liveRows = incidentsRes.data ?? []
   const quartiers = toQuartiers(quartiersRes.data)
   const labelByCode = new Map(quartiers.map((q) => [q.code, q.label]))
 
@@ -79,7 +117,7 @@ export async function getBoardData(now = new Date()): Promise<BoardData> {
   // Las del formulario público del QR guardan `machine_id` directo y no pasan por
   // `contract_machines`. Sin este rescate se quedarían sin cliente ni zona en el tablero
   // (hoy en producción, la única incidencia abierta es precisamente de este tipo).
-  const orphanSeries = rawIncidents
+  const orphanSeries = liveRows
     .filter((i) => i.contract_machines === null && i.machine_id !== null)
     .map((i) => i.machine_id as string)
 
@@ -110,32 +148,9 @@ export async function getBoardData(now = new Date()): Promise<BoardData> {
   }
 
   // ── Fotos del cliente: una consulta y firma en lote ─────────────────────────
-  const liveIncidents = rawIncidents.filter((i) => (LIVE_STATUSES as readonly string[]).includes(i.status))
-  const photoUrlById = new Map<string, string>()
-  if (liveIncidents.length > 0) {
-    const { data: photoRows } = await admin
-      .from('incident_photos')
-      .select('incident_id, storage_path, created_at')
-      .in('incident_id', liveIncidents.map((i) => i.id))
-      .order('created_at', { ascending: true })
+  const photoUrlById = await signFirstPhotos(admin, liveRows.map((i) => i.id))
 
-    const firstPathByIncident = new Map<string, string>()
-    for (const r of photoRows ?? []) {
-      if (!firstPathByIncident.has(r.incident_id)) firstPathByIncident.set(r.incident_id, r.storage_path)
-    }
-    if (firstPathByIncident.size > 0) {
-      const { data: signed } = await admin.storage
-        .from('incident-photos')
-        .createSignedUrls([...firstPathByIncident.values()], 3600)
-      const urlByPath = new Map((signed ?? []).map((s) => [s.path, s.signedUrl]))
-      for (const [incidentId, path] of firstPathByIncident) {
-        const url = urlByPath.get(path)
-        if (url) photoUrlById.set(incidentId, url)
-      }
-    }
-  }
-
-  const incidents: BoardIncident[] = liveIncidents.map((i) => {
+  const incidents: BoardIncident[] = liveRows.map((i) => {
     const line = i.contract_machines
     const machine = line?.machines
     const client = line?.contracts?.clients
@@ -183,14 +198,11 @@ export async function getBoardData(now = new Date()): Promise<BoardData> {
     }
   })
 
-  const weekStart = startOfWeek(now)
   const kpis = {
     sansTechnicien: incidents.filter((i) => i.technicianId === null).length,
     enCours: incidents.filter((i) => i.status === 'en_cours').length,
     urgentes: incidents.filter((i) => i.priority === 'urgente').length,
-    resolusSemaine: rawIncidents.filter(
-      (i) => i.resolved_at !== null && new Date(i.resolved_at).getTime() >= weekStart
-    ).length,
+    resolusSemaine: resolvedCountRes.count ?? 0,
   }
 
   const technicians: Technician[] = (techsRes.data ?? []).map((t) => ({
@@ -244,6 +256,8 @@ export async function getKanbanData(now = new Date()): Promise<{
     .gte('resolved_at', monday.toISOString())
     .limit(200)
 
+  const resolvedPhotos = await signFirstPhotos(admin, (resolvedRows ?? []).map((i) => i.id))
+
   const resolved: AtelierIncident[] = (resolvedRows ?? []).map((i) => ({
     id: i.id,
     numeroIncident: i.numero_incident,
@@ -254,7 +268,7 @@ export async function getKanbanData(now = new Date()): Promise<{
     technicianId: i.assigned_to,
     technicianName: i.profiles?.full_name ?? null,
     description: i.description,
-    photoUrl: null,
+    photoUrl: resolvedPhotos.get(i.id) ?? null,
   }))
 
   const live: AtelierIncident[] = board.incidents.map((i) => ({

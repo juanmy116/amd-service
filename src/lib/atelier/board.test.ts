@@ -7,6 +7,7 @@ import {
   countByQuartier,
   maintenanceWindow,
   groupMaintenancesByDay,
+  isPendingMaintenance,
   waitingLabel,
   type BoardIncident,
   type BoardMaintenance,
@@ -88,12 +89,34 @@ describe('filterByQuartier', () => {
     expect(filterByQuartier(lista, null)).toHaveLength(3)
   })
 
+  it('con lista vacía devuelve todas', () => {
+    expect(filterByQuartier(lista, [])).toHaveLength(3)
+  })
+
   it('filtra por zona', () => {
-    expect(filterByQuartier(lista, 'plateau').map((i) => i.id)).toEqual(['p'])
+    expect(filterByQuartier(lista, ['plateau']).map((i) => i.id)).toEqual(['p'])
+  })
+
+  it('filtra por VARIAS zonas: un chip de ciudad puede agrupar más de un barrio', () => {
+    expect(filterByQuartier(lista, ['plateau', 'mermoz']).map((i) => i.id)).toEqual(['p', 'm'])
   })
 
   it('la pseudo-zona «sin quartier» devuelve las que no tienen ubicación', () => {
-    expect(filterByQuartier(lista, 'none').map((i) => i.id)).toEqual(['sin'])
+    expect(filterByQuartier(lista, ['none']).map((i) => i.id)).toEqual(['sin'])
+  })
+})
+
+describe('isPendingMaintenance', () => {
+  it('una visita planificada está pendiente', () => {
+    expect(isPendingMaintenance(visit({ status: 'planifié' }))).toBe(true)
+  })
+
+  it('una visita hecha no: el mapa no debe contarla', () => {
+    expect(isPendingMaintenance(visit({ status: 'fait' }))).toBe(false)
+  })
+
+  it('una marcada en retraso sigue pendiente', () => {
+    expect(isPendingMaintenance(visit({ status: 'en_retard' }))).toBe(true)
   })
 })
 

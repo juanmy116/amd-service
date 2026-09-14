@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import PanneList from './PanneList'
 import MaintenanceList from './MaintenanceList'
-import AtelierMap from './AtelierMap'
+import AtelierMap, { type QuartierSelection } from './AtelierMap'
 import IncidentDetail from './IncidentDetail'
 import MaintenanceDetail from './MaintenanceDetail'
 import { filterByQuartier, type BoardIncident, type BoardMaintenance } from '@/lib/atelier/board'
@@ -38,7 +38,7 @@ export default function AtelierBoard({
   incidents, maintenances, quartiers, technicians, today, serverNow,
 }: Props) {
   const router = useRouter()
-  const [quartierFilter, setQuartierFilter] = useState<string | null>(null)
+  const [quartierFilter, setQuartierFilter] = useState<QuartierSelection | null>(null)
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [selection, setSelection] = useState<Selection>(null)
   const [busy, setBusy] = useState(false)
@@ -77,8 +77,8 @@ export default function AtelierBoard({
     return () => clearInterval(t)
   }, [router, isIdle])
 
-  const visibleIncidents = filterByQuartier(incidents, quartierFilter)
-  const visibleMaintenances = filterByQuartier(maintenances, quartierFilter)
+  const visibleIncidents = filterByQuartier(incidents, quartierFilter?.codes ?? null)
+  const visibleMaintenances = filterByQuartier(maintenances, quartierFilter?.codes ?? null)
 
   const openIncident = incidents.find((i) => selection?.kind === 'incident' && i.id === selection.id) ?? null
   const openMaintenance = maintenances.find((m) => selection?.kind === 'maintenance' && m.id === selection.id) ?? null
@@ -126,8 +126,8 @@ export default function AtelierBoard({
             incidents={incidents}
             maintenances={maintenances}
             quartiers={quartiers}
-            selectedQuartier={quartierFilter}
-            onSelectQuartier={(code) => { touch(); setQuartierFilter(code) }}
+            selected={quartierFilter}
+            onSelect={(selection) => { touch(); setQuartierFilter(selection) }}
           />
         )}
       </div>

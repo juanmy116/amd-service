@@ -2,7 +2,7 @@
  * Lógica del tablero del kiosko `/atelier`: qué se muestra, en qué orden y cómo se agrupa.
  *
  * Todo aquí es puro (entra un array, sale otro) para poder probarlo sin base de datos ni
- * navegador. Las consultas viven en `src/app/atelier/page.tsx` y los componentes solo pintan.
+ * navegador. Las consultas viven en `src/app/atelier/data.ts` y los componentes solo pintan.
  */
 
 /** Estados de trabajo vivo. Las resueltas y cerradas no ocupan sitio en la columna. */
@@ -56,13 +56,17 @@ export function filterByStatus(incidents: BoardIncident[], status: string | null
   return incidents.filter((i) => i.status === status)
 }
 
+/**
+ * Filtra por una o varias zonas. Acepta lista porque un chip de ciudad agrupa todas las zonas
+ * de esa ciudad: si Thiès llegara a tener dos barrios, el chip debe enseñar los avisos de ambos.
+ */
 export function filterByQuartier<T extends { quartierCode: string | null }>(
   items: T[],
-  quartierCode: string | null
+  codes: string[] | null
 ): T[] {
-  if (!quartierCode) return items
-  if (quartierCode === NO_QUARTIER) return items.filter((i) => i.quartierCode === null)
-  return items.filter((i) => i.quartierCode === quartierCode)
+  if (!codes || codes.length === 0) return items
+  const wanted = new Set(codes)
+  return items.filter((i) => wanted.has(i.quartierCode ?? NO_QUARTIER))
 }
 
 /** Cuántos avisos hay por zona, para el tamaño de las burbujas y los chips. */
@@ -82,6 +86,15 @@ export function countByQuartier(items: { quartierCode: string | null }[]): Map<s
  * Valores reales de la columna (CHECK en BD): 'planifié' · 'fait' · 'en_retard'.
  */
 const DONE_STATUSES = new Set(['fait'])
+
+/**
+ * ¿Sigue pendiente esta visita? Lo usan la columna (para agrupar) y el mapa (para contar).
+ * Sin esto el mapa pintaba burbujas con visitas ya hechas de los últimos 90 días: al pulsarlas,
+ * las columnas salían vacías.
+ */
+export function isPendingMaintenance(visit: BoardMaintenance): boolean {
+  return !DONE_STATUSES.has(visit.status)
+}
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10)
@@ -119,7 +132,7 @@ export function groupMaintenancesByDay(
   visits: BoardMaintenance[],
   today: string
 ): MaintenanceGroup[] {
-  const pending = visits.filter((v) => !DONE_STATUSES.has(v.status))
+  const pending = visits.filter(isPendingMaintenance)
 
   const late = pending
     .filter((v) => v.scheduledDate < today)
