@@ -30,9 +30,14 @@ export default function AtelierHeader({ kpis, view }: Props) {
 
   return (
     <header className="flex items-center justify-between gap-6 shrink-0">
-      <p className="font-display text-2xl font-extrabold text-white whitespace-nowrap">
-        AMD <span className="text-accent">·</span> Atelier
-      </p>
+      <div className="flex items-center gap-3 shrink-0">
+        {/* Logo oficial en blanco: el mismo SVG que la etiqueta QR, sobre fondo oscuro */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/logos/logo-amd-blanco.svg" alt="AMD Service" className="h-9 w-auto" />
+        <span className="text-lg font-semibold text-white/40 border-l border-white/15 pl-3">
+          Atelier
+        </span>
+      </div>
 
       {/* Los cuatro números del día, en la misma línea para no robarle alto al mapa */}
       <div className="flex items-center gap-6">
