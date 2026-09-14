@@ -22,6 +22,12 @@ kiosko es **interactivo** (el despachador hace clic en burbujas y tarjetas).
 
 ## 1. Grabar la tarjeta
 
+> **DietPi ES el sistema operativo, no un programa que se instala encima.** No hay que poner
+> primero Raspberry Pi OS: se graba la imagen de DietPi en la microSD y sustituye a todo lo que
+> hubiera. Comparte los cimientos de Raspberry Pi OS, pero viene sin escritorio ni extras, que es
+> justo lo que buscamos en una Pi 3 de 1 GB.
+
+
 1. Descargar la imagen de DietPi para **Raspberry Pi (ARMv8, 64 bits)**: https://dietpi.com/#download
 2. Grabarla con Raspberry Pi Imager o balenaEtcher en una microSD (clase 10, 16 GB o más).
 3. **Si va por wifi**, antes de sacar la tarjeta del ordenador, editar en la partición `boot`:
