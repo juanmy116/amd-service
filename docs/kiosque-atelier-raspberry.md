@@ -3,9 +3,9 @@
 > Cómo dejar la Raspberry mostrando `/atelier` a pantalla completa, arrancando sola y con el
 > aviso sonoro funcionando. Escrito el 2026-09-14, tras formatear la Raspberry.
 >
-> ⚠️ **Estos pasos no se han ejecutado todavía en la Raspberry de AMD.** Están verificados contra
-> la documentación oficial de DietPi, pero la primera instalación conviene hacerla con calma y
-> corregir aquí lo que no cuadre. Si algo falla, anótalo en este mismo fichero.
+> ✅ **Ejecutado sobre la Raspberry de AMD el 2026-09-14.** Los pasos son los que funcionaron de
+> verdad, incluidos los tropiezos (ver «Lo que no salió a la primera» al final). Si en una
+> reinstalación algo cambia, corrígelo aquí.
 
 ---
 
@@ -81,22 +81,57 @@ Reiniciar (`reboot`) y debería arrancar solo en el navegador, a pantalla comple
 
 ## 4. Ajustes propios de este kiosko
 
-Toda la configuración vive en un único archivo:
+El script que trae DietPi arranca X y lanza Chromium en la misma línea, sin dejar hueco para
+ejecutar nada más dentro de la sesión gráfica. Por eso se parte en dos: el autostart prepara las
+opciones y un **script de sesión** hace lo que necesita X ya arrancado (que la pantalla no se
+apague, ocultar el puntero) antes de abrir el navegador.
+
+Todo el bloque siguiente se copia y pega de una vez por SSH:
 
 ```bash
-nano /var/lib/dietpi/dietpi-software/installed/chromium-autostart.sh
+apt install -y unclutter
+
+cat > /var/lib/dietpi/dietpi-software/installed/amd-kiosk-session.sh <<'EOS'
+#!/bin/dash
+# Sesión gráfica del kiosko de AMD: prepara la pantalla y lanza el navegador.
+xset s off
+xset s noblank
+xset -dpms
+command -v unclutter >/dev/null && unclutter -idle 5 &
+exec /usr/bin/chromium $CHROMIUM_OPTS "${URL:-https://amd-service.vercel.app/atelier}"
+EOS
+
+chmod +x /var/lib/dietpi/dietpi-software/installed/amd-kiosk-session.sh
+
+cp /var/lib/dietpi/dietpi-software/installed/chromium-autostart.sh \
+   /var/lib/dietpi/dietpi-software/installed/chromium-autostart.sh.original
+
+cat > /var/lib/dietpi/dietpi-software/installed/chromium-autostart.sh <<'EOS'
+#!/bin/dash
+# Autostart del kiosko del taller de AMD (basado en el original de DietPi).
+# Copia intacta del original en: chromium-autostart.sh.original
+
+RES_X=$(sed -n '/^[[:blank:]]*SOFTWARE_CHROMIUM_RES_X=/{s/^[^=]*=//p;q}' /boot/dietpi.txt)
+RES_Y=$(sed -n '/^[[:blank:]]*SOFTWARE_CHROMIUM_RES_Y=/{s/^[^=]*=//p;q}' /boot/dietpi.txt)
+
+CHROMIUM_OPTS="--kiosk --window-size=${RES_X:-1280},${RES_Y:-720} --window-position=0,0"
+CHROMIUM_OPTS="$CHROMIUM_OPTS --autoplay-policy=no-user-gesture-required"
+CHROMIUM_OPTS="$CHROMIUM_OPTS --no-first-run --disable-infobars --disable-session-crashed-bubble"
+CHROMIUM_OPTS="$CHROMIUM_OPTS --password-store=basic"
+CHROMIUM_OPTS="$CHROMIUM_OPTS --check-for-update-interval=604800"
+
+URL=$(sed -n '/^[[:blank:]]*SOFTWARE_CHROMIUM_AUTOSTART_URL=/{s/^[^=]*=//p;q}' /boot/dietpi.txt)
+
+export CHROMIUM_OPTS URL
+
+STARTX='xinit'
+[ "$USER" = 'root' ] || STARTX='startx'
+
+exec "$STARTX" /var/lib/dietpi/dietpi-software/installed/amd-kiosk-session.sh
+EOS
 ```
 
-Buscar la línea que define `CHROMIUM_OPTS` y **añadir**:
-
-```sh
---autoplay-policy=no-user-gesture-required \
---no-first-run \
---disable-session-crashed-bubble \
---disable-infobars \
---password-store=basic \
---check-for-update-interval=604800
-```
+Qué hace cada opción del navegador, por orden de importancia:
 
 Qué hace cada una, por orden de importancia:
 
@@ -108,19 +143,9 @@ Qué hace cada una, por orden de importancia:
 | `--no-first-run` · `--disable-infobars` | Quitan carteles de bienvenida y avisos |
 | `--check-for-update-interval` | Que no se ponga a buscar actualizaciones en mitad del día |
 
-### Que la TV no se apague sola
-
-En el **mismo script**, antes de la línea que lanza Chromium, añadir:
-
-```sh
-xset s off          # sin salvapantallas
-xset s noblank      # que no ponga la pantalla en negro
-xset -dpms          # sin ahorro de energía del monitor
-```
-
-Sin esto, a los 10 minutos sin tocar nada la TV se queda negra y el taller pierde el tablero.
-(En `dietpi-config` no aparece la opción hasta que hay entorno gráfico; esta es la forma que
-funciona en un kiosko.)
+> Las tres líneas de `xset` del script de sesión son las que impiden que la TV se quede negra a
+> los 10 minutos. En `dietpi-config` **no hay** opción de *screen blanking* mientras no exista
+> entorno gráfico: esta es la forma que funciona en un kiosko.
 
 > **No usar `-nocursor`.** Se ve en muchos tutoriales, pero esconde el ratón *siempre* y aquí el
 > despachador lo necesita. Para que el puntero desaparezca solo cuando nadie lo mueve:
@@ -129,6 +154,28 @@ funciona en un kiosko.)
 > apt install -y unclutter
 > ```
 > y añadir `unclutter -idle 5 &` dentro del mismo script, antes de la línea que lanza Chromium.
+
+---
+
+## 4-bis. Resolución
+
+Son **dos cosas distintas** y hay que cuadrar las dos:
+
+1. **La señal que manda la Raspberry**: `dietpi-config` → `Display Options` → resolución. En la
+   TV de AMD: **1920×1080**.
+2. **El tamaño con el que abre el navegador**, que DietPi guarda aparte y trae en 1280×720. Si no
+   se cambia, el tablero sale pequeño con franjas negras alrededor aunque la pantalla esté bien:
+
+```bash
+sed -i 's/^[[:blank:]]*SOFTWARE_CHROMIUM_RES_X=.*/SOFTWARE_CHROMIUM_RES_X=1920/' /boot/dietpi.txt
+sed -i 's/^[[:blank:]]*SOFTWARE_CHROMIUM_RES_Y=.*/SOFTWARE_CHROMIUM_RES_Y=1080/' /boot/dietpi.txt
+grep -E "SOFTWARE_CHROMIUM_RES" /boot/dietpi.txt
+reboot
+```
+
+Si **aún** quedan franjas negras, el recorte lo hace la propia TV (*overscan*): en su menú de
+imagen hay que poner el tamaño en *Just Scan* (LG), *Ajuste a pantalla* (Samsung) o *1:1*. Eso no
+se arregla desde la Raspberry. Como último recurso, `disable_overscan=1` en `/boot/config.txt`.
 
 ---
 
@@ -169,6 +216,19 @@ crontab -e
       Si aparece el botón «Activer le son», es que falta la opción del punto 4.
 - [ ] A los 10 minutos sin tocar nada la pantalla **no** se apaga.
 - [ ] Desenchufar y volver a enchufar: arranca solo otra vez.
+
+---
+
+## Lo que no salió a la primera (instalación del 2026-09-14)
+
+- **«Screen blanking» no existe en `dietpi-config`** cuando aún no hay entorno gráfico. Se
+  resuelve con `xset` dentro del script de sesión (paso 4).
+- **El script de DietPi no deja ejecutar nada dentro de la sesión gráfica**: arranca X y lanza
+  Chromium en la misma orden. De ahí el script de sesión aparte.
+- **La pantalla salía con franjas negras** aunque la señal ya era 1920×1080: faltaba cambiar el
+  tamaño de ventana del navegador en `/boot/dietpi.txt` (paso 4-bis).
+- DietPi **no aparece en la lista** del Raspberry Pi Imager: hay que bajar la imagen de
+  dietpi.com y usar «imagen personalizada», o balenaEtcher.
 
 ---
 
