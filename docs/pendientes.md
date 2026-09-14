@@ -6,6 +6,45 @@
 
 ---
 
+## 🔴 Rehacer el limitador de intentos (Upstash borrado) — EL «PORTERO» ESTÁ ROTO
+
+> **Qué pasó (2026-09-14):** la base de datos gratuita de Upstash que limita los intentos de
+> contraseña **fue eliminada** (host `exotic-wren-125514.upstash.io`, ya no resuelve: `NXDOMAIN`).
+> El código la llamaba en cada login, la llamada lanzaba excepción y **la Server Action de login
+> reventaba con un 500** («ERROR 3227098399» en pantalla). Consecuencia: **nadie podía entrar en
+> la aplicación** —admins, técnicos, clientes y el kiosko del taller—, ni con la contraseña
+> correcta. Solo seguían dentro quienes ya tenían sesión iniciada, porque Supabase la renueva
+> sola y no vuelve a pasar por el login. Por eso el fallo estuvo semanas sin detectarse: se
+> descubrió al montar la Raspberry, que era un equipo nuevo y sí tenía que iniciar sesión.
+>
+> **Ya hecho:** `checkRateLimit()` ya no propaga el error (`src/lib/rate-limit.ts`): si el backend
+> está configurado pero no responde, **deja pasar y lo registra** en vez de tumbar el login. Con
+> eso la aplicación funciona aunque Upstash no exista. Cubierto por `src/lib/rate-limit.test.ts`.
+>
+> **Lo que sigue pendiente: volver a montar el limitador.** Ahora mismo **no hay protección propia
+> contra fuerza bruta**; solo quedan los límites que aplica Supabase Auth por su cuenta.
+>
+> **Pasos:**
+> 1. Crear una base nueva en https://console.upstash.com (Redis, región cercana a `us-east-2`,
+>    que es donde está Supabase).
+> 2. Copiar `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`.
+> 3. Ponerlas en **Vercel → Settings → Environment Variables → Production** (y en `.env.local`,
+>    que tiene las viejas).
+> 4. **Redesplegar**: Vercel no recoge variables nuevas sin un despliegue.
+> 5. Comprobar que quedó vivo:
+>    ```bash
+>    curl -H "Authorization: Bearer $UPSTASH_REDIS_REST_TOKEN" "$UPSTASH_REDIS_REST_URL/ping"
+>    ```
+>    Debe responder `{"result":"PONG"}`.
+> 6. Verificar el límite real: fallar 6 veces seguidas el login y comprobar que a partir del sexto
+>    intento sale el aviso de demasiados intentos (cupo: 5 cada 15 minutos).
+>
+> **Ojo con el plan gratuito:** esto ha pasado por inactividad y **volverá a pasar**. Al montarlo,
+> decidir una de dos: plan de pago, o revisar cada cierto tiempo que sigue vivo. Mientras el
+> limitador no exista, la aplicación funciona igual pero sin esa protección.
+
+---
+
 ## ✋ Capa 2 del candado de facturación — confirmación antes de emitir «Émettre»/«Forcer»
 
 > **Qué:** hoy los botones **«Émettre la facture»** y **«Forcer la facturation»** (`src/components/admin/ContractInvoicePreview.tsx`) emiten una factura **real, definitiva e inmutable en un solo clic**, sin diálogo de confirmación. El único freno actual es la **Capa 1** (candado global `billing_settings`, 2026-09-04) que mantiene la facturación APAGADA durante la fase de prueba del SAV.
