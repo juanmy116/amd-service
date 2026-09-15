@@ -144,15 +144,27 @@ export function buildMapItems(
 }
 
 /**
- * ¿Esta burbuja está dentro de lo que se ha filtrado?
+ * ¿Este elemento del mapa —burbuja o chip— está dentro de lo que se ha filtrado?
  *
- * No se compara por identidad porque la misma zona se puede haber seleccionado desde sitios que
- * la nombran distinto: el chip «Diass» filtra por ciudad y la burbuja se llama por su código. Lo
- * que decide es el contenido: una burbuja se resalta cuando todas sus zonas están en el filtro.
+ * No se compara por identidad porque la misma zona se nombra distinto según de dónde se la mire:
+ * en la vista región Diass es una burbuja con el código del barrio (`diass`) y en la de Dakar es
+ * un chip agrupado por ciudad (`Diass`). Comparar identidades dejaba el chip apagado con su
+ * propio filtro puesto, y entonces pulsarlo volvía a seleccionar en vez de quitar el filtro.
+ *
+ * Lo que decide es el contenido: se resalta cuando TODAS sus zonas están en el filtro. Que sea
+ * «todas» y no «exactamente las mismas» es deliberado: una selección puede repartirse en varios
+ * elementos al cambiar de vista —el chip «Thiès» que agrupa dos barrios, o la burbuja «Dakar» de
+ * la región que en la otra foto son trece— y en ese caso todos sus trozos están efectivamente
+ * filtrados, así que todos se marcan.
  */
-export function isBubbleActive(bubble: MapBubble, selectedCodes: string[] | null): boolean {
+export function isSelectionActive(codes: string[], selectedCodes: string[] | null): boolean {
   if (!selectedCodes) return false
-  return bubble.codes.every((code) => selectedCodes.includes(code))
+  return codes.every((code) => selectedCodes.includes(code))
+}
+
+/** Atajo para las burbujas. La regla es la misma que para los chips (ver arriba). */
+export function isBubbleActive(bubble: MapBubble, selectedCodes: string[] | null): boolean {
+  return isSelectionActive(bubble.codes, selectedCodes)
 }
 
 /**
@@ -166,4 +178,24 @@ export function viewForQuartier(quartier: Quartier): MapViewId | null {
   if (fitsInDakar(quartier)) return 'dakar'
   if (isInsideFrame(latLngToPercent(quartier.lat, quartier.lng, REGION_FRAME))) return 'region'
   return null
+}
+
+/**
+ * Vista a la que llevar un chip que agrupa varias zonas.
+ *
+ * Se queda con la primera que SE VEA en alguna foto, no con la primera de la lista sin más: un
+ * chip de ciudad puede mezclar un barrio que no está en ninguna de las dos fotos con otro que sí
+ * (Thiès agrupa por ciudad), y mirando solo el primero el mapa se quedaría quieto mientras las
+ * listas se filtran. Prefiere Dakar a región cuando hay de las dos, porque es la foto de detalle.
+ */
+export function viewForCodes(codes: string[], quartiers: Quartier[]): MapViewId | null {
+  let region: MapViewId | null = null
+  for (const code of codes) {
+    const quartier = quartiers.find((q) => q.code === code)
+    if (!quartier) continue
+    const view = viewForQuartier(quartier)
+    if (view === 'dakar') return 'dakar'
+    if (view === 'region') region ??= 'region'
+  }
+  return region
 }

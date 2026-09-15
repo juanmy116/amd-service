@@ -59,8 +59,13 @@ export default function AtelierBoard({
   const lastInteraction = useRef(Date.now())
   const touch = useCallback(() => { lastInteraction.current = Date.now() }, [])
 
-  const isIdle =
-    selection === null && quartierFilter === null && statusFilter === null && mapView === 'dakar'
+  // Alguien está usando el tablero: hay una ficha abierta o las listas están filtradas.
+  const isBusy = selection !== null || quartierFilter !== null || statusFilter !== null
+
+  // Lo que hay que devolver a su sitio cuando el taller se queda solo. Incluye la vista del mapa,
+  // que NO entra en `isBusy` a propósito: mirar la región no es trabajar sobre una avería, y si
+  // pausara el refresco la TV se quedaría muda ante una panne nueva mientras nadie toca nada.
+  const needsReset = isBusy || mapView !== 'dakar'
 
   // Averías nuevas desde el último refresco → campana + cartel (ver NewIncidentAlert).
   useEffect(() => {
@@ -81,14 +86,14 @@ export default function AtelierBoard({
   // Auto-refresco, pausado mientras alguien está trabajando: recargar con una ficha abierta
   // se la cerraría en las manos al despachador.
   useEffect(() => {
-    if (!isIdle) return
+    if (isBusy) return
     const t = setInterval(() => router.refresh(), REFRESH_MS)
     return () => clearInterval(t)
-  }, [router, isIdle])
+  }, [router, isBusy])
 
   // Vuelta sola a la vista general: si alguien filtró y se fue, la TV no se queda así toda la tarde.
   useEffect(() => {
-    if (isIdle) return
+    if (!needsReset) return
     const t = setInterval(() => {
       if (Date.now() - lastInteraction.current < IDLE_RESET_MS) return
       setSelection(null)
@@ -98,7 +103,7 @@ export default function AtelierBoard({
       router.refresh()
     }, 10_000)
     return () => clearInterval(t)
-  }, [router, isIdle])
+  }, [router, needsReset])
 
   const visibleIncidents = filterByQuartier(incidents, quartierFilter?.codes ?? null)
   const visibleMaintenances = filterByQuartier(maintenances, quartierFilter?.codes ?? null)

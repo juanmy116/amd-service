@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { DAKAR_CLUSTER, buildMapItems, fitsInDakar, isBubbleActive, viewForQuartier } from './mapView'
+import {
+  DAKAR_CLUSTER,
+  buildMapItems,
+  fitsInDakar,
+  isBubbleActive,
+  isSelectionActive,
+  viewForCodes,
+  viewForQuartier,
+} from './mapView'
 import type { Quartier } from '@/lib/quartiers'
 
 // Coordenadas reales del catálogo (migración 20260911150000_quartiers.sql).
@@ -155,5 +163,45 @@ describe('isBubbleActive', () => {
     const cluster = bubble(DAKAR_CLUSTER, ['plateau', 'mermoz'])
     expect(isBubbleActive(cluster, ['plateau'])).toBe(false)
     expect(isBubbleActive(cluster, ['plateau', 'mermoz'])).toBe(true)
+  })
+})
+
+describe('isSelectionActive · chips', () => {
+  it('el chip se enciende con el filtro que puso su propia burbuja en la otra vista', () => {
+    // Se pulsa la burbuja «Diass» en la región (código `diass`) y se vuelve a Dakar, donde la
+    // misma zona es el chip de ciudad `Diass`. Comparando identidades quedaba apagado con su
+    // filtro puesto, y volver a pulsarlo seleccionaba en vez de quitar el filtro.
+    expect(isSelectionActive(['diass'], ['diass'])).toBe(true)
+  })
+
+  it('sin filtro ningún chip está encendido', () => {
+    expect(isSelectionActive(['diass'], null)).toBe(false)
+  })
+
+  it('un chip de ciudad necesita que estén TODOS sus barrios', () => {
+    expect(isSelectionActive(['thies', 'thies-nord'], ['thies'])).toBe(false)
+    expect(isSelectionActive(['thies', 'thies-nord'], ['thies', 'thies-nord'])).toBe(true)
+  })
+})
+
+describe('viewForCodes', () => {
+  it('lleva a la vista donde la zona del chip se ve', () => {
+    expect(viewForCodes(['diass'], ALL)).toBe('region')
+    expect(viewForCodes(['plateau'], ALL)).toBe('dakar')
+  })
+
+  it('no se queda con el primer código si ese no sale en ninguna foto', () => {
+    // Un chip de ciudad puede mezclar una zona invisible con otra que sí está en la región:
+    // mirando solo la primera, el mapa se quedaba quieto mientras las listas se filtraban.
+    expect(viewForCodes(['touba', 'mbour'], ALL)).toBe('region')
+  })
+
+  it('prefiere la foto de detalle cuando el chip mezcla las dos', () => {
+    expect(viewForCodes(['mbour', 'plateau'], ALL)).toBe('dakar')
+  })
+
+  it('devuelve null si nada del chip está en las fotos', () => {
+    expect(viewForCodes(['touba'], ALL)).toBeNull()
+    expect(viewForCodes(['fantasma'], ALL)).toBeNull()
   })
 })

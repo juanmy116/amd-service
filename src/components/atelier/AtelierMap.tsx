@@ -5,7 +5,8 @@ import { bubbleRadius } from '@/lib/atelier/mapFrame'
 import {
   buildMapItems,
   isBubbleActive,
-  viewForQuartier,
+  isSelectionActive,
+  viewForCodes,
   type MapChip,
   type MapViewId,
 } from '@/lib/atelier/mapView'
@@ -78,8 +79,7 @@ export default function AtelierMap({
    */
   function selectChip(chip: MapChip, active: boolean) {
     if (active) return onSelect(null)
-    const quartier = quartiers.find((q) => q.code === chip.codes[0])
-    const target = quartier ? viewForQuartier(quartier) : null
+    const target = viewForCodes(chip.codes, quartiers)
     if (target && target !== view) onViewChange(target)
     onSelect({ id: chip.id, label: chip.label, codes: chip.codes })
   }
@@ -135,7 +135,12 @@ export default function AtelierMap({
           barrio. Por eso la foto manda sobre el hueco, y no al revés. */}
       <div className="flex flex-1 min-h-0 items-center justify-center" style={{ containerType: 'size' }}>
         <div
-          className="relative overflow-hidden rounded-xl border-2 border-white/[0.05]"
+          // `w-full` es la red de seguridad del ancho de abajo: los hijos de esta caja son todos
+          // absolutos, así que un navegador que no entienda `cqh` descartaría esa declaración
+          // inline y se quedaría con un ancho de contenido de cero, es decir sin mapa. Al vivir en
+          // una clase, este 100% sobrevive a ese descarte (el estilo inline solo lo tapa cuando es
+          // válido), y el peor caso pasa a ser un mapa algo alto de más en vez de un hueco negro.
+          className="relative w-full overflow-hidden rounded-xl border-2 border-white/[0.05]"
           style={{
             aspectRatio: `${MAP_WIDTH} / ${MAP_HEIGHT}`,
             // La foto crece hasta llenar el hueco por el lado que se agote antes: el ancho
@@ -208,7 +213,7 @@ export default function AtelierMap({
         </button>
 
         {chips.map((chip) => {
-          const active = selected?.id === chip.id
+          const active = isSelectionActive(chip.codes, selected?.codes ?? null)
           return (
             <button
               key={chip.id}

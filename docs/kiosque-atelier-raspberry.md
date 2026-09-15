@@ -189,8 +189,14 @@ el conector jack aunque la imagen vaya por HDMI. El síntoma es el de la instala
 navegador saldría en su lugar el botón «Activer le son»).
 
 En el propio kiosko hay un **botón con un altavoz en la cabecera**, al lado de `Carte / Kanban`:
-al pulsarlo suena la campana. Es la forma de probar sin inventarse una avería, y separa los dos
-casos: si pone «Son bloqué» falta el paso 4; si no dice nada y aun así no se oye, es lo de aquí.
+al pulsarlo suena la campana. Es la forma de probar esto de aquí —la salida de audio de la Pi y el
+volumen de la TV— sin tener que inventarse una avería.
+
+> ⚠️ Ese botón **no sirve para saber si falta la opción del paso 4**, y es importante no leerlo
+> así: el navegador siempre deja sonar lo que nace de un clic, de modo que el botón se pone verde
+> igualmente en una Raspberry mal configurada. Lo que delata el paso 4 es el aviso de una avería
+> de verdad, porque ahí nadie ha tocado nada: si el navegador lo bloquea, en vez de la campana
+> sale abajo a la izquierda el botón **«Activer le son des alertes»**.
 
 Por orden, conectado por SSH:
 
@@ -249,8 +255,9 @@ crontab -e
 - [ ] Se enciende la Raspberry y aparece el kiosko **sin tocar nada**.
 - [ ] Se ve el mapa de Dakar con sus burbujas (si no, la red o la sesión fallan).
 - [ ] Al hacer clic en una burbuja se filtran las dos columnas.
-- [ ] **La campana suena**: pulsar el botón del altavoz de la cabecera (al lado de `Carte`).
-      Si no se oye nada, paso **4-ter**; si sale «Son bloqué», falta la opción del paso 4.
+- [ ] **El altavoz funciona**: pulsar el botón del altavoz de la cabecera (al lado de `Carte`).
+      Si no se oye nada, paso **4-ter**. Que suene NO confirma el paso 4: eso lo verifica la
+      prueba siguiente, la única en la que el sonido arranca sin que nadie toque nada.
 - [ ] **El aviso completo llega**: pedir a alguien que abra una incidencia de prueba desde el
       portal, o escanear el QR de una máquina. Debe sonar y salir el cartel rojo en menos de 30
       segundos.

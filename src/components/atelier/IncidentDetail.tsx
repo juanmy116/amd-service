@@ -148,12 +148,17 @@ export default function IncidentDetail({
             className="w-80 shrink-0 self-start overflow-hidden rounded-lg border border-white/10 bg-black/40 transition-opacity hover:opacity-90"
           >
             {/* Entera, no recortada: en una avería lo que importa suele estar en un borde de la
-                foto (una pantalla, un papel atascado). Para verla de cerca está el visor. */}
+                foto (una pantalla, un papel atascado). Para verla de cerca está el visor.
+
+                El tope de altura va en pantallas (`vh`) y no en porcentaje: el hueco de la foto se
+                mide por su contenido (`self-start`), así que un `max-h-full` no tiene contra qué
+                calcularse y no limita nada. Sin él, una foto de móvil en vertical crece hasta
+                desbordar la ficha y el kiosko —que no hace scroll— la corta por abajo. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={incident.photoUrl}
               alt="Photo signalée par le client"
-              className="max-h-full w-full object-contain"
+              className="max-h-[45vh] w-full object-contain"
             />
           </button>
         )}
