@@ -39,7 +39,11 @@ const PER_PAGE = COLS * ROWS
 const HEAD_H = 48 // alto de la cabecera roja
 const PAD = 18 // padding lateral del cuerpo
 const LOGO_W = 140 // ancho del logo blanco en la cabecera
-const QR_SIZE = 150 // lado del QR
+const QR_SIZE = 136 // lado del QR (reducido para dejar sitio a "SERVICE TECHNIQUE")
+// Cuerpo de "SERVICE TECHNIQUE". La celda del PDF es más ancha que la etiqueta
+// física (~92 mm frente a 68 mm), así que se escala respecto de los 20 pt
+// aprobados en la etiqueta unitaria para que se vea del mismo tamaño relativo.
+const CTA_SIZE = 27
 
 // WinAnsi (fuentes estándar) cubre el francés; sustituye cualquier carácter
 // fuera de Latin-1 por '?' para no romper la generación del PDF.
@@ -131,12 +135,12 @@ function drawLabel(
   cursor = drawField(page, fonts, x + PAD, cursor, CELL_W - 2 * PAD, 'MACHINE', `${data.marque} ${data.modele}`.trim(), 11, fonts.bold)
   cursor = drawField(page, fonts, x + PAD, cursor, CELL_W - 2 * PAD, 'N° SÉRIE', data.numero_serie, 9.5, fonts.mono)
 
-  // QR centrado + frase del SAV (rojo) en el espacio restante.
+  // QR centrado + "SERVICE TECHNIQUE" (rojo, dos líneas) en el espacio restante.
   const qrTop = cursor - 14
   const qrY = qrTop - QR_SIZE
   page.drawImage(qrImg, { x: cx - QR_SIZE / 2, y: qrY, width: QR_SIZE, height: QR_SIZE })
-  drawCentered(page, fonts.bold, 'Un problème ? Scannez pour', 8, cx, qrY - 16, RED)
-  drawCentered(page, fonts.bold, 'contacter le SAV AMD', 8, cx, qrY - 27, RED)
+  drawCentered(page, fonts.bold, 'SERVICE', CTA_SIZE, cx, qrY - CTA_SIZE - 8, RED)
+  drawCentered(page, fonts.bold, 'TECHNIQUE', CTA_SIZE, cx, qrY - 2 * CTA_SIZE - 12, RED)
 
   // Marco de la etiqueta (encima de todo, nítido).
   page.drawRectangle({ x, y, width: CELL_W, height: CELL_H, borderColor: LINE, borderWidth: 0.75 })

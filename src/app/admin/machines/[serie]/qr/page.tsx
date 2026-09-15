@@ -80,10 +80,10 @@ export default async function MachineQrPage({
           display: flex; flex-direction: column; align-items: center; justify-content: center;
           flex: 1 1 auto; flex-shrink: 0; padding: 2mm 4mm 4mm;
         }
-        .etq-qr svg { width: 44mm; height: 44mm; display: block; }
+        .etq-qr svg { width: 40mm; height: 40mm; display: block; }
         .etq-qr p {
-          margin: 1.6mm 0 0; text-align: center; font-size: 8pt; font-weight: 700;
-          color: #BF0D0D; line-height: 1.3;
+          margin: 2mm 0 0; text-align: center; font-size: 20pt; font-weight: 700;
+          color: #BF0D0D; line-height: 1.12; letter-spacing: .02em;
         }
         @media print {
           body { margin: 0; }
@@ -119,7 +119,7 @@ export default async function MachineQrPage({
           {/* QR sobre fondo blanco */}
           <div className="etq-qr">
             <div dangerouslySetInnerHTML={{ __html: qrSvg }} />
-            <p>Un problème ? Scannez pour<br />contacter le SAV AMD</p>
+            <p>SERVICE<br />TECHNIQUE</p>
           </div>
         </div>
       </div>
