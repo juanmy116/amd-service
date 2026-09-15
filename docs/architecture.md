@@ -231,10 +231,28 @@ Route handler que recibe el formulario de contacto del sitio web público y capt
 
 ### 11. Dashboard Atelier (`/atelier`) ✅
 - Kiosko de taller a pantalla completa para una TV de 32" conectada a una Raspberry Pi 3 — tema oscuro «centro de mando», auto-refresco cada 30 s
-- Muestra todas las incidencias en Kanban (drag & drop = cambia estado) + mini-tablero de mantenimientos lun–vie + 4 tarjetas KPI
+- **Dos vistas** (conmutador en la cabecera, `AtelierHeader`):
+  - `/atelier` — **vista carte** (2026-09-14): 4 columnas → `PanneList` | **mapa de Dakar** | `MaintenanceList`
+  - `/atelier/kanban` — el kanban de siempre, con drag & drop para cambiar estado. Se conserva íntegro
 - Cuenta especial «Atelier»: rol `technician` + flag `profiles.is_dispatcher` → un *dispatcher* puede asignar incidencias y visitas de mantenimiento a los técnicos sin ser admin
 - Las Server Actions de despacho validan `admin OR is_dispatcher` y escriben vía `createAdminClient()`; el proxy (`src/proxy.ts`) protege `/atelier` y `/dashboard` redirige ahí a los dispatchers
 - **Montaje del kiosko (Raspberry Pi 3 + DietPi):** `docs/kiosque-atelier-raspberry.md` — instalación, arranque automático, opción que permite el aviso sonoro y reinicio nocturno
+
+#### 11-ter. Vista carte (entrega 2 del rediseño, 2026-09-14) — PR #126
+
+Diseño completo en `docs/superpowers/specs/2026-09-11-atelier-dashboard-carte-design.md`.
+
+- **Consultas:** `src/app/atelier/data.ts` (`getBoardData` para la carte, `getKanbanData` para el kanban). Cubre los **dos caminos** de una incidencia: línea de contrato y `machine_id` directo (formulario público del QR) — sin ese rescate esas incidencias salen sin cliente ni zona.
+- **Lógica pura y testeada:** `src/lib/atelier/board.ts` (orden por antigüedad, filtros por estado y zona, conteo por zona, ventana de mantenimientos, antigüedad en francés, detección de averías nuevas) y `src/lib/atelier/mapFrame.ts` (`latLngToPercent` en Web Mercator + `bubbleRadius`).
+- **Mapa:** `public/images/atelier/dakar.jpg` — Esri World Imagery, encuadre fijo Dakar→Rufisque, tratada (brillo 0,88 · saturación 0,35 · velo azul), 75 KB **servida en local**: la Raspberry no necesita Internet ni servicio de mapas. El `extent` REAL devuelto por el servicio está en `DAKAR_FRAME`; **si se regenera la imagen hay que actualizarlo** (pedir la exportación con `f=json`). Atribución «Imagery: Esri, Maxar» visible en el mapa, obligatoria.
+- **Burbujas:** una por quartier, tamaño según nº de avisos con tope (Mermoz, Liberté y Point E están a 2 km y se solaparían). Cuentan **solo lo pendiente** (`isPendingMaintenance`), o al pulsarlas las columnas saldrían vacías.
+- **Chips:** «Tout» (quita el filtro), una por ciudad agrupando sus zonas, las zonas de Dakar fuera del encuadre de la foto, y «Sans quartier» para los avisos sin ubicar.
+- **Ficha** (`IncidentDetail` / `MaintenanceDetail`): ocupa el sitio del mapa, con las dos listas visibles. Asignar técnico y cambiar estado; el cambio de estado **delega** en `updateIncidentStatusAction` de `/admin/incidents` (historial, `resolved_at` y CSAT en un único sitio).
+- **Estado compartido** (`AtelierBoard`): filtros sincronizados mapa↔listas, auto-refresco **pausado** mientras hay ficha abierta o filtro activo, y vuelta sola a la vista general tras 2 min sin tocar nada.
+- **Aviso de avería nueva** (`NewIncidentAlert`): campana (`public/sounds/nouvelle-panne.mp3`, generada para el proyecto) + cartel 12 s. Detecta comparando identificadores entre refrescos (`findNewIncidents`), sin conexión permanente con la base; en la primera carga NO suena. Los navegadores bloquean el audio sin interacción previa: la Raspberry arranca Chromium con `--autoplay-policy=no-user-gesture-required` (ver runbook), y si falla aparece un botón «Activer le son».
+- **Tamaño:** `font-size` del documento al **115 %** solo en el kiosko (`KIOSK_FONT_SCALE` en `src/app/atelier/layout.tsx`), decidido viéndolo en la TV real. ⚠️ **No usar `--force-device-scale-factor` en la Raspberry Pi 3: deja la pantalla en blanco.**
+
+> **Trampas que costaron una ronda de revisión cada una:** (1) pedir todas las incidencias no cerradas con `limit(400)` ordenadas por antigüedad **vacía el tablero** cuando se acumulan résolu sin cerrar → se filtra por estado en la BD; (2) los estados reales de `maintenance_visits` son `planifié`/`fait`/`en_retard`; (3) Tailwind solo genera clases **literales**, `bg-${tone}/20` no llega al CSS; (4) `latLngToPercent` redondea a 4 decimales o React avisa de desajuste al hidratar.
 
 #### 11-bis. Ubicación por quartier (entrega 1 del rediseño del kiosko, 2026-09-11)
 
