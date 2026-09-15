@@ -6,6 +6,98 @@
 
 ---
 
+## 🔴🔴 Princity: los tres procesos automáticos funcionan «bien» pero NO TRAEN NADA
+
+> **Descubierto el 2026-09-15**, de rebote, haciendo una consulta ad-hoc de contadores a la API de
+> Princity. Es el hallazgo más grave abierto ahora mismo: **llevamos meses creyendo que Princity
+> alimentaba el sistema solo, y no ha entrado ni un dato.**
+>
+> ### Qué está pasando, en cristiano
+>
+> Cada noche se ejecutan tres procesos que hablan con Princity. Los tres terminan sin error y se
+> apuntan a sí mismos como «correcto», así que el vigilante (`princity-watchdog`) nunca ha avisado.
+> Pero no traen nada: es como un cartero que sale, hace la ronda y vuelve con la saca llena porque
+> no sabe leer los sobres.
+>
+> ### Los números (prod, tabla `princity_api_logs`, 2026-09-15)
+>
+> | Proceso | Veces ejecutado | Registros creados |
+> |---|---|---|
+> | `princity-alerts` (averías) | **3.019** | **0 incidencias** — y `/v3/alerts` tiene **321 alertas activas** |
+> | `princity-counters` (contadores) | **248** | **0 lecturas** importadas, nunca |
+> | `princity-sync` (clientes/equipos) | 139 | Solo clientes (1-6/día). **0 máquinas** |
+>
+> Comprobación cruzada: en `machine_counters` hay **0 filas** con
+> `notes = 'Importé automatiquement depuis Princity API'`. Las 74 que existen vienen todas del OCR
+> por email. Y no es por falta de contratos: **2AS (`099-28`) tiene 40 líneas activas, 16 de ellas
+> con `princity_device_id`, y `billing_day = 1`** — el día 1 de cada mes debería haber importado.
+>
+> ### Causa 1 — hablamos de usted y nos responden de tú (afecta a contadores y alertas)
+>
+> En la petición pedimos los campos por su **nombre largo** (`BillingCounter.date`,
+> `Alert.description`) —y eso es correcto, la API lo exige así en `fieldIds`—. Pero **la respuesta
+> viene con el nombre corto**:
+>
+> ```jsonc
+> // lo que devuelve /v3/billingCounters de verdad (verificado contra la API real)
+> { "date": "2026-09-15", "deviceId": "17-0", "endMono": 42497, "endColor": 28210 }
+> // lo que devuelve /v3/alerts
+> { "severityLevel": "WARNING", "companyId": "34", "code": 801,
+>   "description": "Non détecté(e)…", "activationDate": "2024-10-09T10:11:08.847+00:00",
+>   "deviceId": "34-0" }
+> ```
+>
+> El código lee `entry['BillingCounter.date']` → `undefined` → `continue`. Sale del bucle sin
+> procesar nada y termina «con éxito».
+>
+> - `supabase/functions/princity-counters/index.ts` — líneas del bloque `entry['BillingCounter.*']`
+> - `supabase/functions/princity-alerts/index.ts` — líneas del bloque `entry['Alert.*']`
+>
+> ### Causa 2 — a `/v1/devices` le falta un parámetro obligatorio (afecta a la sincronización)
+>
+> `fetchAllDevices()` (`supabase/functions/princity-sync/index.ts:36`) llama con
+> `{ contract: c.prefix }`. Falta **`status`**, que la documentación marca como *required*. Sin él,
+> Princity responde **HTTP 400 «Provided contract doesn't exist»** — un mensaje que despista, porque
+> el contrato sí existe. El `.catch(() => [])` se lo traga y devuelve lista vacía.
+>
+> Valores válidos: `ACTIVE | INACTIVE | DELETED`. Hay que pedir **los tres** para tener el catálogo
+> completo (comprobado: 58 activos + 6 inactivos + 118 dados de baja = **182 equipos**).
+>
+> ```bash
+> GET /v1/devices?contract=16&status=ACTIVE     # ✅ 200
+> GET /v1/devices?contract=16                   # ❌ 400 "Provided contract doesn't exist"
+> ```
+>
+> ### Pasos para arreglarlo
+>
+> 1. **Corregir la lectura de la respuesta v3** en `princity-counters` y `princity-alerts`: leer la
+>    clave corta. Mejor: un helper que acepte las dos formas
+>    (`entry[k.split('.').pop()] ?? entry[k]`), por si Princity vuelve a cambiar.
+> 2. **Añadir `status` a `/v1/devices`** en `princity-sync`, recorriendo los tres estados, y **dejar
+>    de tragarse el error**: que un 400 quede registrado en `princity_api_logs` con su mensaje.
+> 3. **Que el «éxito» signifique algo.** Hoy las tres se marcan `success` aunque no procesen nada.
+>    Propuesta: si `records_processed > 0` y `records_created == 0` durante N ejecuciones seguidas,
+>    que el watchdog avise. Un verde que no distingue «no había nada» de «no entendí nada» es peor
+>    que no tener semáforo.
+> 4. **Verificar con datos, no con el estado:** contar filas creadas en `princity_api_logs` después
+>    de encender. El `princity_health` en verde no vale como prueba.
+>
+> ### ⚠️ Cuidado al encender las alertas
+>
+> Hay **321 alertas activas acumuladas** desde 2024 esperando en Princity. Si se arregla
+> `princity-alerts` sin más, entrarán **todas de golpe** como incidencias nuevas. Antes de encender:
+> filtrar por `Alert.activationDate` (solo las recientes) o marcar las antiguas como ya vistas.
+>
+> ### Consecuencias que conviene tener presentes
+>
+> - Los contadores de 2AS **nunca han llegado solos**; todo lo que hay vino del OCR por email.
+> - Las averías que detecta Princity **no han creado ni una incidencia** en el SAV.
+> - El catálogo de máquinas **no se actualiza** desde la carga inicial de mayo de 2026.
+>
+> Ver también la memoria `project_princity_crons_silenciosos.md`.
+
+---
+
 ## 🔴 Rehacer el limitador de intentos (Upstash borrado) — EL «PORTERO» ESTÁ ROTO
 
 > **Qué pasó (2026-09-14):** la base de datos gratuita de Upstash que limita los intentos de
