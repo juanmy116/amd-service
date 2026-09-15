@@ -45,6 +45,34 @@
 
 ---
 
+## 🔊 Configurar el audio de la Raspberry del kiosko — LA CAMPANA NO SUENA EN EL TALLER
+
+> **Estado (2026-09-15):** es **lo único** que falta para que el kiosko avise por sonido. **No es
+> un problema de código**: todo lo de la aplicación está hecho y en producción (PR #131).
+>
+> **Cómo se sabe que es la Raspberry y no el navegador.** Cuando entra una avería nueva salía el
+> cartel rojo en pantalla y **no** salía el botón «Activer le son des alertes». Ese botón es el que
+> aparece cuando Chromium bloquea el audio; si no sale, es que Chromium *estaba reproduciendo* y el
+> sonido se perdía más abajo: salida de audio de la Pi, cable o volumen de la TV. DietPi no
+> configura el audio en una instalación mínima, y una Pi 3 con el driver clásico saca el sonido por
+> el **jack** aunque la imagen vaya por HDMI.
+>
+> **Pasos:** sección **«4-ter. Sonido»** de `docs/kiosque-atelier-raspberry.md`, que ya los lleva
+> por orden (instalar ALSA, elegir la salida HDMI, subir el volumen y dejarlo guardado). Se hace
+> por SSH contra `192.168.2.106`.
+>
+> **Cómo comprobar que quedó bien**, en este orden:
+> 1. En el kiosko, pulsar el **botón del altavoz de la cabecera**. Si se oye la campana, la Pi y la
+>    TV están bien.
+> 2. ⚠️ **Ese botón NO comprueba la opción `--autoplay-policy` del paso 4**, y es importante no
+>    leerlo así: como el sonido nace de un clic, Chromium siempre lo deja sonar y el botón se pone
+>    verde igualmente en una Raspberry mal configurada.
+> 3. La prueba que sí lo verifica todo: pedir que alguien abra una incidencia de prueba (o escanear
+>    el QR de una máquina) y **no tocar nada**. Debe sonar sola en menos de 30 segundos. Si en vez
+>    de la campana aparece «Activer le son des alertes», lo que falta es la opción del paso 4.
+
+---
+
 ## ✋ Capa 2 del candado de facturación — confirmación antes de emitir «Émettre»/«Forcer»
 
 > **Qué:** hoy los botones **«Émettre la facture»** y **«Forcer la facturation»** (`src/components/admin/ContractInvoicePreview.tsx`) emiten una factura **real, definitiva e inmutable en un solo clic**, sin diálogo de confirmación. El único freno actual es la **Capa 1** (candado global `billing_settings`, 2026-09-04) que mantiene la facturación APAGADA durante la fase de prueba del SAV.
