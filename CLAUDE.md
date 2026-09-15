@@ -160,5 +160,5 @@ rutas son dinámicas, no conecta a Supabase).
 - **Variables de entorno siempre**, nunca hardcodear URLs ni claves
 - **`send-email` Edge Function** encapsula el proveedor de email (Resend ahora, intercambiable después; soporta adjuntos vía `attachments`)
 - **`service_role`** solo en servidor (Edge Functions, Server Actions) — nunca en el cliente
-- **QR por máquina** codifica la URL `/tech/maquina/[numero_serie]`
+- **QR por máquina** codifica la URL de la pasarela `/m/[numero_serie]` (helper `machineReportUrl` en `src/lib/qr.ts`), que redirige según el rol de quien escanea; sin sesión va al formulario público `/signaler`. Los QR antiguos apuntaban a `/tech/maquina/` o `/tech/scan/` y `extractSerie` los sigue tolerando
 - **RLS** bloqueado hasta que se añadan políticas módulo a módulo
