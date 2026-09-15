@@ -10,6 +10,7 @@ import MaintenanceDetail from './MaintenanceDetail'
 import NewIncidentAlert from './NewIncidentAlert'
 import { filterByQuartier, findNewIncidents, type BoardIncident, type BoardMaintenance } from '@/lib/atelier/board'
 import { assignIncidentAction, assignMaintenanceVisitAction, setIncidentStatusAction } from '@/app/atelier/actions'
+import type { MapViewId } from '@/lib/atelier/mapView'
 import type { Quartier } from '@/lib/quartiers'
 import type { Technician } from './types'
 
@@ -40,6 +41,9 @@ export default function AtelierBoard({
 }: Props) {
   const router = useRouter()
   const [quartierFilter, setQuartierFilter] = useState<QuartierSelection | null>(null)
+  // Qué foto del mapa se mira. Vive aquí, y no dentro del mapa, porque la vuelta al reposo
+  // tiene que devolver la TV a la vista de siempre igual que quita los filtros.
+  const [mapView, setMapView] = useState<MapViewId>('dakar')
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [selection, setSelection] = useState<Selection>(null)
   const [busy, setBusy] = useState(false)
@@ -55,7 +59,8 @@ export default function AtelierBoard({
   const lastInteraction = useRef(Date.now())
   const touch = useCallback(() => { lastInteraction.current = Date.now() }, [])
 
-  const isIdle = selection === null && quartierFilter === null && statusFilter === null
+  const isIdle =
+    selection === null && quartierFilter === null && statusFilter === null && mapView === 'dakar'
 
   // Averías nuevas desde el último refresco → campana + cartel (ver NewIncidentAlert).
   useEffect(() => {
@@ -89,6 +94,7 @@ export default function AtelierBoard({
       setSelection(null)
       setQuartierFilter(null)
       setStatusFilter(null)
+      setMapView('dakar')
       router.refresh()
     }, 10_000)
     return () => clearInterval(t)
@@ -144,6 +150,8 @@ export default function AtelierBoard({
             maintenances={maintenances}
             quartiers={quartiers}
             selected={quartierFilter}
+            view={mapView}
+            onViewChange={(view) => { touch(); setMapView(view) }}
             onSelect={(selection) => { touch(); setQuartierFilter(selection) }}
           />
         )}

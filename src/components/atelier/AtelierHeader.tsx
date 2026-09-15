@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Map, Columns3 } from 'lucide-react'
+import SoundTestButton from './SoundTestButton'
 
 type Props = {
   kpis: { sansTechnicien: number; enCours: number; urgentes: number; resolusSemaine: number }
@@ -64,6 +65,9 @@ export default function AtelierHeader({ kpis, view }: Props) {
       </div>
 
       <div className="flex items-center gap-4">
+        {/* Comprobar la campana sin esperar a que entre una avería */}
+        <SoundTestButton />
+
         {/* Conmutador de vista: el kanban con arrastrar y soltar sigue existiendo */}
         <nav className="flex items-center gap-1 rounded-xl bg-white/5 p-1">
           <Link

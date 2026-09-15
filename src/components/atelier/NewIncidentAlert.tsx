@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { BellRing, VolumeX } from 'lucide-react'
+import { ALERT_SOUND } from '@/lib/atelier/sound'
 
 type Props = {
   /** Cuántas averías nuevas han entrado en el último refresco. */
@@ -12,7 +13,6 @@ type Props = {
   at: number
 }
 
-const SOUND = '/sounds/nouvelle-panne.mp3'
 /** Cuánto se queda el cartel en pantalla. En un taller ruidoso el aviso visual es el que manda. */
 const BANNER_MS = 12_000
 
@@ -33,7 +33,7 @@ export default function NewIncidentAlert({ newCount, lastNumero, at }: Props) {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    audioRef.current = new Audio(SOUND)
+    audioRef.current = new Audio(ALERT_SOUND)
     audioRef.current.preload = 'auto'
   }, [])
 

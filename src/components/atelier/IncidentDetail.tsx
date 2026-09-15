@@ -1,7 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { X, Phone, Printer, MapPin } from 'lucide-react'
 import { waitingLabel, type BoardIncident } from '@/lib/atelier/board'
+import PhotoLightbox from './PhotoLightbox'
 import type { Technician } from './types'
 
 type Props = {
@@ -31,6 +33,7 @@ export default function IncidentDetail({
   incident, technicians, busy, now, onAssign, onChangeStatus, onClose,
 }: Props) {
   const waiting = waitingLabel(incident.createdAt, now)
+  const [zoomed, setZoomed] = useState(false)
 
   return (
     <section className="flex flex-1 min-h-0 flex-col gap-3 rounded-xl border-2 border-white/10 bg-[#15151C] p-5">
@@ -138,21 +141,27 @@ export default function IncidentDetail({
         </div>
 
         {incident.photoUrl && (
-          <a
-            href={incident.photoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-64 shrink-0 overflow-hidden rounded-lg border border-white/10 transition-opacity hover:opacity-90"
+          <button
+            type="button"
+            onClick={() => setZoomed(true)}
+            title="Agrandir la photo"
+            className="w-80 shrink-0 self-start overflow-hidden rounded-lg border border-white/10 bg-black/40 transition-opacity hover:opacity-90"
           >
+            {/* Entera, no recortada: en una avería lo que importa suele estar en un borde de la
+                foto (una pantalla, un papel atascado). Para verla de cerca está el visor. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={incident.photoUrl}
               alt="Photo signalée par le client"
-              className="h-full w-full object-cover"
+              className="max-h-full w-full object-contain"
             />
-          </a>
+          </button>
         )}
       </div>
+
+      {zoomed && incident.photoUrl && (
+        <PhotoLightbox url={incident.photoUrl} onClose={() => setZoomed(false)} />
+      )}
     </section>
   )
 }

@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { latLngToPercent, isInsideFrame, bubbleRadius, DAKAR_FRAME } from './mapFrame'
+import { latLngToPercent, isInsideFrame, bubbleRadius, DAKAR_FRAME, REGION_FRAME } from './mapFrame'
 
-// Puntos de control tomados del propio encuadre de la imagen (Esri World Imagery, EPSG:3857).
-// Los porcentajes esperados se verificaron dibujando las 13 zonas sobre la foto: cada una cae
-// sobre su barrio real (Almadies en la punta oeste, Plateau en la punta sur, Rufisque al este).
+// Puntos de control tomados del propio encuadre de las imágenes (Esri World Imagery, EPSG:3857).
+// Los porcentajes esperados se verificaron dibujando las zonas sobre la foto y mirándola: cada
+// una cae sobre su sitio real (Almadies en la punta oeste, Plateau en la punta sur, Rufisque al
+// este; y en la región, Diass sobre el aeropuerto y Mbour en la Petite Côte).
 
 describe('latLngToPercent', () => {
   it('sitúa el Plateau en la mitad izquierda y abajo', () => {
     const { x, y } = latLngToPercent(14.669, -17.43, DAKAR_FRAME)
-    expect(x).toBeCloseTo(40.6, 0)
-    expect(y).toBeCloseTo(83.7, 0)
+    expect(x).toBeCloseTo(37.4, 0)
+    expect(y).toBeCloseTo(70.9, 0)
   })
 
   it('sitúa Almadies a la izquierda del Plateau (punta oeste)', () => {
@@ -52,6 +53,31 @@ describe('isInsideFrame', () => {
 
   it('rechaza Thiès, que está al este del encuadre', () => {
     expect(isInsideFrame(latLngToPercent(14.791, -16.926, DAKAR_FRAME))).toBe(false)
+  })
+})
+
+describe('REGION_FRAME', () => {
+  it('sitúa Diass en el centro-derecha, sobre el aeropuerto', () => {
+    const { x, y } = latLngToPercent(14.64, -17.07, REGION_FRAME)
+    expect(x).toBeCloseTo(71.3, 0)
+    expect(y).toBeCloseTo(44.5, 0)
+  })
+
+  it('recoge las zonas que no caben en la foto de Dakar', () => {
+    for (const [lat, lng] of [[14.64, -17.07], [14.791, -16.926], [14.42, -16.96], [14.728, -17.183]]) {
+      expect(isInsideFrame(latLngToPercent(lat!, lng!, REGION_FRAME))).toBe(true)
+    }
+  })
+
+  it('sigue dejando fuera Touba, que se queda en un chip', () => {
+    expect(isInsideFrame(latLngToPercent(14.85, -15.88, REGION_FRAME))).toBe(false)
+  })
+
+  it('coloca Thiès al noreste de Mbour', () => {
+    const thies = latLngToPercent(14.791, -16.926, REGION_FRAME)
+    const mbour = latLngToPercent(14.42, -16.96, REGION_FRAME)
+    expect(thies.x).toBeGreaterThan(mbour.x)
+    expect(thies.y).toBeLessThan(mbour.y)
   })
 })
 
