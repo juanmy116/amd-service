@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+import PhotoLightbox from './PhotoLightbox'
 import type { Technician } from './types'
 
 type Props = {
@@ -27,6 +29,8 @@ function initials(name: string): string {
 export default function AssignPanel({
   open, title, subtitle, description, photoUrl, technicians, currentTechnicianId, busy, onSelect, onClose,
 }: Props) {
+  const [zoomed, setZoomed] = useState(false)
+
   if (!open) return null
 
   return (
@@ -45,15 +49,15 @@ export default function AssignPanel({
               <p className="text-sm text-white/70 whitespace-pre-wrap line-clamp-4">{description}</p>
             )}
             {photoUrl && (
-              <a
-                href={photoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => setZoomed(true)}
+                title="Agrandir la photo"
                 className="block w-full overflow-hidden rounded-lg border border-chrome-line hover:opacity-90 transition-opacity"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photoUrl} alt="Photo signalée par le client" className="w-full max-h-48 object-cover" />
-              </a>
+              </button>
             )}
           </div>
         )}
@@ -107,6 +111,8 @@ export default function AssignPanel({
           </button>
         </div>
       </div>
+
+      {zoomed && photoUrl && <PhotoLightbox url={photoUrl} onClose={() => setZoomed(false)} />}
     </div>
   )
 }

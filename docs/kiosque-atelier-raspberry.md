@@ -179,6 +179,50 @@ se arregla desde la Raspberry. Como último recurso, `disable_overscan=1` en `/b
 
 ---
 
+## 4-ter. Sonido
+
+La opción `--autoplay-policy` del paso 4 solo consigue que **el navegador** pueda reproducir. Que
+eso se **oiga** depende de la Raspberry y de la TV, y DietPi no trae el audio configurado: una
+instalación mínima puede quedarse sin ALSA, y una Pi 3 con el driver clásico saca el sonido por
+el conector jack aunque la imagen vaya por HDMI. El síntoma es el de la instalación del
+2026-09-15: **sale el cartel rojo de avería nueva y no se oye nada** (si faltara la opción del
+navegador saldría en su lugar el botón «Activer le son»).
+
+En el propio kiosko hay un **botón con un altavoz en la cabecera**, al lado de `Carte / Kanban`:
+al pulsarlo suena la campana. Es la forma de probar esto de aquí —la salida de audio de la Pi y el
+volumen de la TV— sin tener que inventarse una avería.
+
+> ⚠️ Ese botón **no sirve para saber si falta la opción del paso 4**, y es importante no leerlo
+> así: el navegador siempre deja sonar lo que nace de un clic, de modo que el botón se pone verde
+> igualmente en una Raspberry mal configurada. Lo que delata el paso 4 es el aviso de una avería
+> de verdad, porque ahí nadie ha tocado nada: si el navegador lo bloquea, en vez de la campana
+> sale abajo a la izquierda el botón **«Activer le son des alertes»**.
+
+Por orden, conectado por SSH:
+
+```bash
+# 1. ¿Hay ALSA y qué salidas ve el sistema?
+aplay -l                    # si no existe el comando, falta ALSA:
+dietpi-software install 5   # ALSA (si el número no coincide: dietpi-software list | grep -i alsa)
+
+# 2. Elegir la salida. En dietpi-config: Audio Options → Sound card → la de HDMI.
+#    Con el driver clásico bcm2835 también vale a mano (0 = automático, 1 = jack, 2 = HDMI):
+amixer cset numid=3 2
+
+# 3. Volumen al máximo (el de la Raspberry, aparte del de la TV)
+amixer sset PCM 100%        # o 'Master', según la tarjeta; alsamixer lo enseña en pantalla
+
+# 4. Probar sin navegador de por medio
+speaker-test -c2 -t wav -l1
+```
+
+Si `speaker-test` se oye y la campana no, el problema está en el navegador; si no se oye ni eso,
+sigue siendo de sistema. Y antes de nada, lo evidente: **el volumen y el silencio de la TV**, y
+que esa entrada HDMI reproduzca sonido con otra fuente. Si la pantalla no tiene altavoces, no hay
+ajuste que valga: hace falta un altavoz por el jack o por USB.
+
+---
+
 ## 5. Dejar la sesión iniciada
 
 La primera vez hay que entrar a mano en la TV con la cuenta del kiosko:
@@ -211,9 +255,14 @@ crontab -e
 - [ ] Se enciende la Raspberry y aparece el kiosko **sin tocar nada**.
 - [ ] Se ve el mapa de Dakar con sus burbujas (si no, la red o la sesión fallan).
 - [ ] Al hacer clic en una burbuja se filtran las dos columnas.
-- [ ] **La campana suena**: pedir a alguien que abra una incidencia de prueba desde el portal, o
-      escanear el QR de una máquina. Debe sonar y salir el cartel rojo en menos de 30 segundos.
-      Si aparece el botón «Activer le son», es que falta la opción del punto 4.
+- [ ] **El altavoz funciona**: pulsar el botón del altavoz de la cabecera (al lado de `Carte`).
+      Si no se oye nada, paso **4-ter**. Que suene NO confirma el paso 4: eso lo verifica la
+      prueba siguiente, la única en la que el sonido arranca sin que nadie toque nada.
+- [ ] **El aviso completo llega**: pedir a alguien que abra una incidencia de prueba desde el
+      portal, o escanear el QR de una máquina. Debe sonar y salir el cartel rojo en menos de 30
+      segundos.
+- [ ] **El mapa tiene dos vistas**: `DAKAR` y `RÉGION` (ahí están Diass, Thiès y Mbour).
+- [ ] **La foto de una avería se ve** al abrir su ficha, y se cierra con «Fermer» al agrandarla.
 - [ ] A los 10 minutos sin tocar nada la pantalla **no** se apaga.
 - [ ] Desenchufar y volver a enchufar: arranca solo otra vez.
 
@@ -239,6 +288,8 @@ crontab -e
 | Pantalla negra a los minutos | Faltan las tres líneas de `xset` en el script (paso 4) |
 | Pide la contraseña cada mañana | El perfil de Chromium se borra, o arranca en incógnito (paso 5) |
 | No suena la campana, sale «Activer le son» | Falta `--autoplay-policy` (paso 4) |
+| Sale el cartel rojo pero no se oye nada | El navegador sí reproduce: es la salida de audio de la Raspberry o el volumen de la TV (paso 4-ter) |
+| La foto de la avería sale en blanco | Falta el dominio de Supabase en el `img-src` de la CSP (`next.config.ts`) |
 | Las horas y los días no cuadran | Zona horaria distinta de Africa/Dakar (paso 2) |
 | Va lento a los días | Falta el reinicio nocturno (paso 6) |
 | Sale «Chromium no se cerró correctamente» | Falta `--disable-session-crashed-bubble` (paso 4) |

@@ -6,7 +6,11 @@ const csp = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: https://images.unsplash.com`,
+  // El host de Supabase es obligatorio: las fotos que el cliente adjunta a una incidencia viven
+  // en un bucket PRIVADO y se sirven con URL firmada desde ese dominio. Sin él, el navegador
+  // bloquea la imagen incrustada (se ve un hueco) aunque abrir la URL a pelo funcione, porque
+  // navegar a la foto ya no pasa por `img-src`. Afecta a /atelier, /admin y /portal por igual.
+  `img-src 'self' data: blob: https://${SUPABASE_HOST} https://images.unsplash.com`,
   `connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST}`,
   "font-src 'self'",
   "frame-src 'none'",

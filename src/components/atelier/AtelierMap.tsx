@@ -1,7 +1,15 @@
 'use client'
 
 import { useMemo } from 'react'
-import { DAKAR_FRAME, bubbleRadius, isInsideFrame, latLngToPercent } from '@/lib/atelier/mapFrame'
+import { bubbleRadius } from '@/lib/atelier/mapFrame'
+import {
+  buildMapItems,
+  isBubbleActive,
+  isSelectionActive,
+  viewForCodes,
+  type MapChip,
+  type MapViewId,
+} from '@/lib/atelier/mapView'
 import {
   NO_QUARTIER,
   countByQuartier,
@@ -19,10 +27,23 @@ type Props = {
   maintenances: BoardMaintenance[]
   quartiers: Quartier[]
   selected: QuartierSelection | null
+  /** Qué foto se está mirando. Vive en el tablero para que el reposo la devuelva a «Dakar». */
+  view: MapViewId
+  onViewChange: (view: MapViewId) => void
   onSelect: (selection: QuartierSelection | null) => void
 }
 
-const DAKAR = 'Dakar'
+/** La foto de fondo de cada vista. Las dos son locales: la Raspberry no necesita Internet. */
+const BACKGROUND: Record<MapViewId, string> = {
+  dakar: '/images/atelier/dakar.jpg',
+  region: '/images/atelier/region.jpg',
+}
+
+/** Tamaño de las dos fotos. Manda la proporción de la caja del mapa (ver mapFrame.ts). */
+const MAP_WIDTH = 1100
+const MAP_HEIGHT = 1000
+
+const VIEW_LABEL: Record<MapViewId, string> = { dakar: 'Dakar', region: 'Région' }
 
 /**
  * Las medidas de las burbujas se expresan en `rem` para que crezcan con el tamaño base del
@@ -31,7 +52,9 @@ const DAKAR = 'Dakar'
  */
 const rem = (px: number) => `${px / 16}rem`
 
-export default function AtelierMap({ incidents, maintenances, quartiers, selected, onSelect }: Props) {
+export default function AtelierMap({
+  incidents, maintenances, quartiers, selected, view, onViewChange, onSelect,
+}: Props) {
   const panneCounts = useMemo(() => countByQuartier(incidents), [incidents])
 
   // Solo lo PENDIENTE: la columna esconde las visitas ya hechas, así que contarlas aquí
@@ -41,57 +64,25 @@ export default function AtelierMap({ incidents, maintenances, quartiers, selecte
     [maintenances]
   )
 
-  const countOf = (code: string) => (panneCounts.get(code) ?? 0) + (maintCounts.get(code) ?? 0)
-
-  const dakarZones = useMemo(
-    () => quartiers
-      .filter((q) => q.ville === DAKAR)
-      .map((q) => ({ quartier: q, point: latLngToPercent(q.lat, q.lng, DAKAR_FRAME) })),
-    [quartiers]
+  const { bubbles, chips } = useMemo(
+    () => buildMapItems(quartiers, panneCounts, maintCounts, view),
+    [quartiers, panneCounts, maintCounts, view]
   )
 
-  // Burbujas: zonas de Dakar dentro de la foto y con algo que enseñar.
-  const bubbles = dakarZones
-    .filter(({ point }) => isInsideFrame(point))
-    .map(({ quartier, point }) => ({
-      quartier, point,
-      pannes: panneCounts.get(quartier.code) ?? 0,
-      maints: maintCounts.get(quartier.code) ?? 0,
-    }))
-    .filter((b) => b.pannes > 0 || b.maints > 0)
-
-  // Chips: una ciudad = todas sus zonas (si Thiès tuviera dos barrios, el chip los agrupa).
-  // Se añaden también las zonas de Dakar que caen FUERA del encuadre de la foto: sin chip,
-  // sus avisos serían inalcanzables desde el mapa.
-  const chips = useMemo(() => {
-    const outsideDakar = new Set(
-      dakarZones.filter(({ point }) => !isInsideFrame(point)).map(({ quartier }) => quartier.code)
-    )
-
-    const groups = new Map<string, { id: string; label: string; codes: string[]; count: number }>()
-    for (const q of quartiers) {
-      const count = (panneCounts.get(q.code) ?? 0) + (maintCounts.get(q.code) ?? 0)
-      if (count === 0) continue
-      if (q.ville === DAKAR && !outsideDakar.has(q.code)) continue // ya tiene burbuja
-
-      // La clave agrupa; la etiqueta solo se pinta. Son espacios distintos (una ciudad puede
-      // llamarse igual que el barrio de otra), así que la identidad va por clave.
-      const key = outsideDakar.has(q.code) ? q.code : q.ville
-      const entry = groups.get(key) ?? {
-        id: key,
-        label: outsideDakar.has(q.code) ? q.label : q.ville,
-        codes: [],
-        count: 0,
-      }
-      entry.codes.push(q.code)
-      entry.count += count
-      groups.set(key, entry)
-    }
-    return [...groups.values()].sort((a, b) => b.count - a.count)
-  }, [quartiers, dakarZones, panneCounts, maintCounts])
-
-  const orphanCount = countOf(NO_QUARTIER)
+  const orphanCount = (panneCounts.get(NO_QUARTIER) ?? 0) + (maintCounts.get(NO_QUARTIER) ?? 0)
   const totalCount = incidents.length + maintenances.filter(isPendingMaintenance).length
+
+  /**
+   * Un chip lleva a la vista donde su zona se ve: pulsar «Diass» desde Dakar cambia de foto y
+   * allí la zona ya es una burbuja. Lo que no está en ninguna de las dos fotos (Touba) solo
+   * filtra las listas, sin mover el mapa.
+   */
+  function selectChip(chip: MapChip, active: boolean) {
+    if (active) return onSelect(null)
+    const target = viewForCodes(chip.codes, quartiers)
+    if (target && target !== view) onViewChange(target)
+    onSelect({ id: chip.id, label: chip.label, codes: chip.codes })
+  }
 
   // Ojo: las clases van LITERALES. Tailwind rastrea el código buscando cadenas completas,
   // así que una construida con plantilla (`bg-${tone}/20`) no acaba nunca en el CSS y el chip
@@ -106,11 +97,30 @@ export default function AtelierMap({ incidents, maintenances, quartiers, selecte
 
   return (
     <section className="flex flex-1 flex-col min-h-0 gap-2">
-      <div className="flex items-center justify-between px-1 shrink-0">
-        <span className="text-sm font-bold uppercase tracking-wide text-white">
-          {selected ? selected.label : 'Dakar'}
+      <div className="flex items-center justify-between gap-3 px-1 shrink-0">
+        {/* Conmutador de foto: el casco urbano o toda la región (Diass, Thiès, Mbour…) */}
+        <div className="flex items-center gap-1 rounded-lg bg-white/5 p-0.5">
+          {(['dakar', 'region'] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onViewChange(id)}
+              aria-pressed={view === id}
+              className={[
+                'rounded-md px-2.5 py-1 text-xs font-bold uppercase tracking-wide transition-colors',
+                view === id ? 'bg-white text-ink' : 'text-white/60 hover:text-white',
+              ].join(' ')}
+            >
+              {VIEW_LABEL[id]}
+            </button>
+          ))}
+        </div>
+
+        <span className="min-w-0 truncate text-sm font-bold uppercase tracking-wide text-white">
+          {selected?.label ?? ''}
         </span>
-        <div className="flex items-center gap-4 text-xs font-semibold text-white/50">
+
+        <div className="flex items-center gap-4 text-xs font-semibold text-white/50 shrink-0">
           <span className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-accent" /> Pannes
           </span>
@@ -120,61 +130,79 @@ export default function AtelierMap({ incidents, maintenances, quartiers, selecte
         </div>
       </div>
 
-      <div className="relative flex-1 min-h-0 overflow-hidden rounded-xl border-2 border-white/[0.05]">
-        {/* La foto es local: la Raspberry no necesita Internet ni servicio de mapas */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/images/atelier/dakar.jpg"
-          alt="Carte de Dakar"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+      {/* La caja de la foto conserva SU proporción (ver mapFrame.ts): las burbujas se colocan en
+          porcentaje sobre ella, así que si se deformara o se recortara dejarían de caer sobre su
+          barrio. Por eso la foto manda sobre el hueco, y no al revés. */}
+      <div className="flex flex-1 min-h-0 items-center justify-center" style={{ containerType: 'size' }}>
+        <div
+          // `w-full` es la red de seguridad del ancho de abajo: los hijos de esta caja son todos
+          // absolutos, así que un navegador que no entienda `cqh` descartaría esa declaración
+          // inline y se quedaría con un ancho de contenido de cero, es decir sin mapa. Al vivir en
+          // una clase, este 100% sobrevive a ese descarte (el estilo inline solo lo tapa cuando es
+          // válido), y el peor caso pasa a ser un mapa algo alto de más en vez de un hueco negro.
+          className="relative w-full overflow-hidden rounded-xl border-2 border-white/[0.05]"
+          style={{
+            aspectRatio: `${MAP_WIDTH} / ${MAP_HEIGHT}`,
+            // La foto crece hasta llenar el hueco por el lado que se agote antes: el ancho
+            // disponible, o el que le permite el alto (`cqh` = alto del hueco). Sin esto habría
+            // que elegir entre deformarla o recortarla, y las dos cosas descolocan las burbujas.
+            width: `min(100%, ${((MAP_WIDTH / MAP_HEIGHT) * 100).toFixed(2)}cqh)`,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={BACKGROUND[view]}
+            alt={view === 'dakar' ? 'Carte de Dakar' : 'Carte de la région de Dakar'}
+            className="absolute inset-0 h-full w-full object-fill"
+          />
 
-        {bubbles.map(({ quartier, point, pannes, maints }) => {
-          const active = selected?.codes.includes(quartier.code) ?? false
-          const total = pannes + maints
-          const radius = bubbleRadius(total)
-          const hasPannes = pannes > 0
+          {bubbles.map((bubble) => {
+            const active = isBubbleActive(bubble, selected?.codes ?? null)
+            const total = bubble.pannes + bubble.maints
+            const radius = bubbleRadius(total)
+            const hasPannes = bubble.pannes > 0
 
-          return (
-            <button
-              key={quartier.code}
-              type="button"
-              onClick={() =>
-                onSelect(active ? null : { id: quartier.code, label: quartier.label, codes: [quartier.code] })
-              }
-              className="absolute -translate-x-1/2 -translate-y-1/2 transition-transform hover:scale-110 focus:outline-none"
-              style={{ left: `${point.x}%`, top: `${point.y}%` }}
-              title={`${quartier.label} — ${pannes} panne(s), ${maints} maintenance(s)`}
-            >
-              <span
-                className="flex items-center justify-center rounded-full font-extrabold text-white shadow-lg"
-                style={{
-                  width: rem(radius * 2),
-                  height: rem(radius * 2),
-                  background: hasPannes ? '#BF0D0D' : '#2563EB',
-                  fontSize: rem(Math.max(14, radius * 0.8)),
-                  boxShadow: `0 0 0 ${active ? 6 : 10}px ${hasPannes ? 'rgba(191,13,13,.22)' : 'rgba(37,99,235,.22)'}${active ? ', 0 0 0 3px #fff' : ''}`,
-                }}
+            return (
+              <button
+                key={bubble.id}
+                type="button"
+                onClick={() =>
+                  onSelect(active ? null : { id: bubble.id, label: bubble.label, codes: bubble.codes })
+                }
+                className="absolute -translate-x-1/2 -translate-y-1/2 transition-transform hover:scale-110 focus:outline-none"
+                style={{ left: `${bubble.x}%`, top: `${bubble.y}%` }}
+                title={`${bubble.label} — ${bubble.pannes} panne(s), ${bubble.maints} maintenance(s)`}
               >
-                {total}
-              </span>
-              <span className="mt-1.5 block whitespace-nowrap text-center text-[11px] font-bold uppercase tracking-wide text-white drop-shadow-[0_1px_3px_rgba(0,0,0,.9)]">
-                {quartier.label.split(' · ')[0]}
-              </span>
-              {/* Cuando la zona mezcla pannes y maintenances, un punto azul lo avisa */}
-              {hasPannes && maints > 0 && (
                 <span
-                  className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-[#0E0E12]"
-                  style={{ background: '#2563EB' }}
-                />
-              )}
-            </button>
-          )
-        })}
+                  className="flex items-center justify-center rounded-full font-extrabold text-white shadow-lg"
+                  style={{
+                    width: rem(radius * 2),
+                    height: rem(radius * 2),
+                    background: hasPannes ? '#BF0D0D' : '#2563EB',
+                    fontSize: rem(Math.max(14, radius * 0.8)),
+                    boxShadow: `0 0 0 ${active ? 6 : 10}px ${hasPannes ? 'rgba(191,13,13,.22)' : 'rgba(37,99,235,.22)'}${active ? ', 0 0 0 3px #fff' : ''}`,
+                  }}
+                >
+                  {total}
+                </span>
+                <span className="mt-1.5 block whitespace-nowrap text-center text-[11px] font-bold uppercase tracking-wide text-white drop-shadow-[0_1px_3px_rgba(0,0,0,.9)]">
+                  {bubble.label.split(' · ')[0]}
+                </span>
+                {/* Cuando la zona mezcla pannes y maintenances, un punto azul lo avisa */}
+                {hasPannes && bubble.maints > 0 && (
+                  <span
+                    className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-[#0E0E12]"
+                    style={{ background: '#2563EB' }}
+                  />
+                )}
+              </button>
+            )
+          })}
 
-        <p className="absolute bottom-1.5 right-2 rounded bg-black/40 px-1.5 py-0.5 text-[10px] text-white/45">
-          Imagery: Esri, Maxar
-        </p>
+          <p className="absolute bottom-1.5 right-2 rounded bg-black/40 px-1.5 py-0.5 text-[10px] text-white/45">
+            Imagery: Esri, Maxar
+          </p>
+        </div>
       </div>
 
       {/* «Tout» quita el filtro y por eso cuenta TODO, incluidas las otras ciudades y los
@@ -185,14 +213,12 @@ export default function AtelierMap({ incidents, maintenances, quartiers, selecte
         </button>
 
         {chips.map((chip) => {
-          const active = selected?.id === chip.id
+          const active = isSelectionActive(chip.codes, selected?.codes ?? null)
           return (
             <button
               key={chip.id}
               type="button"
-              onClick={() =>
-                onSelect(active ? null : { id: chip.id, label: chip.label, codes: chip.codes })
-              }
+              onClick={() => selectChip(chip, active)}
               className={chipClass(active)}
             >
               {chip.label} <span className="text-accent">{chip.count}</span>
