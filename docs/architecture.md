@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización (parcial): 2026-09-15 — **rótulo `SERVICE TECHNIQUE` en la etiqueta QR** (PR #134, §6). ⚠️ El resto del documento sigue reflejando el estado del 2026-06-25: el kiosko del taller (`/atelier`, PRs #125–#131), el permiso `can_bill` (#123) y el candado de facturación (#122) **aún no están documentados aquí**.
+> Última actualización: 2026-09-15 — **rótulo `SERVICE TECHNIQUE` en la etiqueta QR** (PR #134, §6), **los 3 crons de Princity no importan nada** (§5) y **el rate limiting no protege hoy** (§Seguridad). Histórico 2026-09-11/15: kiosko del taller (§11, §11-bis, §11-ter, PRs #125–#131), permiso `can_bill` (#123) y candado de facturación (#122) — ya documentados en sus secciones.
 >
 > Anterior: 2026-06-25 — **foto adjunta a la incidencia** (el cliente adjunta una foto opcional al abrir la incidencia desde el portal **o desde el formulario público del QR `/signaler`**; la ven técnico, admin y cliente; bucket `incident-photos`, migración `20260625100000`). Histórico 2026-06-15: **tests RLS de cobertura completa** (88 tests de aislamiento por rol sobre todas las tablas sensibles, PR #93), **migración `middleware` → `proxy`** (convención Next.js 16, PR #94) y `main` protegida en GitHub (required check `typecheck · test · build`). Config de prod cerrada: `COMMERCIAL_EMAIL`, `NEXT_PUBLIC_APP_URL`. Histórico previo (2026-06-11): 3 capas de tests montadas (unit + aislamiento RLS + E2E Playwright, ver §Testing), endurecimiento RLS de `maintenance_visits` + `auth_rls_initplan`, borrado/terminación atómicos de contrato (`delete_contract`/`terminate_contract`), cabos de auditoría cerrados y reconstrucción limpia de la BD arreglada (P0-1). PRs #74–#85.
 
@@ -90,6 +90,8 @@ _(Scanner eliminado del nav; accesible vía FAB persistente)_
 - Detección visual de deltas negativos (⚠)
 
 ### 5. Integración Princity (4 Edge Functions vía API REST) ✅
+
+> 🔴 **ESTADO REAL (2026-09-15): las tres funciones se ejecutan cada noche y NO importan nada.** Terminan sin error, se marcan `success` en `princity_health` y el watchdog no salta, pero no crean ni una fila. En `princity_api_logs`: `princity-alerts` **3 019 ejecuciones → 0 incidencias** (con **321 alertas activas** esperando en Princity), `princity-counters` **248 → 0 relevés**, `princity-sync` solo clientes (**0 máquinas**). Dos causas verificadas contra la API real: (1) la respuesta v3 devuelve la **clave corta** (`date`, `deviceId`, `endMono`…) mientras el código lee la larga (`entry['BillingCounter.date']`) → todo `undefined`; (2) `/v1/devices` exige el parámetro **`status`** (`ACTIVE|INACTIVE|DELETED`) y sin él responde `400 "Provided contract doesn't exist"` — mensaje engañoso que el `.catch(() => [])` se traga. **Todo lo que describe esta sección es el diseño previsto, no lo que ocurre hoy.** Pasos de corrección y aviso sobre la avalancha de alertas acumuladas: `docs/pendientes.md`, primera sección.
 
 > **Cambio de arquitectura (sesión 5):** la antigua integración IMAP (`princity-agent`) fue sustituida por una integración directa contra la API REST de Princity. Solo lectura por diseño — el `PrincityClient` no expone ningún método de mutación.
 
@@ -637,7 +639,10 @@ Mapeo: `prefix → clients.princity_company_id`, `location.name → nom_client`,
 
 > **Nota sobre `ninea`:** la API copia exactamente lo que Princity tiene. Como Princity no exige el campo `taxNumber`, muchos contratos vienen con `null` y por tanto el `ninea` queda vacío en la BD. No es un bug: refleja la realidad de los datos en Princity. Si se necesita el NINEA completo, hay que registrarlo desde Princity o editarlo manualmente en `/admin/clients`.
 
-### `GET /v1/devices?contract=63` — equipos de un contrato
+### `GET /v1/devices?contract=63&status=ACTIVE` — equipos de un contrato
+
+> ⚠️ **`status` es OBLIGATORIO** (`ACTIVE` · `INACTIVE` · `DELETED`). Sin él la API responde `400 "Provided contract doesn't exist"` — mensaje engañoso: el contrato existe. Para el catálogo completo hay que pedir los tres estados (2026-09-15: 58 + 6 + 118 = **182 equipos**). `princity-sync` llama sin `status` y por eso no importa ninguna máquina (ver §5).
+
 ```json
 [
   {
@@ -652,6 +657,20 @@ Mapeo: `prefix → clients.princity_company_id`, `location.name → nom_client`,
 ```
 Mapeo: `id → machines.princity_device_id`, `serial → numero_serie` (PK), `deviceModel.color → type` (color/noir_blanc), `deviceModel.name → modele`, `deviceStatus === "ACTIVE" → active`.
 
+> ⚠️ **La petición usa el nombre LARGO, la respuesta devuelve el CORTO.** En `fieldIds` y en los filtros hay que escribir `BillingCounter.date` / `Alert.description` (la API lo exige así), pero las entradas de la respuesta llegan con la clave sin prefijo. Verificado contra la API real el 2026-09-15; **leer la clave larga devuelve `undefined`** y es la causa de que `princity-counters` y `princity-alerts` no importen nada (ver §5 y `docs/pendientes.md`).
+>
+> ```jsonc
+> // POST /v3/billingCounters  → respuesta real
+> { "entries": [ { "date": "2026-09-15", "deviceId": "17-0", "endMono": 42497, "endColor": 28210 } ],
+>   "numberOfAll": 38765 }
+>
+> // POST /v3/alerts → respuesta real
+> { "entries": [ { "severityLevel": "WARNING", "companyId": "34", "code": 801,
+>                  "description": "Non détecté(e) : Magasin 1 {12201}",
+>                  "activationDate": "2024-10-09T10:11:08.847+00:00", "deviceId": "34-0" } ],
+>   "numberOfAll": 321 }
+> ```
+
 ### `POST /v3/alerts` — alertas en curso
 fieldIds usados: `Alert.activationDate`, `Alert.severityLevel`, `Alert.description`, `Alert.deviceId`, `Alert.code`, `Alert.companyId`.
 Idempotencia en BD: clave compuesta `(princity_alert_code, princity_device_id_raw, received_at)`.
@@ -659,6 +678,7 @@ Idempotencia en BD: clave compuesta `(princity_alert_code, princity_device_id_ra
 ### `POST /v3/billingCounters` — contadores diarios por máquina
 fieldIds usados: `BillingCounter.date`, `BillingCounter.startMono`, `BillingCounter.endMono`, `BillingCounter.startColor`, `BillingCounter.endColor`.
 Filtro: `BillingCounter.deviceId EQ <princity_device_id>`. Orden: `BillingCounter.date DESC`, limit 1.
+**El filtro por fecha NO funciona**: `{ key: 'BillingCounter.date', type: 'GTE', value: '2026-08-01' }` responde `400 "Not able to deserialize data provided."`. Para barrer un rango hay que pedir sin filtro, ordenar `DESC` y paginar (`offset`/`limit`, máx. 1000) hasta rebasar la fecha buscada.
 
 ### Clasificación de `alert_type`
 - `severity = "error"` y `description` NO contiene "toner" → `panne` (crea incidencia)
@@ -1279,7 +1299,12 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - **`client_profiles` — sin auto-vinculación (2026-06-10):** revocado el `INSERT` directo a `authenticated` y eliminada la policy `client_own_profile_insert`. La única vía de vincular un usuario a un cliente es la verificación de contrato+email (`portal/verify`), que hace el upsert con `service_role`. Cierra el acceso cross-tenant.
 - **`service_role`** solo en servidor (Edge Functions, Server Actions) — nunca expuesto al cliente
 - **`machine_counters`** accesible únicamente por admins — datos de facturación
-- **Rate limiting** con Upstash Redis (sliding window) en endpoints públicos: login (5/15m por IP+email), signup (3/h por IP), verify contrato (10/h por IP+user), CSAT (5/h por IP+token), contact API (3/h por IP), **formulario público QR (2/h · 5/24h por `IP:serie`)**. Helper centralizado en `src/lib/rate-limit.ts`. **Fail-CLOSED en producción real** (WP-7): si faltan las credenciales de Upstash, deniega (no deja pasar todo en silencio). Se evalúa con `VERCEL_ENV === 'production'` (no `NODE_ENV`, que vale `'production'` también en los previews de Vercel) → previews/dev quedan permisivos.
+- **Rate limiting** con Upstash Redis (sliding window) en endpoints públicos: login (5/15m por IP+email), signup (3/h por IP), verify contrato (10/h por IP+user), CSAT (5/h por IP+token), contact API (3/h por IP), **formulario público QR (2/h · 5/24h por `IP:serie`)**. Helper centralizado en `src/lib/rate-limit.ts`, con **dos comportamientos distintos que conviene no confundir**:
+
+  - **Sin credenciales de Upstash** (`UPSTASH_REDIS_REST_URL`/`TOKEN` ausentes) → **fail-CLOSED en producción real** (WP-7): deniega, en vez de dejar pasar todo en silencio. Se evalúa con `VERCEL_ENV === 'production'` (no `NODE_ENV`, que vale `'production'` también en los previews de Vercel) → previews/dev quedan permisivos.
+  - **Con credenciales pero backend caído** (host borrado, sin red, timeout) → **fail-OPEN**: permite la petición y registra el error (PR #128, 2026-09-14). Es deliberado: ese día la base gratuita de Upstash se borró por inactividad, `limiter.limit()` empezó a lanzar y la Server Action de login reventaba con un 500 — **nadie podía entrar en la aplicación**, ni con la contraseña correcta; solo seguían dentro quienes ya tenían sesión. Un limitador caído no puede dejar a la empresa fuera de su propia app.
+
+  🔴 **ESTADO REAL (2026-09-15): no hay rate limiting efectivo.** Las variables siguen definidas en Vercel pero apuntan a una base que ya no existe, así que **todos** los endpoints públicos caen en la segunda rama y se permiten. La única protección contra fuerza bruta en el login es hoy la que aplica Supabase Auth por su cuenta. Rehacer el limitador está pendiente en `docs/pendientes.md`.
 
 ### Robustez de errores en UI (2026-06-10) — WP-5 / WP-5b
 
