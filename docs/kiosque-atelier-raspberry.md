@@ -179,6 +179,41 @@ se arregla desde la Raspberry. Como último recurso, `disable_overscan=1` en `/b
 
 ---
 
+## Encontrar la Raspberry en la red
+
+La IP **no es fija**: el router la reparte y tras un corte de luz o un reinicio puede acabar en otro
+aparato. Pasó el 2026-09-16 — el runbook decía `192.168.2.106`, y para entonces esa dirección era el
+móvil de alguien; la Pi estaba en `192.168.2.114`.
+
+El síntoma engaña: `ssh: connect to host ... port 22: Connection refused`. **No significa que la Pi
+esté apagada.** Significa que *algo* contestó y cerró la puerta. Si estuviera apagada, el ssh se
+quedaría esperando hasta agotar el tiempo.
+
+Lo que no cambia es su **dirección física (MAC)**, y las Raspberry se reconocen por el principio:
+`b8:27:eb` (Pi 1–3), `dc:a6:32` / `e4:5f:01` / `28:cd:c1` (Pi 4 y 5). Desde un Mac o Linux de la
+misma red:
+
+```bash
+# Despertar a todos los vecinos y mirar quién es quién
+for i in $(seq 1 254); do (ping -c1 -W400 192.168.2.$i >/dev/null 2>&1 &); done; sleep 15
+arp -a | grep -Ei "b8:27:eb|dc:a6:32|e4:5f:01|28:cd:c1"
+```
+
+La línea que salga lleva la IP buena. Para confirmar antes de entrar:
+
+```bash
+nc -z -G 3 <IP> 22 && echo abierto     # el 22 debe estar abierto
+nc -G 3 <IP> 22 </dev/null | head -1   # DietPi responde: SSH-2.0-dropbear_...
+```
+
+Dos señales que distinguen la Pi de un intruso en su antigua IP: responde al ping en **2-4 ms**
+(un móvil con el wifi dormido tarda 150-300 ms) y tiene el **22 abierto**.
+
+**Para no repetirlo:** reservar la IP en el router (DHCP estático) asociada a la MAC de la Pi, o
+llamarla por nombre — `ssh root@DietPi.local`.
+
+---
+
 ## 4-ter. Sonido
 
 > ⏰ **La campana calla de 19:00 a 07:00** (hora local del aparato) y **eso depende del reloj de la
