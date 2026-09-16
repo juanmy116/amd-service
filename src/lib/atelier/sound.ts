@@ -11,6 +11,24 @@ export const ALERT_SOUND = '/sounds/nouvelle-panne.mp3'
  */
 export const ALERT_SOUND_MS = 5_000
 
+/**
+ * Franja horaria en la que el kiosko puede sonar, en hora local del aparato (7:00–18:59).
+ *
+ * Fuera de ella la franja roja sigue en pantalla —para que al llegar por la mañana se vea lo que
+ * entró de madrugada—, pero la campana calla: una alarma repitiéndose sola en un taller vacío no
+ * avisa a nadie.
+ *
+ * ⚠️ Depende de la hora del sistema de la Raspberry. Si la Pi tiene mal la hora o la zona horaria
+ * (debe ser `Africa/Dakar`), esto silencia o despierta el kiosko a destiempo.
+ */
+export const RINGING_HOURS = { from: 7, to: 19 } as const
+
+/** ¿Puede sonar la campana ahora mismo? Función pura: `now` se pasa para poder probarla. */
+export function canRing(now: Date): boolean {
+  const hour = now.getHours()
+  return hour >= RINGING_HOURS.from && hour < RINGING_HOURS.to
+}
+
 /** Fundido final: cortar el bucle en seco, a mitad de campanada, suena a fallo. */
 const FADE_MS = 250
 const FADE_STEPS = 10

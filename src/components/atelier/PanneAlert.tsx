@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { BellRing, VolumeX } from 'lucide-react'
-import { ALERT_SOUND, ALERT_SOUND_MS, playAlertSound, type AlertPlayback } from '@/lib/atelier/sound'
+import { ALERT_SOUND, ALERT_SOUND_MS, canRing, playAlertSound, type AlertPlayback } from '@/lib/atelier/sound'
 
 type Props = {
   /** Cuántas averías nuevas han entrado en el último refresco. */
@@ -54,9 +54,14 @@ export default function PanneAlert({ newCount, lastNumero, at, unattendedCount }
     audioRef.current.preload = 'auto'
   }, [])
 
-  function ring() {
+  /**
+   * Hace sonar la campana. `manual` la reproduce aunque sea de noche: cuando el sonido nace de un
+   * clic (el botón «Activer le son»), callar haría pensar que está estropeado.
+   */
+  function ring(manual = false) {
     const audio = audioRef.current
     if (!audio) return
+    if (!manual && !canRing(new Date())) return
     playbackRef.current?.cancel()
     const playback = playAlertSound(audio, ALERT_SOUND_MS)
     playbackRef.current = playback
@@ -95,7 +100,7 @@ export default function PanneAlert({ newCount, lastNumero, at, unattendedCount }
       {blocked && (
         <button
           type="button"
-          onClick={ring}
+          onClick={() => ring(true)}
           className="fixed bottom-6 left-6 z-50 flex items-center gap-2 rounded-xl border border-warning/40 bg-warning/15 px-4 py-3 text-sm font-bold text-white shadow-lg"
         >
           <VolumeX size={18} className="text-warning" />
