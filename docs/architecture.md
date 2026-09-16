@@ -258,6 +258,25 @@ Diseño completo en `docs/superpowers/specs/2026-09-11-atelier-dashboard-carte-d
 - **Ficha** (`IncidentDetail` / `MaintenanceDetail`): ocupa el sitio del mapa, con las dos listas visibles. Asignar técnico y cambiar estado; el cambio de estado **delega** en `updateIncidentStatusAction` de `/admin/incidents` (historial, `resolved_at` y CSAT en un único sitio). La foto del cliente se muestra entera (`object-contain`) y se amplía en `PhotoLightbox`, **dentro de la app**: abrirla en una pestaña nueva dejaba el kiosko sin salida posible (Chromium va a pantalla completa, sin barra). Se cierra con «Fermer», Escape o clic fuera.
 - **Estado compartido** (`AtelierBoard`): filtros **y vista del mapa** sincronizados mapa↔listas; auto-refresco **pausado** mientras hay ficha abierta o filtro activo (`isBusy`), y vuelta sola a la vista general (Dakar, sin filtros) tras 2 min sin tocar nada (`needsReset`). Son dos condiciones distintas a propósito: la vista Région entra en la segunda pero **no** en la primera, porque mirar el mapa no es trabajar sobre una avería y pausar ahí el refresco dejaba la TV muda ante una panne nueva.
 - **Aviso de avería nueva** (`NewIncidentAlert`): campana (`public/sounds/nouvelle-panne.mp3`, generada para el proyecto) + cartel 12 s. Detecta comparando identificadores entre refrescos (`findNewIncidents`), sin conexión permanente con la base; en la primera carga NO suena. Los navegadores bloquean el audio sin interacción previa: la Raspberry arranca Chromium con `--autoplay-policy=no-user-gesture-required` (ver runbook), y si falla aparece un botón «Activer le son». **Que el navegador reproduzca no basta**: la salida de audio de la Raspberry y el volumen de la TV son otra cosa (paso 4-ter del runbook). Para probar *esa* parte sin inventarse una avería, la cabecera lleva un botón de altavoz (`SoundTestButton`) que suena la campana a demanda. Ojo con no pedirle más: al nacer de un clic, el navegador siempre le deja sonar, así que **no** diagnostica la falta de `--autoplay-policy` — eso solo lo delata el aviso de una panne real, que intenta sonar sin que nadie haya tocado nada.
+- **Insistencia hasta que alguien se hace cargo** (PR #137, 2026-09-16). El aviso de entrada es
+  efímero —cartel 12 s, campana 5 s— y un técnico en intervención se lo pierde entero. Por eso el
+  kiosko además **no se calla mientras quede una panne en `nouveau`**: `unattendedIncidents()`
+  (`src/lib/atelier/board.ts`) las detecta y `UnattendedBanner` pinta una franja bajo la cabecera
+  que **no se va sola ni con un clic** («2 pannes non prises en charge · la plus ancienne il y a
+  47 min»), más un **recordatorio sonoro cada 5 min**. **No hay estado «visto» nuevo**: el estado
+  de la incidencia ya dice si alguien se hizo cargo, y reconocer = **asignarla** (se puede desde
+  el propio kiosko), no pulsar un botón que se aprende a pulsar sin mirar. La franja se calcula
+  sobre **todas** las pannes, no sobre las filtradas: un filtro de quartier olvidado en la
+  pantalla no puede esconder una avería sin atender. Va **en el flujo, no flotando**: en una TV
+  encendida todo el día, un cartel superpuesto acabaría tapando la panne de la que habla.
+- **Duración y horario de la campana** (PR #137). `playAlertSound()` (`src/lib/atelier/sound.ts`)
+  repite el fichero (~2 s) **en bucle 5 s** y lo apaga con un fundido de 250 ms — cortar a media
+  campanada se oye como un fallo. `canRing()` la limita a **7:00–18:59, hora local del aparato**,
+  todos los días: una alarma repitiéndose de madrugada en un taller vacío no avisa a nadie. ⚠️
+  Depende del **reloj de la Raspberry** (zona `Africa/Dakar`). Dos excepciones deliberadas: de
+  noche **la franja roja sigue en pantalla** (se calla el sonido, no el aviso) y el **botón del
+  altavoz** de la cabecera suena a cualquier hora, porque al nacer de un clic callarse parecería
+  una avería del equipo.
 - **Tamaño:** `font-size` del documento al **115 %** solo en el kiosko (`KIOSK_FONT_SCALE` en `src/app/atelier/layout.tsx`), decidido viéndolo en la TV real. ⚠️ **No usar `--force-device-scale-factor` en la Raspberry Pi 3: deja la pantalla en blanco.**
 
 > **Trampas que costaron una ronda de revisión cada una:** (1) pedir todas las incidencias no cerradas con `limit(400)` ordenadas por antigüedad **vacía el tablero** cuando se acumulan résolu sin cerrar → se filtra por estado en la BD; (2) los estados reales de `maintenance_visits` son `planifié`/`fait`/`en_retard`; (3) Tailwind solo genera clases **literales**, `bg-${tone}/20` no llega al CSS; (4) `latLngToPercent` redondea a 4 decimales o React avisa de desajuste al hidratar; (5) la caja del mapa **tiene que** conservar la proporción de la foto o las burbujas se separan del terreno sin que se note; (6) las fotos del bucket privado viajan por `https://<proyecto>.supabase.co` y hay que declararlo en `img-src` de la CSP (`next.config.ts`) — al faltar, el `<img>` salía en blanco mientras abrir la URL a pelo funcionaba.

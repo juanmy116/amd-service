@@ -137,31 +137,23 @@
 
 ---
 
-## 🔊 Configurar el audio de la Raspberry del kiosko — LA CAMPANA NO SUENA EN EL TALLER
+## ✅ Audio de la Raspberry del kiosko — RESUELTO (2026-09-16)
 
-> **Estado (2026-09-15):** es **lo único** que falta para que el kiosko avise por sonido. **No es
-> un problema de código**: todo lo de la aplicación está hecho y en producción (PR #131).
+> El sonido **ya sale por la TV del taller**. Era lo que quedaba del montaje del kiosko.
 >
-> **Cómo se sabe que es la Raspberry y no el navegador.** Cuando entra una avería nueva salía el
-> cartel rojo en pantalla y **no** salía el botón «Activer le son des alertes». Ese botón es el que
-> aparece cuando Chromium bloquea el audio; si no sale, es que Chromium *estaba reproduciendo* y el
-> sonido se perdía más abajo: salida de audio de la Pi, cable o volumen de la TV. DietPi no
-> configura el audio en una instalación mínima, y una Pi 3 con el driver clásico saca el sonido por
-> el **jack** aunque la imagen vaya por HDMI.
+> **De paso apareció otra cosa**, y conviene recordarla: `ssh root@192.168.2.106` daba
+> `Connection refused`. La Pi no estaba apagada — **esa IP ya era el móvil de alguien**. La
+> Raspberry está ahora en **`192.168.2.114`**. Volverá a pasar mientras no se reserve la IP en el
+> router; cómo encontrarla: «Encontrar la Raspberry en la red» en `docs/kiosque-atelier-raspberry.md`.
 >
-> **Pasos:** sección **«4-ter. Sonido»** de `docs/kiosque-atelier-raspberry.md`, que ya los lleva
-> por orden (instalar ALSA, elegir la salida HDMI, subir el volumen y dejarlo guardado). Se hace
-> por SSH contra `192.168.2.106`.
+> ⏳ **Queda una comprobación**, la única que verifica la cadena entera: abrir una incidencia de
+> prueba y **no tocar nada**. Debe sonar sola en menos de 30 s. Si en vez de la campana sale
+> «Activer le son des alertes», falta `--autoplay-policy=no-user-gesture-required` (paso 4 del
+> runbook). El botón del altavoz de la cabecera NO sirve para esto: al nacer de un clic, Chromium
+> siempre lo deja sonar.
 >
-> **Cómo comprobar que quedó bien**, en este orden:
-> 1. En el kiosko, pulsar el **botón del altavoz de la cabecera**. Si se oye la campana, la Pi y la
->    TV están bien.
-> 2. ⚠️ **Ese botón NO comprueba la opción `--autoplay-policy` del paso 4**, y es importante no
->    leerlo así: como el sonido nace de un clic, Chromium siempre lo deja sonar y el botón se pone
->    verde igualmente en una Raspberry mal configurada.
-> 3. La prueba que sí lo verifica todo: pedir que alguien abra una incidencia de prueba (o escanear
->    el QR de una máquina) y **no tocar nada**. Debe sonar sola en menos de 30 segundos. Si en vez
->    de la campana aparece «Activer le son des alertes», lo que falta es la opción del paso 4.
+> ⏰ Y comprobar el reloj de la Pi (`timedatectl`, zona `Africa/Dakar`): de ello depende el
+> silencio nocturno de 19:00 a 07:00.
 
 ---
 
