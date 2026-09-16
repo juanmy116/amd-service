@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { Volume2, VolumeX } from 'lucide-react'
-import { ALERT_SOUND } from '@/lib/atelier/sound'
+import { ALERT_SOUND, ALERT_SOUND_MS, playAlertSound } from '@/lib/atelier/sound'
 
 type Result = 'idle' | 'playing' | 'error'
 
@@ -25,11 +25,11 @@ export default function SoundTestButton() {
 
   async function test() {
     const audio = (audioRef.current ??= new Audio(ALERT_SOUND))
-    audio.currentTime = 0
     try {
-      await audio.play()
+      // Misma duración que el aviso real: si la prueba sonara menos, no probaría lo mismo.
+      await playAlertSound(audio, ALERT_SOUND_MS).started
       setResult('playing')
-      setTimeout(() => setResult('idle'), 4000)
+      setTimeout(() => setResult('idle'), ALERT_SOUND_MS)
     } catch {
       // Aquí solo se llega si el fichero no carga o no se puede decodificar.
       setResult('error')
