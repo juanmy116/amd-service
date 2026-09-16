@@ -9,6 +9,7 @@ import {
   groupMaintenancesByDay,
   isPendingMaintenance,
   findNewIncidents,
+  unattendedIncidents,
   waitingLabel,
   type BoardIncident,
   type BoardMaintenance,
@@ -227,5 +228,36 @@ describe('findNewIncidents', () => {
 
   it('que desaparezca una (resuelta) no cuenta como novedad', () => {
     expect(findNewIncidents([a], new Set(['a', 'b']))).toEqual([])
+  })
+})
+
+describe('unattendedIncidents', () => {
+  it('solo cuenta las que nadie ha cogido', () => {
+    const sola      = inc({ id: 'a', status: 'nouveau' })
+    const asignada  = inc({ id: 'b', status: 'assigné', technicianId: 't1' })
+    const en_curso  = inc({ id: 'c', status: 'en_cours', technicianId: 't1' })
+
+    expect(unattendedIncidents([sola, asignada, en_curso]).map((i) => i.id)).toEqual(['a'])
+  })
+
+  it('devuelve la más antigua primero: es la que se nombra en el aviso', () => {
+    const nueva  = inc({ id: 'nueva',  createdAt: '2026-09-16T10:00:00Z' })
+    const vieja  = inc({ id: 'vieja',  createdAt: '2026-09-16T08:00:00Z' })
+    const media  = inc({ id: 'media',  createdAt: '2026-09-16T09:00:00Z' })
+
+    expect(unattendedIncidents([nueva, vieja, media]).map((i) => i.id)).toEqual(['vieja', 'media', 'nueva'])
+  })
+
+  it('sin averías sueltas no hay nada que reclamar', () => {
+    expect(unattendedIncidents([inc({ status: 'en_cours' })])).toEqual([])
+    expect(unattendedIncidents([])).toEqual([])
+  })
+
+  it('asignar una avería la saca del aviso: así se apaga la insistencia', () => {
+    const antes = inc({ id: 'x', status: 'nouveau' })
+    expect(unattendedIncidents([antes])).toHaveLength(1)
+
+    const despues = { ...antes, status: 'assigné' as const, technicianId: 't1' }
+    expect(unattendedIncidents([despues])).toHaveLength(0)
   })
 })

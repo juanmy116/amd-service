@@ -181,6 +181,20 @@ se arregla desde la Raspberry. Como último recurso, `disable_overscan=1` en `/b
 
 ## 4-ter. Sonido
 
+> ⏰ **La campana calla de 19:00 a 07:00** (hora local del aparato) y **eso depende del reloj de la
+> Raspberry**: si la Pi tiene mal la hora o la zona horaria, el kiosko se callará o sonará a
+> destiempo. Comprobar que dice `Africa/Dakar` y la hora correcta:
+>
+> ```bash
+> timedatectl            # o: date
+> dietpi-config          # → Language/Regional Options → Timezone
+> ```
+>
+> Fuera de ese horario la franja roja de «panne non prise en charge» **sigue en pantalla**: lo que
+> se silencia es el sonido, no el aviso. Y el botón del altavoz de la cabecera suena siempre, a
+> cualquier hora, para poder probar el equipo de noche.
+
+
 La opción `--autoplay-policy` del paso 4 solo consigue que **el navegador** pueda reproducir. Que
 eso se **oiga** depende de la Raspberry y de la TV, y DietPi no trae el audio configurado: una
 instalación mínima puede quedarse sin ALSA, y una Pi 3 con el driver clásico saca el sonido por

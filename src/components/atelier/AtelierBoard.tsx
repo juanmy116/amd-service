@@ -7,8 +7,9 @@ import MaintenanceList from './MaintenanceList'
 import AtelierMap, { type QuartierSelection } from './AtelierMap'
 import IncidentDetail from './IncidentDetail'
 import MaintenanceDetail from './MaintenanceDetail'
-import NewIncidentAlert from './NewIncidentAlert'
-import { filterByQuartier, findNewIncidents, type BoardIncident, type BoardMaintenance } from '@/lib/atelier/board'
+import PanneAlert from './PanneAlert'
+import UnattendedBanner from './UnattendedBanner'
+import { filterByQuartier, findNewIncidents, unattendedIncidents, waitingLabel, type BoardIncident, type BoardMaintenance } from '@/lib/atelier/board'
 import { assignIncidentAction, assignMaintenanceVisitAction, setIncidentStatusAction } from '@/app/atelier/actions'
 import type { MapViewId } from '@/lib/atelier/mapView'
 import type { Quartier } from '@/lib/quartiers'
@@ -105,6 +106,11 @@ export default function AtelierBoard({
     return () => clearInterval(t)
   }, [router, needsReset])
 
+  // Averías que nadie ha cogido: se miran sobre TODAS, no sobre las filtradas por zona — un
+  // filtro de barrio puesto en la pantalla no puede esconder una avería sin atender.
+  const unattended = unattendedIncidents(incidents)
+  const oldestLabel = unattended[0] ? waitingLabel(unattended[0].createdAt, now).text : null
+
   const visibleIncidents = filterByQuartier(incidents, quartierFilter?.codes ?? null)
   const visibleMaintenances = filterByQuartier(maintenances, quartierFilter?.codes ?? null)
 
@@ -120,7 +126,10 @@ export default function AtelierBoard({
   }
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-4 gap-4" onPointerDown={touch}>
+    <>
+      {unattended.length > 0 && <UnattendedBanner count={unattended.length} oldestLabel={oldestLabel} />}
+
+      <div className="grid min-h-0 flex-1 grid-cols-4 gap-4" onPointerDown={touch}>
       <PanneList
         incidents={visibleIncidents}
         statusFilter={statusFilter}
@@ -162,7 +171,12 @@ export default function AtelierBoard({
         )}
       </div>
 
-      <NewIncidentAlert newCount={alert.count} lastNumero={alert.numero} at={alert.at} />
+      <PanneAlert
+        newCount={alert.count}
+        lastNumero={alert.numero}
+        at={alert.at}
+        unattendedCount={unattended.length}
+      />
 
       <MaintenanceList
         maintenances={visibleMaintenances}
@@ -170,6 +184,7 @@ export default function AtelierBoard({
         selectedId={openMaintenance?.id ?? null}
         onOpen={(visit) => { touch(); setSelection({ kind: 'maintenance', id: visit.id }) }}
       />
-    </div>
+      </div>
+    </>
   )
 }

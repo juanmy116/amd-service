@@ -180,6 +180,24 @@ export function waitingLabel(createdAt: string, now: Date): { text: string; urge
   return { text: `il y a ${Math.max(0, Math.floor(elapsed / MINUTE))} min`, urgent }
 }
 
+// ─── Averías que nadie ha cogido ──────────────────────────────────────────────
+
+/**
+ * Averías de las que nadie se ha hecho cargo todavía: siguen en `nouveau`, sin técnico asignado.
+ *
+ * Es la lista que hace que el kiosko INSISTA. El aviso de entrada dura unos segundos y se pierde
+ * si el técnico está fuera; esto, en cambio, no se va solo: solo desaparece cuando alguien asigna
+ * la avería (desde el propio kiosko) o la pone en curso. Reconocer = hacerse cargo, no pulsar un
+ * botón de «ya lo he visto».
+ *
+ * Devuelve la más antigua primero, que es la que conviene nombrar en el aviso.
+ */
+export function unattendedIncidents(incidents: BoardIncident[]): BoardIncident[] {
+  return incidents
+    .filter((i) => i.status === 'nouveau')
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+}
+
 // ─── Aviso de avería nueva ────────────────────────────────────────────────────
 
 /**
