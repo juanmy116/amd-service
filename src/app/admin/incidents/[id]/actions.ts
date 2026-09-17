@@ -4,6 +4,8 @@ import { requireAdmin } from '@/lib/auth'
 import { INCIDENT_CATEGORIES, INCIDENT_PRIORITIES, INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
+import { sendCsatForIncident } from '@/lib/csat.server'
 
 type FormState = { error: string } | null
 
@@ -61,6 +63,15 @@ export async function updateIncidentAction(
       new_status:  effective_status,
       comment,
     })
+  }
+
+  // La ficha de admin es la tercera puerta a `résolu` (además del tech y del
+  // kanban): sin esto, resolver desde aquí no generaba encuesta y la incidencia
+  // se quedaba en `résolu` para siempre (quien la cierra es el propio envío).
+  // `after()` difiere el envío a DESPUÉS de la respuesta: el `redirect()` lanza
+  // por diseño y la función serverless podría apagarse con el envío a medias.
+  if (effective_status === 'résolu' && old_status !== 'résolu') {
+    after(() => sendCsatForIncident(id).catch(console.error))
   }
 
   redirect('/admin/incidents')
