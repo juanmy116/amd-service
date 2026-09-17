@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Plus, Activity, ChevronRight } from 'lucide-react'
+import { Plus, Activity, ChevronRight, MessageSquare } from 'lucide-react'
 import { CsatTrendChart, IncidentsTrendChart } from '@/components/admin/DashboardCharts'
 import type { CsatPoint, IncidentPoint } from '@/components/admin/DashboardCharts'
 import DashboardKpiStrip from '@/components/admin/DashboardKpiStrip'
@@ -44,6 +44,7 @@ async function getDashboardData() {
     countersRes,
     techRes,
     anomaliesRes,
+    negativeCsatRes,
   ] = await Promise.all([
     supabase.from('clients').select('*', { count: 'exact', head: true }).eq('active', true),
     supabase.from('machines').select('*', { count: 'exact', head: true }).eq('active', true),
@@ -67,6 +68,11 @@ async function getDashboardData() {
       .eq('status', 'actif'),
     supabase.from('profiles').select('id, full_name').eq('role', 'technician').order('full_name'),
     supabase.from('machine_anomalies').select('light').eq('status', 'open'),
+    supabase
+      .from('csat_responses')
+      .select('id')
+      .lte('rating', 2)
+      .gte('responded_at', new Date(Date.now() - 7 * 86_400_000).toISOString()),
   ])
 
   const incidents  = incidentsRes.data  ?? []
@@ -77,6 +83,7 @@ async function getDashboardData() {
   const anomalies  = anomaliesRes.data  ?? []
   const openAnomalies = anomalies.length
   const redAnomalies  = anomalies.filter(a => a.light === 'red').length
+  const negativeCsat  = (negativeCsatRes.data ?? []).length
 
   const openIncidents = incidents.filter(i => !['résolu', 'fermé'].includes(i.status)).length
   const totalCopies   = counters.reduce((s, c) => s + (c.counter_bw ?? 0) + (c.counter_color ?? 0), 0)
@@ -139,6 +146,7 @@ async function getDashboardData() {
     totalCopies,
     avgCsat,
     csatCount:  csatData.length,
+    negativeCsat,
     csatTrend,
     incidentsTrend,
     statusDist,
@@ -177,6 +185,19 @@ export default async function Dashboard() {
         openIncidents={data.stats.openIncidents}
         avgCsat={data.avgCsat}
       />
+
+      {data.negativeCsat > 0 && (
+        <Link
+          href="/admin/avis?negatifs=1"
+          className="flex items-center gap-3 px-4 py-3 rounded-xl border border-accent/30 bg-accent-soft text-sm hover:bg-accent-soft/70 transition-colors"
+        >
+          <MessageSquare size={16} className="text-accent shrink-0" />
+          <span className="text-ink font-medium">
+            {data.negativeCsat} avis négatif{data.negativeCsat > 1 ? 's' : ''} cette semaine
+          </span>
+          <ChevronRight size={15} className="text-ink-muted ml-auto" />
+        </Link>
+      )}
 
       {data.openAnomalies > 0 && (
         <Link
