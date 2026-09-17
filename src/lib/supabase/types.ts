@@ -10,7 +10,32 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.5"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -408,6 +433,8 @@ export type Database = {
           incident_id: string
           rating: number | null
           responded_at: string | null
+          sent_at: string | null
+          sent_to: string | null
           token: string
         }
         Insert: {
@@ -418,6 +445,8 @@ export type Database = {
           incident_id: string
           rating?: number | null
           responded_at?: string | null
+          sent_at?: string | null
+          sent_to?: string | null
           token?: string
         }
         Update: {
@@ -428,6 +457,8 @@ export type Database = {
           incident_id?: string
           rating?: number | null
           responded_at?: string | null
+          sent_at?: string | null
+          sent_to?: string | null
           token?: string
         }
         Relationships: [
@@ -983,7 +1014,36 @@ export type Database = {
           reviewed_by?: string | null
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "machine_anomalies_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["numero_serie"]
+          },
+          {
+            foreignKeyName: "machine_anomalies_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machine_park"
+            referencedColumns: ["numero_serie"]
+          },
+          {
+            foreignKeyName: "machine_anomalies_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_anomalies_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       machine_counters: {
         Row: {
@@ -1002,7 +1062,7 @@ export type Database = {
           month: number
           notes: string | null
           previous_machine_id: string | null
-          reading_date: string
+          reading_date: string | null
           recorded_at: string
           recorded_by: string | null
           status: string
@@ -1024,6 +1084,7 @@ export type Database = {
           month: number
           notes?: string | null
           previous_machine_id?: string | null
+          reading_date?: string | null
           recorded_at?: string
           recorded_by?: string | null
           status?: string
@@ -1045,6 +1106,7 @@ export type Database = {
           month?: number
           notes?: string | null
           previous_machine_id?: string | null
+          reading_date?: string | null
           recorded_at?: string
           recorded_by?: string | null
           status?: string
@@ -1071,6 +1133,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contracts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_counters_contract_machine_id_fkey"
+            columns: ["contract_machine_id"]
+            isOneToOne: false
+            referencedRelation: "contract_machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_counters_contract_machine_id_fkey"
+            columns: ["contract_machine_id"]
+            isOneToOne: false
+            referencedRelation: "v_machine_park"
+            referencedColumns: ["open_line_id"]
           },
           {
             foreignKeyName: "machine_counters_machine_id_fkey"
@@ -1311,21 +1387,6 @@ export type Database = {
           },
         ]
       }
-      parts: {
-        Row: {
-          id: number
-          name: string
-        }
-        Insert: {
-          id?: number
-          name: string
-        }
-        Update: {
-          id?: number
-          name?: string
-        }
-        Relationships: []
-      }
       part_yield_specs: {
         Row: {
           created_at: string
@@ -1369,6 +1430,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      parts: {
+        Row: {
+          id: number
+          name: string
+        }
+        Insert: {
+          id?: number
+          name: string
+        }
+        Update: {
+          id?: number
+          name?: string
+        }
+        Relationships: []
       }
       pending_counter_imports: {
         Row: {
@@ -1691,59 +1767,31 @@ export type Database = {
       }
     }
     Views: {
-      v_machine_part_consumption: {
+      v_csat_feedback: {
         Row: {
-          copies_since_change: number | null
-          expected_yield_total: number | null
-          last_change_at: string | null
+          comment: string | null
+          contact_email: string | null
+          contact_name: string | null
+          id: string | null
+          incident_id: string | null
           machine_id: string | null
-          marque: string | null
-          modele: string | null
-          part_id: number | null
-          part_name: string | null
-          samples: number | null
-          yield_source: string | null
+          nom_client: string | null
+          numero_incident: string | null
+          rating: number | null
+          responded_at: string | null
+          sent_at: string | null
+          sent_to: string | null
+          title: string | null
         }
-        Relationships: []
-      }
-      v_part_yield_baseline: {
-        Row: {
-          avg_yield_total: number | null
-          marque: string | null
-          modele: string | null
-          part_id: number | null
-          samples: number | null
-        }
-        Relationships: []
-      }
-      v_part_yield_effective: {
-        Row: {
-          expected_yield_total: number | null
-          historical_samples: number | null
-          marque: string | null
-          modele: string | null
-          part_id: number | null
-          part_name: string | null
-          yield_source: string | null
-        }
-        Relationships: []
-      }
-      v_machine_parts_history: {
-        Row: {
-          category: string | null
-          changed_at: string | null
-          description: string | null
-          machine_id: string | null
-          part_id: number | null
-          part_name: string | null
-          quantity: number | null
-          reference: string | null
-          source: string | null
-          source_id: string | null
-          technician_id: string | null
-          technician_name: string | null
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "csat_responses_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: true
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       v_machine_park: {
         Row: {
@@ -1777,6 +1825,60 @@ export type Database = {
           },
         ]
       }
+      v_machine_part_consumption: {
+        Row: {
+          copies_since_change: number | null
+          expected_yield_total: number | null
+          last_change_at: string | null
+          machine_id: string | null
+          marque: string | null
+          modele: string | null
+          part_id: number | null
+          part_name: string | null
+          samples: number | null
+          yield_source: string | null
+        }
+        Relationships: []
+      }
+      v_machine_parts_history: {
+        Row: {
+          category: string | null
+          changed_at: string | null
+          description: string | null
+          machine_id: string | null
+          part_id: number | null
+          part_name: string | null
+          quantity: number | null
+          reference: string | null
+          source: string | null
+          source_id: string | null
+          technician_id: string | null
+          technician_name: string | null
+        }
+        Relationships: []
+      }
+      v_part_yield_baseline: {
+        Row: {
+          avg_yield_total: number | null
+          marque: string | null
+          modele: string | null
+          part_id: number | null
+          samples: number | null
+        }
+        Relationships: []
+      }
+      v_part_yield_effective: {
+        Row: {
+          expected_yield_total: number | null
+          historical_samples: number | null
+          marque: string | null
+          modele: string | null
+          part_id: number | null
+          part_name: string | null
+          yield_source: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       assign_machine_from_stock: { Args: { p_payload: Json }; Returns: string }
@@ -1789,6 +1891,7 @@ export type Database = {
       auth_tech_incident_contract_ids: { Args: never; Returns: string[] }
       auth_tech_incident_ids: { Args: never; Returns: string[] }
       auth_tech_visit_ids: { Args: never; Returns: string[] }
+      can_bill: { Args: never; Returns: boolean }
       close_maintenance_visit: {
         Args: {
           p_autres_pieces: string
@@ -1800,7 +1903,6 @@ export type Database = {
         }
         Returns: Json
       }
-      can_bill: { Args: never; Returns: boolean }
       create_contract_with_lines: { Args: { payload: Json }; Returns: Json }
       delete_contract: { Args: { p_contract_id: string }; Returns: Json }
       emit_contract_invoice: { Args: { p_payload: Json }; Returns: string }
@@ -1815,15 +1917,22 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       next_incident_number: { Args: never; Returns: string }
       next_invoice_number: { Args: never; Returns: string }
+      orphan_incident_photo_paths: { Args: never; Returns: string[] }
       process_counter_extraction: {
         Args: { p_extracted: Json; p_pending_id: string }
         Returns: Json
       }
       register_counter_duplicate: { Args: { p_hash: string }; Returns: Json }
+      replace_consumption_anomalies: {
+        Args: { p_rows: Json }
+        Returns: undefined
+      }
       replace_contract_machine: { Args: { p_payload: Json }; Returns: string }
-      replace_consumption_anomalies: { Args: { p_rows: Json }; Returns: undefined }
       return_machine_to_stock: { Args: { p_payload: Json }; Returns: string }
-      set_incident_parts: { Args: { p_incident_id: string; p_parts: Json }; Returns: undefined }
+      set_incident_parts: {
+        Args: { p_incident_id: string; p_parts: Json }
+        Returns: undefined
+      }
       terminate_contract: { Args: { p_payload: Json }; Returns: Json }
       update_contract_with_lines: {
         Args: { p_contract_id: string; payload: Json }
@@ -1855,12 +1964,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1884,11 +1993,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1909,11 +2018,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1934,11 +2043,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1951,11 +2060,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1965,6 +2074,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       alert_type: ["panne", "toner_bas", "autre"],

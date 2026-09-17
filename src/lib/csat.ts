@@ -1,86 +1,60 @@
-import { createAdminClient } from './supabase/admin'
-import { sendEmail } from './email'
+/**
+ * Encuesta de satisfacción (CSAT): decisión de a quién se le envía.
+ *
+ * Lógica pura, separada de `csat.server.ts` a propósito: así se puede probar sin Supabase
+ * (mismo patrón que `quartiers.ts` / `quartiers.server.ts`).
+ */
 
-export async function sendCsatForIncident(incidentId: string): Promise<void> {
-  const admin = createAdminClient()
+export type CsatRecipient = { email: string; source: 'contact' | 'portal' } | null
 
-  const { data: existing } = await admin
-    .from('csat_responses')
-    .select('token, responded_at')
-    .eq('incident_id', incidentId)
-    .maybeSingle()
+/**
+ * Elige a quién se le envía la encuesta.
+ *
+ * El email del formulario público va PRIMERO a propósito: es quien reportó la avería y quien
+ * vivió la intervención. La cuenta del portal queda como respaldo para las incidencias internas.
+ */
+export function resolveCsatRecipient(
+  contactEmail: string | null | undefined,
+  portalEmail: string | null | undefined,
+): CsatRecipient {
+  const contact = contactEmail?.trim()
+  if (contact) return { email: contact, source: 'contact' }
 
-  if (existing?.responded_at) return
+  const portal = portalEmail?.trim()
+  if (portal) return { email: portal, source: 'portal' }
 
-  const { data: incident } = await admin
-    .from('incidents')
-    .select('id, title, contract_machine_id')
-    .eq('id', incidentId)
-    .single()
+  return null
+}
 
-  if (!incident) return
+/** Días que el email promete al cliente («Ce lien est valable 7 jours») y que aplica la BD por defecto. */
+export const CSAT_VALIDITY_DAYS = 7
 
-  // Resolver client_id por contract_machine_id.
-  let clientId: number | null = null
+/**
+ * ¿Hay ya una encuesta enviada que el cliente todavía puede responder?
+ *
+ * Si la respuesta es «sí», reenviar sobra: duplicaría el email y pisaría `sent_to`/`sent_at`.
+ * Si es «no» (nunca se envió, o el enlace ya caducó) hay que enviar y refrescar la caducidad:
+ * mandar un token vencido cuenta la encuesta como enviada y el cliente solo ve «Ce lien a expiré».
+ *
+ * Una fecha ausente o ilegible se trata como NO vigente a propósito: es el lado seguro
+ * (a lo sumo se reenvía de más, nunca se da por buena una encuesta que nadie puede responder).
+ */
+export function isSurveyStillValid(
+  sentAt: string | null | undefined,
+  expiresAt: string | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!sentAt || !expiresAt) return false
 
-  if (incident.contract_machine_id) {
-    const { data: line } = await admin
-      .from('contract_machines')
-      .select('contracts(client_id)')
-      .eq('id', incident.contract_machine_id)
-      .single()
-    clientId = line?.contracts?.client_id ?? null
-  }
+  const expires = new Date(expiresAt).getTime()
+  if (Number.isNaN(expires)) return false
 
-  if (!clientId) return
+  return expires > now.getTime()
+}
 
-  const { data: cp } = await admin
-    .from('client_profiles')
-    .select('profile_id')
-    .eq('client_id', clientId)
-    .maybeSingle()
-
-  if (!cp?.profile_id) return
-
-  const { data: { user } } = await admin.auth.admin.getUserById(cp.profile_id)
-  if (!user?.email) return
-
-  let token: string
-  if (existing) {
-    token = existing.token
-  } else {
-    const { data: csat } = await admin
-      .from('csat_responses')
-      .insert({ incident_id: incidentId })
-      .select('token')
-      .single()
-    if (!csat?.token) return
-    token = csat.token
-  }
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  const csatUrl = `${appUrl}/csat/${token}`
-
-  await sendEmail({
-    template: 'csat',
-    to: user.email,
-    data: { title: incident.title, csat_url: csatUrl },
-  })
-
-  const { data: closed } = await admin
-    .from('incidents')
-    .update({ status: 'fermé', closed_at: new Date().toISOString() })
-    .eq('id', incidentId)
-    .eq('status', 'résolu')
-    .select('id')
-
-  if (closed && closed.length > 0) {
-    await admin.from('incident_history').insert({
-      incident_id: incidentId,
-      changed_by: null,
-      old_status: 'résolu',
-      new_status: 'fermé',
-      comment: 'Fermé automatiquement — email CSAT envoyé',
-    })
-  }
+/** Fecha de caducidad de un enlace que sale AHORA: `now` + 7 días, en ISO para Supabase. */
+export function csatExpiresAt(now: Date = new Date()): string {
+  const expires = new Date(now)
+  expires.setDate(expires.getDate() + CSAT_VALIDITY_DAYS)
+  return expires.toISOString()
 }

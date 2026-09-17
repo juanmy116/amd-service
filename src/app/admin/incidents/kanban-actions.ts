@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
 import type { TablesUpdate } from '@/lib/supabase/types'
-import { sendCsatForIncident } from '@/lib/csat'
+import { sendCsatForIncident } from '@/lib/csat.server'
+import { after } from 'next/server'
 
 export async function updateIncidentStatusAction(
   incidentId: string,
@@ -44,8 +45,12 @@ export async function updateIncidentStatusAction(
     comment:     null,
   })
 
+  // `after()` difiere el envío a DESPUÉS de la respuesta: sin él, el `return` de
+  // abajo puede dar por terminada la función serverless con el envío a medias
+  // (ni correo, ni fila, ni rastro). El `.catch` evita que un fallo del envío
+  // tumbe la acción del usuario.
   if (newStatus === 'résolu' && oldStatus !== 'résolu') {
-    sendCsatForIncident(incidentId).catch(console.error)
+    after(() => sendCsatForIncident(incidentId).catch(console.error))
   }
 
   return {}

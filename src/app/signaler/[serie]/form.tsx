@@ -88,13 +88,13 @@ export default function SignalerForm({ machine }: { machine: Machine }) {
 
         <div>
           <label htmlFor="contact_email" className="block text-sm font-medium text-gray-700 mb-1">
-            Email{' '}
-            <span className="text-gray-400 font-normal text-xs">(optionnel)</span>
+            Email <span style={{ color: '#BF0D0D' }}>*</span>
           </label>
           <input
             id="contact_email"
             type="email"
             name="contact_email"
+            required
             maxLength={100}
             autoComplete="email"
             placeholder="votre@email.com"

@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { redirect } from 'next/navigation'
-import { sendCsatForIncident } from '@/lib/csat'
+import { after } from 'next/server'
+import { sendCsatForIncident } from '@/lib/csat.server'
 import { PARTS } from '@/lib/parts'
 
 type FormState = { error: string } | null
@@ -76,8 +77,12 @@ export async function submitInterventionAction(
     return { error: 'Erreur lors de l\'enregistrement des pièces. Veuillez réessayer.' }
   }
 
+  // `after()` difiere el envío a DESPUÉS de la respuesta: el `redirect()` de
+  // abajo lanza por diseño y la función serverless podría apagarse con el envío
+  // a medias (ni correo, ni fila, ni rastro). El `.catch` evita que un fallo del
+  // envío tumbe la acción del usuario.
   if (new_status === 'résolu' && old_status !== 'résolu') {
-    sendCsatForIncident(id).catch(console.error)
+    after(() => sendCsatForIncident(id).catch(console.error))
   }
 
   redirect('/tech')

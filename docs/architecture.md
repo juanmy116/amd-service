@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-09-17 — **el kiosko del taller queda CERRADO: montado, sonando y verificado en la TV** (§11; PR #139 docs, tras #137 audio/insistencia). Sigue abierto: **el rate limiting no protege hoy** (§Seguridad) y **los 3 crons de Princity no importan nada** (§5). Anterior 2026-09-15: rótulo `SERVICE TECHNIQUE` en la etiqueta QR (PR #134, §6). Histórico 2026-09-11/15: kiosko del taller (§11, §11-bis, §11-ter, PRs #125–#131), permiso `can_bill` (#123) y candado de facturación (#122) — ya documentados en sus secciones.
+> Última actualización: 2026-09-17 — **la encuesta CSAT por fin llega a alguien** (§7-bis): se envía al email del formulario del QR, el envío queda trazado y las opiniones se leen en `/admin/avis`, en la ficha de la avería y en una franja del tablero. Ese mismo día: **el kiosko del taller queda CERRADO: montado, sonando y verificado en la TV** (§11; PR #139 docs, tras #137 audio/insistencia). Sigue abierto: **el rate limiting no protege hoy** (§Seguridad) y **los 3 crons de Princity no importan nada** (§5). Anterior 2026-09-15: rótulo `SERVICE TECHNIQUE` en la etiqueta QR (PR #134, §6). Histórico 2026-09-11/15: kiosko del taller (§11, §11-bis, §11-ter, PRs #125–#131), permiso `can_bill` (#123) y candado de facturación (#122) — ya documentados en sus secciones.
 >
 > Anterior: 2026-06-25 — **foto adjunta a la incidencia** (el cliente adjunta una foto opcional al abrir la incidencia desde el portal **o desde el formulario público del QR `/signaler`**; la ven técnico, admin y cliente; bucket `incident-photos`, migración `20260625100000`). Histórico 2026-06-15: **tests RLS de cobertura completa** (88 tests de aislamiento por rol sobre todas las tablas sensibles, PR #93), **migración `middleware` → `proxy`** (convención Next.js 16, PR #94) y `main` protegida en GitHub (required check `typecheck · test · build`). Config de prod cerrada: `COMMERCIAL_EMAIL`, `NEXT_PUBLIC_APP_URL`. Histórico previo (2026-06-11): 3 capas de tests montadas (unit + aislamiento RLS + E2E Playwright, ver §Testing), endurecimiento RLS de `maintenance_visits` + `auth_rls_initplan`, borrado/terminación atómicos de contrato (`delete_contract`/`terminate_contract`), cabos de auditoría cerrados y reconstrucción limpia de la BD arreglada (P0-1). PRs #74–#85.
 
@@ -38,6 +38,7 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 - Gestión y asignación de incidencias (Kanban drag & drop)
 - Generación de QR por máquina (etiqueta imprimible con logo, datos y código QR)
 - Módulo de contadores de copias agrupado por cliente
+- **Opiniones de clientes** (`/admin/avis`): respuestas a las encuestas de satisfacción, con nota, comentario, quién la dejó y enlace a la avería; filtro «★ ≤ 2». Entrada «Avis clients» en el grupo **Service** de la sidebar (ver §7-bis)
 - Gestión de usuarios internos (técnicos y admins)
 - Gestión de **Leads** (`/admin/leads`): leads recibidos del formulario público de contacto del sitio web, con estado (nouveau / traité / archivé). Entrada "Leads" en el grupo **Pilotage** de la sidebar admin
 - Creación directa de cuentas: admin introduce email + contraseña temporal → cuenta activa al instante (`createUser` con `email_confirm: true`), sin flujo de invitación por email
@@ -164,6 +165,38 @@ Ruta pública **sin autenticación** para que cualquier persona abra un incident
 - El cliente valora de 1 a 5 + comentario opcional
 - Página pública `/csat/[token]` sin autenticación
 - Respuestas almacenadas en `csat_responses`
+
+#### 7-bis. Destinatario, trazabilidad y lectura de las opiniones (2026-09-17)
+
+> **Por qué este bloque existe.** Hasta el 2026-09-17 **no se había enviado ni una sola encuesta**
+> en toda la vida de la app (0 filas con `sent_at`, 0 respuestas). No era un bug suelto: el sistema
+> se diseñó para un portal de clientes que aún no existe (**0 cuentas de portal de 68 clientes
+> activos**), y `sendCsatForIncident` descartaba de entrada toda incidencia sin
+> `contract_machine_id` — justo las del **QR público**, que son las únicas que hay. Encima, el
+> comentario del cliente se guardaba y **no se mostraba en ninguna pantalla**.
+
+- **Destinatario en cascada.** `resolveCsatRecipient` (`src/lib/csat.ts`, **lógica pura y testeada**)
+  elige: `incidents.contact_email` → email de la cuenta de portal del cliente → nadie. El del
+  formulario va **primero** a propósito: es quien reportó la avería y quien vivió la intervención.
+- **Separación puro/servidor.** `src/lib/csat.ts` (puro, sin `server-only`) y
+  **`src/lib/csat.server.ts`** (`sendCsatForIncident`, Supabase admin). Mismo patrón que
+  `quartiers.ts` / `quartiers.server.ts`. Sin esa separación la lógica no es testeable: importar el
+  módulo de servidor desde vitest revienta con `server-only`.
+- **El email es obligatorio en el formulario del QR** (`/signaler/[serie]`), en navegador **y en
+  servidor** (`validateContactEmail`, `src/lib/publicIncident.ts`). Riesgo asumido y documentado:
+  quien no tenga email a mano no puede avisar de la avería. ⚠️ La columna `incidents.contact_email`
+  **sigue siendo nullable en BD** a propósito: hay incidencias anteriores sin email.
+- **Nada falla en silencio.** `csat_responses.sent_to` / `sent_at` registran a dónde y cuándo se
+  envió. Si no hay destinatario, o si el envío del email falla, se anota en `incident_history` y
+  **la incidencia NO se cierra** (se queda en `résolu` para poder reintentar). `sendEmail` no lanza
+  cuando el proveedor rechaza el envío — devuelve `{ error }` —, así que hay que mirar su retorno;
+  y además puede lanzar si revienta el `fetch`. Un `sent_at` que miente es peor que no tenerlo.
+- **Dónde se leen las opiniones:** página **`/admin/avis`** (lista con filtro ★≤2, sobre la vista
+  `v_csat_feedback`), bloque **«Avis du client»** en la ficha de la avería, y **franja roja en el
+  tablero** de `/admin` con los avisos de 1-2 estrellas de los últimos 7 días. La franja **no tiene
+  estado «visto»**: se va sola a los 7 días (misma decisión que en el kiosko, PR #137 — un botón de
+  «ya lo he visto» se acaba pulsando sin mirar).
+- Componente compartido `src/components/ui/Stars.tsx` (lista y ficha).
 
 ### 7. Dashboard de Dirección (`/admin`) ✅
 - KPIs: clientes activos, máquinas activas, contratos activos, incidentes abiertos, CSAT medio, copias este mes
@@ -549,10 +582,11 @@ pg_cron `princity-alerts-hourly` (cada hora)
   → Admin asigna técnico → incidents (status: assigné)
   → Técnico escanea QR → /tech/scan/[serie] → auto-transición assigné → en_cours (automático)
   → Técnico completa formulario + piezas → résolu
-  → sendCsatForIncident: Resend envía CSAT + auto-transición résolu → fermé (automático)
+  → sendCsatForIncident: Resend envía CSAT al contacto del QR (o a la cuenta de portal)
+    + auto-transición résolu → fermé — SOLO si el email sale de verdad (§7-bis)
 ```
 
-> **Flujo QR automático (sesión 12):** el 1er escaneo QR del técnico dispara `assigné → en_cours` sin acción manual. Al resolver (`résolu`), `src/lib/csat.ts` envía el email CSAT y cierra automáticamente a `fermé` (guard `.eq('status','résolu')` + comprobación de filas actualizadas antes de insertar en `incident_history`). El admin puede seguir cerrando manualmente desde el kanban en casos donde no hay portal cliente.
+> **Flujo QR automático (sesión 12):** el 1er escaneo QR del técnico dispara `assigné → en_cours` sin acción manual. Al resolver (`résolu`), `src/lib/csat.server.ts` envía el email CSAT y cierra automáticamente a `fermé` (guard `.eq('status','résolu')` + comprobación de filas actualizadas antes de insertar en `incident_history`). El admin puede seguir cerrando manualmente desde el kanban en casos donde no hay portal cliente.
 
 ### Creada por el cliente (portal)
 ```
@@ -960,6 +994,18 @@ propio cliente en la ficha de detalle (componente compartido `src/components/Inc
 | `responded_at` | timestamptz | nullable — se rellena al responder |
 | `created_at` | timestamptz | default: now() |
 | `expires_at` | timestamptz | default: now() + 7 days |
+| `sent_to` | text | nullable — dirección a la que se envió la encuesta (2026-09-17) |
+| `sent_at` | timestamptz | nullable — cuándo se envió. **NULL = nunca llegó a salir** |
+
+> **Ojo al contar encuestas enviadas:** la fila se crea con su token ANTES de intentar el envío, así
+> que existir no significa haberse enviado. La señal buena es `sent_at IS NOT NULL`. Un fallo de
+> email deja la fila (token reutilizable en el siguiente intento) con `sent_at` a NULL. `UNIQUE
+> (incident_id)`: una encuesta como mucho por avería.
+
+> **Vista `v_csat_feedback`** (migración `20260917100000`, `security_invoker = true`): una fila por
+> opinión **respondida** (`responded_at is not null`) con la avería y el cliente ya resueltos
+> (`numero_incident`, `contact_name`, `contact_email`, `machine_id`, `nom_client`). Alimenta
+> `/admin/avis`. Hereda la RLS de `csat_responses`, que es admin-only.
 
 ---
 
