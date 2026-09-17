@@ -1,86 +1,27 @@
-import { createAdminClient } from './supabase/admin'
-import { sendEmail } from './email'
+/**
+ * Encuesta de satisfacción (CSAT): decisión de a quién se le envía.
+ *
+ * Lógica pura, separada de `csat.server.ts` a propósito: así se puede probar sin Supabase
+ * (mismo patrón que `quartiers.ts` / `quartiers.server.ts`).
+ */
 
-export async function sendCsatForIncident(incidentId: string): Promise<void> {
-  const admin = createAdminClient()
+export type CsatRecipient = { email: string; source: 'contact' | 'portal' } | null
 
-  const { data: existing } = await admin
-    .from('csat_responses')
-    .select('token, responded_at')
-    .eq('incident_id', incidentId)
-    .maybeSingle()
+/**
+ * Elige a quién se le envía la encuesta.
+ *
+ * El email del formulario público va PRIMERO a propósito: es quien reportó la avería y quien
+ * vivió la intervención. La cuenta del portal queda como respaldo para las incidencias internas.
+ */
+export function resolveCsatRecipient(
+  contactEmail: string | null | undefined,
+  portalEmail: string | null | undefined,
+): CsatRecipient {
+  const contact = contactEmail?.trim()
+  if (contact) return { email: contact, source: 'contact' }
 
-  if (existing?.responded_at) return
+  const portal = portalEmail?.trim()
+  if (portal) return { email: portal, source: 'portal' }
 
-  const { data: incident } = await admin
-    .from('incidents')
-    .select('id, title, contract_machine_id')
-    .eq('id', incidentId)
-    .single()
-
-  if (!incident) return
-
-  // Resolver client_id por contract_machine_id.
-  let clientId: number | null = null
-
-  if (incident.contract_machine_id) {
-    const { data: line } = await admin
-      .from('contract_machines')
-      .select('contracts(client_id)')
-      .eq('id', incident.contract_machine_id)
-      .single()
-    clientId = line?.contracts?.client_id ?? null
-  }
-
-  if (!clientId) return
-
-  const { data: cp } = await admin
-    .from('client_profiles')
-    .select('profile_id')
-    .eq('client_id', clientId)
-    .maybeSingle()
-
-  if (!cp?.profile_id) return
-
-  const { data: { user } } = await admin.auth.admin.getUserById(cp.profile_id)
-  if (!user?.email) return
-
-  let token: string
-  if (existing) {
-    token = existing.token
-  } else {
-    const { data: csat } = await admin
-      .from('csat_responses')
-      .insert({ incident_id: incidentId })
-      .select('token')
-      .single()
-    if (!csat?.token) return
-    token = csat.token
-  }
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  const csatUrl = `${appUrl}/csat/${token}`
-
-  await sendEmail({
-    template: 'csat',
-    to: user.email,
-    data: { title: incident.title, csat_url: csatUrl },
-  })
-
-  const { data: closed } = await admin
-    .from('incidents')
-    .update({ status: 'fermé', closed_at: new Date().toISOString() })
-    .eq('id', incidentId)
-    .eq('status', 'résolu')
-    .select('id')
-
-  if (closed && closed.length > 0) {
-    await admin.from('incident_history').insert({
-      incident_id: incidentId,
-      changed_by: null,
-      old_status: 'résolu',
-      new_status: 'fermé',
-      comment: 'Fermé automatiquement — email CSAT envoyé',
-    })
-  }
+  return null
 }

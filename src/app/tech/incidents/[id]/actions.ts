@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { redirect } from 'next/navigation'
-import { sendCsatForIncident } from '@/lib/csat'
+import { sendCsatForIncident } from '@/lib/csat.server'
 import { PARTS } from '@/lib/parts'
 
 type FormState = { error: string } | null

@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
 import type { TablesUpdate } from '@/lib/supabase/types'
-import { sendCsatForIncident } from '@/lib/csat'
+import { sendCsatForIncident } from '@/lib/csat.server'
 
 export async function updateIncidentStatusAction(
   incidentId: string,
