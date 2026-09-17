@@ -168,8 +168,9 @@ cambian nada, porque las escribe el cliente de servicio.
 - **Unitarias (vitest):** `resolveCsatRecipient` con sus cuatro casos — solo `contact_email`; solo
   cuenta de portal; los dos (gana `contact_email`); ninguno.
 - **Unitarias:** validación de `submitPublicIncident` sin email → error, y **ninguna fila insertada**.
-- **RLS:** lectura de `csat_responses` por rol (admin sí; técnico, cliente y anónimo no), en la línea
-  de los 88 tests de aislamiento que ya existen.
+- **RLS:** no hace falta test nuevo — `tests/rls/admin-only-isolation.test.ts` ya cubre
+  `csat_responses` (admin sí; técnico, cliente y anónimo no) y las columnas nuevas no cambian sus
+  policies. Basta con que siga en verde.
 - **Verificación manual antes de dar por buena la cadena:** abrir una avería de prueba desde el QR
   con un email real, marcarla `résolu`, comprobar que el correo llega, responder, y ver la opinión
   en `/admin/avis`, en la ficha y —si se puntúa con 1 o 2 estrellas— en la franja del dashboard.
