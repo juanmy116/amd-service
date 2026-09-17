@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import { sendEmail } from '@/lib/email'
 import { createIncidentPhotoUploadUrl, incidentPhotoExists, type PrepareUploadResult } from '@/lib/incidentPhotoUpload'
+import { validateContactEmail } from '@/lib/publicIncident'
 
 type State =
   | { error: string }
@@ -79,9 +80,8 @@ export async function submitPublicIncident(
   if (!contactPhone) return { error: 'Le numéro de téléphone est obligatoire.' }
   if (!description)  return { error: 'La description est obligatoire.' }
 
-  if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
-    return { error: "L'adresse email n'est pas valide." }
-  }
+  const emailError = validateContactEmail(contactEmail)
+  if (emailError) return { error: emailError }
 
   const ip = await getClientIp()
   const rlKey = `${ip}:${serie}`
@@ -120,7 +120,7 @@ export async function submitPublicIncident(
       status:        'nouveau',
       contact_name:  contactName,
       contact_phone: contactPhone,
-      contact_email: contactEmail || null,
+      contact_email: contactEmail,
       source:        'public',
     } as any)
     .select('id, numero_incident')
