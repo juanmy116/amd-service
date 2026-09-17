@@ -113,17 +113,45 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
   const csatUrl = `${appUrl}/csat/${token}`
   const equipement = await machineLabel(admin, incident.machine_id, incident.contract_machine_id)
 
-  await sendEmail({
-    template: 'csat',
-    to: recipient.email,
-    data: {
-      title:       incident.title,
-      csat_url:    csatUrl,
-      reference:   incident.numero_incident ?? '',
-      client_name: incident.contact_name ?? '',
-      equipement:  equipement ?? '',
-    },
-  })
+  // `sendEmail` no lanza cuando el proveedor rechaza el envío: devuelve `{ error }` (`src/lib/email.ts`).
+  // El try/catch cubre además que reviente el propio fetch (red/DNS).
+  let emailFailed = false
+  let emailError: unknown = null
+  try {
+    const sent = await sendEmail({
+      template: 'csat',
+      to: recipient.email,
+      data: {
+        title:       incident.title,
+        csat_url:    csatUrl,
+        reference:   incident.numero_incident ?? '',
+        client_name: incident.contact_name ?? '',
+        equipement:  equipement ?? '',
+      },
+    })
+    if ('error' in sent) {
+      emailFailed = true
+      emailError  = sent.error
+    }
+  } catch (err) {
+    emailFailed = true
+    emailError  = err
+  }
+
+  if (emailFailed) {
+    // Un `sent_at` que miente es peor que no tenerlo, así que no lo escribimos. Y NO cerramos la
+    // incidencia: el cliente no ha recibido nada, se queda en `résolu` para poder reintentarlo.
+    console.error('[csat] échec envoi email', { incidentId, error: emailError })
+    await admin.from('incident_history').insert({
+      incident_id: incidentId,
+      changed_by:  null,
+      old_status:  null,
+      new_status:  null,
+      comment:     "Enquête de satisfaction — échec de l'envoi de l'email",
+    })
+    // La fila de `csat_responses` se conserva: su token sigue siendo válido y el próximo paso a `résolu` la reutiliza.
+    return
+  }
 
   await admin
     .from('csat_responses')
