@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Star, MessageSquare } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { PanelHeader } from '@/components/ui/PanelHeader'
+import { Stars } from '@/components/ui/Stars'
 
 type Feedback = {
   id: string
@@ -15,21 +16,6 @@ type Feedback = {
   contact_email: string | null
   machine_id: string | null
   nom_client: string | null
-}
-
-function Stars({ rating }: { rating: number }) {
-  return (
-    <span className="inline-flex gap-0.5" aria-label={`${rating} sur 5`}>
-      {[1, 2, 3, 4, 5].map((n) => (
-        <Star
-          key={n}
-          size={14}
-          className={n <= rating ? 'text-amber-400' : 'text-line'}
-          fill={n <= rating ? 'currentColor' : 'none'}
-        />
-      ))}
-    </span>
-  )
 }
 
 function timeAgo(iso: string): string {

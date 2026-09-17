@@ -5,6 +5,7 @@ import IncidentPhotos from '@/components/IncidentPhotos'
 import { updateIncidentAction, deleteIncidentAction } from './actions'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { Stars } from '@/components/ui/Stars'
 
 const STATUS_DOT: Record<string, string> = {
   nouveau:  'bg-blue-500',
@@ -67,6 +68,12 @@ export default async function EditIncidentPage({
     .eq('incident_id', id)
     .order('created_at', { ascending: false })
 
+  const { data: avis } = await supabase
+    .from('csat_responses')
+    .select('rating, comment, responded_at')
+    .eq('incident_id', incident.id)
+    .maybeSingle()
+
   let profileMap = new Map<string, string | null>()
   if (history && history.length > 0) {
     const ids = [...new Set(history.map((h) => h.changed_by).filter((x): x is string => x !== null))]
@@ -128,6 +135,22 @@ export default async function EditIncidentPage({
                 </div>
               )}
             </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Avis du client (enquête de satisfaction) */}
+      {avis?.responded_at && avis.rating != null && (
+        <div className="px-8 pb-4 max-w-3xl">
+          <Card className="p-6">
+            <h2 className="text-sm font-semibold text-ink mb-4">Avis du client</h2>
+            <div className="flex items-center gap-2">
+              <Stars rating={avis.rating} size={16} />
+              <span className="text-sm text-ink-muted">{avis.rating} / 5</span>
+            </div>
+            {avis.comment && (
+              <p className="text-sm text-ink-soft mt-3 whitespace-pre-wrap">« {avis.comment} »</p>
+            )}
           </Card>
         </div>
       )}
