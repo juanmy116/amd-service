@@ -137,6 +137,50 @@
 
 ---
 
+## 🔴 Probar la encuesta de satisfacción de punta a punta (Único pendiente del CSAT)
+
+> **Estado: el código está en producción** (PR #141, `8cc44c2`, 2026-09-17), con las dos migraciones
+> aplicadas y la Edge Function `send-email` redesplegada. Lo que **no** se ha hecho es la única
+> prueba que valida la cadena entera, porque necesita un correo real.
+>
+> **Contexto de por qué importa:** hasta ese día **no se había enviado ni una sola encuesta en toda
+> la vida de la app**. Dar por bueno esto sin verlo llegar sería repetir el mismo error.
+>
+> **Los pasos:**
+> 1. Escanear el QR de una máquina (o ir a `/signaler/<nº de serie>`) y comprobar que **el email es
+>    obligatorio**. Poner uno propio, de verdad.
+> 2. Enviar la avería de prueba.
+> 3. Como admin, marcarla **`résolu`**. Da igual desde dónde: kanban, ficha o app del técnico.
+> 4. Comprobar que **llega el correo**, con el nombre, la referencia `SAV-AAAA-NNNN` y el equipo — y
+>    **sin** la jerga interna «Incident QR».
+> 5. Responder con **2 estrellas** y un comentario.
+> 6. Verificar los tres sitios: `/admin/avis`, el bloque «Avis du client» de la ficha, y la **franja
+>    roja** del tablero de `/admin`.
+> 7. **Borrar la avería de prueba** al terminar.
+>
+> **Si no llega:** mirar el historial de la propia avería. Ahora, cuando el envío falla, queda escrita
+> ahí la razón (sin destinatario / fallo del email / fallo al crear la encuesta) — justo lo que antes
+> no existía y por eso el problema tardó meses en verse.
+
+---
+
+## 🟡 Deuda menor heredada, detectada al revisar el CSAT (no urgente)
+
+> Dos cosas **anteriores** a ese trabajo, que salieron en su revisión de código y se dejaron a
+> propósito fuera para no inflar el PR:
+>
+> 1. **Ninguna plantilla de `send-email` escapa el HTML que interpola** (las 6: `ticket_open`,
+>    `ticket_assigned`, `ticket_resolved`, `csat`, `counter_batch_processed`, `raw`). El dato más
+>    expuesto es el nombre que cualquiera escribe en el formulario público del QR. El riesgo real hoy
+>    es bajo — la Server Action ya quita las etiquetas `<...>` antes de guardar —, pero el arreglo
+>    correcto es añadir un `escapeHtml` a **las seis a la vez**, no parchear una y dejar las otras.
+> 2. **La vista `v_machine_parts_history` concede permisos a `anon`** (privilegios por defecto de
+>    Supabase; su migración no lleva `REVOKE`). **No hay fuga de datos**: es `security_invoker`, así
+>    que la RLS de las tablas base corta igualmente. Pero el grant sobra y conviene alinearla con
+>    `v_machine_park` y `v_csat_feedback`, que sí lo revocan.
+
+---
+
 ## ✅ Audio de la Raspberry del kiosko — CERRADO Y VERIFICADO EN LA TV (2026-09-17)
 
 > El sonido **sale por la TV del taller** y la cadena entera está verificada: se abrió una
