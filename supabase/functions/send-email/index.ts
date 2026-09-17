@@ -78,17 +78,36 @@ function renderTemplate(
         `
       }
 
-    case 'csat':
+    case 'csat': {
+      const reference  = data.reference ?? ''
+      const greeting   = data.client_name ? `<p>Bonjour ${data.client_name},</p>` : ''
+      const rows = [
+        reference ? ['Référence', reference] : null,
+        data.equipement ? ['Équipement', data.equipement] : null,
+      ].filter((r): r is string[] => r !== null)
+
+      const details = rows.length
+        ? `<table style="margin:20px 0;font-size:14px">${rows
+            .map(([k, v]) =>
+              `<tr><td style="color:#6b7280;padding:2px 16px 2px 0">${k}</td>` +
+              `<td style="color:#111;font-weight:600">${v}</td></tr>`)
+            .join('')}</table>`
+        : ''
+
       return {
-        subject: `Votre avis sur l'intervention — ${data.title}`,
+        subject: reference
+          ? `Votre avis sur notre intervention — ${reference}`
+          : `Votre avis sur notre intervention`,
         html: `
           <div style="font-family:Inter,sans-serif;max-width:560px;margin:0 auto;color:#111">
             <div style="background:#BF0D0D;padding:24px 32px;border-radius:12px 12px 0 0">
               <p style="color:white;font-weight:700;font-size:18px;margin:0">AMD Service</p>
             </div>
             <div style="padding:32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
-              <h2 style="margin-top:0">Comment s'est passée notre intervention ?</h2>
-              <p>Votre demande <strong>${data.title}</strong> a été résolue.</p>
+              ${greeting}
+              <p>Votre demande a été résolue.</p>
+              ${details}
+              <h2 style="margin:24px 0 12px">Comment s'est passée notre intervention ?</h2>
               <p>Prenez 30 secondes pour évaluer notre service :</p>
               <div style="text-align:center;margin:32px 0">
                 <a href="${data.csat_url}" style="background:#BF0D0D;color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px">
@@ -100,6 +119,7 @@ function renderTemplate(
           </div>
         `
       }
+    }
 
     case 'counter_batch_processed': {
       const total = data.total ?? '0'
