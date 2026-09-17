@@ -1,6 +1,6 @@
 import { createAdminClient } from './supabase/admin'
 import { sendEmail } from './email'
-import { resolveCsatRecipient } from './csat'
+import { csatExpiresAt, isSurveyStillValid, resolveCsatRecipient } from './csat'
 
 /** Email de la cuenta de portal del cliente dueño de la línea de contrato, si existe. */
 async function portalEmailForLine(
@@ -64,11 +64,15 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
 
   const { data: existing } = await admin
     .from('csat_responses')
-    .select('token, responded_at')
+    .select('token, responded_at, sent_at, expires_at')
     .eq('incident_id', incidentId)
     .maybeSingle()
 
   if (existing?.responded_at) return
+
+  // Ya se envió y el enlace sigue vigente: reenviarlo solo duplicaría el email del cliente
+  // y pisaría `sent_to`/`sent_at`. No es un fallo, así que no deja rastro.
+  if (isSurveyStillValid(existing?.sent_at, existing?.expires_at)) return
 
   const { data: incident } = await admin
     .from('incidents')
@@ -100,12 +104,25 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
   if (existing) {
     token = existing.token
   } else {
-    const { data: csat } = await admin
+    const { data: csat, error } = await admin
       .from('csat_responses')
       .insert({ incident_id: incidentId })
       .select('token')
       .single()
-    if (!csat?.token) return
+    if (!csat?.token) {
+      // Puede chocar con `UNIQUE (incident_id)` si dos resoluciones compiten (kanban + kiosko).
+      // Nada en esta función falla en silencio: sin rastro la incidencia se quedaría en `résolu`
+      // sin explicación ninguna en su historial.
+      console.error('[csat] échec création de la réponse CSAT', { incidentId, error })
+      await admin.from('incident_history').insert({
+        incident_id: incidentId,
+        changed_by:  null,
+        old_status:  null,
+        new_status:  null,
+        comment:     "Enquête de satisfaction non envoyée — échec de la création de l'enquête",
+      })
+      return
+    }
     token = csat.token
   }
 
@@ -153,9 +170,16 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
     return
   }
 
+  // La caducidad se refresca SIEMPRE (también en la fila recién creada, donde ya venía bien):
+  // el enlace que acaba de salir debe valer 7 días desde ESTE envío, que es lo que promete el email.
+  const now = new Date()
   await admin
     .from('csat_responses')
-    .update({ sent_to: recipient.email, sent_at: new Date().toISOString() })
+    .update({
+      sent_to:    recipient.email,
+      sent_at:    now.toISOString(),
+      expires_at: csatExpiresAt(now),
+    })
     .eq('incident_id', incidentId)
 
   const { data: closed } = await admin
