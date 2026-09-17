@@ -5,6 +5,11 @@ import { Card } from '@/components/ui/Card'
 import { PanelHeader } from '@/components/ui/PanelHeader'
 import { Stars } from '@/components/ui/Stars'
 
+// Un avis por incidencia resuelta: 300 es el mismo techo que usan /admin/incidents y /admin/leads
+// y deja margen de sobra para lo que AMD cierra en un vistazo. Lo importante es que sea EXPLÍCITO:
+// sin `.limit()` PostgREST corta en 1000 sin avisar y la media de abajo mentiría en silencio.
+const RESULT_LIMIT = 300
+
 type Feedback = {
   id: string
   incident_id: string
@@ -40,11 +45,17 @@ export default async function AvisPage({
     .from('v_csat_feedback')
     .select('id, incident_id, rating, comment, responded_at, numero_incident, contact_name, contact_email, machine_id, nom_client')
     .order('responded_at', { ascending: false })
+    .limit(RESULT_LIMIT)
 
   if (onlyNegative) query = query.lte('rating', 2)
 
-  const { data } = await query
+  const { data, error } = await query
+  // Si la lectura falla (vista ausente en un entorno nuevo, permisos, BD caída) hay que bloquear:
+  // una lista vacía es indistinguible de "aún no hay opiniones" y haría creer que nadie ha
+  // contestado. Patrón del back-office: lanzar y dejar que lo pinte src/app/admin/error.tsx.
+  if (error) { console.error('[avis]', error); throw new Error('DATA_FETCH_ERROR') }
   const avis = (data ?? []) as Feedback[]
+  const truncated = avis.length >= RESULT_LIMIT
   const average = avis.length
     ? (avis.reduce((s, a) => s + (a.rating ?? 0), 0) / avis.length).toFixed(1)
     : null
@@ -90,9 +101,19 @@ export default async function AvisPage({
         <Card className="px-4 py-3 inline-flex items-center gap-2.5">
           <span className="text-sm font-semibold text-ink">{average} / 5</span>
           <span className="text-xs text-ink-muted">
-            {avis.length} avis{onlyNegative ? ' négatifs' : ''}
+            {/* Al tocar el techo la media ya no describe el total: el texto lo dice en vez de
+                aparentar serlo. */}
+            {truncated
+              ? `sur les ${avis.length} avis${onlyNegative ? ' négatifs' : ''} les plus récents`
+              : `${avis.length} avis${onlyNegative ? ' négatifs' : ''}`}
           </span>
         </Card>
+      )}
+
+      {truncated && (
+        <p className="text-xs text-warning bg-warning-soft border border-warning/30 rounded-lg px-3 py-2">
+          Affichage limité aux {RESULT_LIMIT} avis les plus récents.
+        </p>
       )}
 
       {/* Liste */}

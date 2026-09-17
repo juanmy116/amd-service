@@ -48,10 +48,19 @@ export default async function PortalIncidentDetailPage({
 
   if (!incident) notFound()
 
+  // `incident_history` mezcla dos cosas: los cambios de estado de la avería (lo que el cliente
+  // sigue aquí) y ANOTACIONES internas que el sistema se deja a sí mismo — hoy, los fallos de
+  // envío de la encuesta de satisfacción (`src/lib/csat.server.ts`). Esas anotaciones no son un
+  // paso del servicio: son diagnóstico interno y al cliente solo le dirían que algo se nos
+  // rompió por dentro al intentar escribirle. Se distinguen porque no llevan
+  // estado de destino (`new_status` NULL); una línea real siempre lo tiene (incluida la de
+  // creación, que sí lleva `old_status` NULL y debe verse). Se filtran EN LA CONSULTA, no al
+  // pintar, para que el texto interno no llegue siquiera a viajar al navegador del cliente.
   const { data: history } = await supabase
     .from('incident_history')
     .select('id, old_status, new_status, comment, created_at')
     .eq('incident_id', id)
+    .not('new_status', 'is', null)
     .order('created_at', { ascending: false })
 
   // Obtener máquina y contrato via contract_machine_id si está disponible
