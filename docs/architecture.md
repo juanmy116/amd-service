@@ -197,6 +197,32 @@ Ruta pública **sin autenticación** para que cualquier persona abra un incident
   estado «visto»**: se va sola a los 7 días (misma decisión que en el kiosko, PR #137 — un botón de
   «ya lo he visto» se acaba pulsando sin mirar).
 - Componente compartido `src/components/ui/Stars.tsx` (lista y ficha).
+- **Los cuatro caminos que llevan una avería a `résolu` disparan la encuesta**: PWA técnico, kanban
+  admin, kiosko del taller (delega en el kanban) y **la ficha de admin** (`updateIncidentAction`).
+  Esta última **no lo hacía** y se detectó en la revisión: era el mismo fallo del PR escondido en otra
+  puerta — sin encuesta, sin rastro, y la avería ahí clavada en `résolu` para siempre (quien la
+  cierra es el propio proceso de la encuesta).
+- ⚠️ **El envío va dentro de `after()` de `next/server`**, no en un `.catch()` suelto. En serverless
+  una promesa lanzada y no esperada muere cuando la función termina, y estas acciones hacen
+  `redirect(...)` justo después: resultado, ni email ni rastro. `after()` existe para esto y la
+  documentación de Next dice expresamente que **se ejecuta aunque la respuesta acabe en `redirect`**.
+- **Caducidad del enlace:** `CSAT_VALIDITY_DAYS = 7` (`src/lib/csat.ts`) es la única fuente — el
+  default de la BD, lo que valida `/csat/[token]` y lo que promete el email. Al enviar se **refresca**
+  `expires_at`: si no, un reintento semanas después mandaría un token ya muerto y lo apuntaría como
+  enviado. Y si la encuesta ya salió y sigue vigente, **no se reenvía** (`isSurveyStillValid`).
+- ⚠️ **Las notas internas NO se enseñan al cliente.** `incident_history` se pinta en el portal del
+  cliente y en la ficha admin; el portal filtra **en la consulta** (`.not('new_status','is',null)`)
+  para que el texto no viaje siquiera al navegador. El discriminador es **`new_status IS NULL`**, no
+  «ambos null»: la línea «Incident créé» tiene `old_status` null y **sí** debe verse.
+- `/admin/avis` distingue **error de carga** (lanza → `admin/error.tsx`, patrón WP-5b del repo) de
+  **lista vacía**, y lee con tope explícito de 300 avis avisando si trunca — el tope mudo de
+  PostgREST (1000) haría que la media mintiera en silencio.
+- Migraciones: `20260917100000_csat_feedback` (columnas + vista) y **`20260917110000_csat_feedback_grants`**
+  (`REVOKE ... FROM PUBLIC, anon` + `GRANT SELECT TO authenticated, service_role`). La primera no los
+  llevó y funcionaba solo por los privilegios por defecto de Supabase — que además concedían acceso a
+  `anon`; en una base limpia (`db reset`) la pantalla habría fallado con *permission denied*.
+- ⚠️ **La Edge Function `send-email` hay que desplegarla aparte** (`supabase functions deploy
+  send-email`): no viaja con Vercel.
 
 ### 7. Dashboard de Dirección (`/admin`) ✅
 - KPIs: clientes activos, máquinas activas, contratos activos, incidentes abiertos, CSAT medio, copias este mes
