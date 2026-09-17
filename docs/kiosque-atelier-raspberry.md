@@ -301,6 +301,10 @@ crontab -e
 
 ## 7. Comprobar que quedó bien
 
+> ✅ **El kiosko del taller pasó esta lista entera el 2026-09-17**, incluida la prueba
+> decisiva: una incidencia de prueba hizo **sonar la campana sola**, sin tocar la pantalla.
+> La lista sigue aquí para la próxima Raspberry que se monte.
+
 - [ ] Se enciende la Raspberry y aparece el kiosko **sin tocar nada**.
 - [ ] Se ve el mapa de Dakar con sus burbujas (si no, la red o la sesión fallan).
 - [ ] Al hacer clic en una burbuja se filtran las dos columnas.

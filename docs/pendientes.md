@@ -137,23 +137,21 @@
 
 ---
 
-## ✅ Audio de la Raspberry del kiosko — RESUELTO (2026-09-16)
+## ✅ Audio de la Raspberry del kiosko — CERRADO Y VERIFICADO EN LA TV (2026-09-17)
 
-> El sonido **ya sale por la TV del taller**. Era lo que quedaba del montaje del kiosko.
+> El sonido **sale por la TV del taller** y la cadena entera está verificada: se abrió una
+> incidencia de prueba, **sin tocar el kiosko**, y la campana **sonó sola**. Ya no hace falta el
+> botón del altavoz de la cabecera (ese nunca probó nada: al nacer de un clic, Chromium siempre
+> lo deja sonar). Con esto, el montaje del kiosko del taller queda **completo**.
 >
 > **De paso apareció otra cosa**, y conviene recordarla: `ssh root@192.168.2.106` daba
 > `Connection refused`. La Pi no estaba apagada — **esa IP ya era el móvil de alguien**. La
 > Raspberry está ahora en **`192.168.2.114`**. Volverá a pasar mientras no se reserve la IP en el
 > router; cómo encontrarla: «Encontrar la Raspberry en la red» en `docs/kiosque-atelier-raspberry.md`.
 >
-> ⏳ **Queda una comprobación**, la única que verifica la cadena entera: abrir una incidencia de
-> prueba y **no tocar nada**. Debe sonar sola en menos de 30 s. Si en vez de la campana sale
-> «Activer le son des alertes», falta `--autoplay-policy=no-user-gesture-required` (paso 4 del
-> runbook). El botón del altavoz de la cabecera NO sirve para esto: al nacer de un clic, Chromium
-> siempre lo deja sonar.
->
-> ⏰ Y comprobar el reloj de la Pi (`timedatectl`, zona `Africa/Dakar`): de ello depende el
-> silencio nocturno de 19:00 a 07:00.
+> ⏰ **Único cabo suelto** (menor): comprobar el reloj de la Pi (`timedatectl`, zona
+> `Africa/Dakar`). De él depende el silencio nocturno de 19:00 a 07:00 — si la zona horaria está
+> mal, el kiosko callará (o sonará) a horas equivocadas.
 
 ---
 
