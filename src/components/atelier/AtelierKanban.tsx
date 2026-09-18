@@ -15,6 +15,8 @@ import {
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
+import ResolutionDialog from '@/components/admin/ResolutionDialog'
+import type { OfficeResolution } from '@/lib/resolution'
 import { assignIncidentAction } from '@/app/atelier/actions'
 import AssignPanel from './AssignPanel'
 import type { AtelierIncident, Technician } from './types'
@@ -148,6 +150,8 @@ export default function AtelierKanban({
   const [activeIncident, setActiveIncident] = useState<AtelierIncident | null>(null)
   const [selected, setSelected] = useState<AtelierIncident | null>(null)
   const [busy, setBusy] = useState(false)
+  // Tarjeta soltada en «Résolu», esperando el motivo. No se mueve hasta confirmar.
+  const [pendingResolution, setPendingResolution] = useState<AtelierIncident | null>(null)
 
   const [optimistic, updateOptimistic] = useOptimistic(
     incidents,
@@ -170,9 +174,28 @@ export default function AtelierKanban({
     const newStatus = over.id as string
     const oldStatus = active.data.current?.status as string
     if (newStatus === oldStatus) return
+
+    // Resolver desde el tablero exige explicación, también en la TV del taller.
+    if (newStatus === 'résolu') {
+      const dropped = optimistic.find((i) => i.id === active.id)
+      if (dropped) setPendingResolution(dropped)
+      return
+    }
+
     startTransition(async () => {
       updateOptimistic({ id: active.id as string, newStatus })
       const result = await updateIncidentStatusAction(active.id as string, newStatus)
+      if (!result?.error) router.refresh()
+    })
+  }
+
+  function confirmResolution(office: OfficeResolution) {
+    const incident = pendingResolution
+    if (!incident) return
+    setPendingResolution(null)
+    startTransition(async () => {
+      updateOptimistic({ id: incident.id, newStatus: 'résolu' })
+      const result = await updateIncidentStatusAction(incident.id, 'résolu', office)
       if (!result?.error) router.refresh()
     })
   }
@@ -222,6 +245,17 @@ export default function AtelierKanban({
         busy={busy}
         onSelect={handleAssign}
         onClose={() => setSelected(null)}
+      />
+
+      <ResolutionDialog
+        open={pendingResolution !== null}
+        variant="kiosk"
+        incidentLabel={
+          pendingResolution ? `${pendingResolution.numeroIncident} · ${pendingResolution.title}` : ''
+        }
+        technicians={technicians.map((t) => ({ id: t.id, name: t.fullName }))}
+        onCancel={() => setPendingResolution(null)}
+        onConfirm={confirmResolution}
       />
     </>
   )

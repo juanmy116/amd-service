@@ -18,6 +18,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
+import ResolutionDialog from './ResolutionDialog'
+import type { OfficeResolution } from '@/lib/resolution'
 
 export type KanbanIncident = {
   id: string
@@ -165,10 +167,19 @@ function KanbanColumn({
 
 // ─── Board ────────────────────────────────────────────────────────────────────
 
-export default function KanbanBoard({ incidents: initialIncidents }: { incidents: KanbanIncident[] }) {
+export default function KanbanBoard({
+  incidents: initialIncidents,
+  technicians,
+}: {
+  incidents: KanbanIncident[]
+  technicians: Array<{ id: string; name: string }>
+}) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [activeIncident, setActiveIncident] = useState<KanbanIncident | null>(null)
+  // Avería soltada en «Résolu» y pendiente de que alguien explique por qué. La tarjeta no se
+  // mueve hasta entonces: si la ventana se cancela, nada ha pasado.
+  const [pendingResolution, setPendingResolution] = useState<KanbanIncident | null>(null)
 
   const [optimisticIncidents, updateOptimistic] = useOptimistic(
     initialIncidents,
@@ -193,9 +204,27 @@ export default function KanbanBoard({ incidents: initialIncidents }: { incidents
     const oldStatus = active.data.current?.status as string
     if (newStatus === oldStatus) return
 
+    // Resolver desde el tablero no es un gesto: hay que decir por qué.
+    if (newStatus === 'résolu') {
+      const dropped = optimisticIncidents.find((i) => i.id === active.id)
+      if (dropped) setPendingResolution(dropped)
+      return
+    }
+
     startTransition(async () => {
       updateOptimistic({ id: active.id as string, newStatus })
       const result = await updateIncidentStatusAction(active.id as string, newStatus)
+      if (!result?.error) router.refresh()
+    })
+  }
+
+  function confirmResolution(office: OfficeResolution) {
+    const incident = pendingResolution
+    if (!incident) return
+    setPendingResolution(null)
+    startTransition(async () => {
+      updateOptimistic({ id: incident.id, newStatus: 'résolu' })
+      const result = await updateIncidentStatusAction(incident.id, 'résolu', office)
       if (!result?.error) router.refresh()
     })
   }
@@ -219,6 +248,18 @@ export default function KanbanBoard({ incidents: initialIncidents }: { incidents
       <DragOverlay>
         {activeIncident && <IncidentCard incident={activeIncident} isOverlay />}
       </DragOverlay>
+
+      <ResolutionDialog
+        open={pendingResolution !== null}
+        incidentLabel={
+          pendingResolution
+            ? `${pendingResolution.numero_incident} · ${pendingResolution.title}`
+            : ''
+        }
+        technicians={technicians}
+        onCancel={() => setPendingResolution(null)}
+        onConfirm={confirmResolution}
+      />
     </DndContext>
   )
 }

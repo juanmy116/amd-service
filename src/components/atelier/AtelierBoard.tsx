@@ -9,11 +9,13 @@ import IncidentDetail from './IncidentDetail'
 import MaintenanceDetail from './MaintenanceDetail'
 import PanneAlert from './PanneAlert'
 import UnattendedBanner from './UnattendedBanner'
+import ResolutionDialog from '@/components/admin/ResolutionDialog'
 import { filterByQuartier, findNewIncidents, unattendedIncidents, waitingLabel, type BoardIncident, type BoardMaintenance } from '@/lib/atelier/board'
 import { assignIncidentAction, assignMaintenanceVisitAction, setIncidentStatusAction } from '@/app/atelier/actions'
 import type { MapViewId } from '@/lib/atelier/mapView'
 import type { Quartier } from '@/lib/quartiers'
 import type { Technician } from './types'
+import type { OfficeResolution } from '@/lib/resolution'
 
 type Props = {
   incidents: BoardIncident[]
@@ -48,6 +50,9 @@ export default function AtelierBoard({
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [selection, setSelection] = useState<Selection>(null)
   const [busy, setBusy] = useState(false)
+  // Avería a la que se le ha pulsado «Résolu» y espera el motivo. Vive aquí, y no en la ficha,
+  // porque mientras la ventana está abierta el tablero no puede recargarse ni volver al reposo.
+  const [resolving, setResolving] = useState<BoardIncident | null>(null)
   const [now, setNow] = useState(() => new Date(serverNow))
 
   // Identificadores vistos en el refresco anterior: con ellos se sabe qué ha entrado nuevo.
@@ -60,13 +65,19 @@ export default function AtelierBoard({
   const lastInteraction = useRef(Date.now())
   const touch = useCallback(() => { lastInteraction.current = Date.now() }, [])
 
-  // Alguien está usando el tablero: hay una ficha abierta o las listas están filtradas.
-  const isBusy = selection !== null || quartierFilter !== null || statusFilter !== null
+  // Alguien está usando el tablero: hay una ficha abierta, una ventana de resolución a medio
+  // rellenar, o las listas están filtradas.
+  const isBusy = selection !== null || resolving !== null || quartierFilter !== null || statusFilter !== null
 
   // Lo que hay que devolver a su sitio cuando el taller se queda solo. Incluye la vista del mapa,
   // que NO entra en `isBusy` a propósito: mirar la región no es trabajar sobre una avería, y si
   // pausara el refresco la TV se quedaría muda ante una panne nueva mientras nadie toca nada.
-  const needsReset = isBusy || mapView !== 'dakar'
+  //
+  // Con la ventana de resolución abierta no se reinicia NADA: rellenarla lleva más de los dos
+  // minutos de reposo, y como escribir no cuenta como interacción (solo los clics llaman a
+  // `touch()`), la TV borraba el texto a medio escribir sin avisar. La segunda vez que eso pasa,
+  // nadie vuelve a cerrar una avería desde el kiosko.
+  const needsReset = resolving === null && (isBusy || mapView !== 'dakar')
 
   // Averías nuevas desde el último refresco → campana + cartel (ver NewIncidentAlert).
   useEffect(() => {
@@ -129,7 +140,7 @@ export default function AtelierBoard({
     <>
       {unattended.length > 0 && <UnattendedBanner count={unattended.length} oldestLabel={oldestLabel} />}
 
-      <div className="grid min-h-0 flex-1 grid-cols-4 gap-4" onPointerDown={touch}>
+      <div className="grid min-h-0 flex-1 grid-cols-4 gap-4" onPointerDown={touch} onKeyDown={touch}>
       <PanneList
         incidents={visibleIncidents}
         statusFilter={statusFilter}
@@ -147,7 +158,11 @@ export default function AtelierBoard({
             busy={busy}
             now={now}
             onAssign={(technicianId) => run(() => assignIncidentAction(openIncident.id, technicianId))}
-            onChangeStatus={(status) => run(() => setIncidentStatusAction(openIncident.id, status))}
+            onChangeStatus={(status) => {
+              touch()
+              if (status === 'résolu') { setResolving(openIncident); return }
+              run(() => setIncidentStatusAction(openIncident.id, status))
+            }}
             onClose={() => { touch(); setSelection(null) }}
           />
         ) : openMaintenance ? (
@@ -185,6 +200,22 @@ export default function AtelierBoard({
         onOpen={(visit) => { touch(); setSelection({ kind: 'maintenance', id: visit.id }) }}
       />
       </div>
+
+      <ResolutionDialog
+        open={resolving !== null}
+        variant="kiosk"
+        incidentLabel={resolving ? `${resolving.numeroIncident} · ${resolving.title}` : ''}
+        technicians={technicians.map((t) => ({ id: t.id, name: t.fullName }))}
+        busy={busy}
+        onCancel={() => { touch(); setResolving(null) }}
+        onConfirm={(office) => {
+          const incident = resolving
+          if (!incident) return
+          touch()
+          setResolving(null)
+          run(() => setIncidentStatusAction(incident.id, 'résolu', office))
+        }}
+      />
     </>
   )
 }
