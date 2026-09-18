@@ -152,10 +152,6 @@ export default function IncidentForm({
             </div>
           )}
 
-          {isEdit && (
-            <input type="hidden" name="old_status" value={defaultValues?.status ?? 'nouveau'} />
-          )}
-
           {/* Titre */}
           <div>
             <label className="block text-sm font-medium text-ink-soft mb-1.5">

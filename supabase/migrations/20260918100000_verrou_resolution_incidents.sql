@@ -15,7 +15,8 @@ ALTER TABLE public.incidents
   ADD COLUMN resolved_via      text,
   ADD COLUMN resolution_reason text,
   ADD COLUMN resolution_note   text,
-  ADD COLUMN qr_verified       boolean NOT NULL DEFAULT false;
+  ADD COLUMN qr_verified       boolean NOT NULL DEFAULT false,
+  ADD COLUMN qr_scanned_by     uuid REFERENCES public.profiles(id);
 
 COMMENT ON COLUMN public.incidents.resolved_via IS
   'Vía por la que se resolvió: intervention (técnico, con informe) / bureau (oficina, con motivo). NULL = sin resolver o histórico anterior al verrou.';
@@ -24,7 +25,9 @@ COMMENT ON COLUMN public.incidents.resolution_reason IS
 COMMENT ON COLUMN public.incidents.resolution_note IS
   'Explicación libre de quien resolvió: informe del técnico resumido o justificación de oficina.';
 COMMENT ON COLUMN public.incidents.qr_verified IS
-  'true si el técnico escaneó el QR de la máquina. Semáforo, nunca un bloqueo: una etiqueta despegada no puede impedir cerrar una avería.';
+  'true si alguien escaneó el QR físico de la máquina mientras la avería estaba abierta. Semáforo, nunca un bloqueo: una etiqueta despegada no puede impedir cerrar una avería.';
+COMMENT ON COLUMN public.incidents.qr_scanned_by IS
+  'Quién escaneó. Hace falta para no dar por presente a un técnico por el escaneo de otro: el semáforo verde pide que quien escaneó sea quien resolvió.';
 
 -- Los valores viven también en src/lib/enums.ts (parseEnum). text + CHECK en lugar
 -- de un enum de Postgres porque `resolution_reason` va a crecer con el uso y

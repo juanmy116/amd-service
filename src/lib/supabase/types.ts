@@ -621,6 +621,7 @@ export type Database = {
           opened_by: string | null
           priority: Database["public"]["Enums"]["incident_priority"]
           qr_verified: boolean
+          qr_scanned_by: string | null
           rapport_intervention: string | null
           resolution_note: string | null
           resolution_reason: string | null
@@ -648,6 +649,7 @@ export type Database = {
           opened_by?: string | null
           priority?: Database["public"]["Enums"]["incident_priority"]
           qr_verified?: boolean
+          qr_scanned_by?: string | null
           rapport_intervention?: string | null
           resolution_note?: string | null
           resolution_reason?: string | null
@@ -675,6 +677,7 @@ export type Database = {
           opened_by?: string | null
           priority?: Database["public"]["Enums"]["incident_priority"]
           qr_verified?: boolean
+          qr_scanned_by?: string | null
           rapport_intervention?: string | null
           resolution_note?: string | null
           resolution_reason?: string | null

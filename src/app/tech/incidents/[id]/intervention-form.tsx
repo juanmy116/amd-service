@@ -112,8 +112,6 @@ export default function InterventionForm({
 
       {/* Formulaire intervention */}
       <form action={formAction} className="space-y-5">
-        <input type="hidden" name="old_status" value={incident.status} />
-
         {state?.error && (
           <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
             {state.error}

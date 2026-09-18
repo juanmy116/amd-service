@@ -89,18 +89,6 @@ export default async function MachineScanPage({
     )
   }
 
-  // Rastro del escaneo: el técnico tiene la máquina delante. No bloquea nada — una etiqueta
-  // despegada o sin cobertura no puede impedir cerrar una avería —, pero deja constancia de
-  // quién estuvo físicamente ahí, igual que `qr_verified` en las visitas de mantenimiento.
-  // El filtro por `qr_verified = false` evita reescribir en cada carga de la página.
-  await admin
-    .from('incidents')
-    .update({ qr_verified: true })
-    .or(filterExpr)
-    .eq('assigned_to', user.id)
-    .eq('qr_verified', false)
-    .in('status', ['nouveau', 'assigné', 'en_cours'])
-
   const { data: incidents } = await supabase
     .from('incidents')
     .select('id, title, status, priority, created_at')

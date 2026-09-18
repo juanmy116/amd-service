@@ -82,7 +82,8 @@ ALTER TABLE public.incidents
   ADD COLUMN resolved_via      text,
   ADD COLUMN resolution_reason text,
   ADD COLUMN resolution_note   text,
-  ADD COLUMN qr_verified       boolean NOT NULL DEFAULT false;
+  ADD COLUMN qr_verified       boolean NOT NULL DEFAULT false,
+  ADD COLUMN qr_scanned_by     uuid REFERENCES public.profiles(id);
 
 ALTER TABLE public.incidents
   ADD CONSTRAINT incidents_resolved_via_chk
@@ -103,7 +104,9 @@ Notas de diseño:
   con `parseEnum` (patrón ya existente).
 - Las 4 columnas son nullable / con default → **las averías históricas no se tocan**. Quedan con
   `resolved_via = NULL`, que se muestra como «sin informar» y sin marca de alarma.
-- `qr_verified` es `NOT NULL DEFAULT false`, igual que en `maintenance_visits`.
+- `qr_verified` es `NOT NULL DEFAULT false`, igual que en `maintenance_visits`. Va acompañado de
+  `qr_scanned_by`: sin saber **quién** escaneó, el escaneo de un técnico daría por presente a
+  otro, y el semáforo verde debe pedir que quien escaneó sea quien resolvió.
 - **No hacen falta policies nuevas**: las columnas heredan las de la tabla.
 - Tras aplicar: `npx supabase gen types` → `src/lib/supabase/types.ts`.
 
@@ -162,10 +165,27 @@ Las 4 puertas la llaman. Ninguna decide por su cuenta.
 | `src/lib/resolution.test.ts` | **nuevo** — casos: informe vacío, solo espacios, motivo sin nota, vía incoherente |
 | `src/app/tech/incidents/[id]/intervention-form.tsx` | `required` en el textarea cuando se elige «Résolu» + mensaje |
 | `src/app/tech/incidents/[id]/actions.ts` | validar vía `buildResolution`; escribir `resolved_via='intervention'` |
-| `src/app/tech/scan/[serie]/page.tsx` | marcar `qr_verified = true` en las averías de esa máquina asignadas al técnico |
+| `src/lib/scan.server.ts` | **nuevo** — `stampQrScan()`: marca `qr_verified` + `qr_scanned_by` |
+| `src/app/m/[serie]/page.tsx` | llamar a `stampQrScan()` antes de redirigir al técnico |
 
 **Cómo probarlo:** marcar «Résolu» con el informe vacío → no guarda. Escanear el QR y luego resolver
 → avería con `qr_verified = true`. Resolver desde la lista sin escanear → guarda, con `false`.
+
+> **⚠️ El sello NO puede vivir en `/tech/scan/[serie]`.** Parece la página del escaneo, pero es un
+> enlace normal: `components/tech/AgendaPanel.tsx:97` (presente en el layout de **todas** las páginas
+> `/tech`) y `tech/planning/page.tsx:134,180` apuntan ahí, y al ser `<Link>` con prefetch y no haber
+> ningún `loading.tsx` bajo `src/app/tech`, el servidor puede renderizarla sin que nadie pulse nada.
+> Sellar ahí daría por presente en la máquina a un técnico sentado en la oficina. La única ruta que
+> codifican las etiquetas impresas es `/m/[serie]` (`src/lib/qr.ts` → `machineReportUrl`), y ahí va.
+> *(Hallazgo del `/code-review` alto del PR-1.)*
+
+**Adelantado desde el PR-2 por el mismo review:** las tres puertas de oficina ya leen el estado
+anterior **de la base** en lugar de aceptarlo del cliente, y ya **borran el rastro al reabrir**
+(`reopens()` + `clearResolution()`). Sin eso, devolver una tarjeta a «En cours» y volver a
+arrastrarla a «Résolu» dejaba la avería con el informe y el escaneo de la intervención anterior —
+el blanqueo que el verrou quiere impedir, disponible ya con solo el PR-1 puesto. El PR-2 solo añade
+la ventana; `updateIncidentStatusAction` perdió el parámetro `oldStatus` y los dos kanbans ya no lo
+mandan.
 
 ---
 
@@ -176,7 +196,7 @@ Las 4 puertas la llaman. Ninguna decide por su cuenta.
 | Fichero | Cambio |
 |---|---|
 | `src/components/admin/ResolutionDialog.tsx` | **nuevo** — motivo (desplegable) + explicación + ¿intervino técnico? |
-| `src/app/admin/incidents/kanban-actions.ts` | firma nueva: la resolución exige el payload de oficina; usa `buildResolution` |
+| `src/app/admin/incidents/kanban-actions.ts` | la resolución exige el payload de oficina; usa `buildResolution` (el estado anterior ya se lee de la BD desde el PR-1) |
 | `src/app/atelier/actions.ts` | `setIncidentStatusAction` propaga el payload (sigue delegando) |
 | `src/components/admin/KanbanBoard.tsx` | `onDragEnd` a `résolu` → abre la ventana; la tarjeta **no se mueve** hasta confirmar; cancelar la devuelve |
 | `src/components/atelier/AtelierKanban.tsx` | ídem, estilo kiosko |
@@ -252,10 +272,13 @@ que cruza directo con `project_princity_crons_silenciosos`.
 3. **Regenerar los tipos de Supabase** tras la migración, o el typecheck cae en CI
    (`main` tiene required check `typecheck · test · build`).
 4. **El kiosko**: ver §PR-2. Es el riesgo que más probablemente hunda la función en uso real.
-5. **Averías reabiertas**: `résolu → en_cours → résolu` debe volver a pedir informe. `resolved_at` no
-   se limpia al reabrir (ya documentado en `src/app/atelier/data.ts:104-106`); decidir si
-   `resolved_via` se limpia al salir de `résolu`. **Recomendación: sí, limpiarlo** en la transición de
-   salida, para que la segunda resolución no herede el rastro de la primera.
+5. ~~**Averías reabiertas**~~ **RESUELTO en el PR-1**: reabrir limpia `resolved_via`,
+   `resolution_reason`, `resolution_note`, `qr_verified` y `qr_scanned_by` (`clearResolution()`).
+   `resolved_at` se conserva a propósito — hay recuentos que lo usan
+   (`src/app/atelier/data.ts:104-106`). La condición mira los **dos** estados (`reopens()`): cuenta
+   venir de `fermé`, porque el envío de la encuesta cierra la avería al instante y una resuelta casi
+   nunca se queda en `résolu`; y no cuenta guardar una que ya estaba `en_cours`, que borraría el
+   escaneo recién hecho.
 
 ---
 

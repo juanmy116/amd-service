@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { sendCsatForIncident } from '@/lib/csat.server'
 import { PARTS } from '@/lib/parts'
-import { buildResolution, clearResolution } from '@/lib/resolution'
+import { buildResolution, clearResolution, reopens } from '@/lib/resolution'
 
 type FormState = { error: string } | null
 
@@ -29,10 +29,13 @@ export async function submitInterventionAction(
   if (!incident) return { error: 'Incident introuvable.' }
   if (incident.assigned_to !== user.id) return { error: 'Non autorisé.' }
 
-  const new_status = parseEnum(formData.get('status'),     INCIDENT_STATUSES)
-  const old_status = parseEnum(formData.get('old_status'), INCIDENT_STATUSES)
+  const new_status = parseEnum(formData.get('status'), INCIDENT_STATUSES)
   if (!new_status) return { error: 'Statut invalide.' }
-  if (!old_status) return { error: 'Statut actuel invalide.' }
+
+  // El estado anterior se lee de la base, no de un campo oculto del formulario: una pestaña
+  // abierta hace rato manda el estado de entonces, y con él se decidían el historial, el
+  // `resolved_at` y el envío de la encuesta.
+  const old_status = incident.status
 
   const rapport           = (formData.get('rapport') as string).trim() || null
   const autres_pieces     = (formData.get('autres_pieces') as string).trim() || null
@@ -50,9 +53,11 @@ export async function submitInterventionAction(
     if (!resolution.ok) return { error: resolution.error }
     Object.assign(updates, resolution.fields)
   }
-  // Reabrir borra el rastro: si no, la próxima resolución heredaría el informe y la vía
-  // de la anterior y la marca diría «intervención» aunque la segunda vez nadie fuese.
-  if (old_status === 'résolu' && new_status !== 'résolu') {
+  // Reabrir borra el rastro: si no, la próxima resolución heredaría el informe y la vía de la
+  // anterior y la marca diría «intervención» aunque la segunda vez nadie fuese. Cuenta también
+  // venir de `fermé`: el envío de la encuesta cierra la avería al instante, así que una
+  // resuelta casi nunca se queda en `résolu`.
+  if (reopens(old_status, new_status)) {
     Object.assign(updates, clearResolution())
   }
 

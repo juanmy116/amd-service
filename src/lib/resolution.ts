@@ -103,16 +103,46 @@ export function buildResolution(input: ResolutionInput): ResolutionResult {
 }
 
 /**
- * Columnas a escribir cuando una avería SALE de `résolu` (se reabre).
+ * Estados en los que la avería está ABIERTA. Volver a uno de ellos es reabrirla.
+ *
+ * `fermé` no está aquí a propósito: cerrar es el final normal del camino y conserva el
+ * rastro, que es justamente el archivo de lo que pasó.
+ */
+const OPEN_STATUSES: readonly string[] = ['nouveau', 'assigné', 'en_cours']
+
+/**
+ * ¿Este cambio de estado REABRE la avería?
+ *
+ * Hacen falta los dos estados, no solo el nuevo: guardar una avería que ya estaba `en_cours`
+ * como `en_cours` no es reabrirla, y tratarlo como tal borraría el escaneo que el técnico
+ * acaba de hacer. Solo cuenta venir de `résolu` o de `fermé`.
+ */
+export function reopens(oldStatus: string, newStatus: string): boolean {
+  return OPEN_STATUSES.includes(newStatus) && !OPEN_STATUSES.includes(oldStatus)
+}
+
+/**
+ * Columnas a escribir cuando una avería se REABRE.
  *
  * Sin esto la segunda resolución heredaría el rastro de la primera: informe viejo, vía
- * vieja, y la marca diría «intervención» aunque la segunda vez nadie fuese. `resolved_at`
- * sí se conserva — hay recuentos que lo usan (`atelier/data.ts`).
+ * vieja y escaneo viejo, y la marca diría «intervención» aunque la segunda vez nadie
+ * fuese — exactamente el blanqueo que el verrou pretende impedir. El escaneo también se
+ * borra: haber tenido la máquina delante en marzo no prueba nada sobre la visita de mayo.
+ *
+ * `resolved_at` sí se conserva: hay recuentos que lo usan (`atelier/data.ts`).
  */
 export function clearResolution(): {
   resolved_via: null
   resolution_reason: null
   resolution_note: null
+  qr_verified: false
+  qr_scanned_by: null
 } {
-  return { resolved_via: null, resolution_reason: null, resolution_note: null }
+  return {
+    resolved_via: null,
+    resolution_reason: null,
+    resolution_note: null,
+    qr_verified: false,
+    qr_scanned_by: null,
+  }
 }

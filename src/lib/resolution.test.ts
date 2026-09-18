@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildResolution, clearResolution, MIN_NOTE_LENGTH } from './resolution'
+import { buildResolution, clearResolution, MIN_NOTE_LENGTH, reopens } from './resolution'
 
 describe('buildResolution — vía intervention (el técnico)', () => {
   it('rechaza resolver sin informe', () => {
@@ -87,12 +87,31 @@ describe('buildResolution — vía bureau (el tablero)', () => {
   })
 })
 
+describe('reopens', () => {
+  it('volver a circulación desde résolu o fermé reabre', () => {
+    expect(reopens('résolu', 'en_cours')).toBe(true)
+    expect(reopens('fermé', 'en_cours')).toBe(true)
+    expect(reopens('fermé', 'assigné')).toBe(true)
+  })
+
+  it('cerrar NO es reabrir: el rastro es el archivo de lo que pasó', () => {
+    expect(reopens('résolu', 'fermé')).toBe(false)
+  })
+
+  it('guardar una avería que ya estaba en curso no borra el escaneo que se acaba de hacer', () => {
+    expect(reopens('en_cours', 'en_cours')).toBe(false)
+    expect(reopens('assigné', 'en_cours')).toBe(false)
+  })
+})
+
 describe('clearResolution — al reabrir una avería', () => {
   it('borra el rastro para que la segunda resolución no herede el de la primera', () => {
     expect(clearResolution()).toEqual({
       resolved_via: null,
       resolution_reason: null,
       resolution_note: null,
+      qr_verified: false,
+      qr_scanned_by: null,
     })
   })
 })
