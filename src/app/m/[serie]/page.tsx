@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { stampQrScan } from '@/lib/scan.server'
 
 export default async function MachineGateway({
   params,
@@ -25,6 +26,10 @@ export default async function MachineGateway({
   if (!profile) redirect('/login')
 
   if (profile.role === 'technician' || profile.role === 'admin') {
+    // Esta ruta es la que codifican las etiquetas impresas: llegar aquí significa haber
+    // tenido la máquina delante. Es el único sitio donde ese sello es creíble — ver
+    // `stampQrScan`.
+    await stampQrScan(decodeURIComponent(serie), user.id)
     redirect(`/tech/scan/${encoded}`)
   }
 

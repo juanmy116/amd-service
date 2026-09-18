@@ -195,7 +195,7 @@ export default function KanbanBoard({ incidents: initialIncidents }: { incidents
 
     startTransition(async () => {
       updateOptimistic({ id: active.id as string, newStatus })
-      const result = await updateIncidentStatusAction(active.id as string, oldStatus, newStatus)
+      const result = await updateIncidentStatusAction(active.id as string, newStatus)
       if (!result?.error) router.refresh()
     })
   }

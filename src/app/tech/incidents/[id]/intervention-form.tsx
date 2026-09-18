@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, type ReactNode } from 'react'
+import { useActionState, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, MapPin, Building2, FileText } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
@@ -42,6 +42,16 @@ export default function InterventionForm({
   incident, boundAction, clientName, machineName, machineLocation, contractNumber, checkedParts, photos,
 }: Props) {
   const [state, formAction, pending] = useActionState(boundAction, null)
+
+  // El informe solo es obligatorio para resolver, así que el formulario necesita saber
+  // qué opción está marcada. Misma preselección que antes: una avería recién asignada
+  // arranca en «en cours», y una `nouveau` sin marcar nada.
+  const [status, setStatus] = useState(
+    incident.status === 'résolu' ? 'résolu'
+      : incident.status === 'en_cours' || incident.status === 'assigné' ? 'en_cours'
+      : ''
+  )
+  const resolving = status === 'résolu'
 
   return (
     <div className="p-4 space-y-5 pb-8">
@@ -102,8 +112,6 @@ export default function InterventionForm({
 
       {/* Formulaire intervention */}
       <form action={formAction} className="space-y-5">
-        <input type="hidden" name="old_status" value={incident.status} />
-
         {state?.error && (
           <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
             {state.error}
@@ -120,7 +128,8 @@ export default function InterventionForm({
                   type="radio"
                   name="status"
                   value={o.value}
-                  defaultChecked={incident.status === o.value || (incident.status === 'assigné' && o.value === 'en_cours')}
+                  checked={status === o.value}
+                  onChange={() => setStatus(o.value)}
                   className="accent-red-600"
                 />
                 <span className="text-sm text-ink-soft">{o.label}</span>
@@ -131,10 +140,19 @@ export default function InterventionForm({
 
         {/* Rapport */}
         <Card className="p-4">
-          <p className="text-sm font-semibold text-ink-soft mb-3">Rapport d&apos;intervention</p>
+          <p className="text-sm font-semibold text-ink-soft mb-1">
+            Rapport d&apos;intervention
+            {resolving && <span className="text-accent"> *</span>}
+          </p>
+          <p className="text-xs text-ink-muted mb-3">
+            {resolving
+              ? 'Obligatoire pour résoudre : sans rapport, personne ne saura ce qui a été fait.'
+              : 'Décrivez ce que vous avez fait sur la machine.'}
+          </p>
           <textarea
             name="rapport"
             rows={4}
+            required={resolving}
             defaultValue={incident.rapport_intervention ?? ''}
             placeholder="Décrivez les actions effectuées, l'état de la machine, les pièces changées..."
             className="w-full px-3 py-2.5 rounded-xl border border-line text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"

@@ -74,9 +74,9 @@ export async function assignMaintenanceVisitAction(
 /**
  * Cambia el estado desde la ficha del kiosko.
  *
- * En la vista carte ya no se arrastran tarjetas entre columnas, así que aquí no llega el estado
- * anterior: se lee de la base y se delega en la acción de /admin/incidents, que es la que sabe
- * de historial, `resolved_at` y envío del CSAT. Nada de duplicar esas reglas.
+ * Se delega en la acción de /admin/incidents, que es la que sabe de historial, `resolved_at`,
+ * envío del CSAT y borrado del rastro al reabrir — y la que lee el estado anterior de la base.
+ * Nada de duplicar esas reglas.
  */
 export async function setIncidentStatusAction(
   incidentId: string,
@@ -85,14 +85,5 @@ export async function setIncidentStatusAction(
   const actor = await requireDispatcherActor()
   if (!actor) return { error: 'Non autorisé' }
 
-  const admin = createAdminClient()
-  const { data: incident } = await admin
-    .from('incidents')
-    .select('status')
-    .eq('id', incidentId)
-    .single()
-  if (!incident) return { error: 'Incident introuvable' }
-  if (incident.status === newStatus) return {}
-
-  return updateIncidentStatusAction(incidentId, incident.status, newStatus)
+  return updateIncidentStatusAction(incidentId, newStatus)
 }
