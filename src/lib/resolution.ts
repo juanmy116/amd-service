@@ -17,6 +17,36 @@
 import type { ResolutionReason, ResolvedVia } from './enums'
 
 /**
+ * Lo que la oficina tiene que aportar para cerrar una avería sin intervención registrada.
+ *
+ * Viaja del navegador a la Server Action, así que allí se vuelve a validar: aquí es solo
+ * la forma del dato.
+ */
+export type OfficeResolution = {
+  reason: ResolutionReason
+  note: string
+  /** Técnico que sí fue pero no lo registró, para que su trabajo cuente. */
+  technicianId: string | null
+}
+
+/**
+ * Motivos, en el idioma de la interfaz. Se muestran en el desplegable de la ventana y, desde
+ * el PR-3, en el listado de averías.
+ *
+ * El desplegable es la mitad del valor de la ventana: un clic, sin teclear —que en la TV del
+ * taller es la diferencia entre que se use y que no— y, de paso, la estadística que hoy no
+ * existe («¿cuántas de las que cerramos en oficina son falsas alarmas de Princity?»).
+ */
+export const RESOLUTION_REASON_LABELS: Record<ResolutionReason, string> = {
+  fausse_alerte:             'Fausse alerte (Princity)',
+  telephone:                 'Résolu par téléphone',
+  client:                    'Résolu par le client',
+  technicien_non_enregistre: 'Un technicien est passé sans le saisir',
+  doublon:                   'Doublon d\'une autre panne',
+  autre:                     'Autre',
+}
+
+/**
  * Mínimo de la explicación de oficina.
  *
  * No busca calidad literaria: busca que «ok» no cuele. Pedir un párrafo solo

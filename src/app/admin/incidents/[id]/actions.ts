@@ -1,12 +1,12 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth'
-import { INCIDENT_CATEGORIES, INCIDENT_PRIORITIES, INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
+import { INCIDENT_CATEGORIES, INCIDENT_PRIORITIES, INCIDENT_STATUSES, RESOLUTION_REASONS, parseEnum } from '@/lib/enums'
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { sendCsatForIncident } from '@/lib/csat.server'
-import { clearResolution, reopens } from '@/lib/resolution'
+import { buildResolution, clearResolution, reopens } from '@/lib/resolution'
 
 type FormState = { error: string } | null
 
@@ -54,6 +54,22 @@ export async function updateIncidentAction(
     priority,
     status:       effective_status,
     assigned_to,
+  }
+
+  // Verrou de résolution: cerrar desde la ficha sin informe de técnico exige motivo y
+  // explicación, igual que en el tablero. No se pide cuando la avería ya estaba resuelta:
+  // corregir el título de una resuelta no es resolverla otra vez.
+  if (effective_status === 'résolu' && old_status !== 'résolu') {
+    const resolution = buildResolution({
+      via: 'bureau',
+      reason: parseEnum(formData.get('resolution_reason'), RESOLUTION_REASONS),
+      note: formData.get('resolution_note') as string | null,
+      // El técnico no se pregunta aquí: esta ficha ya tiene su propio campo «Assigné à», y dos
+      // fuentes para el mismo dato acabarían pisándose.
+      technicianId: null,
+    })
+    if (!resolution.ok) return { error: resolution.error }
+    Object.assign(updates, resolution.fields)
   }
 
   if (effective_status === 'résolu' && old_status !== 'résolu') updates.resolved_at = new Date().toISOString()

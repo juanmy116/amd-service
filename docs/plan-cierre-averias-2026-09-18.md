@@ -152,7 +152,7 @@ Las 4 puertas la llaman. Ninguna decide por su cuenta.
 
 ## 4. Entregas
 
-### PR-1 — Cimientos y la puerta del técnico
+### PR-1 — Cimientos y la puerta del técnico ✅ (PR #143)
 
 *Objetivo: el técnico ya no puede resolver sin informe, y el escaneo deja rastro.*
 
@@ -189,9 +189,13 @@ mandan.
 
 ---
 
-### PR-2 — La ventana, en las cuatro puertas
+### PR-2 — La ventana, en las cuatro puertas ✅
 
 *Objetivo: arrastrar o pulsar «Résolu» fuera del formulario del técnico exige explicación.*
+
+> La regla se aplica en la **Server Action**, no solo en la ventana: arrastrar una tarjeta es un
+> `fetch` como cualquier otro y no se puede confiar en que el navegador haya pasado por el
+> formulario.
 
 | Fichero | Cambio |
 |---|---|
@@ -200,8 +204,9 @@ mandan.
 | `src/app/atelier/actions.ts` | `setIncidentStatusAction` propaga el payload (sigue delegando) |
 | `src/components/admin/KanbanBoard.tsx` | `onDragEnd` a `résolu` → abre la ventana; la tarjeta **no se mueve** hasta confirmar; cancelar la devuelve |
 | `src/components/atelier/AtelierKanban.tsx` | ídem, estilo kiosko |
-| `src/components/atelier/IncidentDetail.tsx` | el botón «Résolu» abre la ventana |
-| `src/components/admin/IncidentForm.tsx` | elegir «Résolu» en el `<select>` despliega los campos en línea (no modal) |
+| `src/components/atelier/AtelierBoard.tsx` | el «Résolu» de la ficha abre la ventana (el estado vive en el tablero, no en la ficha: de él dependen el refresco y el reposo) |
+| `src/app/admin/incidents/page.tsx` | cargar los técnicos para el desplegable de la ventana |
+| `src/components/admin/IncidentForm.tsx` | elegir «Résolu» en el `<select>` despliega los campos en línea (no modal). **Sin selector de técnico**: esta ficha ya tiene «Assigné à» y dos fuentes para el mismo dato se pisarían |
 | `src/app/admin/incidents/[id]/actions.ts` | valida vía `buildResolution` |
 | `src/components/atelier/AtelierBoard.tsx` | **arreglo del reset por inactividad** (ver abajo) |
 

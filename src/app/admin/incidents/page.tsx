@@ -29,13 +29,20 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
 
   const supabase = await createClient()
 
-  // Cargar listas en paralelo (clientes para el dropdown).
-  const [clientsRes, contractIdsRes] = await Promise.all([
+  // Cargar listas en paralelo (clientes para el dropdown, técnicos para la ventana de
+  // resolución del kanban: acreditar a quien intervino sin registrarlo).
+  const [clientsRes, contractIdsRes, techniciansRes] = await Promise.all([
     supabase.from('clients').select('id, nom_client').order('nom_client'),
     clientId
       ? supabase.from('contracts').select('id').eq('client_id', clientId)
       : Promise.resolve({ data: null }),
+    supabase.from('profiles').select('id, full_name').eq('role', 'technician').order('full_name'),
   ])
+
+  const technicians = (techniciansRes.data ?? []).map((t) => ({
+    id: t.id,
+    name: t.full_name ?? t.id,
+  }))
 
   // Para incidencias nuevas (post-refactor) el cliente está en contract_machines,
   // no en contracts. Cargamos los IDs de líneas del cliente seleccionado.
@@ -173,7 +180,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
       {view === 'list' ? (
         <IncidentsListView incidents={listIncidents} />
       ) : (
-        <KanbanBoard incidents={kanbanIncidents} />
+        <KanbanBoard incidents={kanbanIncidents} technicians={technicians} />
       )}
     </div>
   )
