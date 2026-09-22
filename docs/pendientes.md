@@ -168,17 +168,27 @@
 
 ---
 
-## ⏰ Probar el cierre de averías en la app real (único pendiente del verrou)
+## ✅ Verrou de résolution — CERRADO Y VERIFICADO EN USO REAL (2026-09-22)
 
-> **Estado: completo (2026-09-22).** Las cuatro entregas del plan
-> `docs/plan-cierre-averias-2026-09-18.md` (PRs #143, #144, #145 y #146, el candado de BD).
-> ⚠️ El candado **solo existe en la base si se hizo `supabase db push`** de la migración
-> `20260922100000` al mergear el #146 — comprobarlo antes de dar esto por cerrado:
-> `select tgname from pg_trigger where tgname = 'trg_guard_incident_resolution';`
-> Documentado en `docs/architecture.md` §Verrou de résolution.
+> **Estado: las cuatro entregas en producción y PROBADAS POR EL USUARIO el 2026-09-22.** Plan:
+> `docs/plan-cierre-averias-2026-09-18.md` (PRs #143, #144, #145 y #146). Migración
+> `20260922100000` aplicada y trigger verificado en prod (`tgenabled = 'O'`). Documentado en
+> `docs/architecture.md` §Verrou de résolution.
 >
-> Lo que falta es verlo funcionar con manos de verdad, sobre todo **en la TV del taller**, que es
-> donde el plan avisaba de que la función podía hundirse en uso real.
+> **Prueba real, con la TV del taller incluida:** la ventana pide motivo y explicación al arrastrar
+> a «Résolu» **y** a «Fermé» desde una columna abierta; escribir más de dos minutos en la TV no
+> borra el texto; el técnico no puede resolver con el informe vacío; y la resolución de oficina
+> acaba en «Fermé» sin mandar encuesta. Verificado además en la base: `SAV-2026-0011` quedó
+> `fermé` / `bureau` / `client`, con su explicación y `resolved_at = closed_at` — archivada en el
+> mismo gesto, como se diseñó.
+>
+> **Un fallo encontrado y corregido durante la prueba** (PR #147, `2817929`): en la TV, la lista de
+> motivos salía **en blanco sobre blanco**. El menú desplegable lo pinta el sistema, no la página, y
+> las `<option>` heredaban el texto blanco del kiosko sobre el fondo blanco del menú. Ahora llevan
+> color y fondo propios. Salió justo donde el plan avisaba de que saldría.
+>
+> **Lo que queda de esta línea de trabajo:** nada bloqueante. Los pasos de abajo se conservan como
+> guión por si hay que repetir la prueba tras un cambio grande.
 >
 > **Los pasos:**
 > 1. En `/admin/incidents`, arrastrar una avería a **«Résolu»**: debe abrirse la ventana pidiendo

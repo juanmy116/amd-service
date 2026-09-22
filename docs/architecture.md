@@ -637,7 +637,10 @@ Cualquier persona escanea el QR de la máquina
 
 ## Verrou de résolution — ninguna avería se cierra sin rastro
 
-✅ **Completo (2026-09-22).** Plan: `docs/plan-cierre-averias-2026-09-18.md`. PRs #143 (cimientos +
+✅ **Completo, en producción y PROBADO EN USO REAL (2026-09-22)**, TV del taller incluida — con un
+fallo encontrado y corregido en la prueba (PR #147: la lista de motivos salía en blanco sobre blanco
+en la TV; el menú de un `<select>` lo pinta el sistema y las `<option>` heredaban el texto blanco del
+kiosko). Plan: `docs/plan-cierre-averias-2026-09-18.md`. PRs #143 (cimientos +
 puerta del técnico), #144 (las 4 puertas de oficina), #145 (consecuencias visibles) y #146 (el
 candado de BD). En producción con el merge de cada PR; el trigger, además, con el `supabase db push`
 de la migración `20260922100000` — sin ese push el candado no existe en la base aunque el código
