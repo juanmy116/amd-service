@@ -2,7 +2,26 @@
 
 > Backlog vivo. Cada entrada: qué, por qué, y pasos concretos. Al cerrar una, moverla a `docs/architecture.md` o borrarla.
 
-> 📋 **Auditoría del sistema de incidencias (2026-06-10):** `docs/auditoria-incidentes-2026-06-10.md` — valoración de escala, aislamiento RLS y mejoras priorizadas. Punto de partida para mañana.
+> 📋 **Auditoría del sistema de incidencias (2026-06-10):** `docs/auditoria-incidentes-2026-06-10.md` — valoración de escala, aislamiento RLS y mejoras priorizadas.
+
+---
+
+## 📍 Por dónde seguir (al 2026-09-22)
+
+| Prioridad | Qué | Por qué duele |
+|---|---|---|
+| 🔴🔴 **1** | **Princity no trae nada** | Tres procesos diarios, meses ejecutándose, **cero datos**. 321 alertas sin convertirse en incidencias y ni una lectura de contador — y los contadores son la materia prima de la facturación. |
+| 🔴 **2** | **El login no tiene portero** | Sin protección propia contra fuerza bruta desde que se borró la base de Upstash. |
+| 🔴 **3** | **El aviso de mantenimientos atrasados no se envía** | Si un técnico no hace el mantenimiento, no se entera nadie. |
+| 🔴 **4** | **Confirmación antes de emitir factura** | «Forcer» emite al instante y las facturas son inmutables. Hace falta antes de encender la facturación. |
+| 🧹 **5** | **Borrar los datos de prueba del 22-09** | Dos notas de ⭐5 que no ha dado ningún cliente están contando en la media. |
+| ⚠️ **6** | **40 visitas el mismo día / sin válvula de escape** | Afecta al uso real del mantenimiento, no bloquea. |
+
+**Cerrado el 2026-09-22:** el verrou de résolution (ninguna avería se cierra sin rastro, probado en
+uso real) y el CSAT (probado de punta a punta; era el pendiente más antiguo). Ese día también se
+corrigieron tres fallos que solo se ven usando la app: la lista de motivos en blanco sobre blanco en
+la TV, las estrellas de la encuesta que se encendían de una en una, y el 404 de la ficha de
+mantenimiento que llevaba cuatro meses.
 
 ---
 

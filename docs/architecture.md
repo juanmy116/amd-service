@@ -298,7 +298,39 @@ Route handler que recibe el formulario de contacto del sitio web público y capt
 - Cierre atómico vía RPC `close_maintenance_visit` (SECURITY DEFINER, idempotente): marca la visita como `fait`, inserta piezas y programa la siguiente visita en una sola transacción
 - Piezas reemplazadas guardadas en `maintenance_parts` (catálogo `parts` + campo libre)
 
+> **¿Cómo se sabe que un técnico hizo el mantenimiento?** (pregunta del usuario, 2026-09-22).
+> Porque **no hay forma de cerrarlo sin estar delante de la máquina**: la única ruta es
+> `/tech/scan/<serie>/maintenance/<visitId>` y la RPC compara la serie escaneada con la de la
+> visita — si no coinciden, rechaza (`visit_not_found`). Ni un admin puede marcarlo hecho desde el
+> escritorio. Al cerrar quedan `done_at` (hora real), `done_by` (quién), `qr_verified = true`, las
+> notas y las piezas; se programa sola la siguiente visita y sale un aviso a Matrix. Se consulta en
+> `/admin/maintenance` (próxima, última hecha, «En retard») y en la ficha del plan.
+>
+> 🔴 **Lo que NO funciona es el caso contrario: el aviso de «EN RETARD» no se envía nunca.** El cron
+> busca visitas `scheduled_date >= hoy` **y** `matrix_notified = false`; una atrasada falla las dos.
+> Un mantenimiento sin hacer no genera ninguna alerta: solo se ve entrando a mirar la pantalla.
+> Detalle y propuesta de arreglo en `docs/pendientes.md`.
+>
+> ⚠️ **Sin válvula de escape:** un mantenimiento hecho sin escanear (etiqueta despegada, móvil sin
+> batería) **no se puede registrar de ninguna manera** y esa visita queda `en_retard` para siempre.
+> En las averías se decidió lo contrario a propósito (el QR es semáforo, nunca bloqueo — ver
+> §Verrou de résolution). Pendiente de decidir si aquí compensa el bloqueo duro.
+>
+> ✅ **Corregido el 2026-09-22 (PR #151):** la ficha del plan (`/admin/maintenance/[id]`) devolvía
+> **404 desde el 21 de mayo**. Los tres enlaces del listado —cliente, contrato y «Détail»— apuntan
+> ahí, así que la sección entera parecía rota. La consulta pedía `profiles(full_name)` dentro de
+> `maintenance_visits`, que tiene dos claves ajenas a `profiles` (`done_by` y la `assigned_to` que
+> añadió el kiosko del taller): PostgREST responde `PGRST201` y la página llamaba a `notFound()`.
+> Se rompió **a distancia y en silencio**, sin tocar el fichero.
+
 ### 11. Dashboard Atelier (`/atelier`) ✅
+
+> 🔴 **Gotcha de la TV (2026-09-22, PR #147):** el menú desplegable de un `<select>` **lo pinta el
+> sistema, no la página**. Las `<option>` heredaban el `text-white` del kiosko y el navegador las
+> dibujaba sobre su propio fondo blanco ⇒ la lista de motivos del verrou salía **en blanco sobre
+> blanco**. Al añadir cualquier `<select>` al kiosko, fijarle color y fondo propios
+> (`[&>option]:bg-white [&>option]:text-[#15151C]`). Y tras desplegar, **recargar el navegador de
+> la Pi (F5)**: el kiosko refresca datos, no código.
 - Kiosko de taller a pantalla completa para una TV de 32" conectada a una Raspberry Pi 3 — tema oscuro «centro de mando», auto-refresco cada 30 s
 - **Dos vistas** (conmutador en la cabecera, `AtelierHeader`):
   - `/atelier` — **vista carte** (2026-09-14): 4 columnas → `PanneList` | **mapa (Dakar / Région)** | `MaintenanceList`
