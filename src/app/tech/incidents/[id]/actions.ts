@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { sendCsatForIncident } from '@/lib/csat.server'
 import { PARTS } from '@/lib/parts'
-import { archivedReportNote, buildResolution, clearResolution, reopens } from '@/lib/resolution'
+import { archivedReportNote, buildResolution, clearResolution, historyComment, reopens } from '@/lib/resolution'
 
 type FormState = { error: string } | null
 
@@ -64,6 +64,13 @@ export async function submitInterventionAction(
   if (reopens(old_status, new_status)) {
     archivedReport = archivedReportNote(incident.rapport_intervention)
     Object.assign(updates, clearResolution())
+    // El formulario llega relleno con el informe anterior. Si el técnico lo ha REESCRITO, ese
+    // texto es suyo y se queda: al reabrir puede estar explicando por qué vuelve. Si lo dejó
+    // tal cual, se va con el resto del rastro — que es lo que impide que el informe de marzo
+    // acabe cerrando la visita de mayo.
+    if (rapport && rapport !== incident.rapport_intervention?.trim()) {
+      updates.rapport_intervention = rapport
+    }
   }
 
   if (new_status === 'résolu' && old_status !== 'résolu') updates.resolved_at = new Date().toISOString()
@@ -77,10 +84,13 @@ export async function submitInterventionAction(
 
   // Historial
   if (new_status !== old_status) {
-    await supabase.from('incident_history').insert({
+    // Esta fila puede ser la ÚNICA copia del informe anterior (la avería acaba de borrarlo),
+    // así que su fallo no puede pasar en silencio.
+    const { error: histErr } = await supabase.from('incident_history').insert({
       incident_id: id, changed_by: user.id,
-      old_status, new_status, comment: comment ?? archivedReport,
+      old_status, new_status, comment: historyComment(comment, archivedReport),
     })
+    if (histErr) console.error('[submitIntervention] historique', { id, archivedReport, error: histErr })
   }
 
   // Piezas reemplazadas (con cantidad). Se reemplaza el set completo de forma

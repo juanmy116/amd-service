@@ -9,6 +9,7 @@ import {
   archivedReportNote,
   buildResolution,
   clearResolution,
+  historyComment,
   reopens,
   requiresOfficeResolution,
   isOpenStatus,
@@ -130,17 +131,20 @@ export async function updateIncidentStatusAction(
   const { error } = await admin.from('incidents').update(updates).eq('id', incidentId)
   if (error) return { error: error.message }
 
-  await admin.from('incident_history').insert({
+  // Sin el motivo, el salto directo a «Fermé» parecería un archivado a secas; y esta fila
+  // puede ser la única copia del informe anterior cuando se reabre. Las dos cosas caben, y el
+  // fallo del insert no puede pasar en silencio.
+  const { error: histErr } = await admin.from('incident_history').insert({
     incident_id: incidentId,
     changed_by:  user.id,
     old_status:  oldStatus,
     new_status:  finalStatus,
-    // Sin esto, el salto directo a «Fermé» parecería un archivado a secas. El motivo queda a
-    // la vista en el historial de la ficha, que es lo que se mira cuando un cliente reclama.
-    comment:     officeReason
-      ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}`
-      : archivedReport,
+    comment:     historyComment(
+      officeReason ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}` : null,
+      archivedReport,
+    ),
   })
+  if (histErr) console.error('[updateIncidentStatus] historique', { incidentId, archivedReport, error: histErr })
 
   // `after()` difiere el envío a DESPUÉS de la respuesta: sin él, el `return` de
   // abajo puede dar por terminada la función serverless con el envío a medias

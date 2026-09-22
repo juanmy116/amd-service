@@ -38,12 +38,21 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- El rastro no se BORRA de una avería que sigue resuelta o archivada. Sin esta regla, el
-  -- candado solo impediría archivar sin rastro «de un solo movimiento»: bastaban dos UPDATE
-  -- seguidos —uno en regla y otro quitando la vía— para dejar la avería indistinguible de una
-  -- histórica. Borrar el rastro es legítimo al REABRIR, y ahí `NEW.status` es un estado vivo,
-  -- así que ese camino sale unas líneas más arriba y nunca llega hasta aquí.
-  IF TG_OP = 'UPDATE' AND OLD.resolved_via IS NOT NULL AND NEW.resolved_via IS NULL THEN
+  -- El rastro no se BORRA ni se VACÍA mientras la avería siga resuelta o archivada. Sin esta
+  -- regla el candado solo impediría archivar sin rastro «de un solo movimiento»: bastaban dos
+  -- UPDATE seguidos —uno en regla y otro dejando la vía en NULL, o el informe en blanco— para
+  -- acabar con una avería marcada «Intervention» sin una línea escrita. Se comprueban las tres
+  -- piezas, no solo la vía: vaciar el informe es el mismo agujero por otro campo.
+  --
+  -- Borrar el rastro es legítimo al REABRIR, y ahí `NEW.status` es un estado vivo, así que ese
+  -- camino sale unas líneas más arriba y nunca llega hasta aquí.
+  IF TG_OP = 'UPDATE' AND OLD.resolved_via IS NOT NULL AND (
+       NEW.resolved_via IS NULL
+    OR (NEW.resolved_via = 'intervention'
+        AND COALESCE(btrim(NEW.rapport_intervention), '') = '')
+    OR (NEW.resolved_via = 'bureau'
+        AND (NEW.resolution_reason IS NULL OR COALESCE(btrim(NEW.resolution_note), '') = ''))
+  ) THEN
     RAISE EXCEPTION 'Impossible d''effacer la trace d''une panne résolue.'
       USING ERRCODE = 'check_violation';
   END IF;

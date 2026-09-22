@@ -101,6 +101,29 @@ describe('candado de resolución — lo que el trigger RECHAZA', () => {
     expect(error?.message ?? '').toContain('effacer la trace')
   })
 
+  it('ni vaciando el informe de una intervención que sigue resuelta', async () => {
+    // El mismo agujero de dos movimientos, por otro campo: dejar la vía puesta y borrar el
+    // texto deja una avería marcada «Intervention» sin una línea escrita.
+    const id = await freshIncident('TEST-GRD-L', 'en_cours')
+    const { error: resolveErr } = await admin
+      .from('incidents')
+      .update({
+        status: 'résolu',
+        resolved_via: 'intervention',
+        rapport_intervention: 'Nettoyage du chemin papier.',
+        resolution_note: 'Nettoyage du chemin papier.',
+      })
+      .eq('id', id)
+    expect(resolveErr).toBeNull()
+
+    const { error } = await admin
+      .from('incidents')
+      .update({ rapport_intervention: null })
+      .eq('id', id)
+    expect(error).not.toBeNull()
+    expect(error?.message ?? '').toContain('effacer la trace')
+  })
+
   it('ni creando la avería ya resuelta de un INSERT', async () => {
     // El camino que usaría un importador o un script: nacer resuelta, sin pasar por ninguna puerta.
     const { error } = await admin.from('incidents').insert({

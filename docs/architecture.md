@@ -679,7 +679,9 @@ real — peor que antes, porque hoy un informe vacío al menos es una señal.
   segunda resolución heredaría el rastro de la primera; el informe era el hueco más fino, porque el
   formulario del técnico lo rellena con lo que ya hubiera y una avería reabierta en mayo se cerraba
   con el texto de marzo sin escribir una línea. No se pierde: la puerta que reabre lo archiva antes
-  en `incident_history` (`archivedReportNote()`). `resolved_at` se conserva (lo usan los recuentos).
+  en `incident_history` (`archivedReportNote()` + `historyComment()`, que junta esa nota con el
+  comentario escrito a mano en vez de quedarse con uno). Si el técnico **reescribe** el informe al
+  reabrir, ese texto es suyo y se conserva. `resolved_at` se conserva (lo usan los recuentos).
 - `sendsSurvey(via)` — solo `intervention` pide opinión al cliente.
 
 ### El QR: semáforo, nunca bloqueo
@@ -697,9 +699,10 @@ Function, un importador, una llamada con la `service_role` key— no podrá arch
 sin decir cómo se resolvió. Rechaza `résolu`/`fermé` viniendo de un estado **vivo** cuando falta la
 vía, falta el informe (`intervention`) o falta el motivo/explicación (`bureau`).
 
-También impide **borrar** el rastro de una avería que sigue resuelta: sin esa regla el candado solo
-valdría «de un solo movimiento», porque dos UPDATE seguidos —uno en regla y otro quitando la vía—
-dejaban la avería como si nunca hubiera tenido rastro.
+También impide **borrar o vaciar** el rastro mientras la avería siga resuelta — las tres piezas, no
+solo la vía: sin esa regla el candado valdría «de un solo movimiento», porque dos UPDATE seguidos
+—uno en regla y otro dejando la vía en NULL, o el informe en blanco— daban una avería marcada
+«Intervention» sin una línea escrita.
 
 No toca: el histórico (una avería que ya estaba resuelta o cerrada **sin** rastro se puede seguir
 editando y archivando — nunca lo tuvo y no se le inventa), el cierre automático tras la encuesta

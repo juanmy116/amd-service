@@ -277,6 +277,19 @@ export function clearResolution(): {
 }
 
 /**
+ * Junta en una línea de historial todo lo que hay que contar de un cambio de estado.
+ *
+ * Existe porque el `??` que había antes elegía **uno**: si quien reabría escribía un
+ * comentario, la nota con el informe archivado se descartaba y el informe del técnico no
+ * quedaba en ninguna parte — ni en la avería, que acababa de borrarlo, ni en el historial.
+ * Todo lo que llega aquí se conserva.
+ */
+export function historyComment(...notes: Array<string | null | undefined>): string | null {
+  const kept = notes.map((n) => n?.trim()).filter((n): n is string => !!n)
+  return kept.length > 0 ? kept.join('\n\n') : null
+}
+
+/**
  * Línea de historial que guarda el informe de la resolución anterior antes de borrarlo.
  *
  * Reabrir limpia el informe para que la próxima resolución traiga el suyo, pero lo que un

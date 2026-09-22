@@ -17,6 +17,7 @@ import {
   archivedReportNote,
   buildResolution,
   clearResolution,
+  historyComment,
   reopens,
   requiresOfficeResolution,
   isOpenStatus,
@@ -123,17 +124,21 @@ export async function updateIncidentAction(
   }
 
   if (final_status !== old_status) {
-    await supabase.from('incident_history').insert({
+    // Todo lo que haya que contar cabe en la misma línea: el comentario escrito a mano, el
+    // motivo que explica el salto a «Fermé» y el informe archivado al reabrir. Antes el `??`
+    // se quedaba con uno y tiraba los demás — y el informe no quedaba en ninguna parte.
+    const { error: histErr } = await supabase.from('incident_history').insert({
       incident_id: id,
       changed_by:  user.id,
       old_status,
       new_status:  final_status,
-      // El comentario escrito a mano manda; si no lo hay, que al menos el motivo explique el
-      // salto directo a «Fermé» a quien lea el historial dentro de seis meses.
-      comment:     comment
-        ?? (officeReason ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}` : null)
-        ?? archivedReport,
+      comment:     historyComment(
+        comment,
+        officeReason ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}` : null,
+        archivedReport,
+      ),
     })
+    if (histErr) console.error('[updateIncident] historique', { id, archivedReport, error: histErr })
   }
 
   // La ficha de admin es la tercera puerta a `résolu` (además del tech y del

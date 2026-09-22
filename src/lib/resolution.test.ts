@@ -4,6 +4,7 @@ import {
   buildResolution,
   clearResolution,
   finalResolutionStatus,
+  historyComment,
   MIN_NOTE_LENGTH,
   OFFICE_RESOLUTION_STATUS,
   reopens,
@@ -216,5 +217,21 @@ describe('archivedReportNote — el informe anterior no se tira', () => {
     expect(archivedReportNote(null)).toBeNull()
     expect(archivedReportNote('   ')).toBeNull()
     expect(archivedReportNote(undefined)).toBeNull()
+  })
+})
+
+describe('historyComment — nada de lo que hay que contar se pierde', () => {
+  it('junta el comentario escrito a mano con la nota de archivo', () => {
+    expect(historyComment('Le client rappelle.', 'Rapport précédent : X'))
+      .toBe('Le client rappelle.\n\nRapport précédent : X')
+  })
+
+  it('con una sola nota, no añade separadores', () => {
+    expect(historyComment(null, 'Rapport précédent : X')).toBe('Rapport précédent : X')
+    expect(historyComment('Le client rappelle.', null)).toBe('Le client rappelle.')
+  })
+
+  it('sin nada que contar, no inventa una línea', () => {
+    expect(historyComment(null, undefined, '   ')).toBeNull()
   })
 })
