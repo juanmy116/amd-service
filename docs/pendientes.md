@@ -137,14 +137,30 @@
 
 ---
 
-## 🔴 Probar la encuesta de satisfacción de punta a punta (Único pendiente del CSAT)
+## ✅ Encuesta de satisfacción — PROBADA DE PUNTA A PUNTA (2026-09-22)
 
-> **Estado: el código está en producción** (PR #141, `8cc44c2`, 2026-09-17), con las dos migraciones
-> aplicadas y la Edge Function `send-email` redesplegada. Lo que **no** se ha hecho es la única
-> prueba que valida la cadena entera, porque necesita un correo real.
+> **Estado: PROBADA Y FUNCIONANDO.** La cadena entera se verificó con un correo real el
+> 2026-09-22 (y antes, el 2026-09-18, con el código anterior al verrou).
 >
-> **Contexto de por qué importa:** hasta ese día **no se había enviado ni una sola encuesta en toda
-> la vida de la app**. Dar por bueno esto sin verlo llegar sería repetir el mismo error.
+> **`SAV-2026-0014`, la prueba buena:** un técnico (`testsav`) resolvió desde `/tech` con su
+> informe («Bourrage bac 1») a las 21:22:42 → el correo salió **un segundo después** y la avería
+> se cerró sola → a las 21:24:40 llegó la respuesta **⭐5 «Nice»**. Dos minutos de punta a punta,
+> visible en `/admin/avis`.
+>
+> **Y la contraprueba, el mismo día:** `SAV-2026-0011`, resuelta desde la **oficina**
+> (`bureau` · «Résolu par le client»), **no generó ninguna encuesta** — que es justo lo que
+> introdujo el verrou (PR #145). Preguntarle al cliente qué tal le atendió el técnico, cuando no
+> fue ninguno, no tenía sentido.
+>
+> **De la prueba salió un fallo, ya corregido** (PR #149, `0b62e1a`): en la página de la encuesta
+> las estrellas **se encendían de una en una** — elegir 5 iluminaba solo la quinta. Llevaba ahí
+> desde que se creó la página; no se había visto porque hasta el 17 de septiembre **nunca había
+> llegado una encuesta a nadie**. La nota guardada siempre fue la correcta: era un fallo de
+> pintado.
+>
+> **Contexto de por qué importaba:** hasta ese día no se había enviado ni una sola encuesta en
+> toda la vida de la app. Los pasos de abajo se conservan como guión por si hay que repetir la
+> prueba tras un cambio grande.
 >
 > **Los pasos:**
 > 1. Escanear el QR de una máquina (o ir a `/signaler/<nº de serie>`) y comprobar que **el email es
@@ -209,6 +225,34 @@
 >    traer su propio informe.
 >
 > **Borrar las averías de prueba al terminar.**
+
+---
+
+## 🧹 Borrar los datos de prueba del 2026-09-22 (verrou + CSAT)
+
+> **Qué hay que quitar:** las averías de prueba **`SAV-2026-0011`, `0012`, `0013` y `0014`**, las
+> **dos respuestas de encuesta** asociadas (⭐5 «Parfait» del 18-09 y ⭐5 «Nice» del 22-09) y la
+> cuenta de técnico **`testsav@amd-service.com`**, creada solo para la prueba.
+>
+> **Por qué importa:** esas dos notas de cinco estrellas **no las ha dado ningún cliente**, y están
+> contando en la satisfacción media de `/admin` y en `/admin/avis`. Cuando llegue la primera
+> opinión real quedará mezclada con ellas y la media dejará de significar nada. Y `testsav` es una
+> cuenta de técnico con contraseña conocida que ya no hace falta.
+>
+> **Hacerlo antes de que entre la primera opinión de verdad.** No corre prisa, pero tampoco
+> conviene olvidarlo.
+>
+> **El orden importa** (comprobado en las claves ajenas de prod):
+> 1. `csat_responses` tiene `ON DELETE NO ACTION` → **bloquea** el borrado de su avería. Hay que
+>    borrar la respuesta primero.
+> 2. `incident_history`, `incident_parts` e `incident_photos` van en **CASCADE**: se borran solas.
+> 3. `princity_alerts.incident_id` también es `NO ACTION`, pero estas averías vienen del QR, no de
+>    Princity, así que no estorba.
+>
+> ⚠️ **Ojo con el botón «Supprimer» de la ficha:** `deleteIncidentAction` no comprueba el error del
+> borrado. Si la encuesta lo bloquea, la pantalla redirige como si todo hubiera ido bien y la
+> avería sigue ahí. Conviene arreglar eso de paso —un borrado que falla en silencio es de la misma
+> familia que el CSAT que nunca se enviaba— o al menos saberlo al hacer la limpieza.
 
 ---
 

@@ -160,6 +160,12 @@ Ruta pública **sin autenticación** para que cualquier persona abra un incident
 **Seguridad:** datos del reporter anónimo (`contact_name/phone/email`) son visibles solo en el detalle de admin. El portal del cliente los excluye con filtro `.or('source.is.null,source.neq.public')` en listado y detalle. Las incidencias públicas se vinculan por `machine_id` directo (sin `contract_machine_id`).
 
 ### 7. Sistema CSAT ✅
+
+> ✅ **Cadena verificada de punta a punta (2026-09-22):** `SAV-2026-0014` — el técnico resuelve con
+> informe → el correo sale un segundo después → la avería se cierra sola → el cliente responde
+> ⭐5 y se ve en `/admin/avis`. Y la contraprueba: `SAV-2026-0011`, resuelta desde la oficina,
+> **no** generó encuesta (verrou, §Verrou de résolution). De la prueba salió el PR #149: las
+> estrellas de la encuesta se encendían de una en una.
 - Al resolver un ticket, se envía email al cliente vía Resend
 - Email contiene enlace único con token de 7 días
 - El cliente valora de 1 a 5 + comentario opcional
