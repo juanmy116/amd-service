@@ -1,6 +1,7 @@
 import { createAdminClient } from './supabase/admin'
 import { sendEmail } from './email'
 import { csatExpiresAt, isSurveyStillValid, resolveCsatRecipient } from './csat'
+import { sendsSurvey } from './resolution'
 
 /** Email de la cuenta de portal del cliente dueño de la línea de contrato, si existe. */
 async function portalEmailForLine(
@@ -76,11 +77,24 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
 
   const { data: incident } = await admin
     .from('incidents')
-    .select('id, title, numero_incident, contact_name, contact_email, machine_id, contract_machine_id')
+    .select('id, title, numero_incident, contact_name, contact_email, machine_id, contract_machine_id, resolved_via')
     .eq('id', incidentId)
     .single()
 
   if (!incident) return
+
+  // Verrou de résolution: la encuesta pregunta por la INTERVENCIÓN, no por el cierre. Mandarla
+  // tras una resolución de oficina —una falsa alerta de Princity, un duplicado, algo resuelto
+  // por teléfono— sería pedirle al cliente que puntúe la visita de un técnico que no fue.
+  if (!sendsSurvey(incident.resolved_via)) {
+    // Sin vía marcada no es un cierre de oficina: es una puerta que no dejó rastro. No se
+    // molesta al cliente, pero que quede en el registro hasta que el candado del PR-4 lo
+    // haga imposible.
+    if (incident.resolved_via === null) {
+      console.warn('[csat] résolution sans trace — enquête non envoyée', { incidentId })
+    }
+    return
+  }
 
   // Antes había aquí un corte por `contract_machine_id` que descartaba TODAS las incidencias
   // del QR público (van por machine_id). Era la razón de que nunca saliera una sola encuesta.

@@ -12,7 +12,8 @@ import {
   firstParam,
   parsePositiveIntParam,
 } from '@/lib/search'
-import { parseEnum, INCIDENT_STATUSES, INCIDENT_PRIORITIES } from '@/lib/enums'
+import { parseEnum, INCIDENT_STATUSES, INCIDENT_PRIORITIES, RESOLUTION_REASONS, RESOLVED_VIA } from '@/lib/enums'
+import { RESOLVED_VIA_LABELS } from '@/lib/resolution'
 
 const SEARCH_COLUMNS = ['numero_incident', 'title'] as const
 const RESULT_LIMIT = 300
@@ -25,6 +26,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
   const clientId = parsePositiveIntParam(sp.client)
   const statusFilter = parseEnum(firstParam(sp.status), INCIDENT_STATUSES)
   const priorityFilter = parseEnum(firstParam(sp.priority), INCIDENT_PRIORITIES)
+  const viaFilter = parseEnum(firstParam(sp.via), RESOLVED_VIA)
   const view = firstParam(sp.view) === 'list' ? 'list' : 'kanban'
 
   const supabase = await createClient()
@@ -55,7 +57,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
     .from('incidents')
     .select(`
       id, numero_incident, title, category, priority, status, machine_id, created_at,
-      contract_machine_id, assigned_to,
+      contract_machine_id, assigned_to, resolved_via, resolution_reason,
       contract_machines(machine_id, machines(numero_serie), contracts(client_id, clients(nom_client))),
       profiles!assigned_to(full_name)
     `)
@@ -65,6 +67,9 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
   if (q) query = query.or(buildSafeOr(SEARCH_COLUMNS, q))
   if (statusFilter) query = query.eq('status', statusFilter)
   if (priorityFilter) query = query.eq('priority', priorityFilter)
+  // Solo en la vista de lista: las averías abiertas no tienen vía todavía, así que este filtro
+  // vaciaría las tres primeras columnas del kanban sin explicar por qué.
+  if (viaFilter && view === 'list') query = query.eq('resolved_via', viaFilter)
   if (clientId) {
     // El cliente de una incidencia se resuelve por su línea de contrato.
     if (cmIds.length > 0) {
@@ -95,6 +100,10 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
       created_at: inc.created_at,
       clientName: resolvedClientName,
       technicianName: inc.profiles?.full_name ?? null,
+      // La BD ya garantiza los valores con un CHECK; se vuelven a pasar por `parseEnum` para
+      // que el tipo llegue estrecho a la vista en vez de un `string` que haya que castear allí.
+      resolvedVia: parseEnum(inc.resolved_via, RESOLVED_VIA),
+      resolutionReason: parseEnum(inc.resolution_reason, RESOLUTION_REASONS),
     }
   })
 
@@ -119,6 +128,8 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
     created_at: r.created_at,
     clientName: r.clientName,
     technicianName: r.technicianName,
+    resolvedVia: r.resolvedVia,
+    resolutionReason: r.resolutionReason,
   }))
 
   const clientOptions = (clientsRes.data ?? []).map((c) => ({
@@ -158,6 +169,14 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
               { value: 'fermé',    label: 'Fermé'    },
             ],
           },
+          ...(view === 'list' ? [{
+            param: 'via',
+            label: 'Toutes les résolutions',
+            options: [
+              { value: 'intervention', label: RESOLVED_VIA_LABELS.intervention },
+              { value: 'bureau',       label: RESOLVED_VIA_LABELS.bureau       },
+            ],
+          }] : []),
           {
             param: 'priority',
             label: 'Toutes les priorités',

@@ -6,6 +6,8 @@ import { updateIncidentAction, deleteIncidentAction } from './actions'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Stars } from '@/components/ui/Stars'
+import { RESOLUTION_REASON_LABELS, RESOLVED_VIA_LABELS } from '@/lib/resolution'
+import { parseEnum, RESOLUTION_REASONS, RESOLVED_VIA } from '@/lib/enums'
 
 const STATUS_DOT: Record<string, string> = {
   nouveau:  'bg-blue-500',
@@ -74,12 +76,25 @@ export default async function EditIncidentPage({
     .eq('incident_id', incident.id)
     .maybeSingle()
 
+  // Los nombres del historial y el de quien escaneó el QR se piden de una vez: son la misma
+  // tabla y casi siempre la misma gente.
+  const profileIds = [...new Set(
+    [...(history ?? []).map((h) => h.changed_by), incident.qr_scanned_by]
+      .filter((x): x is string => typeof x === 'string')
+  )]
+
   let profileMap = new Map<string, string | null>()
-  if (history && history.length > 0) {
-    const ids = [...new Set(history.map((h) => h.changed_by).filter((x): x is string => x !== null))]
-    const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', ids)
+  if (profileIds.length > 0) {
+    const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', profileIds)
     profileMap = new Map(profiles?.map((p) => [p.id, p.full_name]) ?? [])
   }
+
+  const resolvedVia = parseEnum(incident.resolved_via, RESOLVED_VIA)
+  const resolutionReason = parseEnum(incident.resolution_reason, RESOLUTION_REASONS)
+  // El verde exige que quien escaneó sea quien resolvió: el escaneo de un compañero no prueba
+  // que este técnico tuviera la máquina delante.
+  const qrByResolver = incident.qr_verified && incident.qr_scanned_by === incident.assigned_to
+  const qrScannerName = incident.qr_scanned_by ? profileMap.get(incident.qr_scanned_by) ?? null : null
 
   const boundUpdateAction = updateIncidentAction.bind(null, incident.id)
 
@@ -151,6 +166,51 @@ export default async function EditIncidentPage({
             {avis.comment && (
               <p className="text-sm text-ink-soft mt-3 whitespace-pre-wrap">« {avis.comment} »</p>
             )}
+          </Card>
+        </div>
+      )}
+
+      {/* Comment la panne a été résolue (verrou de résolution) */}
+      {resolvedVia && (
+        <div className="px-8 pb-4 max-w-3xl">
+          <Card className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-sm font-semibold text-ink">Résolution</h2>
+              <Badge variant={resolvedVia === 'intervention' ? 'success' : 'warning'}>
+                {RESOLVED_VIA_LABELS[resolvedVia]}
+              </Badge>
+            </div>
+
+            <div className="space-y-2 text-sm">
+              {resolutionReason && (
+                <div className="flex gap-2">
+                  <span className="text-ink-muted w-24 shrink-0">Motif</span>
+                  <span className="text-ink font-medium">{RESOLUTION_REASON_LABELS[resolutionReason]}</span>
+                </div>
+              )}
+
+              {/* La explicación solo se repite cuando NO es una intervención: en ese caso es el
+                  propio informe, que ya tiene su tarjeta justo debajo. */}
+              {resolvedVia === 'bureau' && incident.resolution_note && (
+                <div className="flex gap-2">
+                  <span className="text-ink-muted w-24 shrink-0">Explication</span>
+                  <span className="text-ink-soft whitespace-pre-wrap">{incident.resolution_note}</span>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <span className="text-ink-muted w-24 shrink-0">QR machine</span>
+                {qrByResolver ? (
+                  <span className="text-success font-medium">Scanné sur place</span>
+                ) : incident.qr_verified ? (
+                  <span className="text-warning font-medium">
+                    Scanné par {qrScannerName ?? 'un autre agent'} — pas par le technicien assigné
+                  </span>
+                ) : (
+                  <span className="text-ink-muted">Aucun scan enregistré</span>
+                )}
+              </div>
+            </div>
           </Card>
         </div>
       )}

@@ -14,7 +14,7 @@
  * Plan: docs/plan-cierre-averias-2026-09-18.md
  */
 
-import type { ResolutionReason, ResolvedVia } from './enums'
+import type { IncidentStatus, ResolutionReason, ResolvedVia } from './enums'
 
 /**
  * Lo que la oficina tiene que aportar para cerrar una avería sin intervención registrada.
@@ -44,6 +44,18 @@ export const RESOLUTION_REASON_LABELS: Record<ResolutionReason, string> = {
   technicien_non_enregistre: 'Un technicien est passé sans le saisir',
   doublon:                   'Doublon d\'une autre panne',
   autre:                     'Autre',
+}
+
+/**
+ * Cómo se llama cada vía en la interfaz.
+ *
+ * La pareja intervención/oficina es la que da sentido a todo el verrou: sin ella el listado
+ * vuelve a mostrar un «Résolu» que no distingue entre «un técnico fue» y «alguien limpió el
+ * tablero».
+ */
+export const RESOLVED_VIA_LABELS: Record<ResolvedVia, string> = {
+  intervention: 'Intervention',
+  bureau:       'Bureau',
 }
 
 /**
@@ -133,6 +145,49 @@ export function buildResolution(input: ResolutionInput): ResolutionResult {
 }
 
 /**
+ * Estado en el que termina una resolución de OFICINA.
+ *
+ * Quien cierra una avería resuelta es el envío de la encuesta (`csat.server.ts`). Como en una
+ * resolución de oficina no hay encuesta que mandar, dejarla en `résolu` la condenaría a una
+ * sala de espera de la que nadie la sacaría nunca: el listado se llenaría de resueltas
+ * eternas. Se archiva en el acto.
+ */
+export const OFFICE_RESOLUTION_STATUS = 'fermé' as const
+
+/**
+ * ¿Se le manda la encuesta de satisfacción al cliente por esta resolución?
+ *
+ * Solo por una intervención de verdad. Preguntar «¿qué tal le atendió el técnico?» por una
+ * avería que se cerró por teléfono, o porque era una falsa alarma de Princity, es pedirle al
+ * cliente que puntúe una visita que nunca ocurrió.
+ *
+ * `null` (histórico anterior al verrou, o una puerta futura que se olvide de marcar) tampoco
+ * recibe encuesta: sin saber qué pasó, no se molesta al cliente.
+ */
+export function sendsSurvey(resolvedVia: string | null | undefined): boolean {
+  return resolvedVia === 'intervention'
+}
+
+/**
+ * Estado que se escribe de verdad cuando alguien pide «Résolu».
+ *
+ * `résolu` es una sala de espera: de ella solo saca el envío de la encuesta
+ * (`csat.server.ts`), que cierra la avería al terminar. Si por esa resolución no va a salir
+ * ninguna encuesta, dejarla ahí la condena a quedarse para siempre — que es justo lo que el
+ * PR-3 vino a eliminar, y volvía por la puerta de atrás en cuanto alguien arrastraba otra vez
+ * a «Résolu» una avería ya archivada desde la oficina.
+ *
+ * Solo aplica a transiciones reales: guardar una avería sin tocarle el estado no la archiva.
+ */
+export function finalResolutionStatus(
+  requestedStatus: IncidentStatus,
+  resolvedViaAfter: string | null,
+): IncidentStatus {
+  if (requestedStatus !== 'résolu') return requestedStatus
+  return sendsSurvey(resolvedViaAfter) ? 'résolu' : OFFICE_RESOLUTION_STATUS
+}
+
+/**
  * Estados en los que la avería está ABIERTA. Volver a uno de ellos es reabrirla.
  *
  * `fermé` no está aquí a propósito: cerrar es el final normal del camino y conserva el
@@ -149,14 +204,22 @@ export function isOpenStatus(status: string): boolean {
  * ¿Este cambio de estado necesita que la oficina explique por qué?
  *
  * Una regla, usada por las cuatro puertas y por la interfaz, para que la ventana aparezca
- * exactamente cuando el servidor va a pedir datos.
+ * exactamente cuando el servidor va a pedir datos. Que las dos usen esta misma función es el
+ * punto entero: cuando la pantalla y el servidor opinaban por separado, salía un formulario
+ * obligatorio sin campos donde escribir.
  *
- * - `existingVia` no nulo ⇒ no se pide nada: ya hay rastro y **no se pisa**. Arrastrar de
- *   «Fermé» a «Résolu» una avería que un técnico resolvió de verdad no puede convertir su
- *   informe en una resolución de oficina.
- * - `fermé` viniendo de un estado abierto cuenta igual que `résolu`: archivar sin pasar por
- *   resuelto es la misma cosa invisible. Y si no se pidiera, «Fermé» sería el atajo *barato*
- *   justo porque «Résolu» hace preguntas.
+ * Se pide justificación al **cerrar algo que estaba abierto**, y solo entonces:
+ *
+ * - `existingVia` no nulo ⇒ no se pide nada y **no se pisa**. Arrastrar de «Fermé» a «Résolu»
+ *   una avería que un técnico resolvió de verdad no puede convertir su informe en una
+ *   resolución de oficina.
+ * - La avería tiene que venir de un estado **abierto**. Una ya resuelta o cerrada no se
+ *   resuelve otra vez: corregirle el título, o archivar una resuelta, es mantenimiento del
+ *   registro, no una resolución. Exigir ahí un motivo dejaba sin salida a quien solo quería
+ *   arreglar una errata.
+ * - Viniendo de abierta, `fermé` cuenta igual que `résolu`: archivar sin pasar por resuelto es
+ *   la misma desaparición. Si no se pidiera, «Fermé» sería el atajo *barato* justo porque
+ *   «Résolu» hace preguntas.
  */
 export function requiresOfficeResolution(
   oldStatus: string,
@@ -164,8 +227,8 @@ export function requiresOfficeResolution(
   existingVia: string | null,
 ): boolean {
   if (existingVia !== null) return false
-  if (newStatus === 'résolu') return true
-  return newStatus === 'fermé' && isOpenStatus(oldStatus)
+  if (!isOpenStatus(oldStatus)) return false
+  return newStatus === 'résolu' || newStatus === 'fermé'
 }
 
 /**

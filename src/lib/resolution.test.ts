@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { buildResolution, clearResolution, MIN_NOTE_LENGTH, reopens, requiresOfficeResolution } from './resolution'
+import {
+  buildResolution,
+  clearResolution,
+  finalResolutionStatus,
+  MIN_NOTE_LENGTH,
+  OFFICE_RESOLUTION_STATUS,
+  reopens,
+  requiresOfficeResolution,
+  sendsSurvey,
+} from './resolution'
 
 describe('buildResolution — vía intervention (el técnico)', () => {
   it('rechaza resolver sin informe', () => {
@@ -137,5 +146,58 @@ describe('requiresOfficeResolution', () => {
 
   it('reabrir no pide explicación (la pedirá la próxima resolución)', () => {
     expect(requiresOfficeResolution('résolu', 'en_cours', null)).toBe(false)
+  })
+
+  it('editar una resuelta sin rastro no es resolverla: corregir una errata no puede pedir motivo', () => {
+    // Sin esto la ficha entraba en un callejón sin salida: el servidor exigía una explicación
+    // y el formulario no dibujaba el campo donde escribirla.
+    expect(requiresOfficeResolution('résolu', 'résolu', null)).toBe(false)
+  })
+
+  it('documentar una avería ya cerrada tampoco: no estaba abierta, no se está resolviendo', () => {
+    expect(requiresOfficeResolution('fermé', 'résolu', null)).toBe(false)
+    expect(requiresOfficeResolution('fermé', 'fermé', null)).toBe(false)
+  })
+})
+
+describe('finalResolutionStatus — quién saca la avería de «résolu»', () => {
+  it('una intervención se queda en résolu: la cerrará el envío de la encuesta', () => {
+    expect(finalResolutionStatus('résolu', 'intervention')).toBe('résolu')
+  })
+
+  it('una de oficina se archiva: sin encuesta, nadie la sacaría de ahí nunca', () => {
+    expect(finalResolutionStatus('résolu', 'bureau')).toBe(OFFICE_RESOLUTION_STATUS)
+  })
+
+  it('sin rastro tampoco se queda esperando una encuesta que no va a salir', () => {
+    expect(finalResolutionStatus('résolu', null)).toBe(OFFICE_RESOLUTION_STATUS)
+  })
+
+  it('los demás estados pasan tal cual: esto solo decide qué significa «Résolu»', () => {
+    expect(finalResolutionStatus('en_cours', null)).toBe('en_cours')
+    expect(finalResolutionStatus('fermé', 'bureau')).toBe('fermé')
+    expect(finalResolutionStatus('nouveau', 'intervention')).toBe('nouveau')
+  })
+})
+
+describe('sendsSurvey — a quién se le pregunta qué tal fue', () => {
+  it('una intervención de verdad sí pide opinión al cliente', () => {
+    expect(sendsSurvey('intervention')).toBe(true)
+  })
+
+  it('una resolución de oficina no: nadie fue, no hay visita que puntuar', () => {
+    expect(sendsSurvey('bureau')).toBe(false)
+  })
+
+  it('sin rastro (histórico, o una puerta que no marca) tampoco se molesta al cliente', () => {
+    expect(sendsSurvey(null)).toBe(false)
+    expect(sendsSurvey(undefined)).toBe(false)
+  })
+
+  it('lo que archiva la oficina no puede disparar la encuesta', () => {
+    // Las dos mitades de la misma decisión: la oficina cierra en `fermé`, y quien manda la
+    // encuesta solo mira `résolu`. Si alguien cambiara una, este test cae.
+    expect(OFFICE_RESOLUTION_STATUS).not.toBe('résolu')
+    expect(sendsSurvey('bureau')).toBe(false)
   })
 })

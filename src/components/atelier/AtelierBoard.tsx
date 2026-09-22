@@ -10,6 +10,7 @@ import MaintenanceDetail from './MaintenanceDetail'
 import PanneAlert from './PanneAlert'
 import UnattendedBanner from './UnattendedBanner'
 import ResolutionDialog from '@/components/admin/ResolutionDialog'
+import ArchivedToast from './ArchivedToast'
 import { filterByQuartier, findNewIncidents, unattendedIncidents, waitingLabel, type BoardIncident, type BoardMaintenance } from '@/lib/atelier/board'
 import { assignIncidentAction, assignMaintenanceVisitAction, setIncidentStatusAction } from '@/app/atelier/actions'
 import type { MapViewId } from '@/lib/atelier/mapView'
@@ -54,6 +55,9 @@ export default function AtelierBoard({
   // porque mientras la ventana está abierta el tablero no puede recargarse ni volver al reposo.
   const [resolving, setResolving] = useState<BoardIncident | null>(null)
   const [resolutionError, setResolutionError] = useState<string | null>(null)
+  // La avería archivada sale del tablero (solo muestra las vivas): hay que confirmar que se
+  // ha hecho, o parecerá que el botón no hizo nada (ver ArchivedToast).
+  const [archived, setArchived] = useState<{ numero: string | null; at: number }>({ numero: null, at: 0 })
   const [now, setNow] = useState(() => new Date(serverNow))
 
   // Identificadores vistos en el refresco anterior: con ellos se sabe qué ha entrado nuevo.
@@ -224,9 +228,12 @@ export default function AtelierBoard({
             setResolutionError(result.error)
             return
           }
+          setArchived({ numero: incident.numeroIncident, at: Date.now() })
           setResolving(null)
         }}
       />
+
+      <ArchivedToast numero={archived.numero} at={archived.at} />
     </>
   )
 }

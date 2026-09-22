@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
 import ResolutionDialog from './ResolutionDialog'
-import { isOpenStatus, type OfficeResolution } from '@/lib/resolution'
+import { requiresOfficeResolution, OFFICE_RESOLUTION_STATUS, type OfficeResolution } from '@/lib/resolution'
 
 export type KanbanIncident = {
   id: string
@@ -210,7 +210,11 @@ export default function KanbanBoard({
     // Resolver desde el tablero no es un gesto: hay que decir por qué. Vale también para
     // «Fermé» viniendo de una avería abierta — archivar sin pasar por resuelto es la misma
     // cosa invisible, y si no se pidiera sería el atajo barato justo porque «Résolu» pregunta.
-    if (newStatus === 'résolu' || (newStatus === 'fermé' && isOpenStatus(oldStatus))) {
+    // La misma regla que aplica el servidor, para que la ventana salga exactamente cuando él
+    // va a pedir datos. La vía va a `null` a propósito: el tablero no la carga, pero una avería
+    // en una columna abierta nunca conserva rastro (`clearResolution` lo borra al reabrir). Si
+    // aun así discrepara, manda el servidor.
+    if (requiresOfficeResolution(oldStatus, newStatus, null)) {
       const dropped = optimisticIncidents.find((i) => i.id === active.id)
       if (dropped) {
         setResolutionError(null)
@@ -235,7 +239,10 @@ export default function KanbanBoard({
     if (!incident) return
     setResolutionError(null)
     startTransition(async () => {
-      updateOptimistic({ id: incident.id, newStatus: resolutionTarget })
+      // La ventana solo se abre para resoluciones de oficina, y esas se archivan en el acto:
+      // mover la tarjeta a «Résolu» para verla saltar a «Fermé» al refrescar sería un parpadeo
+      // sin sentido. Al servidor se le sigue mandando lo que pidió el usuario — la regla vive allí.
+      updateOptimistic({ id: incident.id, newStatus: OFFICE_RESOLUTION_STATUS })
       const result = await updateIncidentStatusAction(incident.id, resolutionTarget, office)
       if (result?.error) {
         setResolutionError(result.error)
