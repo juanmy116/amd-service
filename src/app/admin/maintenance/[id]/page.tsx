@@ -32,6 +32,11 @@ export default async function MaintenancePlanDetailPage({
   const { id } = await params
   const supabase = await createClient()
 
+  // Las dos relaciones con `profiles` se piden POR SU CLAVE AJENA. `maintenance_visits` tiene
+  // dos (`done_by` y `assigned_to`, esta última desde el kiosko del taller), así que pedir
+  // `profiles(...)` a secas dejó de ser suficiente: PostgREST no sabe cuál quieres, devuelve
+  // error, el `plan` llega vacío y la página respondía **404**. Los tres enlaces del listado
+  // —cliente, contrato y «Détail»— apuntan aquí, así que la sección entera parecía rota.
   const { data: plan } = await supabase
     .from('maintenance_plans')
     .select(`
@@ -43,7 +48,8 @@ export default async function MaintenancePlanDetailPage({
       maintenance_visits (
         id, scheduled_date, done_at, status, qr_verified, notes, matrix_notified,
         contract_machine_id,
-        profiles ( full_name ),
+        done_by_profile:profiles!maintenance_visits_done_by_fkey ( full_name ),
+        assigned_profile:profiles!maintenance_visits_assigned_to_fkey ( full_name ),
         contract_machines ( machines ( numero_serie, marque, modele ) )
       )
     `)
@@ -59,7 +65,8 @@ export default async function MaintenancePlanDetailPage({
     status: string; qr_verified: boolean; notes: string | null
     matrix_notified: boolean
     contract_machine_id: string
-    profiles: { full_name: string }[] | null
+    done_by_profile: { full_name: string } | null
+    assigned_profile: { full_name: string } | null
     contract_machines: { machines: { numero_serie: string; marque: string; modele: string } | null } | null
   }
   const visits = ((plan.maintenance_visits ?? []) as unknown as Visit[])
@@ -157,8 +164,13 @@ export default async function MaintenancePlanDetailPage({
                       : <span className="text-ink-muted">—</span>
                     }
                   </td>
+                  {/* Quien la hizo; si todavía no está hecha, a quién se le asignó. */}
                   <td className="px-4 py-3.5 text-ink-soft">
-                    {v.profiles?.[0]?.full_name ?? <span className="text-ink-muted">—</span>}
+                    {v.done_by_profile?.full_name ?? (
+                      v.assigned_profile?.full_name
+                        ? <span className="text-ink-muted">{v.assigned_profile.full_name} <span className="text-xs">(assigné)</span></span>
+                        : <span className="text-ink-muted">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3.5">
                     {v.qr_verified
