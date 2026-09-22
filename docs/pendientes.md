@@ -228,6 +228,75 @@
 
 ---
 
+## 🔴 Mantenimientos: el aviso de «EN RETARD» no se envía NUNCA
+
+> **Descubierto el 2026-09-22**, al preguntarse lo más básico: *«¿cómo sabemos si los técnicos han
+> hecho los mantenimientos?»*. La respuesta incómoda es que, si **no** los hacen, no se entera nadie.
+>
+> ### Qué pasa
+>
+> El cron diario (`maintenance-daily-check`, 8:00, activo y sin fallos en 134 ejecuciones) hace dos
+> cosas: marca como `en_retard` las visitas cuya fecha ya pasó, y avisa por Matrix de las que vienen.
+> Pero el aviso busca visitas que cumplan **las dos** condiciones:
+>
+> ```ts
+> .gte('scheduled_date', todayStr)      // de hoy en adelante
+> .eq('matrix_notified', false)         // que no se hayan avisado ya
+> ```
+>
+> Una visita atrasada falla las dos: su fecha es **anterior** a hoy, y ya se avisó cuando estaba
+> próxima (el cron la marcó `matrix_notified = true` entonces). El mensaje
+> `⚠️ MAINTENANCE EN RETARD` existe en `supabase/functions/maintenance-cron/index.ts` pero **es
+> inalcanzable**: para que `isOverdue` sea true haría falta una visita `en_retard` con fecha futura,
+> y el estado `en_retard` se pone justamente cuando la fecha ya pasó.
+>
+> **Consecuencia:** un mantenimiento sin hacer no genera ninguna alerta. Solo se ve entrando a
+> `/admin/maintenance`. Es el mismo patrón que los crons de Princity: algo que parece vigilar y no
+> vigila.
+>
+> ### Cómo arreglarlo
+>
+> Un segundo bloque en el cron, independiente del de «próximas»: buscar `status = 'en_retard'` sin
+> filtrar por fecha y avisar con una cadencia propia (¿cada mañana? ¿solo lunes?), con un contador
+> aparte —`matrix_notified` ya está gastado por el aviso de «planificada»— o simplemente reenviando
+> un resumen: «3 mantenimientos atrasados: …». Un resumen diario evita 40 mensajes sueltos.
+>
+> ### De paso, comprobar que Matrix está configurado
+>
+> `notifyMatrix()` **se calla si faltan las variables** (`MATRIX_HOMESERVER_URL`,
+> `MATRIX_ACCESS_TOKEN`, `MATRIX_MAINTENANCE_ROOM_ID`): no lanza, no registra nada. Nunca se ha
+> verificado que los avisos lleguen de verdad. **Ocasión inmediata:** las 40 visitas creadas el
+> 2026-09-22 a las 21:34 están fechadas el **23/09**, así que el cron de mañana a las 8:00 debería
+> mandar 40 avisos. Si no llega ninguno, es que Matrix no está configurado.
+
+---
+
+## ⚠️ Mantenimientos: 40 visitas el mismo día, y ninguna forma de corregir a mano
+
+> **Dos cosas vistas el 2026-09-22 al mirar los datos reales del primer plan de mantenimiento
+> (contrato 2AS, 40 máquinas).** Ninguna es urgente; las dos afectan al uso real.
+>
+> ### 1. Todas las visitas nacen el mismo día
+>
+> Al crear el plan se generaron **40 visitas con la misma fecha** (23/09). Un técnico tendría
+> cuarenta mantenimientos en un día por todo Dakar, y el aviso diario mandaría cuarenta mensajes de
+> golpe. Conviene repartir la generación inicial (por zona, por semana, por técnico) o al menos
+> avisar en resumen en vez de uno por uno.
+>
+> ### 2. Un mantenimiento hecho sin escanear no se puede registrar
+>
+> Cerrar una visita exige escanear el QR de esa máquina: la RPC `close_maintenance_visit` compara la
+> serie escaneada con la de la visita y rechaza si no coinciden. Es una garantía sólida —nadie puede
+> inventarse un mantenimiento— pero **no tiene válvula de escape**: si la etiqueta está despegada o
+> el móvil sin batería, esa visita se queda `en_retard` para siempre.
+>
+> En las **averías** se decidió lo contrario a propósito (el QR es semáforo 🟢/🟡, nunca bloqueo,
+> ver §Verrou de résolution en `architecture.md`): un técnico sin salida busca un atajo. Merece la
+> pena decidir si los mantenimientos deben seguir el mismo criterio —por ejemplo, permitir cerrar
+> sin escaneo dejándolo marcado como «sin verificar»— o si aquí el bloqueo duro compensa.
+
+---
+
 ## 🧹 Borrar los datos de prueba del 2026-09-22 (verrou + CSAT)
 
 > **Qué hay que quitar:** las averías de prueba **`SAV-2026-0011`, `0012`, `0013` y `0014`**, las
