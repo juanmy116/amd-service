@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  archivedReportNote,
   buildResolution,
   clearResolution,
   finalResolutionStatus,
@@ -119,6 +120,9 @@ describe('clearResolution — al reabrir una avería', () => {
       resolved_via: null,
       resolution_reason: null,
       resolution_note: null,
+      // El informe también: el formulario del técnico lo rellena con lo que ya hubiera, así que
+      // una avería reabierta en mayo se cerraba con el informe de marzo sin escribir una línea.
+      rapport_intervention: null,
       qr_verified: false,
       qr_scanned_by: null,
     })
@@ -199,5 +203,18 @@ describe('sendsSurvey — a quién se le pregunta qué tal fue', () => {
     // encuesta solo mira `résolu`. Si alguien cambiara una, este test cae.
     expect(OFFICE_RESOLUTION_STATUS).not.toBe('résolu')
     expect(sendsSurvey('bureau')).toBe(false)
+  })
+})
+
+describe('archivedReportNote — el informe anterior no se tira', () => {
+  it('lo convierte en una línea de historial antes de borrarlo', () => {
+    expect(archivedReportNote('Changement du tambour.'))
+      .toBe('Rapport de la résolution précédente : Changement du tambour.')
+  })
+
+  it('sin informe anterior no inventa una línea', () => {
+    expect(archivedReportNote(null)).toBeNull()
+    expect(archivedReportNote('   ')).toBeNull()
+    expect(archivedReportNote(undefined)).toBeNull()
   })
 })

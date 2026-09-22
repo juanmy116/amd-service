@@ -77,6 +77,30 @@ describe('candado de resolución — lo que el trigger RECHAZA', () => {
     expect(error?.message ?? '').toContain('motif')
   })
 
+  it('no se le puede QUITAR el rastro a una avería que sigue resuelta', async () => {
+    // Sin esta regla el candado solo valdría «de un solo movimiento»: dos UPDATE seguidos
+    // —uno en regla y otro borrando la vía— dejaban la avería como si nunca hubiera tenido
+    // rastro, indistinguible de una histórica.
+    const id = await freshIncident('TEST-GRD-K', 'en_cours')
+    const { error: resolveErr } = await admin
+      .from('incidents')
+      .update({
+        status: 'fermé',
+        resolved_via: 'bureau',
+        resolution_reason: 'telephone',
+        resolution_note: 'Réglé au téléphone avec le client.',
+      })
+      .eq('id', id)
+    expect(resolveErr).toBeNull()
+
+    const { error } = await admin
+      .from('incidents')
+      .update({ resolved_via: null, resolution_reason: null, resolution_note: null })
+      .eq('id', id)
+    expect(error).not.toBeNull()
+    expect(error?.message ?? '').toContain('effacer la trace')
+  })
+
   it('ni creando la avería ya resuelta de un INSERT', async () => {
     // El camino que usaría un importador o un script: nacer resuelta, sin pasar por ninguna puerta.
     const { error } = await admin.from('incidents').insert({
@@ -122,7 +146,9 @@ describe('candado de resolución — lo que el trigger DEJA pasar', () => {
   it('el cierre automático tras la encuesta: de «résolu» a «fermé»', async () => {
     // `csat.server.ts` hace exactamente esto cuando el email sale. No puede tropezar con el candado.
     const id = await freshIncident('TEST-GRD-H', 'en_cours')
-    await admin
+    // El montaje se comprueba: si un día dejara de pasar, la aserción de abajo se cumpliría
+    // sobre cero filas y el test seguiría verde con el candado roto.
+    const { error: setupErr } = await admin
       .from('incidents')
       .update({
         status: 'résolu',
@@ -131,6 +157,7 @@ describe('candado de resolución — lo que el trigger DEJA pasar', () => {
         resolution_note: 'Bourrage papier dégagé.',
       })
       .eq('id', id)
+    expect(setupErr).toBeNull()
 
     const { error } = await admin
       .from('incidents')
@@ -140,14 +167,17 @@ describe('candado de resolución — lo que el trigger DEJA pasar', () => {
     expect(error).toBeNull()
   })
 
-  it('el histórico sin rastro se puede seguir editando y cerrando', async () => {
-    // Las averías anteriores al verrou no tienen vía y no se les inventa una. Si el candado
-    // mirase solo el estado nuevo, quedarían congeladas: ni corregirles una errata.
+  it('una avería ya resuelta se puede seguir editando y archivando', async () => {
+    // El candado no puede congelar el registro: corregir una errata en el título de una
+    // resuelta, o archivarla, siguen siendo operaciones normales.
+    //
+    // Las averías REALMENTE históricas (anteriores al verrou: `résolu`/`fermé` con
+    // `resolved_via` nulo) ya no se pueden fabricar desde aquí — el INSERT sin rastro está
+    // prohibido y quitarlo después también. Su caso lo cubre la rama «OLD.status no estaba
+    // vivo» del trigger, y en producción son 2 filas de 2026.
     const id = await freshIncident('TEST-GRD-I', 'en_cours')
 
-    // Para tener una «histórica» sin RPC de por medio: se resuelve en regla y luego se le
-    // quita el rastro cuando ya está resuelta, que es justo lo que el candado no vigila.
-    await admin
+    const { error: resolveErr } = await admin
       .from('incidents')
       .update({
         status: 'résolu',
@@ -156,13 +186,8 @@ describe('candado de resolución — lo que el trigger DEJA pasar', () => {
         resolution_note: 'Ancien rapport.',
       })
       .eq('id', id)
-    const { error: stripErr } = await admin
-      .from('incidents')
-      .update({ resolved_via: null, resolution_note: null, rapport_intervention: null })
-      .eq('id', id)
-    expect(stripErr).toBeNull()
+    expect(resolveErr).toBeNull()
 
-    // Ahora es una «histórica»: editar el título y archivarla siguen permitidos.
     const { error: editErr } = await admin
       .from('incidents')
       .update({ title: 'Titre corrigé' })
@@ -178,7 +203,7 @@ describe('candado de resolución — lo que el trigger DEJA pasar', () => {
 
   it('reabrir no pide nada: lo pedirá la próxima resolución', async () => {
     const id = await freshIncident('TEST-GRD-J', 'en_cours')
-    await admin
+    const { error: setupErr } = await admin
       .from('incidents')
       .update({
         status: 'résolu',
@@ -187,10 +212,17 @@ describe('candado de resolución — lo que el trigger DEJA pasar', () => {
         resolution_note: 'Première visite.',
       })
       .eq('id', id)
+    expect(setupErr).toBeNull()
 
     const { error } = await admin
       .from('incidents')
-      .update({ status: 'en_cours', resolved_via: null, resolution_note: null, qr_verified: false })
+      .update({
+        status: 'en_cours',
+        resolved_via: null,
+        resolution_note: null,
+        rapport_intervention: null,
+        qr_verified: false,
+      })
       .eq('id', id)
     expect(error).toBeNull()
   })

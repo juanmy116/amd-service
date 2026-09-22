@@ -6,6 +6,7 @@ import { INCIDENT_STATUSES, RESOLUTION_REASONS, parseEnum, type ResolutionReason
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { sendCsatForIncident } from '@/lib/csat.server'
 import {
+  archivedReportNote,
   buildResolution,
   clearResolution,
   reopens,
@@ -50,7 +51,7 @@ export async function updateIncidentStatusAction(
 
   const { data: current } = await admin
     .from('incidents')
-    .select('status, resolved_via')
+    .select('status, resolved_via, rapport_intervention')
     .eq('id', incidentId)
     .single()
   if (!current) return { error: 'Incident introuvable' }
@@ -118,7 +119,13 @@ export async function updateIncidentStatusAction(
   // Reabrir borra el rastro de la resolución anterior. Sin esto, devolver una tarjeta a «En
   // cours» y volver a arrastrarla a «Résolu» dejaba la avería con el informe y el escaneo de
   // la intervención de antes: indistinguible de una segunda intervención real.
-  if (reopens(oldStatus, finalStatus)) Object.assign(updates, clearResolution())
+  // Igual que en la puerta del técnico: el informe anterior se archiva en el historial antes
+  // de borrarlo, para que la próxima resolución no pueda presentarlo como suyo.
+  let archivedReport: string | null = null
+  if (reopens(oldStatus, finalStatus)) {
+    archivedReport = archivedReportNote(current.rapport_intervention)
+    Object.assign(updates, clearResolution())
+  }
 
   const { error } = await admin.from('incidents').update(updates).eq('id', incidentId)
   if (error) return { error: error.message }
@@ -130,7 +137,9 @@ export async function updateIncidentStatusAction(
     new_status:  finalStatus,
     // Sin esto, el salto directo a «Fermé» parecería un archivado a secas. El motivo queda a
     // la vista en el historial de la ficha, que es lo que se mira cuando un cliente reclama.
-    comment:     officeReason ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}` : null,
+    comment:     officeReason
+      ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}`
+      : archivedReport,
   })
 
   // `after()` difiere el envío a DESPUÉS de la respuesta: sin él, el `return` de

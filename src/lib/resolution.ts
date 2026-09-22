@@ -250,12 +250,19 @@ export function reopens(oldStatus: string, newStatus: string): boolean {
  * fuese — exactamente el blanqueo que el verrou pretende impedir. El escaneo también se
  * borra: haber tenido la máquina delante en marzo no prueba nada sobre la visita de mayo.
  *
+ * **`rapport_intervention` también.** Era el hueco por el que se colaba todo lo demás: el
+ * formulario del técnico rellena ese campo con lo que ya hubiera, así que una avería
+ * reabierta en mayo se cerraba con el informe de marzo sin escribir una línea, y ni la
+ * aplicación ni el candado de la BD podían notarlo — el texto estaba ahí. No se pierde: la
+ * puerta que reabre lo archiva antes en `incident_history` (ver `archivedReportNote`).
+ *
  * `resolved_at` sí se conserva: hay recuentos que lo usan (`atelier/data.ts`).
  */
 export function clearResolution(): {
   resolved_via: null
   resolution_reason: null
   resolution_note: null
+  rapport_intervention: null
   qr_verified: false
   qr_scanned_by: null
 } {
@@ -263,7 +270,20 @@ export function clearResolution(): {
     resolved_via: null,
     resolution_reason: null,
     resolution_note: null,
+    rapport_intervention: null,
     qr_verified: false,
     qr_scanned_by: null,
   }
+}
+
+/**
+ * Línea de historial que guarda el informe de la resolución anterior antes de borrarlo.
+ *
+ * Reabrir limpia el informe para que la próxima resolución traiga el suyo, pero lo que un
+ * técnico escribió sobre una visita real no se tira: queda fechado en el historial de la
+ * avería, que es donde se mira cuando un cliente reclama.
+ */
+export function archivedReportNote(previousReport: string | null | undefined): string | null {
+  const report = previousReport?.trim()
+  return report ? `Rapport de la résolution précédente : ${report}` : null
 }

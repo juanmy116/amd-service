@@ -14,9 +14,10 @@
 -- dejaría abierto justo el atajo que el PR-2 cerró en la aplicación.
 --
 -- QUÉ NO TOCA, a propósito:
---   · El histórico. Una avería que ya estaba en `résolu` o `fermé` puede editarse, cerrarse y
---     archivarse sin rastro: nunca lo tuvo, y no se inventa uno. Por eso la condición mira el
---     estado ANTERIOR y no solo el nuevo.
+--   · El histórico. Una avería que ya estaba en `résolu` o `fermé` **sin rastro** (las
+--     anteriores al verrou) puede editarse, cerrarse y archivarse: nunca lo tuvo, y no se
+--     inventa uno. Por eso la condición mira el estado ANTERIOR y no solo el nuevo. Lo que no
+--     se puede es QUITARLE el rastro a una que sí lo tiene.
 --   · El cierre automático tras la encuesta (`csat.server.ts`), que va de `résolu` a `fermé`.
 --   · Reabrir: volver a un estado vivo no exige nada; lo exigirá la próxima resolución.
 --
@@ -37,8 +38,18 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Y solo si la avería venía viva. Tocar una que ya estaba resuelta o cerrada no es
-  -- resolverla: es mantenimiento del registro.
+  -- El rastro no se BORRA de una avería que sigue resuelta o archivada. Sin esta regla, el
+  -- candado solo impediría archivar sin rastro «de un solo movimiento»: bastaban dos UPDATE
+  -- seguidos —uno en regla y otro quitando la vía— para dejar la avería indistinguible de una
+  -- histórica. Borrar el rastro es legítimo al REABRIR, y ahí `NEW.status` es un estado vivo,
+  -- así que ese camino sale unas líneas más arriba y nunca llega hasta aquí.
+  IF TG_OP = 'UPDATE' AND OLD.resolved_via IS NOT NULL AND NEW.resolved_via IS NULL THEN
+    RAISE EXCEPTION 'Impossible d''effacer la trace d''une panne résolue.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- Pasado eso, solo importa lo que venía vivo. Tocar una avería que ya estaba resuelta o
+  -- cerrada no es resolverla: es mantenimiento del registro.
   IF TG_OP = 'UPDATE' AND OLD.status NOT IN ('nouveau', 'assigné', 'en_cours') THEN
     RETURN NEW;
   END IF;

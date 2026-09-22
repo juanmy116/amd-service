@@ -14,6 +14,7 @@ import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { sendCsatForIncident } from '@/lib/csat.server'
 import {
+  archivedReportNote,
   buildResolution,
   clearResolution,
   reopens,
@@ -47,7 +48,7 @@ export async function updateIncidentAction(
   // envío de la encuesta y el borrado del rastro al reabrir.
   const { data: current } = await supabase
     .from('incidents')
-    .select('status, resolved_via')
+    .select('status, resolved_via, rapport_intervention')
     .eq('id', id)
     .single()
   if (!current) return { error: 'Incident introuvable.' }
@@ -109,7 +110,11 @@ export async function updateIncidentAction(
 
   // Reabrir desde la ficha borra el rastro igual que en el tablero: una resolución que no
   // limpia deja a la siguiente heredar el informe y el escaneo de la anterior.
-  if (reopens(old_status, final_status)) Object.assign(updates, clearResolution())
+  let archivedReport: string | null = null
+  if (reopens(old_status, final_status)) {
+    archivedReport = archivedReportNote(current.rapport_intervention)
+    Object.assign(updates, clearResolution())
+  }
 
   const { error } = await supabase.from('incidents').update(updates).eq('id', id)
   if (error) {
@@ -125,7 +130,9 @@ export async function updateIncidentAction(
       new_status:  final_status,
       // El comentario escrito a mano manda; si no lo hay, que al menos el motivo explique el
       // salto directo a «Fermé» a quien lea el historial dentro de seis meses.
-      comment:     comment ?? (officeReason ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}` : null),
+      comment:     comment
+        ?? (officeReason ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}` : null)
+        ?? archivedReport,
     })
   }
 

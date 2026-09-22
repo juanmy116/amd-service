@@ -637,9 +637,11 @@ Cualquier persona escanea el QR de la máquina
 
 ## Verrou de résolution — ninguna avería se cierra sin rastro
 
-✅ **Completo y en producción (2026-09-22).** Plan: `docs/plan-cierre-averias-2026-09-18.md`.
-PRs #143 (cimientos + puerta del técnico), #144 (las 4 puertas de oficina), #145 (consecuencias
-visibles) y el candado de BD.
+✅ **Completo (2026-09-22).** Plan: `docs/plan-cierre-averias-2026-09-18.md`. PRs #143 (cimientos +
+puerta del técnico), #144 (las 4 puertas de oficina), #145 (consecuencias visibles) y #146 (el
+candado de BD). En producción con el merge de cada PR; el trigger, además, con el `supabase db push`
+de la migración `20260922100000` — sin ese push el candado no existe en la base aunque el código
+esté desplegado.
 
 ### El problema
 
@@ -673,8 +675,11 @@ real — peor que antes, porque hoy un informe vacío al menos es una señal.
   existía en pantalla.
 - `finalResolutionStatus(status, via)` — una resolución que no va a generar encuesta se archiva en
   el acto: `résolu` es una sala de espera de la que solo saca el envío del CSAT.
-- `clearResolution()` — reabrir borra vía, motivo, nota y escaneo. Sin esto la segunda resolución
-  heredaría el rastro de la primera. `resolved_at` se conserva (lo usan los recuentos).
+- `clearResolution()` — reabrir borra vía, motivo, nota, escaneo **y el informe**. Sin esto la
+  segunda resolución heredaría el rastro de la primera; el informe era el hueco más fino, porque el
+  formulario del técnico lo rellena con lo que ya hubiera y una avería reabierta en mayo se cerraba
+  con el texto de marzo sin escribir una línea. No se pierde: la puerta que reabre lo archiva antes
+  en `incident_history` (`archivedReportNote()`). `resolved_at` se conserva (lo usan los recuentos).
 - `sendsSurvey(via)` — solo `intervention` pide opinión al cliente.
 
 ### El QR: semáforo, nunca bloqueo
@@ -692,9 +697,14 @@ Function, un importador, una llamada con la `service_role` key— no podrá arch
 sin decir cómo se resolvió. Rechaza `résolu`/`fermé` viniendo de un estado **vivo** cuando falta la
 vía, falta el informe (`intervention`) o falta el motivo/explicación (`bureau`).
 
-No toca: el histórico (una avería que ya estaba resuelta o cerrada sin rastro se puede seguir
+También impide **borrar** el rastro de una avería que sigue resuelta: sin esa regla el candado solo
+valdría «de un solo movimiento», porque dos UPDATE seguidos —uno en regla y otro quitando la vía—
+dejaban la avería como si nunca hubiera tenido rastro.
+
+No toca: el histórico (una avería que ya estaba resuelta o cerrada **sin** rastro se puede seguir
 editando y archivando — nunca lo tuvo y no se le inventa), el cierre automático tras la encuesta
-(`résolu → fermé`) ni la reapertura. Cubierto por `tests/rls/incident-resolution-guard.test.ts`.
+(`résolu → fermé`) ni la reapertura. Cubierto por `tests/rls/incident-resolution-guard.test.ts`
+(seis rechazos y cinco caminos legítimos, contra un Supabase real en el job `rls` del CI).
 
 ### Qué se ve
 

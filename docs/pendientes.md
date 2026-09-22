@@ -170,10 +170,12 @@
 
 ## ⏰ Probar el cierre de averías en la app real (único pendiente del verrou)
 
-> **Estado: completo y en producción (2026-09-22).** Las cuatro entregas del plan
-> `docs/plan-cierre-averias-2026-09-18.md` están en `main` (PRs #143, #144, #145 y el candado de BD),
-> con la migración `20260922100000` aplicada. Documentado en `docs/architecture.md` §Verrou de
-> résolution.
+> **Estado: completo (2026-09-22).** Las cuatro entregas del plan
+> `docs/plan-cierre-averias-2026-09-18.md` (PRs #143, #144, #145 y #146, el candado de BD).
+> ⚠️ El candado **solo existe en la base si se hizo `supabase db push`** de la migración
+> `20260922100000` al mergear el #146 — comprobarlo antes de dar esto por cerrado:
+> `select tgname from pg_trigger where tgname = 'trg_guard_incident_resolution';`
+> Documentado en `docs/architecture.md` §Verrou de résolution.
 >
 > Lo que falta es verlo funcionar con manos de verdad, sobre todo **en la TV del taller**, que es
 > donde el plan avisaba de que la función podía hundirse en uso real.
@@ -192,6 +194,9 @@
 >    borra el texto, y (b) al confirmar aparece el aviso verde «résolue au bureau et archivée» — la
 >    tarjeta desaparece del tablero y sin ese aviso parecería que no funcionó.
 > 7. Como técnico, intentar resolver **con el informe vacío**: debe negarse.
+> 8. Reabrir una avería ya resuelta y volver a abrirla como técnico: el informe anterior **ya no
+>    aparece** en el formulario (aparece archivado en el historial). La segunda visita tiene que
+>    traer su propio informe.
 >
 > **Borrar las averías de prueba al terminar.**
 

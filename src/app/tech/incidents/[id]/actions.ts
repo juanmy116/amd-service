@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { sendCsatForIncident } from '@/lib/csat.server'
 import { PARTS } from '@/lib/parts'
-import { buildResolution, clearResolution, reopens } from '@/lib/resolution'
+import { archivedReportNote, buildResolution, clearResolution, reopens } from '@/lib/resolution'
 
 type FormState = { error: string } | null
 
@@ -23,7 +23,7 @@ export async function submitInterventionAction(
   // Verificar que el incidente esté asignado a este técnico
   const { data: incident } = await supabase
     .from('incidents')
-    .select('assigned_to, status')
+    .select('assigned_to, status, rapport_intervention')
     .eq('id', id)
     .single()
   if (!incident) return { error: 'Incident introuvable.' }
@@ -57,7 +57,12 @@ export async function submitInterventionAction(
   // anterior y la marca diría «intervención» aunque la segunda vez nadie fuese. Cuenta también
   // venir de `fermé`: el envío de la encuesta cierra la avería al instante, así que una
   // resuelta casi nunca se queda en `résolu`.
+  // El informe de la resolución anterior se archiva en el historial ANTES de que
+  // `clearResolution()` lo borre: reabrir no puede tirar lo que un técnico escribió sobre una
+  // visita real, pero la próxima resolución tiene que traer el suyo.
+  let archivedReport: string | null = null
   if (reopens(old_status, new_status)) {
+    archivedReport = archivedReportNote(incident.rapport_intervention)
     Object.assign(updates, clearResolution())
   }
 
@@ -74,7 +79,7 @@ export async function submitInterventionAction(
   if (new_status !== old_status) {
     await supabase.from('incident_history').insert({
       incident_id: id, changed_by: user.id,
-      old_status, new_status, comment,
+      old_status, new_status, comment: comment ?? archivedReport,
     })
   }
 
