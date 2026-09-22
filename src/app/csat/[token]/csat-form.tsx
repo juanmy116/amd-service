@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { Fragment, useActionState } from 'react'
 import { submitCsatAction } from './actions'
 
 const STARS = [1, 2, 3, 4, 5]
@@ -35,19 +35,40 @@ export default function CsatForm({ token }: { token: string }) {
       {/* Estrellas */}
       <div>
         <p className="text-sm font-medium text-ink-soft mb-3 text-center">Votre note globale</p>
-        <div className="flex justify-center gap-2">
-          {STARS.map((star) => (
-            <label key={star} className="cursor-pointer group">
-              <input type="radio" name="rating" value={star} className="sr-only peer" required />
-              <svg
-                className="w-10 h-10 text-ink-muted peer-checked:text-amber-400 group-hover:text-amber-300 transition-colors"
-                fill="currentColor"
-                viewBox="0 0 24 24"
+        {/*
+          Las estrellas se pintan ACUMULATIVAS: elegir 5 enciende las cinco, no solo la quinta.
+
+          Antes cada estrella era un `<label>` con su propio `<input>` dentro, así que el
+          `peer-checked` no alcanzaba más que a la suya — dar la mejor nota posible parecía dar
+          una de cinco. El truco: los inputs y las etiquetas son HERMANOS (por eso el
+          `<Fragment>`, que no crea nodo), y se pintan en orden inverso con `flex-row-reverse`.
+          Así «la estrella marcada y las que están a su izquierda» es, en el DOM, «la etiqueta
+          de su input y todas las siguientes» — que es justo lo que alcanza el `~` de Tailwind.
+
+          Sigue siendo un grupo de radios de verdad: accesible con teclado y lector de pantalla,
+          y funciona aunque el navegador no ejecute JavaScript.
+        */}
+        <div className="flex flex-row-reverse justify-center gap-2">
+          {[...STARS].reverse().map((star) => (
+            <Fragment key={star}>
+              <input
+                id={`rating-${star}`}
+                type="radio"
+                name="rating"
+                value={star}
+                className="peer sr-only"
+                required
+              />
+              <label
+                htmlFor={`rating-${star}`}
+                className="cursor-pointer text-ink-muted transition-colors peer-checked:text-amber-400 peer-focus-visible:text-amber-400 hover:text-amber-300 [label:hover~&]:text-amber-300"
               >
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-              </svg>
-              <span className="sr-only">{LABELS[star]}</span>
-            </label>
+                <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+                <span className="sr-only">{LABELS[star]}</span>
+              </label>
+            </Fragment>
           ))}
         </div>
       </div>
