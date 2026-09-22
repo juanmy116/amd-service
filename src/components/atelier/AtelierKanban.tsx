@@ -16,7 +16,8 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
 import ResolutionDialog from '@/components/admin/ResolutionDialog'
-import { isOpenStatus, OFFICE_RESOLUTION_STATUS, type OfficeResolution } from '@/lib/resolution'
+import ArchivedToast from './ArchivedToast'
+import { requiresOfficeResolution, OFFICE_RESOLUTION_STATUS, type OfficeResolution } from '@/lib/resolution'
 import { assignIncidentAction } from '@/app/atelier/actions'
 import AssignPanel from './AssignPanel'
 import type { AtelierIncident, Technician } from './types'
@@ -154,6 +155,9 @@ export default function AtelierKanban({
   const [pendingResolution, setPendingResolution] = useState<AtelierIncident | null>(null)
   const [resolutionError, setResolutionError] = useState<string | null>(null)
   const [resolutionTarget, setResolutionTarget] = useState<string>('résolu')
+  // Acuse de recibo: la tarjeta archivada desaparece del tablero, así que hay que decir que
+  // ha funcionado (ver ArchivedToast).
+  const [archived, setArchived] = useState<{ numero: string | null; at: number }>({ numero: null, at: 0 })
 
   const [optimistic, updateOptimistic] = useOptimistic(
     incidents,
@@ -179,7 +183,11 @@ export default function AtelierKanban({
 
     // Resolver desde el tablero exige explicación, también en la TV del taller. Y «Fermé»
     // desde una avería abierta igual: archivar sin pasar por resuelto es lo mismo.
-    if (newStatus === 'résolu' || (newStatus === 'fermé' && isOpenStatus(oldStatus))) {
+    // La misma regla que aplica el servidor, para que la ventana salga exactamente cuando él
+    // va a pedir datos. La vía va a `null` a propósito: el tablero no la carga, pero una avería
+    // en una columna abierta nunca conserva rastro (`clearResolution` lo borra al reabrir). Si
+    // aun así discrepara, manda el servidor.
+    if (requiresOfficeResolution(oldStatus, newStatus, null)) {
       const dropped = optimistic.find((i) => i.id === active.id)
       if (dropped) {
         setResolutionError(null)
@@ -212,6 +220,7 @@ export default function AtelierKanban({
         setResolutionError(result.error)
         return
       }
+      setArchived({ numero: incident.numeroIncident, at: Date.now() })
       setPendingResolution(null)
       router.refresh()
     })
@@ -276,6 +285,8 @@ export default function AtelierKanban({
         onCancel={() => setPendingResolution(null)}
         onConfirm={confirmResolution}
       />
+
+      <ArchivedToast numero={archived.numero} at={archived.at} />
     </>
   )
 }

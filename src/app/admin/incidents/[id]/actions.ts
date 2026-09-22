@@ -19,7 +19,7 @@ import {
   reopens,
   requiresOfficeResolution,
   isOpenStatus,
-  OFFICE_RESOLUTION_STATUS,
+  finalResolutionStatus,
   RESOLUTION_REASON_LABELS,
 } from '@/lib/resolution'
 
@@ -67,9 +67,13 @@ export async function updateIncidentAction(
   // corregir el título de una resuelta no es resolverla otra vez.
   const isOffice = requiresOfficeResolution(old_status, effective_status, current.resolved_via)
 
-  // Igual que en el tablero: la resolución de oficina se archiva en el acto, porque no hay
-  // encuesta que la cierre después (ver OFFICE_RESOLUTION_STATUS).
-  const final_status = isOffice ? OFFICE_RESOLUTION_STATUS : effective_status
+  // Igual que en el tablero: una resolución que no va a generar encuesta se archiva en el
+  // acto, porque nada la sacaría después de «Résolu» (ver `finalResolutionStatus`). Guardar
+  // la ficha sin tocar el estado no archiva nada: editar una errata no cierra una avería.
+  const via_after = isOffice ? 'bureau' : current.resolved_via
+  const final_status = effective_status === old_status
+    ? effective_status
+    : finalResolutionStatus(effective_status, via_after)
 
   const updates: TablesUpdate<'incidents'> = {
     title,

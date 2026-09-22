@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
 import ResolutionDialog from './ResolutionDialog'
-import { isOpenStatus, OFFICE_RESOLUTION_STATUS, type OfficeResolution } from '@/lib/resolution'
+import { requiresOfficeResolution, OFFICE_RESOLUTION_STATUS, type OfficeResolution } from '@/lib/resolution'
 
 export type KanbanIncident = {
   id: string
@@ -210,7 +210,11 @@ export default function KanbanBoard({
     // Resolver desde el tablero no es un gesto: hay que decir por qué. Vale también para
     // «Fermé» viniendo de una avería abierta — archivar sin pasar por resuelto es la misma
     // cosa invisible, y si no se pidiera sería el atajo barato justo porque «Résolu» pregunta.
-    if (newStatus === 'résolu' || (newStatus === 'fermé' && isOpenStatus(oldStatus))) {
+    // La misma regla que aplica el servidor, para que la ventana salga exactamente cuando él
+    // va a pedir datos. La vía va a `null` a propósito: el tablero no la carga, pero una avería
+    // en una columna abierta nunca conserva rastro (`clearResolution` lo borra al reabrir). Si
+    // aun así discrepara, manda el servidor.
+    if (requiresOfficeResolution(oldStatus, newStatus, null)) {
       const dropped = optimisticIncidents.find((i) => i.id === active.id)
       if (dropped) {
         setResolutionError(null)

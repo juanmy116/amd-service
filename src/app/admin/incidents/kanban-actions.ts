@@ -11,7 +11,7 @@ import {
   reopens,
   requiresOfficeResolution,
   isOpenStatus,
-  OFFICE_RESOLUTION_STATUS,
+  finalResolutionStatus,
   RESOLUTION_REASON_LABELS,
   type OfficeResolution,
 } from '@/lib/resolution'
@@ -65,9 +65,15 @@ export async function updateIncidentStatusAction(
   const isOffice = requiresOfficeResolution(oldStatus, status, current.resolved_via)
 
   // Lo que llega del navegador dice qué quiso hacer el usuario; lo que se escribe lo decide
-  // esta acción. Una resolución de oficina se archiva en el acto: sin encuesta que esperar,
-  // «Résolu» sería una sala de espera de la que nadie la sacaría (ver OFFICE_RESOLUTION_STATUS).
-  const finalStatus = isOffice ? OFFICE_RESOLUTION_STATUS : status
+  // esta acción: una resolución que no va a generar encuesta se archiva en el acto, porque
+  // nada la sacaría después de «Résolu» (ver `finalResolutionStatus`).
+  const viaAfter = isOffice ? 'bureau' : current.resolved_via
+  const finalStatus = finalResolutionStatus(status, viaAfter)
+
+  // Lo pedido no cambia nada: des-archivar una resolución de oficina la devuelve a «Fermé»,
+  // que es donde ya estaba. La tarjeta vuelve a su sitio al refrescar y no se inventa una
+  // línea de historial que diga «fermé → fermé».
+  if (finalStatus === oldStatus) return {}
 
   const updates: TablesUpdate<'incidents'> = { status: finalStatus }
   let officeReason: ResolutionReason | null = null

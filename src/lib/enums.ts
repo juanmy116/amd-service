@@ -12,6 +12,7 @@ export const MAINTENANCE_FREQUENCIES    = ['mensuel', 'trimestriel'] as const
 export const VISIT_STATUSES             = ['planifié', 'en_retard', 'fait'] as const
 export const CONTRACT_MACHINE_STATUSES  = ['actif', 'suspendu', 'terminé'] as const
 
+export type IncidentStatus          = typeof INCIDENT_STATUSES[number]
 export type ResolvedVia             = typeof RESOLVED_VIA[number]
 export type ResolutionReason        = typeof RESOLUTION_REASONS[number]
 export type MachineType             = typeof MACHINE_TYPES[number]

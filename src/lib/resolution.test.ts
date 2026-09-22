@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   buildResolution,
   clearResolution,
+  finalResolutionStatus,
   MIN_NOTE_LENGTH,
   OFFICE_RESOLUTION_STATUS,
   reopens,
@@ -145,6 +146,37 @@ describe('requiresOfficeResolution', () => {
 
   it('reabrir no pide explicación (la pedirá la próxima resolución)', () => {
     expect(requiresOfficeResolution('résolu', 'en_cours', null)).toBe(false)
+  })
+
+  it('editar una resuelta sin rastro no es resolverla: corregir una errata no puede pedir motivo', () => {
+    // Sin esto la ficha entraba en un callejón sin salida: el servidor exigía una explicación
+    // y el formulario no dibujaba el campo donde escribirla.
+    expect(requiresOfficeResolution('résolu', 'résolu', null)).toBe(false)
+  })
+
+  it('documentar una avería ya cerrada tampoco: no estaba abierta, no se está resolviendo', () => {
+    expect(requiresOfficeResolution('fermé', 'résolu', null)).toBe(false)
+    expect(requiresOfficeResolution('fermé', 'fermé', null)).toBe(false)
+  })
+})
+
+describe('finalResolutionStatus — quién saca la avería de «résolu»', () => {
+  it('una intervención se queda en résolu: la cerrará el envío de la encuesta', () => {
+    expect(finalResolutionStatus('résolu', 'intervention')).toBe('résolu')
+  })
+
+  it('una de oficina se archiva: sin encuesta, nadie la sacaría de ahí nunca', () => {
+    expect(finalResolutionStatus('résolu', 'bureau')).toBe(OFFICE_RESOLUTION_STATUS)
+  })
+
+  it('sin rastro tampoco se queda esperando una encuesta que no va a salir', () => {
+    expect(finalResolutionStatus('résolu', null)).toBe(OFFICE_RESOLUTION_STATUS)
+  })
+
+  it('los demás estados pasan tal cual: esto solo decide qué significa «Résolu»', () => {
+    expect(finalResolutionStatus('en_cours', null)).toBe('en_cours')
+    expect(finalResolutionStatus('fermé', 'bureau')).toBe('fermé')
+    expect(finalResolutionStatus('nouveau', 'intervention')).toBe('nouveau')
   })
 })
 

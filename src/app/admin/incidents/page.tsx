@@ -67,7 +67,9 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
   if (q) query = query.or(buildSafeOr(SEARCH_COLUMNS, q))
   if (statusFilter) query = query.eq('status', statusFilter)
   if (priorityFilter) query = query.eq('priority', priorityFilter)
-  if (viaFilter) query = query.eq('resolved_via', viaFilter)
+  // Solo en la vista de lista: las averías abiertas no tienen vía todavía, así que este filtro
+  // vaciaría las tres primeras columnas del kanban sin explicar por qué.
+  if (viaFilter && view === 'list') query = query.eq('resolved_via', viaFilter)
   if (clientId) {
     // El cliente de una incidencia se resuelve por su línea de contrato.
     if (cmIds.length > 0) {
@@ -167,14 +169,14 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
               { value: 'fermé',    label: 'Fermé'    },
             ],
           },
-          {
+          ...(view === 'list' ? [{
             param: 'via',
             label: 'Toutes les résolutions',
             options: [
               { value: 'intervention', label: RESOLVED_VIA_LABELS.intervention },
               { value: 'bureau',       label: RESOLVED_VIA_LABELS.bureau       },
             ],
-          },
+          }] : []),
           {
             param: 'priority',
             label: 'Toutes les priorités',

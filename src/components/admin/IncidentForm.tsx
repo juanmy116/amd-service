@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { RESOLUTION_REASON_LABELS, MIN_NOTE_LENGTH } from '@/lib/resolution'
+import { RESOLUTION_REASON_LABELS, MIN_NOTE_LENGTH, requiresOfficeResolution } from '@/lib/resolution'
 import { RESOLUTION_REASONS } from '@/lib/enums'
 
 type FormState = { error: string } | null
@@ -16,6 +16,8 @@ type IncidentData = {
   priority?: string
   status?: string
   assigned_to?: string | null
+  /** Rastro de una resolución anterior: si ya lo hay, esta ficha no vuelve a pedir motivo. */
+  resolved_via?: string | null
 }
 
 /** Shape used in create mode: contracts with their active lines */
@@ -88,8 +90,16 @@ export default function IncidentForm({
   const [selectedContractId, setSelectedContractId] = useState<string>(firstContract?.id ?? '')
   // Resolver desde la ficha pide lo mismo que desde el tablero. Se muestra en línea (no en una
   // ventana) porque aquí ya se está editando un formulario: abrir un modal encima sobraría.
+  //
+  // La condición es la MISMA función que aplica la Server Action. Cuando cada lado opinaba por
+  // su cuenta, pasar una avería a «Fermé» desde aquí devolvía «Le motif est obligatoire» sin
+  // que hubiera ningún campo en pantalla donde escribirlo: un callejón sin salida.
   const [status, setStatus] = useState<string>(defaultValues?.status ?? 'nouveau')
-  const resolvingFromOffice = status === 'résolu' && defaultValues?.status !== 'résolu'
+  const resolvingFromOffice = requiresOfficeResolution(
+    defaultValues?.status ?? 'nouveau',
+    status,
+    defaultValues?.resolved_via ?? null,
+  )
   const [selectedLineId, setSelectedLineId] = useState<string>('')
 
   const selectedContract = contracts?.find((c) => c.id === selectedContractId) ?? null
