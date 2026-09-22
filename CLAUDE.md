@@ -14,15 +14,25 @@ Aplicación web para la gestión de incidencias (SAV) de AMD Service, empresa de
 
 ## Estado actual del desarrollo
 
-La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). Último merge: PR #94 (`bab9564`) el 2026-06-15 — migración `middleware` → `proxy` (Next 16). Hitos recientes: tests RLS de cobertura completa (88 tests, #93), `main` protegida con required check `typecheck · test · build`, config de prod cerrada (`COMMERCIAL_EMAIL`, `NEXT_PUBLIC_APP_URL`), y la auditoría de infraestructura y seguridad (PRs #58–#70). Detalle en `docs/architecture.md` y en las memorias del proyecto.
+La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). Último merge: PR #152 (2026-09-22).
 
-> **Core de facturación reconstruido, desplegado y validado (2026-06-09).** Tras la auditoría preproducción (Codex, NO-GO), se rediseñó el core completo en 9 PRs (#39–#49): modelo parque/stock (estado alquilada/stock derivado, RPCs `assign/return_machine_from/to_stock`), cálculo de consumo por línea/cliente, ciclo de facturación por **aniversario del contrato** (`billing_day`→día anterior del mes siguiente, clamp día 31), facturas **inmutables** en BD (trigger), coherencia contable en emisión, y **vigencia temporal de tarifas**. Las 11 migraciones se desplegaron a prod (con reconciliación previa del historial git↔BD vía `migration repair`). **Gate final E2E PASADO (GO):** suite completa sobre datos sintéticos + inmutabilidad probada por SQL directo + limpieza verificada. Detalle: `docs/gate-final-facturacion-2026-06-08.md` y `docs/architecture.md`. ⚠️ **Pendiente operativo (no código):** cargar los contratos reales (máquinas desde stock con su lectura, plan, `billing_day`) antes de emitir la primera factura real — hoy hay 0 contratos.
+**Hitos recientes (septiembre 2026):**
+- **Verrou de résolution** (#143–#147): ninguna avería se cierra sin decir cómo se resolvió — informe obligatorio para el técnico, motivo + explicación en las cuatro puertas de oficina, rastro visible en el listado y la ficha, y un trigger en la BD que lo hace imposible de saltar. Probado en uso real, TV del taller incluida. Ver `docs/architecture.md` §Verrou de résolution.
+- **CSAT vivo** (#141, #149): la encuesta de satisfacción **nunca se había enviado** en toda la vida de la app; ahora sale al email del formulario del QR y está verificada de punta a punta.
+- **Kiosko del taller** (#125–#137): dashboard en TV con mapa de Dakar, campana y Raspberry en el taller, cerrado y verificado.
+- **Facturación APAGADA a propósito** (#122): candado en BD hasta validar el SAV en uso real. Encenderla es un `UPDATE`.
+
+**Lo que NO funciona ahora mismo** (detalle en `docs/pendientes.md`): los tres crons de Princity se ejecutan a diario y **no importan ni un dato** desde hace meses; el limitador de intentos del login **no existe** desde que se borró la base de Upstash; y el aviso de mantenimientos atrasados **nunca se envía**.
+
+Detalle en `docs/architecture.md` y en las memorias del proyecto.
+
+> **Core de facturación reconstruido, desplegado y validado (2026-06-09).** Tras la auditoría preproducción (Codex, NO-GO), se rediseñó el core completo en 9 PRs (#39–#49): modelo parque/stock (estado alquilada/stock derivado, RPCs `assign/return_machine_from/to_stock`), cálculo de consumo por línea/cliente, ciclo de facturación por **aniversario del contrato** (`billing_day`→día anterior del mes siguiente, clamp día 31), facturas **inmutables** en BD (trigger), coherencia contable en emisión, y **vigencia temporal de tarifas**. Las 11 migraciones se desplegaron a prod (con reconciliación previa del historial git↔BD vía `migration repair`). **Gate final E2E PASADO (GO):** suite completa sobre datos sintéticos + inmutabilidad probada por SQL directo + limpieza verificada. Detalle: `docs/gate-final-facturacion-2026-06-08.md` y `docs/architecture.md`. ⚠️ **Pendiente operativo (no código):** el contrato real de **2AS** (`099-28`, 40 líneas) ya está cargado y su primera factura calculada en preview (~3,76 M FCFA, **sin emitir**); la facturación sigue APAGADA por el candado del PR #122. Axa (`064-007`) pendiente.
 
 ### ✅ Completado
 - Sitio web público AMD + página `/location` (SEO Dakar)
 - Back-office admin (`/admin`): clientes, máquinas, contratos, incidencias (Kanban), compteurs, maintenance, calendrier, équipe, Princity
 - Portal cliente (`/portal`) y PWA técnico (`/tech`) con escáner QR
-- Auth por rol, RLS, rate limiting, integraciones (Resend/CSAT, Princity API)
+- Auth por rol, RLS, integraciones (Resend/CSAT, Princity API) · ⚠️ el **rate limiting del login no existe** desde que se borró la base de Upstash (ver `docs/pendientes.md`)
 - Búsqueda + filtros admin · `numero_incident` (SAV-YYYY-NNNN)
 - **Dashboard Atelier** (`/atelier`): kiosko de taller para TV 32" — cuenta «Atelier» (rol técnico + flag `is_dispatcher`) que asigna incidencias y mantenimientos a los técnicos
 - **Importador CSV de máquinas** (PR #22)
