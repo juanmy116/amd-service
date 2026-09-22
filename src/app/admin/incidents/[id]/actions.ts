@@ -6,6 +6,7 @@ import type { TablesUpdate } from '@/lib/supabase/types'
 import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { sendCsatForIncident } from '@/lib/csat.server'
+import { clearResolution, reopens } from '@/lib/resolution'
 
 type FormState = { error: string } | null
 
@@ -21,12 +22,21 @@ export async function updateIncidentAction(
 
   const category   = parseEnum(formData.get('category'), INCIDENT_CATEGORIES)
   const priority   = parseEnum(formData.get('priority'), INCIDENT_PRIORITIES)
-  const new_status = parseEnum(formData.get('status'),   INCIDENT_STATUSES)
-  const old_status = parseEnum(formData.get('old_status'), INCIDENT_STATUSES)
+  const new_status = parseEnum(formData.get('status'), INCIDENT_STATUSES)
   if (!category)   return { error: 'Catégorie invalide.' }
   if (!priority)   return { error: 'Priorité invalide.' }
   if (!new_status) return { error: 'Statut invalide.' }
-  if (!old_status) return { error: 'Statut actuel invalide.' }
+
+  // El estado anterior se lee de la base y no del formulario: una ficha abierta desde hace
+  // rato manda el estado de entonces, y de él dependen el historial, el `resolved_at`, el
+  // envío de la encuesta y el borrado del rastro al reabrir.
+  const { data: current } = await supabase
+    .from('incidents')
+    .select('status')
+    .eq('id', id)
+    .single()
+  if (!current) return { error: 'Incident introuvable.' }
+  const old_status = current.status
 
   const comment     = (formData.get('comment')   as string)?.trim() || null
   const assigned_to = (formData.get('assigned_to') as string).trim() || null
@@ -48,6 +58,10 @@ export async function updateIncidentAction(
 
   if (effective_status === 'résolu' && old_status !== 'résolu') updates.resolved_at = new Date().toISOString()
   if (effective_status === 'fermé'  && old_status !== 'fermé')  updates.closed_at   = new Date().toISOString()
+
+  // Reabrir desde la ficha borra el rastro igual que en el tablero: una resolución que no
+  // limpia deja a la siguiente heredar el informe y el escaneo de la anterior.
+  if (reopens(old_status, effective_status)) Object.assign(updates, clearResolution())
 
   const { error } = await supabase.from('incidents').update(updates).eq('id', id)
   if (error) {

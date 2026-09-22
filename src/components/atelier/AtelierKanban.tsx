@@ -172,7 +172,7 @@ export default function AtelierKanban({
     if (newStatus === oldStatus) return
     startTransition(async () => {
       updateOptimistic({ id: active.id as string, newStatus })
-      const result = await updateIncidentStatusAction(active.id as string, oldStatus, newStatus)
+      const result = await updateIncidentStatusAction(active.id as string, newStatus)
       if (!result?.error) router.refresh()
     })
   }
