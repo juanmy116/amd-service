@@ -4,6 +4,8 @@ import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import { RESOLUTION_REASON_LABELS, MIN_NOTE_LENGTH } from '@/lib/resolution'
+import { RESOLUTION_REASONS } from '@/lib/enums'
 
 type FormState = { error: string } | null
 
@@ -84,6 +86,10 @@ export default function IncidentForm({
   // Cascade state for contract → machine selection
   const firstContract = contracts?.[0]
   const [selectedContractId, setSelectedContractId] = useState<string>(firstContract?.id ?? '')
+  // Resolver desde la ficha pide lo mismo que desde el tablero. Se muestra en línea (no en una
+  // ventana) porque aquí ya se está editando un formulario: abrir un modal encima sobraría.
+  const [status, setStatus] = useState<string>(defaultValues?.status ?? 'nouveau')
+  const resolvingFromOffice = status === 'résolu' && defaultValues?.status !== 'résolu'
   const [selectedLineId, setSelectedLineId] = useState<string>('')
 
   const selectedContract = contracts?.find((c) => c.id === selectedContractId) ?? null
@@ -280,7 +286,8 @@ export default function IncidentForm({
                 <label className="block text-sm font-medium text-ink-soft mb-1.5">Statut</label>
                 <select
                   name="status"
-                  defaultValue={defaultValues?.status ?? 'nouveau'}
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
                   className={selectClass}
                 >
                   {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -301,6 +308,49 @@ export default function IncidentForm({
               </select>
             </div>
           </div>
+
+          {/* Résolution sans intervention — verrou de résolution */}
+          {resolvingFromOffice && (
+            <div className="space-y-4 rounded-lg border border-accent/30 bg-accent-soft/40 p-4">
+              <div>
+                <p className="text-sm font-semibold text-ink">Résoudre sans intervention</p>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  Aucun rapport de technicien n&apos;est enregistré : dites pourquoi la panne est close.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                  Motif <span className="text-accent">*</span>
+                </label>
+                <select name="resolution_reason" required defaultValue="" className={selectClass}>
+                  <option value="" disabled>Choisir un motif...</option>
+                  {RESOLUTION_REASONS.map((r) => (
+                    <option key={r} value={r}>{RESOLUTION_REASON_LABELS[r]}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-ink-soft mb-1.5">
+                  Explication <span className="text-accent">*</span>
+                </label>
+                <textarea
+                  name="resolution_note"
+                  required
+                  minLength={MIN_NOTE_LENGTH}
+                  rows={2}
+                  placeholder="Deux lignes suffisent : que s'est-il passé ?"
+                  className={`${inputClass} resize-none`}
+                />
+              </div>
+
+              <p className="text-xs text-ink-muted">
+                Si un technicien est passé sans le saisir, indiquez-le dans «&nbsp;Assigné à&nbsp;» :
+                son travail sera compté pour lui.
+              </p>
+            </div>
+          )}
 
           {/* Commentaire — edit only */}
           {isEdit && (

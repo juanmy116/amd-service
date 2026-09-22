@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
+import type { OfficeResolution } from '@/lib/resolution'
 
 async function requireDispatcherActor(): Promise<{ userId: string } | null> {
   const supabase = await createClient()
@@ -80,10 +81,11 @@ export async function assignMaintenanceVisitAction(
  */
 export async function setIncidentStatusAction(
   incidentId: string,
-  newStatus: string
+  newStatus: string,
+  office?: OfficeResolution | null
 ): Promise<{ error?: string }> {
   const actor = await requireDispatcherActor()
   if (!actor) return { error: 'Non autorisé' }
 
-  return updateIncidentStatusAction(incidentId, newStatus)
+  return updateIncidentStatusAction(incidentId, newStatus, office)
 }

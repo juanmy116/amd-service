@@ -15,6 +15,8 @@ import {
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
+import ResolutionDialog from '@/components/admin/ResolutionDialog'
+import { isOpenStatus, type OfficeResolution } from '@/lib/resolution'
 import { assignIncidentAction } from '@/app/atelier/actions'
 import AssignPanel from './AssignPanel'
 import type { AtelierIncident, Technician } from './types'
@@ -144,10 +146,14 @@ export default function AtelierKanban({
   technicians: Technician[]
 }) {
   const router = useRouter()
-  const [, startTransition] = useTransition()
+  const [pending, startTransition] = useTransition()
   const [activeIncident, setActiveIncident] = useState<AtelierIncident | null>(null)
   const [selected, setSelected] = useState<AtelierIncident | null>(null)
   const [busy, setBusy] = useState(false)
+  // Tarjeta soltada en «Résolu», esperando el motivo. No se mueve hasta confirmar.
+  const [pendingResolution, setPendingResolution] = useState<AtelierIncident | null>(null)
+  const [resolutionError, setResolutionError] = useState<string | null>(null)
+  const [resolutionTarget, setResolutionTarget] = useState<string>('résolu')
 
   const [optimistic, updateOptimistic] = useOptimistic(
     incidents,
@@ -170,10 +176,41 @@ export default function AtelierKanban({
     const newStatus = over.id as string
     const oldStatus = active.data.current?.status as string
     if (newStatus === oldStatus) return
+
+    // Resolver desde el tablero exige explicación, también en la TV del taller. Y «Fermé»
+    // desde una avería abierta igual: archivar sin pasar por resuelto es lo mismo.
+    if (newStatus === 'résolu' || (newStatus === 'fermé' && isOpenStatus(oldStatus))) {
+      const dropped = optimistic.find((i) => i.id === active.id)
+      if (dropped) {
+        setResolutionError(null)
+        setPendingResolution(dropped)
+        setResolutionTarget(newStatus)
+      }
+      return
+    }
+
     startTransition(async () => {
       updateOptimistic({ id: active.id as string, newStatus })
       const result = await updateIncidentStatusAction(active.id as string, newStatus)
       if (!result?.error) router.refresh()
+    })
+  }
+
+  // La ventana aguanta abierta hasta la respuesta: un fallo no puede llevarse por delante lo
+  // que alguien acaba de escribir de pie delante de la TV.
+  function confirmResolution(office: OfficeResolution) {
+    const incident = pendingResolution
+    if (!incident) return
+    setResolutionError(null)
+    startTransition(async () => {
+      updateOptimistic({ id: incident.id, newStatus: resolutionTarget })
+      const result = await updateIncidentStatusAction(incident.id, resolutionTarget, office)
+      if (result?.error) {
+        setResolutionError(result.error)
+        return
+      }
+      setPendingResolution(null)
+      router.refresh()
     })
   }
 
@@ -222,6 +259,19 @@ export default function AtelierKanban({
         busy={busy}
         onSelect={handleAssign}
         onClose={() => setSelected(null)}
+      />
+
+      <ResolutionDialog
+        open={pendingResolution !== null}
+        variant="kiosk"
+        incidentLabel={
+          pendingResolution ? `${pendingResolution.numeroIncident} · ${pendingResolution.title}` : ''
+        }
+        technicians={technicians.map((t) => ({ id: t.id, name: t.fullName }))}
+        busy={pending}
+        error={resolutionError}
+        onCancel={() => setPendingResolution(null)}
+        onConfirm={confirmResolution}
       />
     </>
   )

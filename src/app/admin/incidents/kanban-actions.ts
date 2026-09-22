@@ -2,10 +2,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
+import { INCIDENT_STATUSES, RESOLUTION_REASONS, parseEnum } from '@/lib/enums'
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { sendCsatForIncident } from '@/lib/csat.server'
-import { clearResolution, reopens } from '@/lib/resolution'
+import { buildResolution, clearResolution, reopens, requiresOfficeResolution, type OfficeResolution } from '@/lib/resolution'
 import { after } from 'next/server'
 
 /**
@@ -18,7 +18,8 @@ import { after } from 'next/server'
  */
 export async function updateIncidentStatusAction(
   incidentId: string,
-  newStatus: string
+  newStatus: string,
+  office?: OfficeResolution | null
 ): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -40,7 +41,7 @@ export async function updateIncidentStatusAction(
 
   const { data: current } = await admin
     .from('incidents')
-    .select('status')
+    .select('status, resolved_via')
     .eq('id', incidentId)
     .single()
   if (!current) return { error: 'Incident introuvable' }
@@ -49,6 +50,37 @@ export async function updateIncidentStatusAction(
   if (oldStatus === status) return {}
 
   const updates: TablesUpdate<'incidents'> = { status }
+
+  // Verrou de résolution: desde el tablero no se cierra una avería sin decir por qué. La
+  // ventana que pide el motivo la pone la interfaz, pero la regla se aplica aquí — arrastrar
+  // una tarjeta es un `fetch` como cualquier otro y no se puede confiar en que el navegador
+  // haya pasado por el formulario.
+  if (requiresOfficeResolution(oldStatus, status, current.resolved_via)) {
+    // El técnico acreditado se valida como el motivo: sin esto, una llamada a mano podría
+    // apuntar el trabajo a un UUID cualquiera (violación de FK con el mensaje crudo de
+    // Postgres en pantalla) o a un perfil de admin, que acabaría contando en el recuento por
+    // técnico del panel.
+    const technicianId = office?.technicianId ?? null
+    if (technicianId) {
+      const { data: tech } = await admin
+        .from('profiles')
+        .select('id')
+        .eq('id', technicianId)
+        .eq('role', 'technician')
+        .maybeSingle()
+      if (!tech) return { error: 'Technicien invalide' }
+    }
+
+    const resolution = buildResolution({
+      via: 'bureau',
+      reason: parseEnum(office?.reason, RESOLUTION_REASONS),
+      note: office?.note,
+      technicianId,
+    })
+    if (!resolution.ok) return { error: resolution.error }
+    Object.assign(updates, resolution.fields)
+  }
+
   if (status === 'résolu' && oldStatus !== 'résolu') updates.resolved_at = new Date().toISOString()
   if (status === 'fermé'  && oldStatus !== 'fermé')  updates.closed_at   = new Date().toISOString()
 
