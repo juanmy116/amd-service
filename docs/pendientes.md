@@ -150,7 +150,11 @@
 > 1. Escanear el QR de una máquina (o ir a `/signaler/<nº de serie>`) y comprobar que **el email es
 >    obligatorio**. Poner uno propio, de verdad.
 > 2. Enviar la avería de prueba.
-> 3. Como admin, marcarla **`résolu`**. Da igual desde dónde: kanban, ficha o app del técnico.
+> 3. Resolverla **desde la app del técnico, con su informe**. ⚠️ **Ya no da igual desde dónde:**
+>    desde el 2026-09-22 (verrou de résolution) una resolución de **oficina** —kanban, ficha admin o
+>    kiosko— **no manda encuesta a propósito** y archiva la avería directamente. Preguntar «¿qué tal
+>    le atendió el técnico?» por algo cerrado por teléfono no tenía sentido. Para esta prueba hace
+>    falta la vía `intervention`.
 > 4. Comprobar que **llega el correo**, con el nombre, la referencia `SAV-AAAA-NNNN` y el equipo — y
 >    **sin** la jerga interna «Incident QR».
 > 5. Responder con **2 estrellas** y un comentario.
@@ -161,6 +165,40 @@
 > **Si no llega:** mirar el historial de la propia avería. Ahora, cuando el envío falla, queda escrita
 > ahí la razón (sin destinatario / fallo del email / fallo al crear la encuesta) — justo lo que antes
 > no existía y por eso el problema tardó meses en verse.
+
+---
+
+## ⏰ Probar el cierre de averías en la app real (único pendiente del verrou)
+
+> **Estado: completo (2026-09-22).** Las cuatro entregas del plan
+> `docs/plan-cierre-averias-2026-09-18.md` (PRs #143, #144, #145 y #146, el candado de BD).
+> ⚠️ El candado **solo existe en la base si se hizo `supabase db push`** de la migración
+> `20260922100000` al mergear el #146 — comprobarlo antes de dar esto por cerrado:
+> `select tgname from pg_trigger where tgname = 'trg_guard_incident_resolution';`
+> Documentado en `docs/architecture.md` §Verrou de résolution.
+>
+> Lo que falta es verlo funcionar con manos de verdad, sobre todo **en la TV del taller**, que es
+> donde el plan avisaba de que la función podía hundirse en uso real.
+>
+> **Los pasos:**
+> 1. En `/admin/incidents`, arrastrar una avería a **«Résolu»**: debe abrirse la ventana pidiendo
+>    motivo y explicación. Cancelar → la tarjeta **no** se mueve.
+> 2. Repetirlo arrastrando a **«Fermé»** desde una columna abierta: debe pedir lo mismo (era el
+>    atajo barato).
+> 3. Confirmar con un motivo: la tarjeta acaba en **«Fermé»**, no en «Résolu», y **el cliente no
+>    recibe encuesta**.
+> 4. En la ficha, comprobar la tarjeta **«Résolution»** (vía, motivo, explicación y el semáforo del
+>    QR) y que el historial explica el salto a «Fermé».
+> 5. En la lista, comprobar la columna **Résolution** (verde/ámbar) y el filtro por vía.
+> 6. **En el kiosko**: resolver desde la TV y comprobar que (a) escribir más de dos minutos **no**
+>    borra el texto, y (b) al confirmar aparece el aviso verde «résolue au bureau et archivée» — la
+>    tarjeta desaparece del tablero y sin ese aviso parecería que no funcionó.
+> 7. Como técnico, intentar resolver **con el informe vacío**: debe negarse.
+> 8. Reabrir una avería ya resuelta y volver a abrirla como técnico: el informe anterior **ya no
+>    aparece** en el formulario (aparece archivado en el historial). La segunda visita tiene que
+>    traer su propio informe.
+>
+> **Borrar las averías de prueba al terminar.**
 
 ---
 

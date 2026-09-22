@@ -6,6 +6,7 @@ import { INCIDENT_STATUSES, RESOLUTION_REASONS, parseEnum, type ResolutionReason
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { sendCsatForIncident } from '@/lib/csat.server'
 import {
+  archivedResolutionNote,
   buildResolution,
   clearResolution,
   reopens,
@@ -50,7 +51,7 @@ export async function updateIncidentStatusAction(
 
   const { data: current } = await admin
     .from('incidents')
-    .select('status, resolved_via')
+    .select('status, resolved_via, resolution_reason, resolution_note, rapport_intervention')
     .eq('id', incidentId)
     .single()
   if (!current) return { error: 'Incident introuvable' }
@@ -118,20 +119,41 @@ export async function updateIncidentStatusAction(
   // Reabrir borra el rastro de la resolución anterior. Sin esto, devolver una tarjeta a «En
   // cours» y volver a arrastrarla a «Résolu» dejaba la avería con el informe y el escaneo de
   // la intervención de antes: indistinguible de una segunda intervención real.
-  if (reopens(oldStatus, finalStatus)) Object.assign(updates, clearResolution())
+  // Igual que en la puerta del técnico: el informe anterior se archiva en el historial antes
+  // de borrarlo, para que la próxima resolución no pueda presentarlo como suyo.
+  let archivedTrace: string | null = null
+  if (reopens(oldStatus, finalStatus)) {
+    archivedTrace = archivedResolutionNote({
+      via: current.resolved_via,
+      reason: current.resolution_reason,
+      note: current.resolution_note,
+      rapport: current.rapport_intervention,
+    })
+    Object.assign(updates, clearResolution())
+  }
+
+  // Archivar ANTES de borrar: si la copia no entra, la avería no se toca.
+  if (archivedTrace) {
+    const { error: archErr } = await admin.from('incident_history').insert({
+      incident_id: incidentId, changed_by: user.id,
+      old_status: null, new_status: null, comment: archivedTrace,
+    })
+    if (archErr) return { error: "Impossible d'archiver la trace précédente." }
+  }
 
   const { error } = await admin.from('incidents').update(updates).eq('id', incidentId)
   if (error) return { error: error.message }
 
-  await admin.from('incident_history').insert({
+  // Sin el motivo, el salto directo a «Fermé» parecería un archivado a secas: queda a la vista
+  // en el historial de la ficha, que es lo que se mira cuando un cliente reclama.
+  const { error: histErr } = await admin.from('incident_history').insert({
     incident_id: incidentId,
     changed_by:  user.id,
     old_status:  oldStatus,
     new_status:  finalStatus,
-    // Sin esto, el salto directo a «Fermé» parecería un archivado a secas. El motivo queda a
-    // la vista en el historial de la ficha, que es lo que se mira cuando un cliente reclama.
     comment:     officeReason ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}` : null,
   })
+  if (histErr) console.error('[updateIncidentStatus] historique', { incidentId, error: histErr })
 
   // `after()` difiere el envío a DESPUÉS de la respuesta: sin él, el `return` de
   // abajo puede dar por terminada la función serverless con el envío a medias

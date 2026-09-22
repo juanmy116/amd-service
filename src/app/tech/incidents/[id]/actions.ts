@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { sendCsatForIncident } from '@/lib/csat.server'
 import { PARTS } from '@/lib/parts'
-import { buildResolution, clearResolution, reopens } from '@/lib/resolution'
+import { archivedResolutionNote, buildResolution, clearResolution, historyComment, reopens } from '@/lib/resolution'
 
 type FormState = { error: string } | null
 
@@ -23,7 +23,7 @@ export async function submitInterventionAction(
   // Verificar que el incidente esté asignado a este técnico
   const { data: incident } = await supabase
     .from('incidents')
-    .select('assigned_to, status')
+    .select('assigned_to, status, resolved_via, resolution_reason, resolution_note, rapport_intervention')
     .eq('id', id)
     .single()
   if (!incident) return { error: 'Incident introuvable.' }
@@ -57,12 +57,43 @@ export async function submitInterventionAction(
   // anterior y la marca diría «intervención» aunque la segunda vez nadie fuese. Cuenta también
   // venir de `fermé`: el envío de la encuesta cierra la avería al instante, así que una
   // resuelta casi nunca se queda en `résolu`.
+  // El informe de la resolución anterior se archiva en el historial ANTES de que
+  // `clearResolution()` lo borre: reabrir no puede tirar lo que un técnico escribió sobre una
+  // visita real, pero la próxima resolución tiene que traer el suyo.
+  let archivedTrace: string | null = null
   if (reopens(old_status, new_status)) {
+    archivedTrace = archivedResolutionNote({
+      via: incident.resolved_via,
+      reason: incident.resolution_reason,
+      note: incident.resolution_note,
+      rapport: incident.rapport_intervention,
+    })
     Object.assign(updates, clearResolution())
+    // El formulario llega relleno con el informe anterior. Si el técnico lo ha REESCRITO, ese
+    // texto es suyo y se queda: al reabrir puede estar explicando por qué vuelve. Si lo dejó
+    // tal cual, se va con el resto del rastro — que es lo que impide que el informe de marzo
+    // acabe cerrando la visita de mayo.
+    if (rapport && rapport !== incident.rapport_intervention?.trim()) {
+      updates.rapport_intervention = rapport
+    }
   }
 
   if (new_status === 'résolu' && old_status !== 'résolu') updates.resolved_at = new Date().toISOString()
   if (new_status === 'fermé'  && old_status !== 'fermé')  updates.closed_at   = new Date().toISOString()
+
+  // El rastro se archiva ANTES de borrarlo. Al revés —que es como estaba— un fallo al escribir
+  // el historial dejaba el informe borrado de la avería y sin copia en ninguna parte, con el
+  // técnico viendo «guardado». Si esta línea no entra, no se toca la avería.
+  if (archivedTrace) {
+    const { error: archErr } = await supabase.from('incident_history').insert({
+      incident_id: id, changed_by: user.id,
+      old_status: null, new_status: null, comment: archivedTrace,
+    })
+    if (archErr) {
+      console.error('[submitIntervention] archivage', { id, error: archErr })
+      return { error: 'Impossible d\'archiver le rapport précédent. Veuillez réessayer.' }
+    }
+  }
 
   const { error } = await supabase.from('incidents').update(updates).eq('id', id)
   if (error) {
@@ -72,10 +103,11 @@ export async function submitInterventionAction(
 
   // Historial
   if (new_status !== old_status) {
-    await supabase.from('incident_history').insert({
+    const { error: histErr } = await supabase.from('incident_history').insert({
       incident_id: id, changed_by: user.id,
       old_status, new_status, comment,
     })
+    if (histErr) console.error('[submitIntervention] historique', { id, error: histErr })
   }
 
   // Piezas reemplazadas (con cantidad). Se reemplaza el set completo de forma

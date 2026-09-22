@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
+  archivedResolutionNote,
   buildResolution,
   clearResolution,
   finalResolutionStatus,
+  historyComment,
   MIN_NOTE_LENGTH,
   OFFICE_RESOLUTION_STATUS,
   reopens,
@@ -119,6 +121,9 @@ describe('clearResolution — al reabrir una avería', () => {
       resolved_via: null,
       resolution_reason: null,
       resolution_note: null,
+      // El informe también: el formulario del técnico lo rellena con lo que ya hubiera, así que
+      // una avería reabierta en mayo se cerraba con el informe de marzo sin escribir una línea.
+      rapport_intervention: null,
       qr_verified: false,
       qr_scanned_by: null,
     })
@@ -199,5 +204,53 @@ describe('sendsSurvey — a quién se le pregunta qué tal fue', () => {
     // encuesta solo mira `résolu`. Si alguien cambiara una, este test cae.
     expect(OFFICE_RESOLUTION_STATUS).not.toBe('résolu')
     expect(sendsSurvey('bureau')).toBe(false)
+  })
+})
+
+describe('archivedResolutionNote — el rastro anterior no se tira', () => {
+  it('guarda el informe del técnico con su vía', () => {
+    expect(archivedResolutionNote({
+      via: 'intervention',
+      reason: null,
+      note: 'Changement du tambour.',
+      rapport: 'Changement du tambour.',
+    })).toBe('Trace de la résolution précédente (Intervention) : Changement du tambour.')
+  })
+
+  it('y la explicación de oficina con su motivo — que era la que se perdía entera', () => {
+    expect(archivedResolutionNote({
+      via: 'bureau',
+      reason: 'telephone',
+      note: 'Réglé au téléphone avec Mme Diop.',
+      rapport: null,
+    })).toBe('Trace de la résolution précédente (Bureau · Résolu par téléphone) : Réglé au téléphone avec Mme Diop.')
+  })
+
+  it('no repite el texto cuando el informe y la explicación son el mismo', () => {
+    const note = archivedResolutionNote({
+      via: 'intervention', reason: null, note: 'Même texte.', rapport: 'Même texte.',
+    })
+    expect(note).toBe('Trace de la résolution précédente (Intervention) : Même texte.')
+  })
+
+  it('sin nada escrito no inventa una línea', () => {
+    expect(archivedResolutionNote({ via: null, reason: null, note: null, rapport: null })).toBeNull()
+    expect(archivedResolutionNote({ via: 'bureau', reason: 'autre', note: '  ', rapport: null })).toBeNull()
+  })
+})
+
+describe('historyComment — nada de lo que hay que contar se pierde', () => {
+  it('junta el comentario escrito a mano con la nota de archivo', () => {
+    expect(historyComment('Le client rappelle.', 'Rapport précédent : X'))
+      .toBe('Le client rappelle.\n\nRapport précédent : X')
+  })
+
+  it('con una sola nota, no añade separadores', () => {
+    expect(historyComment(null, 'Rapport précédent : X')).toBe('Rapport précédent : X')
+    expect(historyComment('Le client rappelle.', null)).toBe('Le client rappelle.')
+  })
+
+  it('sin nada que contar, no inventa una línea', () => {
+    expect(historyComment(null, undefined, '   ')).toBeNull()
   })
 })

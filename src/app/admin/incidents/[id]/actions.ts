@@ -14,8 +14,10 @@ import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { sendCsatForIncident } from '@/lib/csat.server'
 import {
+  archivedResolutionNote,
   buildResolution,
   clearResolution,
+  historyComment,
   reopens,
   requiresOfficeResolution,
   isOpenStatus,
@@ -47,7 +49,7 @@ export async function updateIncidentAction(
   // envío de la encuesta y el borrado del rastro al reabrir.
   const { data: current } = await supabase
     .from('incidents')
-    .select('status, resolved_via')
+    .select('status, resolved_via, resolution_reason, resolution_note, rapport_intervention')
     .eq('id', id)
     .single()
   if (!current) return { error: 'Incident introuvable.' }
@@ -109,7 +111,28 @@ export async function updateIncidentAction(
 
   // Reabrir desde la ficha borra el rastro igual que en el tablero: una resolución que no
   // limpia deja a la siguiente heredar el informe y el escaneo de la anterior.
-  if (reopens(old_status, final_status)) Object.assign(updates, clearResolution())
+  let archivedTrace: string | null = null
+  if (reopens(old_status, final_status)) {
+    archivedTrace = archivedResolutionNote({
+      via: current.resolved_via,
+      reason: current.resolution_reason,
+      note: current.resolution_note,
+      rapport: current.rapport_intervention,
+    })
+    Object.assign(updates, clearResolution())
+  }
+
+  // Archivar ANTES de borrar: si la copia no entra, la avería no se toca.
+  if (archivedTrace) {
+    const { error: archErr } = await supabase.from('incident_history').insert({
+      incident_id: id, changed_by: user.id,
+      old_status: null, new_status: null, comment: archivedTrace,
+    })
+    if (archErr) {
+      console.error('[updateIncident] archivage', { id, error: archErr })
+      return { error: 'Une erreur est survenue. Veuillez réessayer.' }
+    }
+  }
 
   const { error } = await supabase.from('incidents').update(updates).eq('id', id)
   if (error) {
@@ -118,15 +141,19 @@ export async function updateIncidentAction(
   }
 
   if (final_status !== old_status) {
-    await supabase.from('incident_history').insert({
+    // El comentario escrito a mano y el motivo caben los dos: antes el `??` se quedaba con uno
+    // y tiraba el otro.
+    const { error: histErr } = await supabase.from('incident_history').insert({
       incident_id: id,
       changed_by:  user.id,
       old_status,
       new_status:  final_status,
-      // El comentario escrito a mano manda; si no lo hay, que al menos el motivo explique el
-      // salto directo a «Fermé» a quien lea el historial dentro de seis meses.
-      comment:     comment ?? (officeReason ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}` : null),
+      comment:     historyComment(
+        comment,
+        officeReason ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}` : null,
+      ),
     })
+    if (histErr) console.error('[updateIncident] historique', { id, error: histErr })
   }
 
   // La ficha de admin es la tercera puerta a `résolu` (además del tech y del

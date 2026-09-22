@@ -250,12 +250,19 @@ export function reopens(oldStatus: string, newStatus: string): boolean {
  * fuese — exactamente el blanqueo que el verrou pretende impedir. El escaneo también se
  * borra: haber tenido la máquina delante en marzo no prueba nada sobre la visita de mayo.
  *
+ * **`rapport_intervention` también.** Era el hueco por el que se colaba todo lo demás: el
+ * formulario del técnico rellena ese campo con lo que ya hubiera, así que una avería
+ * reabierta en mayo se cerraba con el informe de marzo sin escribir una línea, y ni la
+ * aplicación ni el candado de la BD podían notarlo — el texto estaba ahí. No se pierde: la
+ * puerta que reabre lo archiva antes en `incident_history` (ver `archivedReportNote`).
+ *
  * `resolved_at` sí se conserva: hay recuentos que lo usan (`atelier/data.ts`).
  */
 export function clearResolution(): {
   resolved_via: null
   resolution_reason: null
   resolution_note: null
+  rapport_intervention: null
   qr_verified: false
   qr_scanned_by: null
 } {
@@ -263,7 +270,63 @@ export function clearResolution(): {
     resolved_via: null,
     resolution_reason: null,
     resolution_note: null,
+    rapport_intervention: null,
     qr_verified: false,
     qr_scanned_by: null,
   }
+}
+
+/**
+ * Junta en una línea de historial todo lo que hay que contar de un cambio de estado.
+ *
+ * Existe porque el `??` que había antes elegía **uno**: si quien reabría escribía un
+ * comentario, la nota con el informe archivado se descartaba y el informe del técnico no
+ * quedaba en ninguna parte — ni en la avería, que acababa de borrarlo, ni en el historial.
+ * Todo lo que llega aquí se conserva.
+ */
+export function historyComment(...notes: Array<string | null | undefined>): string | null {
+  const kept = notes.map((n) => n?.trim()).filter((n): n is string => !!n)
+  return kept.length > 0 ? kept.join('\n\n') : null
+}
+
+/** Lo que una avería llevaba escrito antes de que la reabrieran. */
+export type PreviousResolution = {
+  via: string | null
+  reason: ResolutionReason | string | null
+  note: string | null
+  rapport: string | null
+}
+
+/**
+ * Línea de historial que guarda el rastro de la resolución anterior antes de borrarlo.
+ *
+ * Reabrir limpia el rastro para que la próxima resolución traiga el suyo, pero lo que alguien
+ * escribió sobre una visita real no se tira: queda fechado en el historial de la avería, que
+ * es donde se mira cuando un cliente reclama.
+ *
+ * Guarda **todo** el rastro, no solo el informe del técnico. La explicación de oficina se
+ * perdía igual —y es obligatoria— pero al no estar en el historial de la resolución (allí solo
+ * queda el motivo) desaparecía sin copia: «lo arreglamos por teléfono con la Sra. Diop, la
+ * bandeja estaba mal cerrada» se esfumaba al reabrir.
+ */
+export function archivedResolutionNote(previous: PreviousResolution): string | null {
+  const rapport = previous.rapport?.trim()
+  const note = previous.note?.trim()
+  const via = previous.via === 'bureau' || previous.via === 'intervention'
+    ? RESOLVED_VIA_LABELS[previous.via]
+    : null
+
+  // El informe y la explicación son el mismo texto en la vía `intervention` (lo escribe
+  // `buildResolution`): se enseña una vez.
+  const body = rapport && note && rapport === note ? rapport : [rapport, note].filter(Boolean).join(' — ')
+  if (!body) return null
+
+  const reason = typeof previous.reason === 'string'
+    ? RESOLUTION_REASON_LABELS[previous.reason as ResolutionReason] ?? previous.reason
+    : null
+  const head = [via, reason].filter(Boolean).join(' · ')
+
+  return head
+    ? `Trace de la résolution précédente (${head}) : ${body}`
+    : `Trace de la résolution précédente : ${body}`
 }

@@ -259,7 +259,7 @@ export default async function EditIncidentPage({
                       <span className="text-xs text-ink-muted">{formatDateTime(h.created_at)}</span>
                     </div>
                     {h.comment && (
-                      <p className="mt-1 text-xs text-ink-muted italic">{h.comment}</p>
+                      <p className="mt-1 text-xs text-ink-muted italic whitespace-pre-wrap">{h.comment}</p>
                     )}
                   </div>
                 </div>

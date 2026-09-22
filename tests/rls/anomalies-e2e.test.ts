@@ -43,7 +43,13 @@ beforeAll(async () => {
 
   // Último cambio de la pieza 7 (Toner BK) el 2026-03-15.
   const { data: inc, error: iErr } = await admin.from('incidents')
-    .insert({ numero_incident: 'TEST-E2EI1', title: 'toner', contract_machine_id: line!.id, status: 'résolu', resolved_at: '2026-03-15T12:00:00Z' })
+    // El candado de resolución exige rastro para nacer resuelta (trg_guard_incident_resolution).
+    .insert({
+      numero_incident: 'TEST-E2EI1', title: 'toner', contract_machine_id: line!.id,
+      status: 'résolu', resolved_at: '2026-03-15T12:00:00Z',
+      resolved_via: 'intervention', rapport_intervention: 'Changement du toner BK.',
+      resolution_note: 'Changement du toner BK.',
+    })
     .select('id').single()
   if (iErr) throw new Error(`seed incident: ${iErr.message}`)
   const { error: ipErr } = await admin.from('incident_parts').insert({ incident_id: inc!.id, part_id: 7, quantity: 1 })

@@ -43,6 +43,9 @@ beforeAll(async () => {
     dates.map((d, i) => ({
       numero_incident: `TEST-I${i + 1}`, title: `Inc ${i}`, contract_machine_id: line!.id,
       assigned_to: techA, status: 'résolu' as const, resolved_at: `${d}T12:00:00Z`,
+      // El candado de resolución exige rastro para nacer resuelta (trg_guard_incident_resolution).
+      resolved_via: 'intervention' as const, rapport_intervention: 'Changement de pièce.',
+      resolution_note: 'Changement de pièce.',
     }))
   ).select('id, numero_incident')
   for (const inc of incs!) {
@@ -117,6 +120,9 @@ describe('v_machine_part_consumption — elige el contador por reading_date, no 
     const { data: inc } = await admin.from('incidents').insert({
       numero_incident: 'TEST-I-LATE', title: 'Inc late', contract_machine_id: line!.id,
       status: 'résolu' as const, resolved_at: '2026-03-01T12:00:00Z',
+      // Ídem: sin rastro, el candado rechaza el INSERT.
+      resolved_via: 'intervention' as const, rapport_intervention: 'Changement de pièce.',
+      resolution_note: 'Changement de pièce.',
     }).select('id').single()
     await admin.from('incident_parts').insert({ incident_id: inc!.id, part_id: 7, quantity: 1 })
 
