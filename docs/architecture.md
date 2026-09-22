@@ -607,7 +607,7 @@ pg_cron `princity-alerts-hourly` (cada hora)
   → Si alert_type = 'panne' y machine+contract conocidos → incidents (status: nouveau)
   → Admin asigna técnico → incidents (status: assigné)
   → Técnico escanea QR → /tech/scan/[serie] → auto-transición assigné → en_cours (automático)
-  → Técnico completa formulario + piezas → résolu
+  → Técnico completa formulario + piezas → résolu (el informe es OBLIGATORIO, ver §Verrou)
   → sendCsatForIncident: Resend envía CSAT al contacto del QR (o a la cuenta de portal)
     + auto-transición résolu → fermé — SOLO si el email sale de verdad (§7-bis)
 ```
@@ -632,6 +632,84 @@ Cualquier persona escanea el QR de la máquina
   → Email notificación a savamdservice@gmail.com
   → Muestra número de referencia SAV-YYYY-NNNN
 ```
+
+---
+
+## Verrou de résolution — ninguna avería se cierra sin rastro
+
+✅ **Completo y en producción (2026-09-22).** Plan: `docs/plan-cierre-averias-2026-09-18.md`.
+PRs #143 (cimientos + puerta del técnico), #144 (las 4 puertas de oficina), #145 (consecuencias
+visibles) y el candado de BD.
+
+### El problema
+
+Había **cinco** puntos del código que escribían `status = 'résolu'` y **ninguno** exigía nada: ni
+informe, ni escaneo del QR. Una avería podía quedar resuelta con `assigned_to = NULL` y sin una
+línea escrita. Peor: como el envío de la encuesta es lo que archiva la avería, el cliente recibía
+una encuesta de satisfacción por una intervención que nadie había documentado, y la avería quedaba
+cerrada en blanco. El mantenimiento preventivo sí tenía prueba de presencia física
+(`maintenance_visits.qr_verified`); las averías nunca la recibieron.
+
+### Las dos vías
+
+| Vía | Quién | Qué exige | Dónde acaba |
+|---|---|---|---|
+| `intervention` | el técnico, con la máquina delante | **informe obligatorio** (`rapport_intervention`) | `résolu` → la encuesta la archiva en `fermé` |
+| `bureau` | oficina (tablero admin, kanban del kiosko, ficha del kiosko, ficha admin) | **motivo** (lista) + **explicación** (mínimo 10 caracteres) | **directo a `fermé`**, sin encuesta |
+
+La marca la pone **la puerta de entrada**, no lo que se escriba: si el formulario de oficina fuese
+igual que el del técnico, una resolución bien redactada sería indistinguible de una intervención
+real — peor que antes, porque hoy un informe vacío al menos es una señal.
+
+### Una sola regla, cuatro puertas y la pantalla
+
+`src/lib/resolution.ts` (puro, sin Supabase, probado con vitest) concentra todo:
+
+- `buildResolution()` — valida la vía y devuelve las columnas a escribir.
+- `requiresOfficeResolution(old, new, via)` — **¿hay que pedir justificación?** Solo al cerrar algo
+  que estaba **vivo**, solo si no hay rastro ya, y tanto para `résolu` como para `fermé` (si no,
+  «Fermé» sería el atajo barato justo porque «Résolu» hace preguntas). La usan las Server Actions
+  **y** la interfaz: cuando cada lado decidía por su cuenta salía un campo obligatorio que no
+  existía en pantalla.
+- `finalResolutionStatus(status, via)` — una resolución que no va a generar encuesta se archiva en
+  el acto: `résolu` es una sala de espera de la que solo saca el envío del CSAT.
+- `clearResolution()` — reabrir borra vía, motivo, nota y escaneo. Sin esto la segunda resolución
+  heredaría el rastro de la primera. `resolved_at` se conserva (lo usan los recuentos).
+- `sendsSurvey(via)` — solo `intervention` pide opinión al cliente.
+
+### El QR: semáforo, nunca bloqueo
+
+Escanear el QR de la máquina con la avería abierta marca `qr_verified` y guarda `qr_scanned_by`
+(`src/lib/scan.server.ts`). La ficha lo enseña en verde **solo si quien escaneó es quien resolvió**.
+No bloquea nunca: una etiqueta despegada o un móvil sin cobertura no pueden dejar a un técnico sin
+poder cerrar lo que acaba de arreglar — buscaría un atajo y volveríamos al principio.
+
+### El candado (migración `20260922100000_guard_incident_resolution.sql`)
+
+Trigger `trg_guard_incident_resolution`, BEFORE INSERT OR UPDATE sobre `incidents`. Misma idea que
+`tg_invoices_immutable` o el candado de facturación: si mañana aparece una sexta puerta —una Edge
+Function, un importador, una llamada con la `service_role` key— no podrá archivar una avería viva
+sin decir cómo se resolvió. Rechaza `résolu`/`fermé` viniendo de un estado **vivo** cuando falta la
+vía, falta el informe (`intervention`) o falta el motivo/explicación (`bureau`).
+
+No toca: el histórico (una avería que ya estaba resuelta o cerrada sin rastro se puede seguir
+editando y archivando — nunca lo tuvo y no se le inventa), el cierre automático tras la encuesta
+(`résolu → fermé`) ni la reapertura. Cubierto por `tests/rls/incident-resolution-guard.test.ts`.
+
+### Qué se ve
+
+- `/admin/incidents` (lista): columna **Résolution** — verde `Intervention`, ámbar `Bureau` con el
+  motivo debajo — y filtro por vía (solo en la vista de lista: las abiertas no tienen vía todavía).
+- Ficha de la avería: tarjeta **Résolution** con vía, motivo, explicación y el semáforo del QR.
+- Kiosko: al archivar desde el taller, `ArchivedToast` confirma durante 8 segundos qué avería se
+  archivó — el tablero solo muestra averías vivas, así que la tarjeta desaparece y, sin el aviso,
+  parecería que no ha funcionado.
+
+### Subproducto
+
+El desplegable de motivos es, desde el primer día, una estadística: dentro de unos meses podrá
+responder *«qué porcentaje de lo que cerramos en oficina son falsas alarmas de Princity»* — dato que
+cruza directo con el problema de los crons silenciosos (§Integración Princity).
 
 ---
 
@@ -879,6 +957,11 @@ Núcleo del sistema SAV.
 | `status` | enum | nouveau / assigné / en_cours / résolu / fermé |
 | `rapport_intervention` | text | informe del técnico, nullable |
 | `autres_pieces` | text | piezas libres, nullable |
+| `resolved_via` | text | `intervention` / `bureau`, nullable — cómo se resolvió. NULL = sin resolver o histórico anterior al verrou |
+| `resolution_reason` | text | solo si `bureau`: `fausse_alerte` / `telephone` / `client` / `technicien_non_enregistre` / `doublon` / `autre` |
+| `resolution_note` | text | explicación de quien resolvió (el informe del técnico, o la justificación de oficina) |
+| `qr_verified` | boolean NOT NULL DEFAULT false | true si alguien escaneó el QR físico con la avería abierta. **Semáforo, nunca bloqueo** |
+| `qr_scanned_by` | UUID | FK → profiles, nullable — quién escaneó. El verde exige que sea quien resolvió |
 | `contact_name` | text | nullable — nombre del reporter (incidentes públicos vía QR) |
 | `contact_phone` | text | nullable — teléfono del reporter |
 | `contact_email` | text | nullable — email del reporter (opcional en el formulario) |
@@ -891,6 +974,8 @@ Núcleo del sistema SAV.
 > **`numero_incident` (SAV-YYYY-NNNN):** contador secuencial por año, reseteado el 1 de enero. Generado por `public.next_incident_number()` (upsert atómico sobre `incident_counters`). Asignado por el trigger `trg_set_incident_numero` BEFORE INSERT. Visible en Kanban, vista lista admin, detalle admin, PWA técnico (lista + detalle) y portal cliente (lista + detalle).
 
 > **Vinculación internas vs públicas:** las incidencias **internas** se vinculan solo por `contract_machine_id` (con `machine_id=NULL`); las **públicas** (`source='public'`) por `machine_id` directo (con `contract_machine_id=NULL`). La columna legacy `contract_id` y su FK `incidents_contract_id_fkey` fueron eliminadas en el cleanup del 2026-06-05.
+
+> **Verrou de résolution (2026-09-22, PRs #143/#144/#145 + candado):** tres CHECK garantizan la coherencia (`resolved_via` ∈ {intervention, bureau}; `resolution_reason` de la lista; el motivo es **exclusivo** de la vía `bureau`) y el trigger `trg_guard_incident_resolution` (BEFORE INSERT OR UPDATE) impide que una avería **viva** pase a `résolu` o a `fermé` sin rastro. Ver §Verrou de résolution.
 
 > **Incidentes públicos (`source='public'`):** creados por `submitPublicIncident` sin autenticación, con `opened_by=null` y `contract_machine_id` nullable. El detalle admin muestra una sección "Contact" con badge "Public". El portal cliente los excluye con `.or('source.is.null,source.neq.public')`.
 
