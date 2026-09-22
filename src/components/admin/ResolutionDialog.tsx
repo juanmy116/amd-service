@@ -56,9 +56,15 @@ export default function ResolutionDialog({
   const tooShort = note.trim().length < MIN_NOTE_LENGTH
   const canConfirm = reason !== '' && !tooShort && !busy
 
+  // Las `<option>` llevan color y fondo PROPIOS, no heredados. El menú desplegable lo pinta el
+  // sistema, no la página: en la TV del taller el texto blanco del kiosko se heredaba dentro de
+  // un menú de fondo blanco y la lista de motivos salía en blanco sobre blanco — solo se leía la
+  // opción resaltada. Fijar los dos colores la hace legible pinte como pinte el navegador.
+  const optionColors = '[&>option]:bg-white [&>option]:text-[#15151C]'
+
   const field = kiosk
-    ? 'w-full rounded-xl border-2 border-white/15 bg-white/5 px-4 py-3 text-lg text-white focus:border-accent focus:outline-none'
-    : 'w-full rounded-lg border border-line bg-card px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent'
+    ? `w-full rounded-xl border-2 border-white/15 bg-white/5 px-4 py-3 text-lg text-white focus:border-accent focus:outline-none ${optionColors}`
+    : `w-full rounded-lg border border-line bg-card px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent ${optionColors}`
   const label = kiosk
     ? 'block text-sm font-bold uppercase tracking-wider text-white/40 mb-2'
     : 'block text-sm font-medium text-ink-soft mb-1.5'
