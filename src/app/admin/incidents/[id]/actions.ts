@@ -1,12 +1,27 @@
 'use server'
 
 import { requireAdmin } from '@/lib/auth'
-import { INCIDENT_CATEGORIES, INCIDENT_PRIORITIES, INCIDENT_STATUSES, RESOLUTION_REASONS, parseEnum } from '@/lib/enums'
+import {
+  INCIDENT_CATEGORIES,
+  INCIDENT_PRIORITIES,
+  INCIDENT_STATUSES,
+  RESOLUTION_REASONS,
+  parseEnum,
+  type ResolutionReason,
+} from '@/lib/enums'
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { sendCsatForIncident } from '@/lib/csat.server'
-import { buildResolution, clearResolution, reopens, requiresOfficeResolution } from '@/lib/resolution'
+import {
+  buildResolution,
+  clearResolution,
+  reopens,
+  requiresOfficeResolution,
+  isOpenStatus,
+  OFFICE_RESOLUTION_STATUS,
+  RESOLUTION_REASON_LABELS,
+} from '@/lib/resolution'
 
 type FormState = { error: string } | null
 
@@ -47,19 +62,27 @@ export async function updateIncidentAction(
       ? 'assigné' as const
       : new_status
 
+  // Verrou de résolution: cerrar desde la ficha sin informe de técnico exige motivo y
+  // explicación, igual que en el tablero. No se pide cuando la avería ya trae rastro:
+  // corregir el título de una resuelta no es resolverla otra vez.
+  const isOffice = requiresOfficeResolution(old_status, effective_status, current.resolved_via)
+
+  // Igual que en el tablero: la resolución de oficina se archiva en el acto, porque no hay
+  // encuesta que la cierre después (ver OFFICE_RESOLUTION_STATUS).
+  const final_status = isOffice ? OFFICE_RESOLUTION_STATUS : effective_status
+
   const updates: TablesUpdate<'incidents'> = {
     title,
     description:  (formData.get('description') as string).trim() || null,
     category,
     priority,
-    status:       effective_status,
+    status:       final_status,
     assigned_to,
   }
 
-  // Verrou de résolution: cerrar desde la ficha sin informe de técnico exige motivo y
-  // explicación, igual que en el tablero. No se pide cuando la avería ya trae rastro:
-  // corregir el título de una resuelta no es resolverla otra vez.
-  if (requiresOfficeResolution(old_status, effective_status, current.resolved_via)) {
+  let officeReason: ResolutionReason | null = null
+
+  if (isOffice) {
     const resolution = buildResolution({
       via: 'bureau',
       reason: parseEnum(formData.get('resolution_reason'), RESOLUTION_REASONS),
@@ -70,14 +93,19 @@ export async function updateIncidentAction(
     })
     if (!resolution.ok) return { error: resolution.error }
     Object.assign(updates, resolution.fields)
+    officeReason = resolution.fields.resolution_reason
   }
 
-  if (effective_status === 'résolu' && old_status !== 'résolu') updates.resolved_at = new Date().toISOString()
-  if (effective_status === 'fermé'  && old_status !== 'fermé')  updates.closed_at   = new Date().toISOString()
+  // Quedó resuelta hoy aunque se archive en el mismo gesto: `resolved_at` alimenta el
+  // marcador «Résolus cette semaine» del kiosko. Solo si venía de un estado abierto —
+  // documentar una vieja no reescribe la fecha en que de verdad se arregló.
+  const resolvedNow = final_status === 'résolu' || isOffice
+  if (resolvedNow && isOpenStatus(old_status)) updates.resolved_at = new Date().toISOString()
+  if (final_status === 'fermé' && old_status !== 'fermé') updates.closed_at = new Date().toISOString()
 
   // Reabrir desde la ficha borra el rastro igual que en el tablero: una resolución que no
   // limpia deja a la siguiente heredar el informe y el escaneo de la anterior.
-  if (reopens(old_status, effective_status)) Object.assign(updates, clearResolution())
+  if (reopens(old_status, final_status)) Object.assign(updates, clearResolution())
 
   const { error } = await supabase.from('incidents').update(updates).eq('id', id)
   if (error) {
@@ -85,13 +113,15 @@ export async function updateIncidentAction(
     return { error: 'Une erreur est survenue. Veuillez réessayer.' }
   }
 
-  if (effective_status !== old_status) {
+  if (final_status !== old_status) {
     await supabase.from('incident_history').insert({
       incident_id: id,
       changed_by:  user.id,
       old_status,
-      new_status:  effective_status,
-      comment,
+      new_status:  final_status,
+      // El comentario escrito a mano manda; si no lo hay, que al menos el motivo explique el
+      // salto directo a «Fermé» a quien lea el historial dentro de seis meses.
+      comment:     comment ?? (officeReason ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}` : null),
     })
   }
 
@@ -100,7 +130,7 @@ export async function updateIncidentAction(
   // se quedaba en `résolu` para siempre (quien la cierra es el propio envío).
   // `after()` difiere el envío a DESPUÉS de la respuesta: el `redirect()` lanza
   // por diseño y la función serverless podría apagarse con el envío a medias.
-  if (effective_status === 'résolu' && old_status !== 'résolu') {
+  if (final_status === 'résolu' && old_status !== 'résolu') {
     after(() => sendCsatForIncident(id).catch(console.error))
   }
 

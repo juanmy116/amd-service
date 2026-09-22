@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
 import ResolutionDialog from './ResolutionDialog'
-import { isOpenStatus, type OfficeResolution } from '@/lib/resolution'
+import { isOpenStatus, OFFICE_RESOLUTION_STATUS, type OfficeResolution } from '@/lib/resolution'
 
 export type KanbanIncident = {
   id: string
@@ -235,7 +235,10 @@ export default function KanbanBoard({
     if (!incident) return
     setResolutionError(null)
     startTransition(async () => {
-      updateOptimistic({ id: incident.id, newStatus: resolutionTarget })
+      // La ventana solo se abre para resoluciones de oficina, y esas se archivan en el acto:
+      // mover la tarjeta a «Résolu» para verla saltar a «Fermé» al refrescar sería un parpadeo
+      // sin sentido. Al servidor se le sigue mandando lo que pidió el usuario — la regla vive allí.
+      updateOptimistic({ id: incident.id, newStatus: OFFICE_RESOLUTION_STATUS })
       const result = await updateIncidentStatusAction(incident.id, resolutionTarget, office)
       if (result?.error) {
         setResolutionError(result.error)

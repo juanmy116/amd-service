@@ -47,6 +47,18 @@ export const RESOLUTION_REASON_LABELS: Record<ResolutionReason, string> = {
 }
 
 /**
+ * Cómo se llama cada vía en la interfaz.
+ *
+ * La pareja intervención/oficina es la que da sentido a todo el verrou: sin ella el listado
+ * vuelve a mostrar un «Résolu» que no distingue entre «un técnico fue» y «alguien limpió el
+ * tablero».
+ */
+export const RESOLVED_VIA_LABELS: Record<ResolvedVia, string> = {
+  intervention: 'Intervention',
+  bureau:       'Bureau',
+}
+
+/**
  * Mínimo de la explicación de oficina.
  *
  * No busca calidad literaria: busca que «ok» no cuele. Pedir un párrafo solo
@@ -130,6 +142,30 @@ export function buildResolution(input: ResolutionInput): ResolutionResult {
   if (input.technicianId) fields.assigned_to = input.technicianId
 
   return { ok: true, fields }
+}
+
+/**
+ * Estado en el que termina una resolución de OFICINA.
+ *
+ * Quien cierra una avería resuelta es el envío de la encuesta (`csat.server.ts`). Como en una
+ * resolución de oficina no hay encuesta que mandar, dejarla en `résolu` la condenaría a una
+ * sala de espera de la que nadie la sacaría nunca: el listado se llenaría de resueltas
+ * eternas. Se archiva en el acto.
+ */
+export const OFFICE_RESOLUTION_STATUS = 'fermé' as const
+
+/**
+ * ¿Se le manda la encuesta de satisfacción al cliente por esta resolución?
+ *
+ * Solo por una intervención de verdad. Preguntar «¿qué tal le atendió el técnico?» por una
+ * avería que se cerró por teléfono, o porque era una falsa alarma de Princity, es pedirle al
+ * cliente que puntúe una visita que nunca ocurrió.
+ *
+ * `null` (histórico anterior al verrou, o una puerta futura que se olvide de marcar) tampoco
+ * recibe encuesta: sin saber qué pasó, no se molesta al cliente.
+ */
+export function sendsSurvey(resolvedVia: string | null | undefined): boolean {
+  return resolvedVia === 'intervention'
 }
 
 /**

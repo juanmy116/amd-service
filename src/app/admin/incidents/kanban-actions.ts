@@ -2,10 +2,19 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { INCIDENT_STATUSES, RESOLUTION_REASONS, parseEnum } from '@/lib/enums'
+import { INCIDENT_STATUSES, RESOLUTION_REASONS, parseEnum, type ResolutionReason } from '@/lib/enums'
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { sendCsatForIncident } from '@/lib/csat.server'
-import { buildResolution, clearResolution, reopens, requiresOfficeResolution, type OfficeResolution } from '@/lib/resolution'
+import {
+  buildResolution,
+  clearResolution,
+  reopens,
+  requiresOfficeResolution,
+  isOpenStatus,
+  OFFICE_RESOLUTION_STATUS,
+  RESOLUTION_REASON_LABELS,
+  type OfficeResolution,
+} from '@/lib/resolution'
 import { after } from 'next/server'
 
 /**
@@ -49,13 +58,21 @@ export async function updateIncidentStatusAction(
   const oldStatus = current.status
   if (oldStatus === status) return {}
 
-  const updates: TablesUpdate<'incidents'> = { status }
-
   // Verrou de résolution: desde el tablero no se cierra una avería sin decir por qué. La
   // ventana que pide el motivo la pone la interfaz, pero la regla se aplica aquí — arrastrar
   // una tarjeta es un `fetch` como cualquier otro y no se puede confiar en que el navegador
   // haya pasado por el formulario.
-  if (requiresOfficeResolution(oldStatus, status, current.resolved_via)) {
+  const isOffice = requiresOfficeResolution(oldStatus, status, current.resolved_via)
+
+  // Lo que llega del navegador dice qué quiso hacer el usuario; lo que se escribe lo decide
+  // esta acción. Una resolución de oficina se archiva en el acto: sin encuesta que esperar,
+  // «Résolu» sería una sala de espera de la que nadie la sacaría (ver OFFICE_RESOLUTION_STATUS).
+  const finalStatus = isOffice ? OFFICE_RESOLUTION_STATUS : status
+
+  const updates: TablesUpdate<'incidents'> = { status: finalStatus }
+  let officeReason: ResolutionReason | null = null
+
+  if (isOffice) {
     // El técnico acreditado se valida como el motivo: sin esto, una llamada a mano podría
     // apuntar el trabajo a un UUID cualquiera (violación de FK con el mensaje crudo de
     // Postgres en pantalla) o a un perfil de admin, que acabaría contando en el recuento por
@@ -79,15 +96,23 @@ export async function updateIncidentStatusAction(
     })
     if (!resolution.ok) return { error: resolution.error }
     Object.assign(updates, resolution.fields)
+    officeReason = resolution.fields.resolution_reason
   }
 
-  if (status === 'résolu' && oldStatus !== 'résolu') updates.resolved_at = new Date().toISOString()
-  if (status === 'fermé'  && oldStatus !== 'fermé')  updates.closed_at   = new Date().toISOString()
+  // La avería quedó resuelta hoy aunque se archive en el mismo gesto: `resolved_at` es lo que
+  // cuenta el marcador «Résolus cette semaine» del kiosko (`atelier/data.ts`).
+  //
+  // Solo cuenta si venía de un estado abierto. Documentar hoy una avería que ya estaba
+  // resuelta o cerrada —arrastrar una vieja a «Résolu» para rellenarle el motivo— no puede
+  // reescribir la fecha en que de verdad se arregló, o el marcador de la semana se infla.
+  const resolvedNow = finalStatus === 'résolu' || isOffice
+  if (resolvedNow && isOpenStatus(oldStatus)) updates.resolved_at = new Date().toISOString()
+  if (finalStatus === 'fermé' && oldStatus !== 'fermé') updates.closed_at = new Date().toISOString()
 
   // Reabrir borra el rastro de la resolución anterior. Sin esto, devolver una tarjeta a «En
   // cours» y volver a arrastrarla a «Résolu» dejaba la avería con el informe y el escaneo de
   // la intervención de antes: indistinguible de una segunda intervención real.
-  if (reopens(oldStatus, status)) Object.assign(updates, clearResolution())
+  if (reopens(oldStatus, finalStatus)) Object.assign(updates, clearResolution())
 
   const { error } = await admin.from('incidents').update(updates).eq('id', incidentId)
   if (error) return { error: error.message }
@@ -96,15 +121,19 @@ export async function updateIncidentStatusAction(
     incident_id: incidentId,
     changed_by:  user.id,
     old_status:  oldStatus,
-    new_status:  status,
-    comment:     null,
+    new_status:  finalStatus,
+    // Sin esto, el salto directo a «Fermé» parecería un archivado a secas. El motivo queda a
+    // la vista en el historial de la ficha, que es lo que se mira cuando un cliente reclama.
+    comment:     officeReason ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}` : null,
   })
 
   // `after()` difiere el envío a DESPUÉS de la respuesta: sin él, el `return` de
   // abajo puede dar por terminada la función serverless con el envío a medias
   // (ni correo, ni fila, ni rastro). El `.catch` evita que un fallo del envío
   // tumbe la acción del usuario.
-  if (status === 'résolu' && oldStatus !== 'résolu') {
+  // Solo las intervenciones piden opinión al cliente; una resolución de oficina nunca llega
+  // a `résolu`, y `sendCsatForIncident` lo vuelve a comprobar por su cuenta.
+  if (finalStatus === 'résolu' && oldStatus !== 'résolu') {
     after(() => sendCsatForIncident(incidentId).catch(console.error))
   }
 
