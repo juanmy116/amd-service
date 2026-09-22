@@ -6,10 +6,9 @@ import { INCIDENT_STATUSES, RESOLUTION_REASONS, parseEnum, type ResolutionReason
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { sendCsatForIncident } from '@/lib/csat.server'
 import {
-  archivedReportNote,
+  archivedResolutionNote,
   buildResolution,
   clearResolution,
-  historyComment,
   reopens,
   requiresOfficeResolution,
   isOpenStatus,
@@ -52,7 +51,7 @@ export async function updateIncidentStatusAction(
 
   const { data: current } = await admin
     .from('incidents')
-    .select('status, resolved_via, rapport_intervention')
+    .select('status, resolved_via, resolution_reason, resolution_note, rapport_intervention')
     .eq('id', incidentId)
     .single()
   if (!current) return { error: 'Incident introuvable' }
@@ -122,29 +121,39 @@ export async function updateIncidentStatusAction(
   // la intervención de antes: indistinguible de una segunda intervención real.
   // Igual que en la puerta del técnico: el informe anterior se archiva en el historial antes
   // de borrarlo, para que la próxima resolución no pueda presentarlo como suyo.
-  let archivedReport: string | null = null
+  let archivedTrace: string | null = null
   if (reopens(oldStatus, finalStatus)) {
-    archivedReport = archivedReportNote(current.rapport_intervention)
+    archivedTrace = archivedResolutionNote({
+      via: current.resolved_via,
+      reason: current.resolution_reason,
+      note: current.resolution_note,
+      rapport: current.rapport_intervention,
+    })
     Object.assign(updates, clearResolution())
+  }
+
+  // Archivar ANTES de borrar: si la copia no entra, la avería no se toca.
+  if (archivedTrace) {
+    const { error: archErr } = await admin.from('incident_history').insert({
+      incident_id: incidentId, changed_by: user.id,
+      old_status: null, new_status: null, comment: archivedTrace,
+    })
+    if (archErr) return { error: "Impossible d'archiver la trace précédente." }
   }
 
   const { error } = await admin.from('incidents').update(updates).eq('id', incidentId)
   if (error) return { error: error.message }
 
-  // Sin el motivo, el salto directo a «Fermé» parecería un archivado a secas; y esta fila
-  // puede ser la única copia del informe anterior cuando se reabre. Las dos cosas caben, y el
-  // fallo del insert no puede pasar en silencio.
+  // Sin el motivo, el salto directo a «Fermé» parecería un archivado a secas: queda a la vista
+  // en el historial de la ficha, que es lo que se mira cuando un cliente reclama.
   const { error: histErr } = await admin.from('incident_history').insert({
     incident_id: incidentId,
     changed_by:  user.id,
     old_status:  oldStatus,
     new_status:  finalStatus,
-    comment:     historyComment(
-      officeReason ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}` : null,
-      archivedReport,
-    ),
+    comment:     officeReason ? `Résolu au bureau — ${RESOLUTION_REASON_LABELS[officeReason]}` : null,
   })
-  if (histErr) console.error('[updateIncidentStatus] historique', { incidentId, archivedReport, error: histErr })
+  if (histErr) console.error('[updateIncidentStatus] historique', { incidentId, error: histErr })
 
   // `after()` difiere el envío a DESPUÉS de la respuesta: sin él, el `return` de
   // abajo puede dar por terminada la función serverless con el envío a medias

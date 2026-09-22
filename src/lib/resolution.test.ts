@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  archivedReportNote,
+  archivedResolutionNote,
   buildResolution,
   clearResolution,
   finalResolutionStatus,
@@ -207,16 +207,35 @@ describe('sendsSurvey — a quién se le pregunta qué tal fue', () => {
   })
 })
 
-describe('archivedReportNote — el informe anterior no se tira', () => {
-  it('lo convierte en una línea de historial antes de borrarlo', () => {
-    expect(archivedReportNote('Changement du tambour.'))
-      .toBe('Rapport de la résolution précédente : Changement du tambour.')
+describe('archivedResolutionNote — el rastro anterior no se tira', () => {
+  it('guarda el informe del técnico con su vía', () => {
+    expect(archivedResolutionNote({
+      via: 'intervention',
+      reason: null,
+      note: 'Changement du tambour.',
+      rapport: 'Changement du tambour.',
+    })).toBe('Trace de la résolution précédente (Intervention) : Changement du tambour.')
   })
 
-  it('sin informe anterior no inventa una línea', () => {
-    expect(archivedReportNote(null)).toBeNull()
-    expect(archivedReportNote('   ')).toBeNull()
-    expect(archivedReportNote(undefined)).toBeNull()
+  it('y la explicación de oficina con su motivo — que era la que se perdía entera', () => {
+    expect(archivedResolutionNote({
+      via: 'bureau',
+      reason: 'telephone',
+      note: 'Réglé au téléphone avec Mme Diop.',
+      rapport: null,
+    })).toBe('Trace de la résolution précédente (Bureau · Résolu par téléphone) : Réglé au téléphone avec Mme Diop.')
+  })
+
+  it('no repite el texto cuando el informe y la explicación son el mismo', () => {
+    const note = archivedResolutionNote({
+      via: 'intervention', reason: null, note: 'Même texte.', rapport: 'Même texte.',
+    })
+    expect(note).toBe('Trace de la résolution précédente (Intervention) : Même texte.')
+  })
+
+  it('sin nada escrito no inventa una línea', () => {
+    expect(archivedResolutionNote({ via: null, reason: null, note: null, rapport: null })).toBeNull()
+    expect(archivedResolutionNote({ via: 'bureau', reason: 'autre', note: '  ', rapport: null })).toBeNull()
   })
 })
 

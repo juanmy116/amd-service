@@ -682,6 +682,7 @@ real — peor que antes, porque hoy un informe vacío al menos es una señal.
   en `incident_history` (`archivedReportNote()` + `historyComment()`, que junta esa nota con el
   comentario escrito a mano en vez de quedarse con uno). Si el técnico **reescribe** el informe al
   reabrir, ese texto es suyo y se conserva. `resolved_at` se conserva (lo usan los recuentos).
+  La copia se escribe **antes** de borrar nada: si no entra, la avería no se toca.
 - `sendsSurvey(via)` — solo `intervention` pide opinión al cliente.
 
 ### El QR: semáforo, nunca bloqueo
@@ -699,6 +700,11 @@ Function, un importador, una llamada con la `service_role` key— no podrá arch
 sin decir cómo se resolvió. Rechaza `résolu`/`fermé` viniendo de un estado **vivo** cuando falta la
 vía, falta el informe (`intervention`) o falta el motivo/explicación (`bureau`).
 
+Al **reabrir**, el propio trigger vacía el rastro (vía, motivo, explicación, escaneo y el informe
+si no se ha reescrito). Sin eso el candado se saltaba en dos movimientos: poner la avería en un
+estado vivo sin limpiar nada y cerrarla acto seguido aprovechando el rastro viejo — la visita de
+mayo cerrada con el informe de marzo. La limpieza no puede depender de que la aplicación se acuerde.
+
 También impide **borrar o vaciar** el rastro mientras la avería siga resuelta — las tres piezas, no
 solo la vía: sin esa regla el candado valdría «de un solo movimiento», porque dos UPDATE seguidos
 —uno en regla y otro dejando la vía en NULL, o el informe en blanco— daban una avería marcada
@@ -707,7 +713,7 @@ solo la vía: sin esa regla el candado valdría «de un solo movimiento», porqu
 No toca: el histórico (una avería que ya estaba resuelta o cerrada **sin** rastro se puede seguir
 editando y archivando — nunca lo tuvo y no se le inventa), el cierre automático tras la encuesta
 (`résolu → fermé`) ni la reapertura. Cubierto por `tests/rls/incident-resolution-guard.test.ts`
-(seis rechazos y cinco caminos legítimos, contra un Supabase real en el job `rls` del CI).
+(nueve rechazos y seis caminos legítimos, contra un Supabase real en el job `rls` del CI).
 
 ### Qué se ve
 

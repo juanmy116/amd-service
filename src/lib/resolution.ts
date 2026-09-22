@@ -289,14 +289,44 @@ export function historyComment(...notes: Array<string | null | undefined>): stri
   return kept.length > 0 ? kept.join('\n\n') : null
 }
 
+/** Lo que una avería llevaba escrito antes de que la reabrieran. */
+export type PreviousResolution = {
+  via: string | null
+  reason: ResolutionReason | string | null
+  note: string | null
+  rapport: string | null
+}
+
 /**
- * Línea de historial que guarda el informe de la resolución anterior antes de borrarlo.
+ * Línea de historial que guarda el rastro de la resolución anterior antes de borrarlo.
  *
- * Reabrir limpia el informe para que la próxima resolución traiga el suyo, pero lo que un
- * técnico escribió sobre una visita real no se tira: queda fechado en el historial de la
- * avería, que es donde se mira cuando un cliente reclama.
+ * Reabrir limpia el rastro para que la próxima resolución traiga el suyo, pero lo que alguien
+ * escribió sobre una visita real no se tira: queda fechado en el historial de la avería, que
+ * es donde se mira cuando un cliente reclama.
+ *
+ * Guarda **todo** el rastro, no solo el informe del técnico. La explicación de oficina se
+ * perdía igual —y es obligatoria— pero al no estar en el historial de la resolución (allí solo
+ * queda el motivo) desaparecía sin copia: «lo arreglamos por teléfono con la Sra. Diop, la
+ * bandeja estaba mal cerrada» se esfumaba al reabrir.
  */
-export function archivedReportNote(previousReport: string | null | undefined): string | null {
-  const report = previousReport?.trim()
-  return report ? `Rapport de la résolution précédente : ${report}` : null
+export function archivedResolutionNote(previous: PreviousResolution): string | null {
+  const rapport = previous.rapport?.trim()
+  const note = previous.note?.trim()
+  const via = previous.via === 'bureau' || previous.via === 'intervention'
+    ? RESOLVED_VIA_LABELS[previous.via]
+    : null
+
+  // El informe y la explicación son el mismo texto en la vía `intervention` (lo escribe
+  // `buildResolution`): se enseña una vez.
+  const body = rapport && note && rapport === note ? rapport : [rapport, note].filter(Boolean).join(' — ')
+  if (!body) return null
+
+  const reason = typeof previous.reason === 'string'
+    ? RESOLUTION_REASON_LABELS[previous.reason as ResolutionReason] ?? previous.reason
+    : null
+  const head = [via, reason].filter(Boolean).join(' · ')
+
+  return head
+    ? `Trace de la résolution précédente (${head}) : ${body}`
+    : `Trace de la résolution précédente : ${body}`
 }

@@ -19,7 +19,9 @@
 --     inventa uno. Por eso la condición mira el estado ANTERIOR y no solo el nuevo. Lo que no
 --     se puede es QUITARLE el rastro a una que sí lo tiene.
 --   · El cierre automático tras la encuesta (`csat.server.ts`), que va de `résolu` a `fermé`.
---   · Reabrir: volver a un estado vivo no exige nada; lo exigirá la próxima resolución.
+--   · Reabrir: volver a un estado vivo no exige nada; lo exigirá la próxima resolución. Eso sí,
+--     el trigger aprovecha para VACIAR el rastro él mismo (ver abajo): así la limpieza no
+--     depende de que la aplicación se acuerde de hacerla.
 --
 -- El escaneo del QR (`qr_verified`) NO se exige aquí y no se exigirá nunca: es un semáforo. Una
 -- etiqueta despegada o un móvil sin cobertura en Dakar no pueden dejar a un técnico sin poder
@@ -33,7 +35,32 @@ LANGUAGE plpgsql
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-  -- Solo importa lo que termina resuelto o archivado.
+  -- REABRIR: la avería vuelve a estar viva, y el rastro de la resolución anterior se vacía
+  -- AQUÍ, no solo en la aplicación (`clearResolution()`).
+  --
+  -- Sin esto el candado se saltaba en dos movimientos, y justo por la puerta para la que
+  -- existe: un script podía poner `status = 'en_cours'` dejando intactos la vía y el informe
+  -- de marzo, y acto seguido `status = 'fermé'` — el trigger veía una avería que venía viva,
+  -- con vía puesta e informe no vacío, y la dejaba pasar. La visita de mayo quedaba cerrada
+  -- con el informe de marzo. La garantía no puede depender de que la aplicación se acuerde.
+  IF TG_OP = 'UPDATE'
+     AND NEW.status IN ('nouveau', 'assigné', 'en_cours')
+     AND OLD.status IN ('résolu', 'fermé') THEN
+    -- El informe se conserva SOLO si quien reabre ha escrito uno nuevo: el formulario del
+    -- técnico llega relleno con el anterior, así que un texto idéntico al que ya había no es
+    -- trabajo nuevo, es el de la vez pasada colándose.
+    IF COALESCE(btrim(NEW.rapport_intervention), '') = COALESCE(btrim(OLD.rapport_intervention), '') THEN
+      NEW.rapport_intervention := NULL;
+    END IF;
+    NEW.resolved_via      := NULL;
+    NEW.resolution_reason := NULL;
+    NEW.resolution_note   := NULL;
+    NEW.qr_verified       := false;
+    NEW.qr_scanned_by     := NULL;
+    RETURN NEW;
+  END IF;
+
+  -- Pasada la reapertura, solo importa lo que termina resuelto o archivado.
   IF NEW.status NOT IN ('résolu', 'fermé') THEN
     RETURN NEW;
   END IF;

@@ -135,9 +135,78 @@ describe('candado de resolución — lo que el trigger RECHAZA', () => {
     expect(error).not.toBeNull()
     expect(error?.message ?? '').toContain('sans trace')
   })
+
+  it('ni en dos movimientos: reabrir por SQL no conserva el rastro para cerrar después', async () => {
+    // El ataque que el candado tenía abierto: un script pone la avería «en_cours» dejando
+    // intactos la vía y el informe de marzo, y acto seguido la cierra — la visita de mayo
+    // quedaba cerrada con el informe de la de marzo. Ahora reabrir VACÍA el rastro en la propia
+    // base, así que el segundo movimiento se queda sin nada que enseñar.
+    const id = await freshIncident('TEST-GRD-M', 'en_cours')
+    const { error: resolveErr } = await admin
+      .from('incidents')
+      .update({
+        status: 'résolu',
+        resolved_via: 'intervention',
+        rapport_intervention: 'Visite de mars.',
+        resolution_note: 'Visite de mars.',
+      })
+      .eq('id', id)
+    expect(resolveErr).toBeNull()
+
+    // Movimiento 1: reabrir sin tocar nada más.
+    const { error: reopenErr } = await admin
+      .from('incidents')
+      .update({ status: 'en_cours' })
+      .eq('id', id)
+    expect(reopenErr).toBeNull()
+
+    const { data: after } = await admin
+      .from('incidents')
+      .select('resolved_via, rapport_intervention, resolution_note, qr_verified')
+      .eq('id', id)
+      .single()
+    expect(after?.resolved_via).toBeNull()
+    expect(after?.rapport_intervention).toBeNull()
+    expect(after?.resolution_note).toBeNull()
+    expect(after?.qr_verified).toBe(false)
+
+    // Movimiento 2: cerrarla aprovechando el rastro viejo. Ya no hay rastro que aprovechar.
+    const { error } = await admin.from('incidents').update({ status: 'fermé' }).eq('id', id)
+    expect(error).not.toBeNull()
+    expect(error?.message ?? '').toContain('sans trace')
+  })
 })
 
 describe('candado de resolución — lo que el trigger DEJA pasar', () => {
+  it('reabrir conservando el informe que el técnico acaba de reescribir', async () => {
+    // El formulario del técnico llega relleno con el informe anterior: si lo deja intacto, se
+    // va con el rastro; si escribe algo nuevo, es trabajo suyo y se queda.
+    const id = await freshIncident('TEST-GRD-N', 'en_cours')
+    await admin
+      .from('incidents')
+      .update({
+        status: 'résolu',
+        resolved_via: 'intervention',
+        rapport_intervention: 'Visite de mars.',
+        resolution_note: 'Visite de mars.',
+      })
+      .eq('id', id)
+
+    const { error } = await admin
+      .from('incidents')
+      .update({ status: 'en_cours', rapport_intervention: 'La panne est revenue, je repasse.' })
+      .eq('id', id)
+    expect(error).toBeNull()
+
+    const { data: after } = await admin
+      .from('incidents')
+      .select('resolved_via, rapport_intervention')
+      .eq('id', id)
+      .single()
+    expect(after?.resolved_via).toBeNull()
+    expect(after?.rapport_intervention).toBe('La panne est revenue, je repasse.')
+  })
+
   it('una intervención con su informe', async () => {
     const id = await freshIncident('TEST-GRD-F', 'en_cours')
     const { error } = await admin
