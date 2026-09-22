@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
 import ResolutionDialog from './ResolutionDialog'
-import type { OfficeResolution } from '@/lib/resolution'
+import { isOpenStatus, type OfficeResolution } from '@/lib/resolution'
 
 export type KanbanIncident = {
   id: string
@@ -175,11 +175,14 @@ export default function KanbanBoard({
   technicians: Array<{ id: string; name: string }>
 }) {
   const router = useRouter()
-  const [, startTransition] = useTransition()
+  const [pending, startTransition] = useTransition()
   const [activeIncident, setActiveIncident] = useState<KanbanIncident | null>(null)
   // Avería soltada en «Résolu» y pendiente de que alguien explique por qué. La tarjeta no se
   // mueve hasta entonces: si la ventana se cancela, nada ha pasado.
   const [pendingResolution, setPendingResolution] = useState<KanbanIncident | null>(null)
+  const [resolutionError, setResolutionError] = useState<string | null>(null)
+  // A qué columna se soltó: «Résolu» o «Fermé» (las dos piden explicación desde una abierta).
+  const [resolutionTarget, setResolutionTarget] = useState<string>('résolu')
 
   const [optimisticIncidents, updateOptimistic] = useOptimistic(
     initialIncidents,
@@ -204,10 +207,16 @@ export default function KanbanBoard({
     const oldStatus = active.data.current?.status as string
     if (newStatus === oldStatus) return
 
-    // Resolver desde el tablero no es un gesto: hay que decir por qué.
-    if (newStatus === 'résolu') {
+    // Resolver desde el tablero no es un gesto: hay que decir por qué. Vale también para
+    // «Fermé» viniendo de una avería abierta — archivar sin pasar por resuelto es la misma
+    // cosa invisible, y si no se pidiera sería el atajo barato justo porque «Résolu» pregunta.
+    if (newStatus === 'résolu' || (newStatus === 'fermé' && isOpenStatus(oldStatus))) {
       const dropped = optimisticIncidents.find((i) => i.id === active.id)
-      if (dropped) setPendingResolution(dropped)
+      if (dropped) {
+        setResolutionError(null)
+        setPendingResolution(dropped)
+        setResolutionTarget(newStatus)
+      }
       return
     }
 
@@ -218,14 +227,22 @@ export default function KanbanBoard({
     })
   }
 
+  // La ventana no se cierra hasta que la acción responde: si falla (sesión caducada, error de
+  // base), el error se muestra dentro y lo escrito sigue ahí para reintentar. Cerrarla antes
+  // perdía la justificación entera sin decir nada.
   function confirmResolution(office: OfficeResolution) {
     const incident = pendingResolution
     if (!incident) return
-    setPendingResolution(null)
+    setResolutionError(null)
     startTransition(async () => {
-      updateOptimistic({ id: incident.id, newStatus: 'résolu' })
-      const result = await updateIncidentStatusAction(incident.id, 'résolu', office)
-      if (!result?.error) router.refresh()
+      updateOptimistic({ id: incident.id, newStatus: resolutionTarget })
+      const result = await updateIncidentStatusAction(incident.id, resolutionTarget, office)
+      if (result?.error) {
+        setResolutionError(result.error)
+        return
+      }
+      setPendingResolution(null)
+      router.refresh()
     })
   }
 
@@ -257,6 +274,8 @@ export default function KanbanBoard({
             : ''
         }
         technicians={technicians}
+        busy={pending}
+        error={resolutionError}
         onCancel={() => setPendingResolution(null)}
         onConfirm={confirmResolution}
       />

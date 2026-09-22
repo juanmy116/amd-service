@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildResolution, clearResolution, MIN_NOTE_LENGTH, reopens } from './resolution'
+import { buildResolution, clearResolution, MIN_NOTE_LENGTH, reopens, requiresOfficeResolution } from './resolution'
 
 describe('buildResolution — vía intervention (el técnico)', () => {
   it('rechaza resolver sin informe', () => {
@@ -113,5 +113,29 @@ describe('clearResolution — al reabrir una avería', () => {
       qr_verified: false,
       qr_scanned_by: null,
     })
+  })
+})
+
+describe('requiresOfficeResolution', () => {
+  it('resolver desde el tablero pide explicación', () => {
+    expect(requiresOfficeResolution('en_cours', 'résolu', null)).toBe(true)
+  })
+
+  it('archivar sin pasar por resuelto también: si no, «Fermé» sería el atajo barato', () => {
+    expect(requiresOfficeResolution('nouveau', 'fermé', null)).toBe(true)
+    expect(requiresOfficeResolution('en_cours', 'fermé', null)).toBe(true)
+  })
+
+  it('cerrar una resuelta es el final normal del camino, no pide nada', () => {
+    expect(requiresOfficeResolution('résolu', 'fermé', null)).toBe(false)
+  })
+
+  it('no pisa el rastro existente: el informe de un técnico no se convierte en «oficina»', () => {
+    expect(requiresOfficeResolution('fermé', 'résolu', 'intervention')).toBe(false)
+    expect(requiresOfficeResolution('en_cours', 'résolu', 'bureau')).toBe(false)
+  })
+
+  it('reabrir no pide explicación (la pedirá la próxima resolución)', () => {
+    expect(requiresOfficeResolution('résolu', 'en_cours', null)).toBe(false)
   })
 })

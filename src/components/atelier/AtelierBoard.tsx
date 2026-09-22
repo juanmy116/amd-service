@@ -53,6 +53,7 @@ export default function AtelierBoard({
   // Avería a la que se le ha pulsado «Résolu» y espera el motivo. Vive aquí, y no en la ficha,
   // porque mientras la ventana está abierta el tablero no puede recargarse ni volver al reposo.
   const [resolving, setResolving] = useState<BoardIncident | null>(null)
+  const [resolutionError, setResolutionError] = useState<string | null>(null)
   const [now, setNow] = useState(() => new Date(serverNow))
 
   // Identificadores vistos en el refresco anterior: con ellos se sabe qué ha entrado nuevo.
@@ -134,6 +135,7 @@ export default function AtelierBoard({
     const result = await action()
     setBusy(false)
     if (!result?.error) router.refresh()
+    return result
   }
 
   return (
@@ -201,19 +203,28 @@ export default function AtelierBoard({
       />
       </div>
 
+      {/* La ventana no se cierra hasta que la acción responde. Aquí importa más que en
+          ningún otro sitio: se rellena de pie delante de la TV, y perder el texto sin
+          explicación es la forma segura de que nadie vuelva a cerrar una avería aquí. */}
       <ResolutionDialog
         open={resolving !== null}
         variant="kiosk"
         incidentLabel={resolving ? `${resolving.numeroIncident} · ${resolving.title}` : ''}
         technicians={technicians.map((t) => ({ id: t.id, name: t.fullName }))}
         busy={busy}
-        onCancel={() => { touch(); setResolving(null) }}
-        onConfirm={(office) => {
+        error={resolutionError}
+        onCancel={() => { touch(); setResolving(null); setResolutionError(null) }}
+        onConfirm={async (office) => {
           const incident = resolving
           if (!incident) return
           touch()
+          setResolutionError(null)
+          const result = await run(() => setIncidentStatusAction(incident.id, 'résolu', office))
+          if (result?.error) {
+            setResolutionError(result.error)
+            return
+          }
           setResolving(null)
-          run(() => setIncidentStatusAction(incident.id, 'résolu', office))
         }}
       />
     </>

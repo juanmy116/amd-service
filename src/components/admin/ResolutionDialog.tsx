@@ -27,13 +27,16 @@ type Props = {
   incidentLabel: string
   technicians: Array<{ id: string; name: string }>
   busy?: boolean
+  /** Error devuelto por la Server Action. La ventana sigue abierta para poder reintentar. */
+  error?: string | null
   variant?: 'admin' | 'kiosk'
   onCancel: () => void
   onConfirm: (resolution: OfficeResolution) => void
 }
 
 export default function ResolutionDialog({
-  open, incidentLabel, technicians, busy = false, variant = 'admin', onCancel, onConfirm,
+  open, incidentLabel, technicians, busy = false, error = null, variant = 'admin',
+  onCancel, onConfirm,
 }: Props) {
   const [reason, setReason] = useState('')
   const [note, setNote] = useState('')
@@ -79,6 +82,18 @@ export default function ResolutionDialog({
               {incidentLabel}
             </p>
           </div>
+
+          {error && (
+            <p
+              className={
+                kiosk
+                  ? 'rounded-xl border-2 border-accent/40 bg-accent/10 px-4 py-3 text-base font-semibold text-white'
+                  : 'rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'
+              }
+            >
+              {error}
+            </p>
+          )}
 
           <div>
             <label className={label} htmlFor="resolution-reason">Motif</label>
@@ -166,7 +181,7 @@ export default function ResolutionDialog({
                     : 'rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40'
                 }
               >
-                Résoudre
+                {busy ? 'Enregistrement...' : 'Résoudre'}
               </button>
             </div>
           </div>

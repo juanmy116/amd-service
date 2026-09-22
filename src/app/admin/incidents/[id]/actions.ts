@@ -6,7 +6,7 @@ import type { TablesUpdate } from '@/lib/supabase/types'
 import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { sendCsatForIncident } from '@/lib/csat.server'
-import { buildResolution, clearResolution, reopens } from '@/lib/resolution'
+import { buildResolution, clearResolution, reopens, requiresOfficeResolution } from '@/lib/resolution'
 
 type FormState = { error: string } | null
 
@@ -32,7 +32,7 @@ export async function updateIncidentAction(
   // envío de la encuesta y el borrado del rastro al reabrir.
   const { data: current } = await supabase
     .from('incidents')
-    .select('status')
+    .select('status, resolved_via')
     .eq('id', id)
     .single()
   if (!current) return { error: 'Incident introuvable.' }
@@ -57,9 +57,9 @@ export async function updateIncidentAction(
   }
 
   // Verrou de résolution: cerrar desde la ficha sin informe de técnico exige motivo y
-  // explicación, igual que en el tablero. No se pide cuando la avería ya estaba resuelta:
+  // explicación, igual que en el tablero. No se pide cuando la avería ya trae rastro:
   // corregir el título de una resuelta no es resolverla otra vez.
-  if (effective_status === 'résolu' && old_status !== 'résolu') {
+  if (requiresOfficeResolution(old_status, effective_status, current.resolved_via)) {
     const resolution = buildResolution({
       via: 'bureau',
       reason: parseEnum(formData.get('resolution_reason'), RESOLUTION_REASONS),
