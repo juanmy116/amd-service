@@ -42,8 +42,11 @@ async function subscribeAndSave(): Promise<{ ok: true } | { ok: false; error: st
   const desiredKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY!)
   let existing = await reg.pushManager.getSubscription()
   // Rotación de la clave VAPID: una suscripción firmada con la clave anterior ya no sirve — hay
-  // que darla de baja y volver a suscribirse con la nueva antes de poder guardarla.
-  if (existing && !sameKey(existing.options.applicationServerKey, desiredKey)) {
+  // que darla de baja y volver a suscribirse con la nueva antes de poder guardarla. Solo si la
+  // clave existente se puede LEER y es distinta: si el navegador no la expone (null), se conserva
+  // la suscripción — darla de baja por una duda cortaría avisos que funcionan.
+  const existingKey = existing?.options.applicationServerKey ?? null
+  if (existing && existingKey && !sameKey(existingKey, desiredKey)) {
     await existing.unsubscribe()
     existing = null
   }

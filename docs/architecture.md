@@ -175,6 +175,18 @@ blanca de hosts de servicio push reales (`parseSubscription` en `src/lib/pwa/pus
 un cliente podría registrar cualquier URL y usar `send-push` como cañón de peticiones a lo que sea
 (server-side request forgery), porque `send-push` hace un POST directo a `endpoint`.
 
+**Cierre de sesión en un móvil compartido.** Los botones «Déconnexion» de `/tech` (inicio móvil y
+barra lateral de escritorio) usan `TechSignOutButton` (`src/components/tech/`): antes de
+`signOut()`, y como mejor esfuerzo con un tope de 3 s (nunca bloquea la salida), lee la suscripción
+de este aparato (`getRegistration('/tech')` → `pushManager.getSubscription()`), llama a la Server
+Action `disablePushSubscription(endpoint)` — que valida el endpoint con la misma lista blanca
+(`isAllowedPushEndpoint`) y marca `disabled_at` **solo si la fila es del técnico conectado**
+(`endpoint` + `user_id`) — y luego `unsubscribe()`. Así el técnico que se va deja de recibir avisos
+en ese móvil. Cuando entra el siguiente, la re-suscripción silenciosa de `PushToggle` hace el upsert
+por endpoint con `disabled_at: null` y el aparato queda a su nombre. Si la clave VAPID de una
+suscripción existente no se puede leer (`applicationServerKey` null), `PushToggle` la conserva:
+solo la da de baja cuando ambas claves son legibles y distintas (rotación real).
+
 **Tabla `push_notifications`** — la cola ES el registro de lo enviado:
 
 | Campo | Notas |

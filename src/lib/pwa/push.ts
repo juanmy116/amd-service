@@ -9,10 +9,11 @@ export function urlBase64ToUint8Array(base64Url: string): Uint8Array {
 }
 
 /**
- * ¿Los bytes de una applicationServerKey ya suscrita (ArrayBuffer, o null si no hay suscripción
- * previa) coinciden con la clave VAPID actual? Si no coinciden (rotación de la clave VAPID), la
- * suscripción vieja hay que darla de baja y crear una nueva — el navegador rechaza envíos
- * firmados con otra clave.
+ * ¿Los bytes de una applicationServerKey ya suscrita coinciden con la clave VAPID actual? Si no
+ * coinciden (rotación de la clave VAPID), la suscripción vieja hay que darla de baja y crear una
+ * nueva — el navegador rechaza envíos firmados con otra clave. `null` devuelve false; OJO: quien
+ * llama NO debe tratar un null (clave ilegible: algunos navegadores no la exponen) como «clave
+ * distinta» — ver PushToggle, que en ese caso conserva la suscripción.
  */
 export function sameKey(a: ArrayBuffer | null, b: Uint8Array): boolean {
   if (!a) return false
@@ -39,23 +40,23 @@ function isAllowedPushHost(hostname: string): boolean {
   return ALLOWED_PUSH_HOST_SUFFIXES.some(suffix => hostname.endsWith(suffix))
 }
 
+/** ¿Es un endpoint de un servicio push real (https, host de la lista blanca, ≤ 2048)? */
+export function isAllowedPushEndpoint(endpoint: unknown): endpoint is string {
+  if (typeof endpoint !== 'string' || endpoint.length === 0 || endpoint.length > 2048) return false
+  try {
+    const url = new URL(endpoint)
+    return url.protocol === 'https:' && isAllowedPushHost(url.hostname)
+  } catch {
+    return false
+  }
+}
+
 /** Valida lo que llega del navegador antes de guardarlo (viene del cliente: no fiarse). */
 export function parseSubscription(input: unknown): ParsedSubscription | null {
   if (!input || typeof input !== 'object') return null
   const { endpoint, keys } = input as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } }
   const ok = (v: unknown, max: number): v is string => typeof v === 'string' && v.length > 0 && v.length <= max
-  if (!ok(endpoint, 2048)) return null
-
-  let hostname: string
-  try {
-    const url = new URL(endpoint)
-    if (url.protocol !== 'https:') return null
-    hostname = url.hostname
-  } catch {
-    return null
-  }
-  if (!isAllowedPushHost(hostname)) return null
-
+  if (!isAllowedPushEndpoint(endpoint)) return null
   if (!ok(keys?.p256dh, 512) || !ok(keys?.auth, 512)) return null
   return { endpoint, p256dh: keys.p256dh, auth: keys.auth }
 }

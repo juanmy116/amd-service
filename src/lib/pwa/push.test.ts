@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseSubscription, sameKey, urlBase64ToUint8Array } from './push'
+import { isAllowedPushEndpoint, parseSubscription, sameKey, urlBase64ToUint8Array } from './push'
 
 describe('urlBase64ToUint8Array', () => {
   it('decodifica base64url sin relleno', () => {
@@ -92,5 +92,27 @@ describe('parseSubscription', () => {
   it('rechaza una key demasiado larga (> 512)', () => {
     expect(parseSubscription({ ...valid, keys: { p256dh: 'a'.repeat(513), auth: 'auth-key' } })).toBeNull()
     expect(parseSubscription({ ...valid, keys: { p256dh: 'p256dh-key', auth: 'a'.repeat(513) } })).toBeNull()
+  })
+})
+
+describe('isAllowedPushEndpoint', () => {
+  it('acepta los endpoints https de los servicios push reales', () => {
+    expect(isAllowedPushEndpoint('https://web.push.apple.com/abc')).toBe(true)
+    expect(isAllowedPushEndpoint('https://fcm.googleapis.com/fcm/send/abc')).toBe(true)
+    expect(isAllowedPushEndpoint('https://updates.push.services.mozilla.com/wpush/v2/x')).toBe(true)
+  })
+
+  it('rechaza otros hosts, http, URLs rotas y no-strings', () => {
+    expect(isAllowedPushEndpoint('https://evil.example.com/x')).toBe(false)
+    expect(isAllowedPushEndpoint('https://web.push.apple.com.evil.com/x')).toBe(false)
+    expect(isAllowedPushEndpoint('http://fcm.googleapis.com/x')).toBe(false)
+    expect(isAllowedPushEndpoint('no es una url')).toBe(false)
+    expect(isAllowedPushEndpoint('')).toBe(false)
+    expect(isAllowedPushEndpoint(null)).toBe(false)
+    expect(isAllowedPushEndpoint(42)).toBe(false)
+  })
+
+  it('rechaza un endpoint demasiado largo (> 2048)', () => {
+    expect(isAllowedPushEndpoint('https://fcm.googleapis.com/' + 'a'.repeat(2048))).toBe(false)
   })
 })
