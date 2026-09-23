@@ -33,14 +33,15 @@ export default function QrScanner() {
         try { BrowserMultiFormatReader.releaseAllStreams() } catch { /* noop */ }
 
         // Sellar ANTES de navegar: la ficha de la máquina ya no pasa por /m (ver comentario de
-        // abajo), así que el sello QR se deja aquí. Primero la posición (≤ ~3,5 s: tope de
-        // `getPositionOnce`; sin permiso o sin GPS ⇒ null al instante o al vencer), luego el
+        // abajo), así que el sello QR se deja aquí. Primero la posición, siempre fresca (sin
+        // caché: puede fijar la ubicación de la máquina; ≤ ~3,5 s: tope de `getPositionOnce`;
+        // sin permiso o sin GPS ⇒ null al instante o al vencer), luego el
         // sello con su propio tope de 2,5 s. Ninguno de los dos impide abrir la ficha: con mala
         // cobertura se navega igualmente (el sello puede llegar después o perderse; la ficha es lo
         // que el técnico necesita).
         void (async () => {
           try {
-            const position = await getPositionOnce(3000)
+            const position = await getPositionOnce(3000, 0)
             setPhase('stamping')
             await Promise.race([
               recordQrScanAction(serie, position),
