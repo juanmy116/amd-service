@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { Camera, AlertCircle } from 'lucide-react'
 import { extractSerie } from '@/lib/qr'
+import { recordQrScanAction } from './actions'
 
 export default function QrScanner() {
   const videoRef    = useRef<HTMLVideoElement>(null)
@@ -29,10 +30,19 @@ export default function QrScanner() {
         // transición de cliente quede en blanco.
         try { BrowserMultiFormatReader.releaseAllStreams() } catch { /* noop */ }
 
-        // Navegación DIRECTA a la ficha. Ya estamos dentro de la PWA técnico, así que
-        // no pasamos por el gateway /m (cuyo redirect server-side dejaba la página en
-        // blanco hasta recargar).
-        router.push(`/tech/scan/${encodeURIComponent(serie)}`)
+        // Sellar ANTES de navegar: la ficha de la máquina ya no pasa por /m (ver comentario de
+        // abajo), así que el sello QR se deja aquí. Un fallo del sello nunca impide abrir la ficha.
+        void (async () => {
+          try {
+            await recordQrScanAction(serie)
+          } catch (err) {
+            console.error('[scan] sello QR fallido', err)
+          }
+          // Navegación DIRECTA a la ficha. Ya estamos dentro de la PWA técnico, así que
+          // no pasamos por el gateway /m (cuyo redirect server-side dejaba la página en
+          // blanco hasta recargar).
+          router.push(`/tech/scan/${encodeURIComponent(serie)}`)
+        })()
       }
     }).catch(() => {
       setError('Impossible d\'accéder à la caméra. Vérifiez les permissions.')

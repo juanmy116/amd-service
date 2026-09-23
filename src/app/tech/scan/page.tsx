@@ -11,8 +11,11 @@ export default function ScanPage() {
 
       {/* Mobile: scanner actif */}
       <div className="lg:hidden">
-        <p className="text-sm text-ink-muted mb-4">
+        <p className="text-sm text-ink-muted mb-1">
           Pointez la caméra sur le QR code collé sur la machine.
+        </p>
+        <p className="text-xs text-ink-muted mb-4">
+          Scannez toujours depuis l&apos;application AMD SAV, pas avec l&apos;appareil photo du téléphone.
         </p>
         <QrScanner />
       </div>
