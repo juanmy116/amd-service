@@ -26,11 +26,13 @@ CREATE TABLE public.push_subscriptions (
 CREATE INDEX push_subscriptions_user_id_idx ON public.push_subscriptions (user_id) WHERE disabled_at IS NULL;
 
 ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY push_subscriptions_own_select ON public.push_subscriptions
-  FOR SELECT TO authenticated USING (user_id = (SELECT auth.uid()));
-CREATE POLICY push_subscriptions_admin_select ON public.push_subscriptions
-  FOR SELECT TO authenticated USING (public.is_admin());
+CREATE POLICY push_subscriptions_select ON public.push_subscriptions
+  FOR SELECT TO authenticated USING (user_id = (SELECT auth.uid()) OR public.is_admin());
 -- Sin INSERT/UPDATE/DELETE para authenticated: el alta va por Server Action (service_role).
+-- Los privilegios por defecto de prod dan ALL a anon/authenticated en tablas nuevas; RLS ya lo
+-- bloquea, pero se retiran por defensa en profundidad.
+REVOKE ALL ON public.push_subscriptions FROM anon;
+REVOKE INSERT, UPDATE, DELETE ON public.push_subscriptions FROM authenticated;
 
 -- 2. Cola + registro.
 CREATE TABLE public.push_notifications (
@@ -53,10 +55,15 @@ CREATE INDEX push_notifications_recipient_idx ON public.push_notifications (reci
 ALTER TABLE public.push_notifications ENABLE ROW LEVEL SECURITY;
 CREATE POLICY push_notifications_admin_select ON public.push_notifications
   FOR SELECT TO authenticated USING (public.is_admin());
+REVOKE ALL ON public.push_notifications FROM anon;
+REVOKE INSERT, UPDATE, DELETE ON public.push_notifications FROM authenticated;
 
 -- 3. «Toque» a la Edge Function. URL y secreto viven en Vault (se crean a mano en prod, ver
 --    runbook). Sin ellos no se llama: la fila queda pendiente y ningún entorno de pruebas
 --    dispara la función de producción.
+--    NUNCA debe tumbar una asignación: corre dentro del UPDATE de la avería/visita, así que
+--    cualquier fallo (Vault, pg_net, permisos) se degrada a WARNING; la fila sigue 'pending'
+--    y el cron la reintenta.
 CREATE OR REPLACE FUNCTION public.kick_push_sender() RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_catalog
@@ -76,6 +83,8 @@ BEGIN
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-push-secret', v_secret),
     body    := '{}'::jsonb
   );
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'kick_push_sender: % (%)', SQLERRM, SQLSTATE;
 END;
 $$;
 REVOKE EXECUTE ON FUNCTION public.kick_push_sender() FROM PUBLIC, anon, authenticated;
@@ -94,6 +103,13 @@ DECLARE
   v_queued boolean := false;
 BEGIN
   IF NEW.assigned_to IS NOT DISTINCT FROM v_old THEN
+    RETURN NEW;
+  END IF;
+
+  -- Una tarea ya terminada no se avisa: la resolución de OFICINA escribe assigned_to para
+  -- acreditar al técnico (src/lib/resolution.ts) en el mismo UPDATE que la cierra.
+  IF (TG_TABLE_NAME = 'incidents' AND NEW.status IN ('résolu', 'fermé'))
+     OR (TG_TABLE_NAME = 'maintenance_visits' AND NEW.status = 'fait') THEN
     RETURN NEW;
   END IF;
 
@@ -151,8 +167,10 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.claim_push_notifications(int) FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.claim_push_notifications(int) TO service_role;
 
--- 6. Red de seguridad cada minuto: caduca lo que ya no tiene sentido avisar (> 1 h) y, si queda
---    algo pendiente, vuelve a tocar la función. Idempotente.
+-- 6. Red de seguridad cada minuto: da por fallidas las filas que agotaron sus 3 intentos,
+--    caduca lo que ya no tiene sentido avisar (> 1 h), purga historial viejo (cola > 90 días,
+--    log de pg_cron > 7 días: este job escribe ~1.440 filas/día) y, si queda algo reclamable,
+--    vuelve a tocar la función. Idempotente.
 SELECT cron.unschedule('push-notifications-retry') WHERE EXISTS (
   SELECT 1 FROM cron.job WHERE jobname = 'push-notifications-retry'
 );
@@ -160,12 +178,18 @@ SELECT cron.schedule(
   'push-notifications-retry',
   '* * * * *',
   $$
+  UPDATE public.push_notifications SET status = 'failed', error = coalesce(error, 'max_attempts')
+   WHERE status IN ('pending', 'sending') AND attempts >= 3
+     AND (status = 'pending' OR claimed_at < now() - interval '5 minutes');
   UPDATE public.push_notifications SET status = 'expired'
    WHERE status IN ('pending', 'sending') AND created_at < now() - interval '1 hour';
+  DELETE FROM public.push_notifications WHERE created_at < now() - interval '90 days';
+  DELETE FROM cron.job_run_details WHERE end_time < now() - interval '7 days';
   SELECT public.kick_push_sender()
    WHERE EXISTS (SELECT 1 FROM public.push_notifications
-                  WHERE status = 'pending'
-                     OR (status = 'sending' AND claimed_at < now() - interval '5 minutes'));
+                  WHERE attempts < 3
+                    AND (status = 'pending'
+                         OR (status = 'sending' AND claimed_at < now() - interval '5 minutes')));
   $$
 );
 

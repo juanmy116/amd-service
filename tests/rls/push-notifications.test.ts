@@ -69,9 +69,12 @@ beforeAll(async () => {
 afterAll(async () => {
   // Las filas de ambas tablas cuelgan de profiles (ON DELETE CASCADE): cleanup() borra los
   // usuarios de prueba y se las lleva. El borrado explícito deja limpio también un run a medias.
+  // `if (t)`: si beforeAll falló, no tapar su error con otro.
   await admin.from('push_subscriptions').delete().like('endpoint', 'https://push.test/TEST-%')
-  await admin.from('push_notifications').delete()
-    .in('recipient_id', [t.adminUid, t.techA, t.techB, t.clientAUid, t.clientBUid])
+  if (t) {
+    await admin.from('push_notifications').delete()
+      .in('recipient_id', [t.adminUid, t.techA, t.techB, t.clientAUid, t.clientBUid])
+  }
   await cleanup(admin)
 })
 
@@ -201,6 +204,22 @@ describe('trigger de asignación — incidencias', () => {
     const q = await queueFor(id)
     expect(q).toHaveLength(1)
     expect(q[0]).toMatchObject({ recipient_id: t.techB, kind: 'assigned' })
+  })
+})
+
+describe('trigger de asignación — tareas terminadas', () => {
+  it('la resolución de oficina que acredita a un técnico no le avisa', async () => {
+    // src/lib/resolution.ts escribe assigned_to en el MISMO UPDATE que cierra la avería.
+    const id = await newIncident('TEST-PUSH-6', t.techA)
+    const before = (await queueFor(id)).length
+    await setIncident(id, {
+      status: 'résolu',
+      assigned_to: t.techB,
+      resolved_via: 'bureau',
+      resolution_reason: 'technicien_non_enregistre',
+      resolution_note: 'Résolu par téléphone avec le client.',
+    })
+    expect(await queueFor(id)).toHaveLength(before)
   })
 })
 
