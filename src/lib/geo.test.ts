@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   distanceMeters, presenceFor, parseLatLng, itineraryLinks, destinationText, formatDistance,
-  sortByDistance, PRESENCE_RADIUS_M, FIRST_SCAN_MAX_ACCURACY_M, type LatLng,
+  sortByDistance, readPosition, PRESENCE_RADIUS_M, FIRST_SCAN_MAX_ACCURACY_M, type LatLng,
 } from './geo'
 
 const PLATEAU: LatLng = { lat: 14.6708, lng: -17.4381 }
@@ -174,5 +174,47 @@ describe('sortByDistance', () => {
   it('no modifica el array original', () => {
     sortByDistance(items, PLATEAU, (i) => i.c)
     expect(items.map((i) => i.id)).toEqual(['sin-1', 'almadies', 'sin-2', 'plateau'])
+  })
+})
+
+describe('readPosition', () => {
+  function fd(fields: Record<string, string>): FormData {
+    const f = new FormData()
+    for (const [k, v] of Object.entries(fields)) f.set(k, v)
+    return f
+  }
+
+  it('lee una posición válida', () => {
+    expect(readPosition(fd({ pos_lat: '14.6928', pos_lng: '-17.4467', pos_accuracy: '12.5' })))
+      .toEqual({ lat: 14.6928, lng: -17.4467, accuracy: 12.5 })
+    expect(readPosition(fd({ pos_lat: '0', pos_lng: '0', pos_accuracy: '0' })))
+      .toEqual({ lat: 0, lng: 0, accuracy: 0 })
+  })
+
+  it('sin posición (el navegador no la dio) ⇒ null', () => {
+    expect(readPosition(new FormData())).toBeNull()
+  })
+
+  it('falta algún campo o viene vacío ⇒ null', () => {
+    expect(readPosition(fd({ pos_lat: '14.69', pos_lng: '-17.44' }))).toBeNull()
+    expect(readPosition(fd({ pos_lat: '14.69', pos_accuracy: '10' }))).toBeNull()
+    expect(readPosition(fd({ pos_lat: '', pos_lng: '-17.44', pos_accuracy: '10' }))).toBeNull()
+    expect(readPosition(fd({ pos_lat: '14.69', pos_lng: '-17.44', pos_accuracy: ' ' }))).toBeNull()
+  })
+
+  it('NaN o Infinity ⇒ null', () => {
+    expect(readPosition(fd({ pos_lat: 'abc', pos_lng: '-17.44', pos_accuracy: '10' }))).toBeNull()
+    expect(readPosition(fd({ pos_lat: 'NaN', pos_lng: '-17.44', pos_accuracy: '10' }))).toBeNull()
+    expect(readPosition(fd({ pos_lat: '14.69', pos_lng: 'Infinity', pos_accuracy: '10' }))).toBeNull()
+    expect(readPosition(fd({ pos_lat: '14.69', pos_lng: '-17.44', pos_accuracy: 'Infinity' }))).toBeNull()
+  })
+
+  it('fuera de rango ⇒ null', () => {
+    expect(readPosition(fd({ pos_lat: '90.5', pos_lng: '-17.44', pos_accuracy: '10' }))).toBeNull()
+    expect(readPosition(fd({ pos_lat: '14.69', pos_lng: '-180.1', pos_accuracy: '10' }))).toBeNull()
+  })
+
+  it('precisión negativa ⇒ null', () => {
+    expect(readPosition(fd({ pos_lat: '14.69', pos_lng: '-17.44', pos_accuracy: '-1' }))).toBeNull()
   })
 })

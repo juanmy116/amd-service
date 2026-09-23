@@ -83,7 +83,26 @@ export function parseLatLng(text: string): LatLng | null {
   return null
 }
 
-export type ItineraryLinks = { google: string; waze: string; apple: string }
+/**
+ * Posición del técnico tal como la manda el navegador en un FormData (`pos_lat`, `pos_lng`,
+ * `pos_accuracy`, ver `appendPosition` en `src/lib/pwa/geolocation.ts`). Viene del cliente:
+ * no se fía de nada. Falta algo, no es un número finito, está fuera de rango o la precisión es
+ * negativa ⇒ null (se trata como «sans position»).
+ */
+export function readPosition(fd: FormData): (LatLng & { accuracy: number }) | null {
+  const num = (key: string): number => {
+    const v = fd.get(key)
+    // Number('') y Number(' ') valen 0: un campo vacío no es una coordenada.
+    return typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN
+  }
+  const lat = num('pos_lat')
+  const lng = num('pos_lng')
+  const accuracy = num('pos_accuracy')
+  if (!inRange(lat, lng) || !Number.isFinite(accuracy) || accuracy < 0) return null
+  return { lat, lng, accuracy }
+}
+
+export type ItineraryLinks ={ google: string; waze: string; apple: string }
 
 /** Enlaces «Itinéraire» para las tres apps. Prefiere coordenadas; si no, la dirección en texto. */
 export function itineraryLinks({ coords, text }: { coords: LatLng | null; text: string | null }): ItineraryLinks | null {
