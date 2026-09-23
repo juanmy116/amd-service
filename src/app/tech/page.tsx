@@ -5,6 +5,7 @@ import { signOut } from '@/app/login/actions'
 import { LogOut, Clock, CheckCircle, AlertCircle, Printer, ChevronRight } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
+import { InstallCard } from '@/components/tech/InstallCard'
 import type { BadgeVariant } from '@/components/ui/Badge'
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
@@ -93,6 +94,8 @@ export default async function TechPage() {
           </button>
         </form>
       </div>
+
+      <InstallCard />
 
       {/* Header desktop */}
       <div className="hidden lg:block">
