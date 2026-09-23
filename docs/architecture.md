@@ -84,10 +84,10 @@ rojo con logo blanco, pantalla completa, abre en `/tech`, nada tapado por la bar
 
 - **Manifest en `/amd-sav.webmanifest`** (`src/lib/pwa/manifest.ts` + `src/app/amd-sav.webmanifest/route.ts`),
   **no** con la convención `app/manifest.ts`: esa convención lo enlazaría en **todas** las
-  páginas, y la web pública no debe ofrecerse como app. Tampoco puede llamarse `/tech...`: el
-  proxy protege todo lo que empieza por `/tech` (`isProtectedPath`), y iOS descarga el manifest
-  **sin cookies** — un nombre así lo redirigiría a `/login` y «Añadir a pantalla de inicio»
-  crearía un marcador de Safari en vez de la app instalada. Solo lo enlaza el layout de `/tech`
+  páginas, y la web pública no debe ofrecerse como app. Tampoco se llama `/tech...`: aunque
+  `isProtectedPath` (`src/lib/protected-routes.ts`) ya no cae en la trampa del prefijo — protege
+  la ruta exacta o sus subrutas, no cualquier texto que empiece igual —, un nombre que empezara
+  por `/tech` seguiría siendo confuso al lado de las rutas reales de la app. Solo lo enlaza el layout de `/tech`
   (`metadata.manifest` en `src/app/tech/layout.tsx`), nunca la web pública.
 - **Iconos** en `public/pwa/` (`icon-192.png`, `icon-512.png`, `icon-maskable-512.png`,
   `apple-touch-icon.png`), generados una vez con `sharp` a partir del logo AMD y versionados en

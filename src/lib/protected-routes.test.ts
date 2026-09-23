@@ -13,7 +13,9 @@ describe('isProtectedPath', () => {
     expect(isProtectedPath('/sw.js')).toBe(false)
   })
 
-  it('documenta la trampa: cualquier ruta que EMPIECE por /tech queda protegida', () => {
-    expect(isProtectedPath('/tech.webmanifest')).toBe(true)
+  it('no protege rutas que solo empiezan por un prefijo protegido (no son ese prefijo ni una subruta)', () => {
+    for (const p of ['/tech.webmanifest', '/technologies', '/administration']) {
+      expect(isProtectedPath(p)).toBe(false)
+    }
   })
 })
