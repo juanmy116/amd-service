@@ -7,7 +7,9 @@ import { useEffect } from 'react'
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
-    navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch(err => {
+    // scope: '/tech' (no '/'): start_url del manifest es /tech, que ya está dentro de ese scope,
+    // y así el SW no controla /admin, /atelier (kiosko) ni /portal.
+    navigator.serviceWorker.register('/sw.js', { scope: '/tech', updateViaCache: 'none' }).catch(err => {
       console.error('[pwa] registro del service worker fallido', err)
     })
   }, [])

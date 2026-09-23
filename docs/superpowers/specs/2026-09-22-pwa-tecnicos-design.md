@@ -137,11 +137,10 @@ usuario (botón). No hay sonido propio.
   requise». Nada se encola.
 - **Nunca** se cachea nada fuera de `/tech` ni respuestas de otros usuarios (clave por usuario;
   se vacía al cerrar sesión).
-- **El SW se registra con `scope: '/'`** (Fase 1) y por tanto controla **todo el origen**
-  (`/admin`, `/atelier`/kiosko, la web pública, `/portal`), no solo `/tech`. Cualquier handler de
-  `fetch`/caché que se añada aquí **debe filtrar por ruta** (`url.pathname.startsWith('/tech')`) y
-  dejar pasar sin tocar (`return` / sin `respondWith`) todo lo demás — si no, se arriesga a
-  cachear páginas de otros roles o del kiosko.
+- **El SW se registra con `scope: '/tech'`** (Fase 1, corregido en revisión de código): no
+  controla `/admin`, `/atelier`/kiosko ni `/portal`, solo `/tech`. Aun así, cualquier handler de
+  `fetch`/caché que se añada aquí debe seguir sin cachear respuestas de otro usuario (clave por
+  usuario, se vacía al cerrar sesión).
 
 ## 4. Pruebas
 

@@ -94,11 +94,10 @@ rojo con logo blanco, pantalla completa, abre en `/tech`, nada tapado por la bar
   git; se regeneran con `node scripts/generate-pwa-icons.mjs`.
 - **Service worker mínimo en `public/sw.js`**: sin manejador `fetch`, no cachea nada — solo existe
   para tomar el control (`skipWaiting` + `clients.claim()`) y sentar la base de la Fase 2 (push) y
-  la Fase 4 (offline). Se registra con `scope: '/'` desde `ServiceWorkerRegister` en el layout de
-  `/tech`, lo que significa que controla **todo el origen** (admin, portal, kiosko del taller), no
-  solo `/tech` — cualquier caché que se le añada en el futuro deberá filtrar por ruta. Cabeceras
-  `Cache-Control: no-cache, no-store, must-revalidate` en `next.config.ts` para que el navegador
-  siempre pida la versión nueva.
+  la Fase 4 (offline). Se registra con **`scope: '/tech'`** desde `ServiceWorkerRegister` en el
+  layout de `/tech` (`start_url` del manifest, `/tech`, cae dentro de ese scope): no afecta a
+  admin/kiosko/portal/web pública. Cabeceras `Cache-Control: no-cache, no-store, must-revalidate`
+  en `next.config.ts` para que el navegador siempre pida la versión nueva.
 - **Zonas seguras (`safe-area-inset`)**: `viewport.viewportFit = 'cover'` en el layout de `/tech`
   + `env(safe-area-inset-bottom)` en el padding del contenido, el FAB «Scanner» y la nav inferior,
   para que la barra de gestos del iPhone no tape nada en modo instalado.
