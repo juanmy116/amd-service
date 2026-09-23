@@ -1,12 +1,13 @@
 'use client'
 
-import { useActionState, useState, type ReactNode } from 'react'
+import { startTransition, useActionState, useState, type FormEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, MapPin, Building2, FileText } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import { PARTS } from '@/lib/parts'
+import { appendPosition, getPositionOnce } from '@/lib/pwa/geolocation'
 
 type FormState = { error: string } | null
 
@@ -42,6 +43,23 @@ export default function InterventionForm({
   incident, boundAction, clientName, machineName, machineLocation, contractNumber, checkedParts, photos,
 }: Props) {
   const [state, formAction, pending] = useActionState(boundAction, null)
+
+  // Al RESOLVER se adjunta la posición del técnico (la oficina ve si estaba en el sitio). Se pide
+  // aquí y no en segundo plano; `getPositionOnce` nunca lanza ni espera más de ~4,5 s, y sin
+  // permiso o sin GPS se envía igual (queda «sans position»). Solo en la transición a `résolu`,
+  // que es cuando el servidor la guarda. La captura va FUERA de la acción: dentro, los cambios
+  // de estado son de transición y «Localisation…» no se pintaría hasta el final.
+  const [locating, setLocating] = useState(false)
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    if (status !== 'résolu' || incident.status === 'résolu') return // envío normal
+    e.preventDefault()
+    if (locating || pending) return
+    const data = new FormData(e.currentTarget)
+    setLocating(true)
+    appendPosition(data, await getPositionOnce(4000))
+    setLocating(false)
+    startTransition(() => formAction(data))
+  }
 
   // El informe solo es obligatorio para resolver, así que el formulario necesita saber
   // qué opción está marcada. Misma preselección que antes: una avería recién asignada
@@ -111,7 +129,7 @@ export default function InterventionForm({
       {photos}
 
       {/* Formulaire intervention */}
-      <form action={formAction} className="space-y-5">
+      <form action={formAction} onSubmit={handleSubmit} className="space-y-5">
         {state?.error && (
           <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
             {state.error}
@@ -209,11 +227,11 @@ export default function InterventionForm({
 
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || locating}
           className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-semibold text-white bg-accent disabled:opacity-60 transition-opacity"
         >
-          {pending && <Loader2 size={16} className="animate-spin" />}
-          Enregistrer l&apos;intervention
+          {(pending || locating) && <Loader2 size={16} className="animate-spin" />}
+          {locating ? 'Localisation…' : <>Enregistrer l&apos;intervention</>}
         </button>
       </form>
     </div>

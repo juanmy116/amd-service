@@ -7,9 +7,32 @@ import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { sendCsatForIncident } from '@/lib/csat.server'
 import { PARTS } from '@/lib/parts'
+import { computePresence } from '@/lib/presence.server'
+import { readPosition } from '@/lib/geo'
 import { archivedResolutionNote, buildResolution, clearResolution, historyComment, reopens } from '@/lib/resolution'
 
 type FormState = { error: string } | null
+
+/**
+ * Máquina de la avería: la de su línea de contrato (es la que está hoy en ese puesto) o, en las
+ * averías sin línea (formulario público del QR), su `machine_id`. Sin ninguna ⇒ null, y el
+ * veredicto de presencia queda en «machine sans position».
+ */
+async function incidentSerie(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  incident: { contract_machine_id: string | null; machine_id: string | null },
+): Promise<string | null> {
+  if (incident.contract_machine_id) {
+    const { data, error } = await supabase
+      .from('contract_machines')
+      .select('machine_id')
+      .eq('id', incident.contract_machine_id)
+      .maybeSingle()
+    if (error) console.error('[submitIntervention.serie]', error)
+    if (data?.machine_id) return data.machine_id
+  }
+  return incident.machine_id
+}
 
 export async function submitInterventionAction(
   id: string,
@@ -23,7 +46,7 @@ export async function submitInterventionAction(
   // Verificar que el incidente esté asignado a este técnico
   const { data: incident } = await supabase
     .from('incidents')
-    .select('assigned_to, status, resolved_via, resolution_reason, resolution_note, rapport_intervention')
+    .select('assigned_to, status, resolved_via, resolution_reason, resolution_note, rapport_intervention, contract_machine_id, machine_id')
     .eq('id', id)
     .single()
   if (!incident) return { error: 'Incident introuvable.' }
@@ -52,6 +75,13 @@ export async function submitInterventionAction(
     const resolution = buildResolution({ via: 'intervention', rapport })
     if (!resolution.ok) return { error: resolution.error }
     Object.assign(updates, resolution.fields)
+  }
+
+  // Dónde estaba el técnico al resolver (Fase 3). Solo en la transición: volver a guardar una
+  // resuelta no es resolverla otra vez y no debe pisar la posición de entonces. Nunca bloquea:
+  // sin permiso o sin GPS queda «sans position».
+  if (new_status === 'résolu' && old_status !== 'résolu') {
+    Object.assign(updates, await computePresence(await incidentSerie(supabase, incident), readPosition(formData)))
   }
   // Reabrir borra el rastro: si no, la próxima resolución heredaría el informe y la vía de la
   // anterior y la marca diría «intervención» aunque la segunda vez nadie fuese. Cuenta también

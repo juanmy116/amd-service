@@ -256,6 +256,9 @@ export function reopens(oldStatus: string, newStatus: string): boolean {
  * aplicación ni el candado de la BD podían notarlo — el texto estaba ahí. No se pierde: la
  * puerta que reabre lo archiva antes en `incident_history` (ver `archivedReportNote`).
  *
+ * La posición del técnico (Fase 3) también: dónde estaba al resolver la primera vez no prueba
+ * nada sobre la segunda, y la próxima resolución escribe la suya.
+ *
  * `resolved_at` sí se conserva: hay recuentos que lo usan (`atelier/data.ts`).
  */
 export function clearResolution(): {
@@ -265,6 +268,12 @@ export function clearResolution(): {
   rapport_intervention: null
   qr_verified: false
   qr_scanned_by: null
+  tech_lat: null
+  tech_lng: null
+  tech_accuracy_m: null
+  tech_distance_m: null
+  tech_position_at: null
+  tech_presence: null
 } {
   return {
     resolved_via: null,
@@ -273,6 +282,12 @@ export function clearResolution(): {
     rapport_intervention: null,
     qr_verified: false,
     qr_scanned_by: null,
+    tech_lat: null,
+    tech_lng: null,
+    tech_accuracy_m: null,
+    tech_distance_m: null,
+    tech_position_at: null,
+    tech_presence: null,
   }
 }
 
