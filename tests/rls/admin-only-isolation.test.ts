@@ -4,7 +4,7 @@ import { expectEmpty } from './assert'
 import { seedTenants, SC } from './scenario'
 
 // Aislamiento RLS de tablas INTERNAS admin-only: leads, princity_api_logs,
-// princity_health, pending_counter_imports, csat_responses.
+// princity_health, pending_counter_imports, csat_responses, push_notifications.
 // Ningún rol externo (client/technician/anon) debe poder leerlas; solo el admin.
 // (incident_photos NO es admin-only: cliente y técnico ven las fotos de sus
 //  incidencias → su aislamiento vive en incident-photos-isolation.test.ts).
@@ -12,13 +12,15 @@ import { seedTenants, SC } from './scenario'
 
 const admin = adminClient()
 let incidentAId: string
+// push_notifications: id fijo de entidad para localizar la fila sembrada (la columna no tiene FK).
+const PUSH_ENTITY_ID = '7e57e57e-0000-4000-8000-000000000001'
 
 beforeAll(async () => {
   if (!ANON_KEY || !SERVICE_KEY) {
     throw new Error('Faltan ANON_KEY/SERVICE_ROLE_KEY. Ejecuta con `supabase start` y exporta las claves.')
   }
   await cleanup(admin)
-  await seedTenants(admin)
+  const t = await seedTenants(admin)
 
   const { data: inc } = await admin.from('incidents').select('id').eq('numero_incident', SC.incidentNumA).single()
   incidentAId = inc!.id as string
@@ -34,6 +36,10 @@ beforeAll(async () => {
       image_path: '2026/06/test-rls.jpg', image_size_bytes: 1000, image_hash_sha256: 'TEST-pci-rls',
     }),
     admin.from('csat_responses').insert({ incident_id: incidentAId, token: 'TEST-csat-token', rating: 5 }),
+    // El destinatario es el propio técnico A: ni siquiera él debe leer la cola.
+    admin.from('push_notifications').insert({
+      recipient_id: t.techA, kind: 'assigned', entity_type: 'incident', entity_id: PUSH_ENTITY_ID,
+    }),
   ])
   const failed = seeds.find((s) => s.error)
   if (failed?.error) throw new Error(`seed admin-only: ${failed.error.message}`)
@@ -50,6 +56,7 @@ const cases: { table: string; column: string; value: string }[] = [
   { table: 'princity_health', column: 'function_name', value: 'TEST-fn' },
   { table: 'pending_counter_imports', column: 'image_hash_sha256', value: 'TEST-pci-rls' },
   { table: 'csat_responses', column: 'token', value: 'TEST-csat-token' },
+  { table: 'push_notifications', column: 'entity_id', value: PUSH_ENTITY_ID },
 ]
 
 describe.each(cases)('RLS admin-only — $table', ({ table, column, value }) => {

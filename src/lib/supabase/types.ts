@@ -1750,6 +1750,106 @@ export type Database = {
         }
         Relationships: []
       }
+      push_notifications: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          error: string | null
+          id: string
+          kind: string
+          recipient_id: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          error?: string | null
+          id?: string
+          kind: string
+          recipient_id: string
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          error?: string | null
+          id?: string
+          kind?: string
+          recipient_id?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_notifications_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          disabled_at: string | null
+          endpoint: string
+          id: string
+          last_error: string | null
+          last_seen_at: string
+          last_success_at: string | null
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          disabled_at?: string | null
+          endpoint: string
+          id?: string
+          last_error?: string | null
+          last_seen_at?: string
+          last_success_at?: string | null
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          disabled_at?: string | null
+          endpoint?: string
+          id?: string
+          last_error?: string | null
+          last_seen_at?: string
+          last_success_at?: string | null
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quartiers: {
         Row: {
           active: boolean
@@ -1907,6 +2007,28 @@ export type Database = {
       auth_tech_incident_ids: { Args: never; Returns: string[] }
       auth_tech_visit_ids: { Args: never; Returns: string[] }
       can_bill: { Args: never; Returns: boolean }
+      claim_push_notifications: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          claimed_at: string | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          error: string | null
+          id: string
+          kind: string
+          recipient_id: string
+          sent_at: string | null
+          status: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "push_notifications"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       close_maintenance_visit: {
         Args: {
           p_autres_pieces: string
@@ -1930,6 +2052,7 @@ export type Database = {
         Returns: string
       }
       is_admin: { Args: never; Returns: boolean }
+      kick_push_sender: { Args: never; Returns: undefined }
       next_incident_number: { Args: never; Returns: string }
       next_invoice_number: { Args: never; Returns: string }
       orphan_incident_photo_paths: { Args: never; Returns: string[] }
