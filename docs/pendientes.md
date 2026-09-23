@@ -58,7 +58,8 @@ no un control de seguridad.
 > **Resuelto tal como proponía esta entrada:** `close_maintenance_visit` ya no escribe
 > `qr_verified = true` a ciegas; el sello lo pone solo el escaneo real (`stampQrScan`), igual que
 > en las averías (migración `20260925100000`, trigger `guard_field_evidence` de paso impide que un
-> usuario logueado se lo escriba a mano). Las visitas cerradas **antes** del 25/09/2026 conservan
+> usuario logueado se lo escriba a mano), y solo sella la visita que toca (la pendiente más
+> antigua con fecha ≤ hoy + 14 días). Las visitas cerradas **antes** del 25/09/2026 conservan
 > su ✓ antiguo (no se reescribe el histórico) — la ficha de `/admin/maintenance/[id]` lo anota para
 > que no se lea como una prueba real. Detalle en `docs/architecture.md` §3d.
 

@@ -144,14 +144,21 @@ usuario (botón). No hay sonido propio.
 >   — solo las escriba `service_role`; un usuario puede vaciarlas (lo que hace `clearResolution()`
 >   al reabrir) pero nunca ponerlas, y reabrir una avería las vacía para cualquiera. Ver
 >   `docs/architecture.md` §3d para el detalle completo.
+>   **Revisión del PR #157:** la posición del técnico salió de `incidents`/`maintenance_visits`
+>   a una tabla aparte, `field_presence`, que **solo lee la oficina** — el cliente del portal lee
+>   sus averías fila entera y habría visto dónde estaba el técnico. El trigger se quedó solo con el
+>   sello QR; `field_presence` la escribe solo `service_role` y se borra al reabrir la avería.
+>   También: el primer escaneo solo fija la ubicación con la máquina instalada en un cliente, una
+>   línea de contrato nueva la borra (la máquina puede haberse movido), el escaneo sella solo la
+>   visita que toca y `far` descuenta también el margen de la ubicación de la máquina.
 
 - **Prerrequisito**: cambiar `Permissions-Policy` de `geolocation=()` a `geolocation=(self)` en
   `next.config.ts` — hoy bloquea la geolocalización en todo el sitio (trampa nº 2 detectada al
   planear la Fase 1).
 - **Columnas en `machines`**: `lat`, `lng`, `location_accuracy_m`, `location_source`
   (`first_scan` | `admin`), `location_set_at`, `location_set_by`.
-- **Columnas de presencia** en `incidents` (al resolver) y `maintenance_visits` (al cerrar):
-  `tech_lat`, `tech_lng`, `tech_accuracy_m`, `tech_distance_m` (a la máquina, si tiene ubicación).
+- **Presencia del técnico** al resolver una avería / cerrar una visita: posición, precisión y
+  distancia a la máquina — implementada en la tabla admin-only `field_presence` (ver nota arriba).
 - **Captura**: al escanear el QR (`/tech/scan/[serie]`) y al cerrar, el móvil pide la posición
   (`getCurrentPosition`, alta precisión, timeout corto). Nunca bloquea:
   - Primer escaneo de una máquina sin ubicación ⇒ se guarda como su ubicación (`first_scan`).
