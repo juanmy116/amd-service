@@ -108,8 +108,13 @@ BEGIN
 
   -- Una tarea ya terminada no se avisa: la resolución de OFICINA escribe assigned_to para
   -- acreditar al técnico (src/lib/resolution.ts) en el mismo UPDATE que la cierra.
-  IF (TG_TABLE_NAME = 'incidents' AND NEW.status IN ('résolu', 'fermé'))
-     OR (TG_TABLE_NAME = 'maintenance_visits' AND NEW.status = 'fait') THEN
+  -- Ramas separadas y comparando como texto: `status` es un enum distinto en cada tabla y
+  -- PL/pgSQL no corta el OR, así que `NEW.status = 'fait'` en incidents fallaría al convertir.
+  IF TG_TABLE_NAME = 'incidents' THEN
+    IF NEW.status::text IN ('résolu', 'fermé') THEN
+      RETURN NEW;
+    END IF;
+  ELSIF NEW.status::text = 'fait' THEN
     RETURN NEW;
   END IF;
 
