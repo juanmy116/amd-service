@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
 import { adminClient, signInAs, cleanup, ANON_KEY, SERVICE_KEY } from './helpers'
 import { seedTenants, SC, type Tenants } from './scenario'
 
@@ -93,6 +93,12 @@ describe('machines — CHECK de ubicación completa', () => {
     return admin.from('machines').update(patch).eq('numero_serie', SC.snB)
   }
 
+  // Cada caso parte de una máquina sin ubicación: si uno se colara, no contamina al siguiente.
+  beforeEach(async () => {
+    const { error } = await setLocation({ lat: null, lng: null, location_source: null })
+    if (error) throw new Error(`reset location: ${error.message}`)
+  })
+
   it('acepta una ubicación completa y en rango, y volver a vaciarla', async () => {
     const set = await setLocation({ lat: 14.6928, lng: -17.4467, location_source: 'admin' })
     expect(set.error).toBeNull()
@@ -100,9 +106,10 @@ describe('machines — CHECK de ubicación completa', () => {
     expect(clear.error).toBeNull()
   })
 
-  it('rechaza lat sin lng', async () => {
-    const { error } = await setLocation({ lat: 14.6928, location_source: 'admin' })
-    expect(error).not.toBeNull()
+  it('rechaza lat sin lng (y lng sin lat)', async () => {
+    // Regresión: sin IS NOT NULL explícitos, `NULL BETWEEN …` daba NULL y el CHECK lo dejaba pasar.
+    expect((await setLocation({ lat: 14.6928, location_source: 'admin' })).error).not.toBeNull()
+    expect((await setLocation({ lng: -17.4467, location_source: 'admin' })).error).not.toBeNull()
   })
 
   it('rechaza lat fuera de rango', async () => {

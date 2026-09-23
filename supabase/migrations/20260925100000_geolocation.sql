@@ -16,9 +16,12 @@ ALTER TABLE public.machines
   ADD COLUMN location_source     text CHECK (location_source IN ('first_scan', 'admin')),
   ADD COLUMN location_set_at     timestamptz,
   ADD COLUMN location_set_by     uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  -- Los IS NOT NULL explícitos hacen falta: con lng NULL, `lng BETWEEN …` da NULL y un CHECK
+  -- que evalúa a NULL se da por cumplido (dejaría pasar lat sin lng).
   ADD CONSTRAINT machines_location_complete_chk CHECK (
     (lat IS NULL AND lng IS NULL AND location_source IS NULL)
-    OR (lat BETWEEN -90 AND 90 AND lng BETWEEN -180 AND 180 AND location_source IS NOT NULL)
+    OR (lat IS NOT NULL AND lng IS NOT NULL AND location_source IS NOT NULL
+        AND lat BETWEEN -90 AND 90 AND lng BETWEEN -180 AND 180)
   );
 
 -- Mismas columnas de presencia en incidencias y visitas.
