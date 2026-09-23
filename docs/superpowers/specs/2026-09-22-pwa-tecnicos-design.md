@@ -76,6 +76,19 @@ la barra de gestos.
 
 ### Fase 2 — Notificaciones push
 
+> **Refinamiento sobre este diseño (implementación, 2026-09-24):** en vez de llamar a `send-push`
+> directamente desde el trigger, el trigger **encola** en `push_notifications` (que es a la vez el
+> registro de lo enviado) y solo da un «toque» no bloqueante a la Edge Function vía `pg_net`, con
+> la URL y el secreto leídos de **Vault** — si no están (CI, local, o antes del runbook en prod) no
+> llama a nada y la fila queda `pending`. Un cron de 1 minuto es la red de seguridad: reintenta lo
+> pendiente, da por fallido lo que agotó sus 3 intentos, caduca lo que lleva > 1 h sin sentido y
+> purga historial viejo. Por qué cola y no llamada directa: (1) nada se pierde si `send-push` falla
+> o tarda — la fila queda y el cron reintenta; (2) todo aviso queda registrado con su estado, no
+> solo los que salieron bien — lección de Princity/Matrix, que fallaban en silencio; (3) el toque
+> exige un secreto de Vault, así que `send-push` no es un endpoint público que alguien pueda usar
+> para bombardear a los técnicos; (4) en CI la BD local nunca llama a producción. Detalle completo
+> del flujo, tablas, estados y runbook: `docs/architecture.md` §«Notificaciones push (Fase 2)».
+
 **Requisitos iOS:** iOS ≥ 16.4, app **instalada**, y el permiso se pide **tras un toque** del
 usuario (botón). No hay sonido propio.
 

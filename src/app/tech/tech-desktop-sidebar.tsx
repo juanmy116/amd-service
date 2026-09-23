@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, AlertCircle, Printer, LogOut, CalendarDays } from 'lucide-react'
-import { signOut } from '@/app/login/actions'
+import { TechSignOutButton } from '@/components/tech/TechSignOutButton'
 
 const NAV = [
   { href: '/tech',           label: 'Tableau de bord',   icon: LayoutDashboard, exact: true },
@@ -55,15 +55,10 @@ export default function TechDesktopSidebar({ fullName }: { fullName: string | nu
         {fullName && (
           <p className="px-3 text-xs text-chrome-fg mb-2 truncate">{fullName}</p>
         )}
-        <form action={signOut}>
-          <button
-            type="submit"
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-chrome-fg hover:bg-chrome-hover hover:text-chrome-fg-strong transition-colors"
-          >
-            <LogOut size={18} />
-            Déconnexion
-          </button>
-        </form>
+        <TechSignOutButton className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-chrome-fg hover:bg-chrome-hover hover:text-chrome-fg-strong transition-colors">
+          <LogOut size={18} />
+          Déconnexion
+        </TechSignOutButton>
       </div>
     </aside>
   )

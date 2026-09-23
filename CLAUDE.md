@@ -65,6 +65,7 @@ Crear archivo `.env.local` en la raíz del proyecto `web-amd` con:
 NEXT_PUBLIC_SUPABASE_URL=https://myyejbviunyvywfukysj.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key del proyecto AMD en Supabase>
 SUPABASE_SECRET_KEY=<sb_secret_... — usada por createAdminClient y como Bearer hacia send-email>
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=<clave pública VAPID — notificaciones push de la PWA técnico, ver docs/architecture.md §Notificaciones push>
 ```
 
 > Las claves se encuentran en el panel de Supabase → proyecto AMD → Settings → API.

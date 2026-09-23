@@ -1,11 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { signOut } from '@/app/login/actions'
 import { LogOut, Clock, CheckCircle, AlertCircle, Printer, ChevronRight } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { InstallCard } from '@/components/tech/InstallCard'
+import { PushToggle } from '@/components/tech/PushToggle'
+import { TechSignOutButton } from '@/components/tech/TechSignOutButton'
 import type { BadgeVariant } from '@/components/ui/Badge'
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
@@ -88,14 +89,13 @@ export default async function TechPage() {
           <p className="text-xs text-ink-muted">Bonjour,</p>
           <h1 className="text-xl font-semibold text-ink font-display">{firstName}</h1>
         </div>
-        <form action={signOut}>
-          <button type="submit" className="w-9 h-9 flex items-center justify-center rounded-xl border border-line bg-card text-ink-muted">
-            <LogOut size={16} />
-          </button>
-        </form>
+        <TechSignOutButton className="w-9 h-9 flex items-center justify-center rounded-xl border border-line bg-card text-ink-muted">
+          <LogOut size={16} />
+        </TechSignOutButton>
       </div>
 
       <InstallCard />
+      <PushToggle />
 
       {/* Header desktop */}
       <div className="hidden lg:block">

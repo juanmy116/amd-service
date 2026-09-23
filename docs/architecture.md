@@ -124,6 +124,179 @@ rojo con logo blanco, pantalla completa, abre en `/tech`, nada tapado por la bar
   estáticos ya excluidos) para que las comprobaciones de actualización del manifest/SW no gasten
   un round-trip de sesión a Supabase — de paso, evita que ese tráfico pase por `getUser()`.
 
+### 3c. Notificaciones push (Fase 2, migración `20260924100000`)
+
+Aviso al iPhone del técnico en el instante en que se le **asigna** o se le **retira** una avería
+o un mantenimiento, con toque para abrir la tarea. Arquitectura de **cola de salida**: nada se
+envía "en caliente" desde la Server Action que asigna — un trigger encola, y una Edge Function
+vacía la cola. Así ningún aviso se pierde en silencio (lección de Princity/Matrix, que fallaban
+sin dejar rastro) y un lote de asignaciones no bloquea al usuario que las hace.
+
+**Flujo:**
+
+1. Se asigna/reasigna/desasigna `assigned_to` en `incidents` o `maintenance_visits` (kiosko con
+   `service_role`, ficha, kanban o alta — los 4 sitios del código, y cualquiera futuro, porque el
+   trigger vive en la tabla, no en cada Server Action).
+2. Trigger `enqueue_assignment_push()` (`AFTER INSERT OR UPDATE OF assigned_to`) **encola** en
+   `push_notifications` una fila por cada aviso que corresponda y da un «toque» a la Edge Function
+   `send-push` vía `kick_push_sender()` (`pg_net`, no bloqueante).
+3. `send-push` reclama la cola con `claim_push_notifications` (`FOR UPDATE SKIP LOCKED`) **de 10 en
+   10** y procesa esas filas **en paralelo** (`Promise.allSettled`, cada fila con su propio
+   `try/catch` y su estado final) — así el tiempo de pared de la función queda acotado aunque un
+   servicio push tarde. Carga el contexto real (línea + máquina + cliente en una sola consulta
+   embebida, luego el barrio), arma el texto con la función pura
+   `supabase/functions/_shared/push-message.ts` y envía Web Push (VAPID) a cada suscripción activa
+   del técnico.
+4. El Service Worker (`public/sw.js`) muestra la notificación y, al tocarla, abre/reutiliza una
+   ventana de `/tech` en la tarea correspondiente. Destinos: avería asignada → `/tech/incidents/<id>`;
+   mantenimiento asignado → **`/tech/planning`** (nunca `/tech/scan/<serie>/maintenance/<id>`: ese
+   formulario cierra la visita como «QR vérifié» sin escanear, ver `docs/pendientes.md`); tarea
+   retirada → `/tech`. El payload lleva `tag` (`<entity_type>-<id>`, un aviso nuevo de la misma
+   tarea sustituye al anterior) y `kind`: con `kind = 'assigned'` el SW pone `renotify: true` para
+   que la sustitución vuelva a sonar; una retirada sustituye en silencio. `renotify` solo se pone
+   si hay `tag` (sin él, `showNotification` lanza `TypeError`).
+5. Un cron de 1 minuto (`push-notifications-retry`) es la red de seguridad: reintenta lo pendiente,
+   da por fallido lo que agotó sus intentos, caduca lo que ya no tiene sentido avisar y purga
+   historial viejo.
+
+**Tabla `push_subscriptions`** — un aparato suscrito de un técnico (puede tener varios):
+
+| Campo | Notas |
+|---|---|
+| `user_id` | FK `profiles`, `ON DELETE CASCADE` |
+| `endpoint` | **UNIQUE** — identifica el APARATO, no el técnico: si un móvil compartido cambia de dueño, la Server Action reasigna la fila por `upsert(onConflict: 'endpoint')` |
+| `p256dh` / `auth` | claves de cifrado del navegador |
+| `last_success_at` / `last_error` / `disabled_at` | `disabled_at` se marca cuando Apple/Google responde 404/410 (el aparato dio de baja la suscripción — reinstalación, borrado de datos, rotación de clave VAPID) |
+
+RLS: el técnico ve solo las suyas, admin ve todas (`user_id = auth.uid() OR is_admin()`). **Sin
+INSERT/UPDATE/DELETE para `authenticated`** — el alta va por la Server Action `savePushSubscription`
+(`src/app/tech/push-actions.ts`) con `service_role`, que a su vez valida el endpoint con una lista
+blanca de hosts de servicio push reales (`parseSubscription` en `src/lib/pwa/push.ts`): sin ella,
+un cliente podría registrar cualquier URL y usar `send-push` como cañón de peticiones a lo que sea
+(server-side request forgery), porque `send-push` hace un POST directo a `endpoint`.
+
+**Cierre de sesión en un móvil compartido.** Los botones «Déconnexion» de `/tech` (inicio móvil y
+barra lateral de escritorio) usan `TechSignOutButton` (`src/components/tech/`): antes de
+`signOut()`, y como mejor esfuerzo con un tope de 3 s (nunca bloquea la salida), lee la suscripción
+de este aparato (`getRegistration('/tech')` → `pushManager.getSubscription()`), llama a la Server
+Action `disablePushSubscription(endpoint)` — que valida el endpoint con la misma lista blanca
+(`isAllowedPushEndpoint`) y marca `disabled_at` **solo si la fila es del técnico conectado**
+(`endpoint` + `user_id`) — y luego `unsubscribe()`. Así el técnico que se va deja de recibir avisos
+en ese móvil. Cuando entra el siguiente, la re-suscripción silenciosa de `PushToggle` hace el upsert
+por endpoint con `disabled_at: null` y el aparato queda a su nombre. Si la clave VAPID de una
+suscripción existente no se puede leer (`applicationServerKey` null), `PushToggle` la conserva:
+solo la da de baja cuando ambas claves son legibles y distintas (rotación real).
+
+**Tabla `push_notifications`** — la cola ES el registro de lo enviado:
+
+| Campo | Notas |
+|---|---|
+| `kind` | `assigned` \| `unassigned` |
+| `entity_type` / `entity_id` | `incident` \| `visit` |
+| `status` | `pending` → `sending` → `sent` \| `no_subscription` \| `failed` \| `expired` |
+| `attempts` | máximo 3 antes de darse por fallida |
+| `error` | detalle real del rechazo del servicio push (código + cuerpo, no el mensaje genérico de `WebPushError`) |
+
+RLS: solo admin lee (`push_notifications_admin_select`); sin INSERT/UPDATE/DELETE para
+`authenticated` (los escribe el trigger y la Edge Function, ambos con privilegios elevados).
+
+**El trigger no avisa en tres casos** (además de que `assigned_to` no haya cambiado):
+- **Quien hace el cambio se auto-asigna** (`NEW.assigned_to = auth.uid()`): no tiene sentido
+  avisarle de algo que él mismo acaba de hacer. Desde `service_role` (kiosko, crons) `auth.uid()`
+  es `NULL`, así que ahí siempre avisa.
+- **La tarea ya está cerrada** (`incidents.status` en `résolu`/`fermé`, `maintenance_visits.status
+  = 'fait'`): la resolución de OFICINA escribe `assigned_to` en el mismo `UPDATE` que cierra la
+  tarea para acreditar al técnico — eso no debe generar un «Nouvelle panne» falso.
+- **El técnico anterior ya no existe** (`EXISTS (SELECT 1 FROM profiles WHERE id = v_old)`):
+  borrar un técnico pone `assigned_to = NULL` por `ON DELETE SET NULL` y dispara el trigger con el
+  perfil **ya borrado** — sin este guard, el INSERT de `unassigned` violaría la FK de
+  `recipient_id` y tumbaría el borrado del técnico.
+
+**`kick_push_sender()` nunca tumba la asignación.** Corre dentro del mismo `UPDATE` que asigna la
+avería/visita, así que cualquier fallo (Vault sin configurar, `pg_net` caído, permisos) se degrada
+a `RAISE WARNING` — la fila queda `pending` y el cron la reintenta. Si `push_sender_url` /
+`push_sender_secret` no existen en Vault (CI, local, o antes del runbook en prod), la función
+simplemente no llama a nada.
+
+**`send-push` detecta avisos caducados antes de enviarlos** (`isStale`, en el propio Edge
+Function): entre que se encola una fila y se envía (el cron tarda hasta 1 minuto, o hay
+reintentos) la tarea puede haberse reasignado otra vez o haberse cerrado. Enviar un aviso obsoleto
+confundiría al técnico, así que la fila se marca `expired` / `error: 'stale'` en vez de enviarse:
+- `kind = 'assigned'` caduca si el destinatario ya no es el asignado actual, o si la tarea ya se
+  cerró.
+- `kind = 'unassigned'` caduca si el destinatario volvió a ser el asignado (reasignación de ida y
+  vuelta), **o si nunca se le llegó a avisar de la asignación** (no existe una fila `assigned` en
+  `status = 'sent'` para el mismo técnico y la misma tarea): un «Tâche retirée» de algo de lo que no
+  sabía nada solo confunde. Esta comprobación va antes de cargar el contexto.
+
+**Cron `push-notifications-retry` (cada minuto, idempotente):**
+1. Da por **`failed`** las filas con `attempts >= 3` que seguían `pending`/`sending`
+   (`error = coalesce(error, 'max_attempts')`).
+2. **Caduca** (`expired`) lo que lleva más de 1 hora sin poder avisar — un aviso de hace una hora
+   ya no sirve. Solo toca filas `pending` o `sending` **huérfanas** (reclamadas hace > 5 min): una
+   fila que `send-push` está procesando en ese momento no se pisa (si no, un envío correcto podría
+   quedar marcado `expired`, o al revés).
+3. **Purga la cola**: borra filas de más de 90 días (evita que `push_notifications` crezca sin
+   límite; el propio registro de "se envió o no" ya no aporta pasado ese plazo).
+4. **Purga el log de `pg_cron`**: borra las filas de `cron.job_run_details` de más de 7 días **solo
+   de este job** (`jobid` de `push-notifications-retry`; deja ~1.440 filas/día si no se purgara).
+   El historial de los demás jobs (Princity, recordatorios…) no se toca.
+5. Si queda algo reclamable (`attempts < 3` y `pending`, o `sending` abandonada > 5 min), vuelve a
+   tocar `send-push` — red de seguridad ante un «toque» que falló al encolar.
+
+**Vault vs. secrets de la Edge Function — no es el mismo sitio:**
+- **Vault de Postgres** (`vault.create_secret`, leído por `kick_push_sender()` vía
+  `vault.decrypted_secrets`): `push_sender_url` (URL de `send-push`) y `push_sender_secret` (debe
+  coincidir con `PUSH_SENDER_SECRET` de abajo).
+- **Secrets de la Edge Function** (`supabase secrets set`, `Deno.env` dentro de `send-push`):
+  `VAPID_SUBJECT` (debe ser `mailto:<email>` o una URL `https://`), `VAPID_PUBLIC_KEY`,
+  `VAPID_PRIVATE_KEY`, `PUSH_SENDER_SECRET` (comparado en tiempo constante con la cabecera
+  `x-push-secret`; sin él o si no coincide, `send-push` responde 401 sin reclamar la cola).
+- **Variable de Vercel** (cliente): `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — la misma clave pública, para
+  que `PushToggle.tsx` pueda llamar a `pushManager.subscribe()` desde el navegador.
+
+**Diagnóstico** (SQL Editor de Supabase, prod):
+
+```sql
+-- Qué está pasando con la cola: cuántas filas por estado y por error.
+select status, error, count(*) from push_notifications group by 1, 2;
+
+-- Últimas 5 ejecuciones del cron de reintento.
+select * from cron.job_run_details
+ where jobid = (select jobid from cron.job where jobname = 'push-notifications-retry')
+ order by start_time desc limit 5;
+```
+
+#### Runbook de puesta en marcha
+
+Lo ejecuta el coordinador **con confirmación del usuario**, nunca el implementador ni un agente
+sin permiso explícito para desplegar/tocar la BD de producción.
+
+0. **Pre-flight** — comprobar que las extensiones necesarias existen en el proyecto de prod y que
+   la Edge Function compila antes de desplegar nada:
+   ```sql
+   select extname from pg_extension where extname in ('supabase_vault', 'pg_net', 'pg_cron');
+   ```
+   ```bash
+   npx -y deno check supabase/functions/send-push/index.ts
+   ```
+1. `npx web-push generate-vapid-keys --json` (par de claves VAPID) y `openssl rand -hex 32`
+   (secreto del toque, `PUSH_SENDER_SECRET`).
+2. `supabase secrets set VAPID_PUBLIC_KEY=… VAPID_PRIVATE_KEY=… VAPID_SUBJECT=mailto:<email de AMD> PUSH_SENDER_SECRET=…`
+   — el `VAPID_SUBJECT` **debe** ser `mailto:<email>` o una URL `https://`; cualquier otra cosa
+   hace que `webpush.setVapidDetails()` falle y `send-push` responda 500 en cada invocación.
+3. `supabase functions deploy send-push --no-verify-jwt`
+4. `supabase db push`
+5. Vault en prod (SQL Editor de Supabase):
+   ```sql
+   select vault.create_secret('https://myyejbviunyvywfukysj.supabase.co/functions/v1/send-push', 'push_sender_url');
+   select vault.create_secret('<el mismo secreto del paso 1>', 'push_sender_secret');
+   ```
+6. Vercel: `NEXT_PUBLIC_VAPID_PUBLIC_KEY=<clave pública>` (entorno *Production*) y redeploy.
+7. Prueba en iPhone: activar los avisos desde `/tech` → asignar una avería a `testsav` desde el
+   kiosko → llega el aviso → tocarlo abre la avería; reasignarla a otro técnico → llega «Tâche
+   retirée»; comprobar en `push_notifications` que las filas quedaron `sent`.
+
 ### 4. Módulo Contadores (`/admin/contadores`) ✅
 - Vista principal agrupa máquinas por cliente con indicador ⚠ de relevés pendientes
 - Clic en cliente → vista detalle con todas sus máquinas y sus últimos relevés
@@ -1684,6 +1857,7 @@ Hallazgos P0 confirmados con SQL real contra producción y corregidos en el PR W
 | `UPSTASH_REDIS_REST_TOKEN` | Token REST de la base Upstash Redis para rate limiting (ver nota arriba). |
 | `SAV_NOTIFY_EMAIL` | Destino de la notificación de incidencia pública (`/signaler`). Fallback `savamdservice@gmail.com` si no se define. (WP-7) |
 | `COMMERCIAL_EMAIL` | Destino de la notificación de lead del formulario de contacto. |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Clave pública VAPID (par generado con `npx web-push generate-vapid-keys`) — la usa `PushToggle.tsx` para `pushManager.subscribe()`. Sin ella, `PushToggle` no se muestra (ver §Notificaciones push). |
 
 > Resend (`RESEND_API_KEY`, `RESEND_FROM`) vive como secret de Supabase Edge Functions, no en Vercel — la app Next.js delega el envío de emails a la Edge Function `send-email`. La `SUPABASE_SERVICE_ROLE_KEY` legacy ha sido eliminada del entorno (PR #8).
 
@@ -1694,6 +1868,8 @@ Hallazgos P0 confirmados con SQL real contra producción y corregidos en el PR W
 | `PRINCITY_BASE_URL` | `https://amdservice.its-printer.com/api` |
 | `PRINCITY_API_KEY` | Header `App-auth-key` de la API Princity (solo lectura, ver auditoría) |
 | `RESEND_API_KEY` | API key Resend para emails del watchdog |
+| `VAPID_SUBJECT` / `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Firma de Web Push en `send-push` (Fase 2 de notificaciones). `VAPID_SUBJECT` debe ser `mailto:<email>` o una URL `https://`. |
+| `PUSH_SENDER_SECRET` | Secreto de `send-push` (cabecera `x-push-secret`, comparación en tiempo constante). El mismo valor vive en Vault de Postgres como `push_sender_secret` — ver §Notificaciones push. |
 
 > Los antiguos secrets `IMAP_HOST`, `IMAP_USER`, `IMAP_PASSWORD` quedaron obsoletos tras retirar `princity-agent`. Pueden borrarse del dashboard de Supabase.
 

@@ -20,19 +20,22 @@ export default async function TeamPage() {
   const supabase      = await createClient()
   const supabaseAdmin = createAdminClient()
 
-  const [profilesRes, usersRes] = await Promise.all([
+  const [profilesRes, usersRes, pushRes] = await Promise.all([
     supabase
       .from('profiles')
       .select('id, full_name, phone, role')
       .in('role', ['admin', 'technician'])
       .order('full_name'),
     supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
+    supabase.from('push_subscriptions').select('user_id').is('disabled_at', null),
   ])
   // WP-5b: un fallo técnico bloquea (boundary) en vez de crashear crudo (users.map sobre undefined).
   if (profilesRes.error) { console.error('[team] profiles', profilesRes.error); throw new Error('DATA_FETCH_ERROR') }
   if (usersRes.error) { console.error('[team] listUsers', usersRes.error); throw new Error('DATA_FETCH_ERROR') }
+  if (pushRes.error) { console.error('[team] push_subscriptions', pushRes.error); throw new Error('DATA_FETCH_ERROR') }
   const profiles = profilesRes.data
   const emailMap = new Map((usersRes.data.users ?? []).map((u) => [u.id, u.email ?? '']))
+  const pushEnabledIds = new Set((pushRes.data ?? []).map((s) => s.user_id))
 
   return (
     <div className="p-8">
@@ -57,13 +60,14 @@ export default async function TeamPage() {
               <th className="text-left px-5 py-3.5 font-medium text-ink-muted">Email</th>
               <th className="text-left px-5 py-3.5 font-medium text-ink-muted">Téléphone</th>
               <th className="text-left px-5 py-3.5 font-medium text-ink-muted">Rôle</th>
+              <th className="text-left px-5 py-3.5 font-medium text-ink-muted">Notifications</th>
               <th />
             </tr>
           </thead>
           <tbody className="divide-y divide-line-subtle">
             {(!profiles || profiles.length === 0) && (
               <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-ink-muted">
+                <td colSpan={6} className="px-5 py-10 text-center text-ink-muted">
                   Aucun membre dans l&apos;équipe
                 </td>
               </tr>
@@ -77,6 +81,9 @@ export default async function TeamPage() {
                   <Badge variant={ROLE_VARIANT[p.role] ?? 'neutral'}>
                     {ROLE_LABEL[p.role] ?? p.role}
                   </Badge>
+                </td>
+                <td className="px-5 py-4 text-ink-soft text-xs">
+                  {p.role === 'technician' ? (pushEnabledIds.has(p.id) ? '🔔 Activées' : '— Non activées') : ''}
                 </td>
                 <td className="px-5 py-4 text-right">
                   <Link
