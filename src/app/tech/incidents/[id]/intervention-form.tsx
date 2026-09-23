@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/Card'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import { PARTS } from '@/lib/parts'
 import { appendPosition, getPositionOnce } from '@/lib/pwa/geolocation'
+import type { LatLng } from '@/lib/geo'
+import ItineraryButton from '@/components/tech/ItineraryButton'
 
 type FormState = { error: string } | null
 
@@ -33,6 +35,9 @@ type Props = {
   machineName: string
   machineLocation: string | null
   contractNumber: string | null
+  /** Destination pour le bouton « Itinéraire » : coordonnées de la machine, ou son adresse en texte. */
+  destCoords: LatLng | null
+  destText: string | null
   /** part_id → cantidad ya registrada (para precargar el formulario) */
   checkedParts: Map<number, number>
   /** Galería de fotos del cliente (Server Component pasado como slot). */
@@ -40,7 +45,8 @@ type Props = {
 }
 
 export default function InterventionForm({
-  incident, boundAction, clientName, machineName, machineLocation, contractNumber, checkedParts, photos,
+  incident, boundAction, clientName, machineName, machineLocation, contractNumber,
+  destCoords, destText, checkedParts, photos,
 }: Props) {
   const [state, formAction, pending] = useActionState(boundAction, null)
 
@@ -79,7 +85,7 @@ export default function InterventionForm({
         <Link href="/tech" className="flex items-center justify-center w-9 h-9 rounded-xl border border-line bg-card shrink-0">
           <ArrowLeft size={16} className="text-ink-muted" />
         </Link>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="font-mono text-[10px] font-semibold tracking-wide text-accent">
             {incident.numero_incident}
           </p>
@@ -92,6 +98,7 @@ export default function InterventionForm({
             </Badge>
           </div>
         </div>
+        <ItineraryButton coords={destCoords} text={destText} />
       </div>
 
       {/* Infos machine */}
