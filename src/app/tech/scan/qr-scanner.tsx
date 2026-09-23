@@ -31,10 +31,15 @@ export default function QrScanner() {
         try { BrowserMultiFormatReader.releaseAllStreams() } catch { /* noop */ }
 
         // Sellar ANTES de navegar: la ficha de la máquina ya no pasa por /m (ver comentario de
-        // abajo), así que el sello QR se deja aquí. Un fallo del sello nunca impide abrir la ficha.
+        // abajo), así que el sello QR se deja aquí. Un fallo del sello nunca impide abrir la ficha
+        // y nunca bloquea más de 2,5 s: con mala cobertura se navega igualmente (el sello puede
+        // llegar después o perderse; la ficha es lo que el técnico necesita).
         void (async () => {
           try {
-            await recordQrScanAction(serie)
+            await Promise.race([
+              recordQrScanAction(serie),
+              new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+            ])
           } catch (err) {
             console.error('[scan] sello QR fallido', err)
           }
