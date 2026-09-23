@@ -104,7 +104,7 @@ export default async function EditIncidentPage({
   const qrScannerName = incident.qr_scanned_by ? profileMap.get(incident.qr_scanned_by) ?? null : null
   // `tech_presence` viene de un CHECK en BD (no un enum de Postgres): el tipo generado es
   // `string | null`, así que se afirma al tipo cerrado que sí es.
-  const position = presenceLabel(incident.tech_presence as Presence | null, incident.tech_distance_m)
+  const position = presenceLabel(incident.tech_presence as Presence | null, incident.tech_distance_m, incident.tech_accuracy_m)
   const positionMapUrl = incident.tech_lat != null && incident.tech_lng != null
     ? `https://www.google.com/maps?q=${incident.tech_lat},${incident.tech_lng}`
     : null

@@ -36,8 +36,7 @@ export async function computePresence(
     if (data?.lat != null && data.lng != null) machine = { lat: data.lat, lng: data.lng }
   }
 
-  const tech = position ? { lat: position.lat, lng: position.lng } : null
-  const { presence, distance } = presenceFor({ tech, machine })
+  const { presence, distance } = presenceFor({ tech: position, machine })
   return {
     tech_lat: position?.lat ?? null,
     tech_lng: position?.lng ?? null,

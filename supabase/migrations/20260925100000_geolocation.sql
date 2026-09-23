@@ -1,9 +1,10 @@
 -- Fase 3 de la PWA de técnicos: geolocalización (2026-09-25).
 -- 1) Ubicación exacta de cada máquina (primer escaneo con buena precisión, o el admin).
 -- 2) Dónde estaba el técnico al resolver una avería / cerrar un mantenimiento, y el veredicto
---    calculado en el servidor contra la ubicación de la máquina (🟢 near ≤ 200 m / 🟡 far /
---    🟡 no_position = no dio permiso o sin GPS / ⚪ no_machine_position = la máquina aún no
---    tiene ubicación). Nunca bloquea nada.
+--    calculado en el servidor contra la ubicación de la máquina (🟢 near ≤ 200 m con GPS
+--    ≤ 150 m / 🟡 far = lejos incluso restando el margen del GPS / 🟡 imprecise = el GPS no
+--    permite decir ni una cosa ni otra / 🟡 no_position = no dio permiso o sin GPS /
+--    ⚪ no_machine_position = la máquina aún no tiene ubicación). Nunca bloquea nada.
 -- 3) close_maintenance_visit deja de poner qr_verified = true a ciegas: el sello lo pone el
 --    escaneo real (stampQrScan), igual que en las averías.
 
@@ -31,7 +32,7 @@ ALTER TABLE public.incidents
   ADD COLUMN tech_accuracy_m   real,
   ADD COLUMN tech_distance_m   real,
   ADD COLUMN tech_position_at  timestamptz,
-  ADD COLUMN tech_presence     text CHECK (tech_presence IN ('near', 'far', 'no_position', 'no_machine_position'));
+  ADD COLUMN tech_presence     text CHECK (tech_presence IN ('near', 'far', 'imprecise', 'no_position', 'no_machine_position'));
 
 ALTER TABLE public.maintenance_visits
   ADD COLUMN tech_lat          double precision,
@@ -39,7 +40,7 @@ ALTER TABLE public.maintenance_visits
   ADD COLUMN tech_accuracy_m   real,
   ADD COLUMN tech_distance_m   real,
   ADD COLUMN tech_position_at  timestamptz,
-  ADD COLUMN tech_presence     text CHECK (tech_presence IN ('near', 'far', 'no_position', 'no_machine_position'));
+  ADD COLUMN tech_presence     text CHECK (tech_presence IN ('near', 'far', 'imprecise', 'no_position', 'no_machine_position'));
 
 -- close_maintenance_visit: misma firma y mismo cuerpo que 20260604140000 (única definición
 -- previa); solo cambia que ya NO fuerza qr_verified.

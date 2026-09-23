@@ -2,7 +2,7 @@
 
 import { requireTechnician } from '@/lib/auth'
 import { stampQrScan } from '@/lib/scan.server'
-import type { LatLng } from '@/lib/geo'
+import { isValidLatLng, type LatLng } from '@/lib/geo'
 
 type ScanPosition = LatLng & { accuracy: number }
 
@@ -12,8 +12,7 @@ function validPosition(p: unknown): ScanPosition | null {
   if (!p || typeof p !== 'object') return null
   const { lat, lng, accuracy } = p as Record<string, unknown>
   if (typeof lat !== 'number' || typeof lng !== 'number' || typeof accuracy !== 'number') return null
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(accuracy)) return null
-  if (Math.abs(lat) > 90 || Math.abs(lng) > 180 || accuracy < 0) return null
+  if (!isValidLatLng(lat, lng) || !Number.isFinite(accuracy) || accuracy < 0) return null
   return { lat, lng, accuracy }
 }
 

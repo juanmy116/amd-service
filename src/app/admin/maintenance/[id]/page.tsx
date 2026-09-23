@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/Card'
 import { PanelHeader } from '@/components/ui/PanelHeader'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
-import { presenceLabel } from '@/lib/geo'
+import { presenceLabel, type Presence } from '@/lib/geo'
 
 const PRESENCE_TONE_CLASS: Record<'green' | 'amber' | 'grey', string> = {
   green: 'text-success font-medium',
@@ -54,7 +54,7 @@ export default async function MaintenancePlanDetailPage({
       ),
       maintenance_visits (
         id, scheduled_date, done_at, status, qr_verified, notes, matrix_notified,
-        tech_presence, tech_distance_m,
+        tech_presence, tech_distance_m, tech_accuracy_m,
         contract_machine_id,
         done_by_profile:profiles!maintenance_visits_done_by_fkey ( full_name ),
         assigned_profile:profiles!maintenance_visits_assigned_to_fkey ( full_name ),
@@ -72,8 +72,9 @@ export default async function MaintenancePlanDetailPage({
     id: string; scheduled_date: string; done_at: string | null
     status: string; qr_verified: boolean; notes: string | null
     matrix_notified: boolean
-    tech_presence: 'near' | 'far' | 'no_position' | 'no_machine_position' | null
+    tech_presence: Presence | null
     tech_distance_m: number | null
+    tech_accuracy_m: number | null
     contract_machine_id: string
     done_by_profile: { full_name: string } | null
     assigned_profile: { full_name: string } | null
@@ -195,7 +196,7 @@ export default async function MaintenancePlanDetailPage({
                   </td>
                   <td className="px-4 py-3.5">
                     {(() => {
-                      const position = presenceLabel(v.tech_presence, v.tech_distance_m)
+                      const position = presenceLabel(v.tech_presence, v.tech_distance_m, v.tech_accuracy_m)
                       return position
                         ? <span className={`text-xs ${PRESENCE_TONE_CLASS[position.tone]}`}>{position.text}</span>
                         : <span className="text-xs text-ink-muted">—</span>
