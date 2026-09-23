@@ -8,6 +8,13 @@ import { Badge } from '@/components/ui/Badge'
 import { Stars } from '@/components/ui/Stars'
 import { RESOLUTION_REASON_LABELS, RESOLVED_VIA_LABELS } from '@/lib/resolution'
 import { parseEnum, RESOLUTION_REASONS, RESOLVED_VIA } from '@/lib/enums'
+import { presenceLabel, type Presence } from '@/lib/geo'
+
+const PRESENCE_TONE_CLASS: Record<'green' | 'amber' | 'grey', string> = {
+  green: 'text-success font-medium',
+  amber: 'text-warning font-medium',
+  grey:  'text-ink-muted',
+}
 
 const STATUS_DOT: Record<string, string> = {
   nouveau:  'bg-blue-500',
@@ -95,6 +102,12 @@ export default async function EditIncidentPage({
   // que este técnico tuviera la máquina delante.
   const qrByResolver = incident.qr_verified && incident.qr_scanned_by === incident.assigned_to
   const qrScannerName = incident.qr_scanned_by ? profileMap.get(incident.qr_scanned_by) ?? null : null
+  // `tech_presence` viene de un CHECK en BD (no un enum de Postgres): el tipo generado es
+  // `string | null`, así que se afirma al tipo cerrado que sí es.
+  const position = presenceLabel(incident.tech_presence as Presence | null, incident.tech_distance_m)
+  const positionMapUrl = incident.tech_lat != null && incident.tech_lng != null
+    ? `https://www.google.com/maps?q=${incident.tech_lat},${incident.tech_lng}`
+    : null
 
   const boundUpdateAction = updateIncidentAction.bind(null, incident.id)
 
@@ -210,6 +223,25 @@ export default async function EditIncidentPage({
                   <span className="text-ink-muted">Aucun scan enregistré</span>
                 )}
               </div>
+
+              {position && (
+                <div className="flex gap-2">
+                  <span className="text-ink-muted w-24 shrink-0">Position</span>
+                  <span className="flex items-center gap-2">
+                    <span className={PRESENCE_TONE_CLASS[position.tone]}>{position.text}</span>
+                    {positionMapUrl && (
+                      <a
+                        href={positionMapUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-accent hover:underline"
+                      >
+                        voir
+                      </a>
+                    )}
+                  </span>
+                </div>
+              )}
             </div>
           </Card>
         </div>

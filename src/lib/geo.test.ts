@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   distanceMeters, presenceFor, parseLatLng, itineraryLinks, destinationText, formatDistance,
-  sortByDistance, readPosition, PRESENCE_RADIUS_M, FIRST_SCAN_MAX_ACCURACY_M, type LatLng,
+  sortByDistance, readPosition, presenceLabel, PRESENCE_RADIUS_M, FIRST_SCAN_MAX_ACCURACY_M, type LatLng,
 } from './geo'
 
 const PLATEAU: LatLng = { lat: 14.6708, lng: -17.4381 }
@@ -216,5 +216,28 @@ describe('readPosition', () => {
 
   it('precisión negativa ⇒ null', () => {
     expect(readPosition(fd({ pos_lat: '14.69', pos_lng: '-17.44', pos_accuracy: '-1' }))).toBeNull()
+  })
+})
+
+describe('presenceLabel', () => {
+  it('near ⇒ vert, distance en mètres', () => {
+    expect(presenceLabel('near', 45)).toEqual({ tone: 'green', text: 'Sur place (à 45 m)' })
+  })
+
+  it('far ⇒ ambre, distance en km', () => {
+    expect(presenceLabel('far', 2300)).toEqual({ tone: 'amber', text: 'Loin de la machine (à 2,3 km)' })
+  })
+
+  it('no_position ⇒ ambre, sans distance', () => {
+    expect(presenceLabel('no_position', null)).toEqual({ tone: 'amber', text: 'Position non transmise' })
+  })
+
+  it('no_machine_position ⇒ gris, sans distance', () => {
+    expect(presenceLabel('no_machine_position', null))
+      .toEqual({ tone: 'grey', text: 'Machine sans position enregistrée' })
+  })
+
+  it('null (tâche antérieure à la phase) ⇒ null, rien à afficher', () => {
+    expect(presenceLabel(null, null)).toBeNull()
   })
 })

@@ -142,6 +142,23 @@ export function formatDistance(m: number): string {
   return km < 10 ? `${km.toFixed(1).replace('.', ',')} km` : `${Math.round(m / 1000)} km`
 }
 
+export type PresenceLabel = { tone: 'green' | 'amber' | 'grey'; text: string }
+
+/**
+ * Lo que ve la oficina en la ficha de una avería o de una visita: color + texto a partir del
+ * veredicto guardado en la fila. `presence: null` es una tarea de antes de esta fase (las
+ * columnas no existían): no se muestra nada.
+ */
+export function presenceLabel(presence: Presence | null, distance: number | null): PresenceLabel | null {
+  switch (presence) {
+    case 'near': return { tone: 'green', text: `Sur place (à ${formatDistance(distance ?? 0)})` }
+    case 'far':  return { tone: 'amber', text: `Loin de la machine (à ${formatDistance(distance ?? 0)})` }
+    case 'no_position':         return { tone: 'amber', text: 'Position non transmise' }
+    case 'no_machine_position': return { tone: 'grey',  text: 'Machine sans position enregistrée' }
+    default: return null
+  }
+}
+
 /**
  * Copia ordenada por distancia a `origin`. Lo que no tiene coordenadas va al final conservando
  * su orden relativo (sort estable).

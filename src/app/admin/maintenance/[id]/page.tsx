@@ -6,6 +6,13 @@ import { Card } from '@/components/ui/Card'
 import { PanelHeader } from '@/components/ui/PanelHeader'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
+import { presenceLabel } from '@/lib/geo'
+
+const PRESENCE_TONE_CLASS: Record<'green' | 'amber' | 'grey', string> = {
+  green: 'text-success font-medium',
+  amber: 'text-warning font-medium',
+  grey:  'text-ink-muted',
+}
 
 const FREQ_LABEL: Record<string, string> = {
   mensuel:     'Mensuel',
@@ -47,6 +54,7 @@ export default async function MaintenancePlanDetailPage({
       ),
       maintenance_visits (
         id, scheduled_date, done_at, status, qr_verified, notes, matrix_notified,
+        tech_presence, tech_distance_m,
         contract_machine_id,
         done_by_profile:profiles!maintenance_visits_done_by_fkey ( full_name ),
         assigned_profile:profiles!maintenance_visits_assigned_to_fkey ( full_name ),
@@ -64,6 +72,8 @@ export default async function MaintenancePlanDetailPage({
     id: string; scheduled_date: string; done_at: string | null
     status: string; qr_verified: boolean; notes: string | null
     matrix_notified: boolean
+    tech_presence: 'near' | 'far' | 'no_position' | 'no_machine_position' | null
+    tech_distance_m: number | null
     contract_machine_id: string
     done_by_profile: { full_name: string } | null
     assigned_profile: { full_name: string } | null
@@ -122,6 +132,10 @@ export default async function MaintenancePlanDetailPage({
       {/* Historial visitas */}
       <Card className="overflow-hidden">
         <PanelHeader title="Historique des visites" />
+        <p className="px-4 pt-3 text-xs text-ink-muted">
+          Avant le 25/09/2026, le QR n&apos;était pas vraiment vérifié : la clôture le marquait
+          « ✓ Vérifié » automatiquement, sans scan réel sur la machine.
+        </p>
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-neutral-soft border-b border-line-subtle">
@@ -131,13 +145,14 @@ export default async function MaintenancePlanDetailPage({
               <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Réalisée le</th>
               <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Technicien</th>
               <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">QR</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Position</th>
               <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Notes</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line-subtle">
             {visits.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-ink-muted text-sm">
+                <td colSpan={8} className="px-4 py-10 text-center text-ink-muted text-sm">
                   Aucune visite planifiée
                 </td>
               </tr>
@@ -177,6 +192,14 @@ export default async function MaintenancePlanDetailPage({
                       ? <span className="text-xs text-success font-medium">✓ Vérifié</span>
                       : <span className="text-xs text-ink-muted">—</span>
                     }
+                  </td>
+                  <td className="px-4 py-3.5">
+                    {(() => {
+                      const position = presenceLabel(v.tech_presence, v.tech_distance_m)
+                      return position
+                        ? <span className={`text-xs ${PRESENCE_TONE_CLASS[position.tone]}`}>{position.text}</span>
+                        : <span className="text-xs text-ink-muted">—</span>
+                    })()}
                   </td>
                   <td className="px-4 py-3.5 text-ink-soft text-xs max-w-xs truncate">
                     {v.notes ?? <span className="text-ink-muted">—</span>}
