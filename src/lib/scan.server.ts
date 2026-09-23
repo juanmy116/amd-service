@@ -25,7 +25,7 @@ export async function stampQrScan(numeroSerie: string, userId: string): Promise<
   const admin = createAdminClient()
 
   // El escaneo de la etiqueta de un equipo dado de baja no prueba nada (la propia página de
-  // scan hace `notFound()` en ese caso).
+  // scan muestra «Machine introuvable ou retirée du parc» en ese caso).
   const { data: machine } = await admin
     .from('machines')
     .select('active')

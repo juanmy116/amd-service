@@ -27,8 +27,8 @@ export default async function MachineGateway({
 
   if (profile.role === 'technician' || profile.role === 'admin') {
     // Esta ruta es la que codifican las etiquetas impresas: llegar aquí significa haber
-    // tenido la máquina delante. Es el único sitio donde ese sello es creíble — ver
-    // `stampQrScan`.
+    // tenido la máquina delante. Es uno de los DOS sitios donde ese sello es creíble; el otro
+    // es el escáner de la propia app (`recordQrScanAction`) — ver `stampQrScan`.
     await stampQrScan(decodeURIComponent(serie), user.id)
     redirect(`/tech/scan/${encoded}`)
   }
