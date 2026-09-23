@@ -106,6 +106,9 @@ usuario (botón). No hay sonido propio.
 
 ### Fase 3 — Geolocalización
 
+- **Prerrequisito**: cambiar `Permissions-Policy` de `geolocation=()` a `geolocation=(self)` en
+  `next.config.ts` — hoy bloquea la geolocalización en todo el sitio (trampa nº 2 detectada al
+  planear la Fase 1).
 - **Columnas en `machines`**: `lat`, `lng`, `location_accuracy_m`, `location_source`
   (`first_scan` | `admin`), `location_set_at`, `location_set_by`.
 - **Columnas de presencia** en `incidents` (al resolver) y `maintenance_visits` (al cerrar):
@@ -134,6 +137,11 @@ usuario (botón). No hay sonido propio.
   requise». Nada se encola.
 - **Nunca** se cachea nada fuera de `/tech` ni respuestas de otros usuarios (clave por usuario;
   se vacía al cerrar sesión).
+- **El SW se registra con `scope: '/'`** (Fase 1) y por tanto controla **todo el origen**
+  (`/admin`, `/atelier`/kiosko, la web pública, `/portal`), no solo `/tech`. Cualquier handler de
+  `fetch`/caché que se añada aquí **debe filtrar por ruta** (`url.pathname.startsWith('/tech')`) y
+  dejar pasar sin tocar (`return` / sin `respondWith`) todo lo demás — si no, se arriesga a
+  cachear páginas de otros roles o del kiosko.
 
 ## 4. Pruebas
 

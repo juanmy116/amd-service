@@ -78,6 +78,45 @@ _(Scanner eliminado del nav; accesible vía FAB persistente)_
 - `TechIncidentList.tsx` — Client Component: chips de filtro + tarjetas; exporta tipo `TechIncident`
 - `AgendaPanel.tsx`, `MaintenanceVisitForm.tsx` — existentes
 
+### 3b. PWA instalable (`/tech`) ✅ — Fase 1 (2026-09-23)
+Un técnico puede «Añadir a pantalla de inicio» desde Safari y obtener la app «AMD SAV» (icono
+rojo con logo blanco, pantalla completa, abre en `/tech`, nada tapado por la barra de gestos).
+
+- **Manifest en `/amd-sav.webmanifest`** (`src/lib/pwa/manifest.ts` + `src/app/amd-sav.webmanifest/route.ts`),
+  **no** con la convención `app/manifest.ts`: esa convención lo enlazaría en **todas** las
+  páginas, y la web pública no debe ofrecerse como app. Tampoco puede llamarse `/tech...`: el
+  proxy protege todo lo que empieza por `/tech` (`isProtectedPath`), y iOS descarga el manifest
+  **sin cookies** — un nombre así lo redirigiría a `/login` y «Añadir a pantalla de inicio»
+  crearía un marcador de Safari en vez de la app instalada. Solo lo enlaza el layout de `/tech`
+  (`metadata.manifest` en `src/app/tech/layout.tsx`), nunca la web pública.
+- **Iconos** en `public/pwa/` (`icon-192.png`, `icon-512.png`, `icon-maskable-512.png`,
+  `apple-touch-icon.png`), generados una vez con `sharp` a partir del logo AMD y versionados en
+  git; se regeneran con `node scripts/generate-pwa-icons.mjs`.
+- **Service worker mínimo en `public/sw.js`**: sin manejador `fetch`, no cachea nada — solo existe
+  para tomar el control (`skipWaiting` + `clients.claim()`) y sentar la base de la Fase 2 (push) y
+  la Fase 4 (offline). Se registra con `scope: '/'` desde `ServiceWorkerRegister` en el layout de
+  `/tech`, lo que significa que controla **todo el origen** (admin, portal, kiosko del taller), no
+  solo `/tech` — cualquier caché que se le añada en el futuro deberá filtrar por ruta. Cabeceras
+  `Cache-Control: no-cache, no-store, must-revalidate` en `next.config.ts` para que el navegador
+  siempre pida la versión nueva.
+- **Zonas seguras (`safe-area-inset`)**: `viewport.viewportFit = 'cover'` en el layout de `/tech`
+  + `env(safe-area-inset-bottom)` en el padding del contenido, el FAB «Scanner» y la nav inferior,
+  para que la barra de gestos del iPhone no tape nada en modo instalado.
+- **Tarjeta de instalación** (`src/components/tech/InstallCard.tsx`, en `/tech`): guía al técnico
+  según el navegador, con lógica pura y testeada en `src/lib/pwa/display.ts`
+  (`installHint`/`InstallHint`):
+  - `'ios'` — Safari en iPhone/iPad: pasos «Compartir → Sur l'écran d'accueil → Ajouter».
+  - `'ios-other'` — iPhone pero en un navegador que **no puede** instalar: Chrome/Firefox/Edge en
+    iOS (`CriOS`/`FxiOS`/`EdgiOS` en el user-agent, que usan el motor de Safari sin tener esa
+    opción) o un navegador integrado de otra app, típicamente WhatsApp (el user-agent no lleva
+    `Safari/`). Mensaje: abrir el enlace en Safari.
+  - `'other'` — Android u otros: indicación genérica del menú del navegador.
+  - `'none'` — ya instalada (`display-mode: standalone` o `navigator.standalone`) o el técnico ya
+    la cerró (recordado en `localStorage`, `INSTALL_DISMISSED_KEY`).
+- **Proxy (`src/proxy.ts`)**: el matcher excluye `sw.js` y `amd-sav.webmanifest` (además de los
+  estáticos ya excluidos) para que las comprobaciones de actualización del manifest/SW no gasten
+  un round-trip de sesión a Supabase — de paso, evita que ese tráfico pase por `getUser()`.
+
 ### 4. Módulo Contadores (`/admin/contadores`) ✅
 - Vista principal agrupa máquinas por cliente con indicador ⚠ de relevés pendientes
 - Clic en cliente → vista detalle con todas sus máquinas y sus últimos relevés
