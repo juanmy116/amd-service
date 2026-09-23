@@ -43,7 +43,7 @@ export default async function TechLayout({ children }: { children: React.ReactNo
         <TechDesktopSidebar fullName={profile?.full_name ?? null} />
       </div>
       <main className="lg:ml-64 xl:mr-72">
-        <div className="max-w-lg mx-auto lg:max-w-none pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
+        <div className="max-w-lg mx-auto lg:max-w-none pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
           {children}
         </div>
       </main>

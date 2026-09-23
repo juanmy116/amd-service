@@ -15,7 +15,7 @@ export default function TechNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-chrome border-t border-chrome-line z-10 pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-chrome border-t border-chrome-line z-10 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <div className="grid grid-cols-4 h-16">
         {NAV.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href)

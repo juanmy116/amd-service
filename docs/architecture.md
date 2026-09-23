@@ -100,7 +100,9 @@ rojo con logo blanco, pantalla completa, abre en `/tech`, nada tapado por la bar
   en `next.config.ts` para que el navegador siempre pida la versión nueva.
 - **Zonas seguras (`safe-area-inset`)**: `viewport.viewportFit = 'cover'` en el layout de `/tech`
   + `env(safe-area-inset-bottom)` en el padding del contenido, el FAB «Scanner» y la nav inferior,
-  para que la barra de gestos del iPhone no tape nada en modo instalado.
+  para que la barra de gestos del iPhone no tape nada en modo instalado. También
+  `env(safe-area-inset-left)`/`-right)` en el contenedor del contenido y en la nav inferior, para
+  el notch en horizontal (landscape).
 - **Tarjeta de instalación** (`src/components/tech/InstallCard.tsx`, en `/tech`): guía al técnico
   según el navegador, con lógica pura y testeada en `src/lib/pwa/display.ts`
   (`installHint`/`InstallHint`):
