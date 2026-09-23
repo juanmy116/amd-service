@@ -50,7 +50,7 @@ export function InstallCard() {
         <ol className="space-y-2 text-sm text-ink">
           <li className="flex items-center gap-2">
             <span className="font-semibold text-accent">1.</span> Touchez
-            <Share size={16} className="text-info" aria-label="Partager" /> en bas de Safari
+            <Share size={16} className="text-info" aria-hidden /> Partager (ou « ⋯ » puis Partager)
           </li>
           <li className="flex items-center gap-2">
             <span className="font-semibold text-accent">2.</span> Choisissez

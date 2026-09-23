@@ -106,10 +106,10 @@ rojo con logo blanco, pantalla completa, abre en `/tech`, nada tapado por la bar
   según el navegador, con lógica pura y testeada en `src/lib/pwa/display.ts`
   (`installHint`/`InstallHint`):
   - `'ios'` — Safari en iPhone/iPad: pasos «Compartir → Sur l'écran d'accueil → Ajouter».
-  - `'ios-other'` — iPhone pero en un navegador que **no puede** instalar: Chrome/Firefox/Edge en
-    iOS (`CriOS`/`FxiOS`/`EdgiOS` en el user-agent, que usan el motor de Safari sin tener esa
-    opción) o un navegador integrado de otra app, típicamente WhatsApp (el user-agent no lleva
-    `Safari/`). Mensaje: abrir el enlace en Safari.
+  - `'ios-other'` — iPhone fuera de Safari: Chrome/Firefox/Edge en iOS (`CriOS`/`FxiOS`/`EdgiOS`;
+    pueden instalar desde iOS 16.4 pero con otro menú) o un navegador integrado de otra app,
+    típicamente WhatsApp (sin `Safari/` en el user-agent; **no** puede instalar). Mensaje único:
+    abrir el enlace en Safari.
   - `'other'` — Android u otros: indicación genérica del menú del navegador.
   - `'none'` — ya instalada (`display-mode: standalone` o `navigator.standalone`) o el técnico ya
     la cerró (recordado en `localStorage`, `INSTALL_DISMISSED_KEY`).

@@ -17,10 +17,9 @@ export function installHint({ userAgent, maxTouchPoints, standalone, dismissed }
   // iPadOS se anuncia como «Macintosh»: lo delata la pantalla táctil.
   const isIOS = /iPhone|iPad|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && maxTouchPoints > 1)
   if (isIOS) {
-    // «Añadir a pantalla de inicio» solo existe en el Safari real. Chrome/Firefox/Edge en iOS
-    // (CriOS/FxiOS/EdgiOS) usan el motor de Safari pero no tienen esa opción; y los navegadores
-    // integrados de apps como WhatsApp no llevan "Safari/" en el UA. En ambos casos hay que
-    // pedirle al técnico que abra el enlace en Safari.
+    // Los pasos de la tarjeta son los de Safari. Chrome/Firefox/Edge en iOS (CriOS/FxiOS/EdgiOS)
+    // también pueden instalar desde iOS 16.4, pero con otro menú; y los navegadores integrados de
+    // apps como WhatsApp (sin "Safari/" en el UA) no pueden. Un único camino fiable: abrir en Safari.
     const isOtherIosBrowser = /CriOS|FxiOS|EdgiOS/.test(userAgent) || !/Safari\//.test(userAgent)
     return isOtherIosBrowser ? 'ios-other' : 'ios'
   }
