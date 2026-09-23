@@ -56,6 +56,8 @@ export const config = {
   matcher: [
     // El manifest y el service worker los pide iOS SIN cookies: si pasaran por aquí, cada
     // comprobación de actualización gastaría un round-trip de sesión a Supabase sin necesidad.
-    '/((?!_next/static|_next/image|favicon\\.ico|sw\\.js|amd-sav\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // `$` ancla cada alternativa: sin él, cualquier ruta que EMPEZARA por "sw.js" (p. ej.
+    // "/sw.jsx") también habría quedado excluida del proxy por accidente.
+    '/((?!_next/static|_next/image|favicon\\.ico|sw\\.js$|amd-sav\\.webmanifest$|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
