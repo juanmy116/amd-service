@@ -14,6 +14,18 @@ const STATUS_LABEL: Record<string, string> = {
   nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu',
 }
 
+// Cabecera común a la ficha y a «Machine introuvable»: vuelta al escáner + título.
+function FicheHeader() {
+  return (
+    <div className="flex items-center gap-3 pt-2">
+      <Link href="/tech/scan" className="flex items-center justify-center w-9 h-9 rounded-xl border border-line bg-card shrink-0">
+        <ArrowLeft size={16} className="text-ink-muted" />
+      </Link>
+      <h1 className="text-base font-semibold text-ink font-display">Fiche machine</h1>
+    </div>
+  )
+}
+
 export default async function MachineScanPage({
   params,
 }: {
@@ -41,12 +53,7 @@ export default async function MachineScanPage({
   if (!machine || !machine.active) {
     return (
       <div className="p-4 space-y-5">
-        <div className="flex items-center gap-3 pt-2">
-          <Link href="/tech/scan" className="flex items-center justify-center w-9 h-9 rounded-xl border border-line bg-card shrink-0">
-            <ArrowLeft size={16} className="text-ink-muted" />
-          </Link>
-          <h1 className="text-base font-semibold text-ink font-display">Fiche machine</h1>
-        </div>
+        <FicheHeader />
         <Card className="p-6 text-center space-y-2">
           <AlertTriangle size={24} className="text-warning mx-auto" />
           <p className="text-sm font-semibold text-ink">Machine introuvable ou retirée du parc</p>
@@ -137,14 +144,7 @@ export default async function MachineScanPage({
 
   return (
     <div className="p-4 space-y-5">
-      <div className="flex items-center gap-3 pt-2">
-        <Link href="/tech/scan" className="flex items-center justify-center w-9 h-9 rounded-xl border border-line bg-card shrink-0">
-          <ArrowLeft size={16} className="text-ink-muted" />
-        </Link>
-        <h1 className="text-base font-semibold text-ink font-display">
-          Fiche machine
-        </h1>
-      </div>
+      <FicheHeader />
 
       {/* Machine info */}
       <Card className="p-4 space-y-4">
