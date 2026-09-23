@@ -54,6 +54,7 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 - Login para técnicos
 - Escaneo de QR → ficha de la máquina con incidencias activas + mantenimiento pendiente
 - **Auto-transición 1er escaneo:** al cargar `/tech/scan/[serie]`, los incidentes `assigné` asignados al técnico pasan automáticamente a `en_cours` (usando `createAdminClient()` server-only). Registrado en `incident_history` con `comment: 'Mise en cours automatique — scan QR'`. Solo ejecuta si la máquina está activa (`machine.active`).
+- **Cualquier técnico ve cualquier máquina activa (decisión 2026-09-23):** en campo un técnico se topa con máquinas que no son suyas (préstamo, sustitución, otra ronda). `/tech/scan/[serie]` lee la parte de **solo lectura** (máquina, línea, contrato, cliente, plan de mantenimiento activo) con `createAdminClient()` tras `requireTechnician()` — antes esa lectura pasaba por RLS (`tech_machines_select` / `auth_tech_assigned_machine_ids()`, solo máquinas con incidencia asignada) y daba **404** en cuanto la máquina no era «suya», incluso teniendo una visita de mantenimiento pendiente ahí. Lo que da derecho a **actuar** sigue sin cambios y sigue por RLS con el cliente del usuario: la lista de incidencias (solo las suyas) y la visibilidad/edición de visitas de mantenimiento (`auth_tech_visit_ids()`: asignada a él o de una máquina donde tiene trabajo asignado). La página de la visita (`/tech/scan/[serie]/maintenance/[visitId]`) sigue el mismo patrón: autoriza la visita con el cliente del usuario (si RLS no la deja ver, `notFound()`) y pinta máquina/cliente/notas del plan con `createAdminClient()`. Una máquina inexistente o dada de baja ya no es un 404 desnudo: la ficha muestra «Machine introuvable ou retirée du parc» + el serie leído, con CTA para avisar al bureau. Sin migraciones ni cambios de RLS — spec en `docs/superpowers/plans/2026-09-23-escaneo-tecnicos.md`.
 - Vista de intervenciones asignadas
 - Formulario de intervención: informe + checkboxes de piezas + campo libre + estado
 - Formulario de cierre de mantenimiento preventivo: piezas reemplazadas + notas; accesible solo desde el QR de la máquina (`qr_verified = true` garantizado)
@@ -774,9 +775,24 @@ real — peor que antes, porque hoy un informe vacío al menos es una señal.
 ### El QR: semáforo, nunca bloqueo
 
 Escanear el QR de la máquina con la avería abierta marca `qr_verified` y guarda `qr_scanned_by`
-(`src/lib/scan.server.ts`). La ficha lo enseña en verde **solo si quien escaneó es quien resolvió**.
-No bloquea nunca: una etiqueta despegada o un móvil sin cobertura no pueden dejar a un técnico sin
-poder cerrar lo que acaba de arreglar — buscaría un atajo y volveríamos al principio.
+(`src/lib/scan.server.ts`, función `stampQrScan`). La ficha lo enseña en verde **solo si quien
+escaneó es quien resolvió**. No bloquea nunca: una etiqueta despegada o un móvil sin cobertura no
+pueden dejar a un técnico sin poder cerrar lo que acaba de arreglar — buscaría un atajo y
+volveríamos al principio.
+
+**Dos orígenes del sello (2026-09-23), los únicos que prueban que alguien tuvo la etiqueta física
+delante:**
+- `/m/[serie]` — la pasarela que codifica la etiqueta impresa, abierta con la cámara del sistema
+  (típicamente Safari, sin sesión).
+- `recordQrScanAction` (`src/app/tech/scan/actions.ts`) — el escáner **de la propia app**
+  (`qr-scanner.tsx`), que ahora sella ANTES de navegar a la ficha. Necesario porque con la PWA
+  instalada la cámara del iPhone abre los QR en Safari en vez de en la app, así que escanear
+  desde dentro de la app (con sesión) es el único camino real para que un técnico deje su sello;
+  antes de este fix la app nunca llamaba a `stampQrScan` y el técnico que trabajaba solo con la
+  PWA dejaba sus averías en 🟡 aunque hubiera escaneado.
+- Sigue **sin** sellarse al renderizar `/tech/scan/[serie]`: es un `<Link>` con prefetch (agenda
+  del técnico, `/tech/planning`) que el servidor puede pintar sin que nadie pulse nada; sellar ahí
+  daría por presente en la máquina a un técnico sentado en la oficina.
 
 ### El candado (migración `20260922100000_guard_incident_resolution.sql`)
 
