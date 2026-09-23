@@ -2,12 +2,12 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { Navigation, MapPin, Loader2 } from 'lucide-react'
+import { MapPin } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import { getIncidentDisplayName } from '@/lib/incident'
-import { getPositionOnce } from '@/lib/pwa/geolocation'
-import { sortByDistance, distanceMeters, formatDistance, type LatLng } from '@/lib/geo'
+import { sortByDistance, distanceMeters, formatTaskDistance, type TaskCoords } from '@/lib/geo'
+import { NearestToggle, useNearestSort } from './NearestToggle'
 
 const PRIORITY_COLOR: Record<string, string> = {
   urgente: '#BF0D0D',
@@ -40,8 +40,8 @@ export type TechIncident = {
   created_at: string
   machine_id: string | null
   clients: { nom_client: string } | null
-  /** Coordonnées de la machine (les siennes, ou le centre de son quartier), pour « Plus proche ». */
-  coords: LatLng | null
+  /** Coordonnées de la machine (les siennes, ou — `approx` — le centre de son quartier), pour « Plus proche ». */
+  coords: TaskCoords | null
 }
 
 type Filter = 'all' | 'urgent' | 'today'
@@ -58,10 +58,7 @@ function isToday(dateStr: string): boolean {
 
 export default function TechIncidentList({ incidents }: { incidents: TechIncident[] }) {
   const [filter, setFilter] = useState<Filter>('all')
-  const [nearest, setNearest] = useState(false)
-  const [origin, setOrigin] = useState<LatLng | null>(null)
-  const [locating, setLocating] = useState(false)
-  const [noPosition, setNoPosition] = useState(false)
+  const { origin, locating, noPosition, toggle } = useNearestSort()
 
   const urgentCount = incidents.filter(i => i.priority === 'urgente').length
   const todayCount  = incidents.filter(i => isToday(i.created_at)).length
@@ -72,8 +69,8 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
     return true
   })
   // « Plus proche » ne change pas l'ordre par défaut tant qu'on ne l'a pas activé.
-  if (nearest && origin) {
-    filtered = sortByDistance(filtered, origin, i => i.coords)
+  if (origin) {
+    filtered = sortByDistance(filtered, origin, i => i.coords?.coords ?? null)
   }
 
   const chips: { key: Filter; label: string; count: number }[] = [
@@ -81,17 +78,6 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
     { key: 'urgent', label: 'Urgents',     count: urgentCount },
     { key: 'today',  label: "Aujourd'hui", count: todayCount },
   ]
-
-  async function toggleNearest() {
-    if (nearest) { setNearest(false); return }
-    setLocating(true)
-    setNoPosition(false)
-    const pos = await getPositionOnce(6000)
-    setLocating(false)
-    if (!pos) { setNoPosition(true); return }
-    setOrigin({ lat: pos.lat, lng: pos.lng })
-    setNearest(true)
-  }
 
   return (
     <div className="space-y-4">
@@ -109,18 +95,7 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
             {chip.label} ({chip.count})
           </button>
         ))}
-        <button
-          onClick={toggleNearest}
-          disabled={locating}
-          className={`flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-xs font-semibold border transition-colors disabled:opacity-60 ${
-            nearest
-              ? 'bg-accent text-white border-transparent'
-              : 'bg-card text-ink-muted border-line hover:border-line'
-          }`}
-        >
-          {locating ? <Loader2 size={13} className="animate-spin" /> : <Navigation size={13} />}
-          Plus proche
-        </button>
+        <NearestToggle active={origin !== null} locating={locating} onToggle={toggle} />
       </div>
 
       {noPosition && (
@@ -132,8 +107,8 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
       ) : (
         <div className="space-y-3">
           {filtered.map(inc => {
-            const distance = nearest && origin && inc.coords
-              ? formatDistance(distanceMeters(origin, inc.coords))
+            const distance = origin && inc.coords
+              ? formatTaskDistance(distanceMeters(origin, inc.coords.coords), inc.coords.approx)
               : null
             return (
             <Link

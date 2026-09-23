@@ -5,9 +5,7 @@ import InterventionForm from './intervention-form'
 import IncidentPhotos from '@/components/IncidentPhotos'
 import { submitInterventionAction } from './actions'
 import { getOpenLineForMachine } from '@/lib/contract-machines'
-import { getQuartiers } from '@/lib/quartiers.server'
-import { resolveQuartierCode } from '@/lib/quartiers'
-import { destinationText, type LatLng } from '@/lib/geo'
+import { itineraryDestination } from '@/lib/geo.server'
 
 export default async function TechIncidentPage({
   params,
@@ -45,14 +43,12 @@ export default async function TechIncidentPage({
     machines: { marque: string; modele: string; localisation: string | null; lat: number | null; lng: number | null; quartier_code: string | null } | null
   } | null = null
 
-  // Destination pour le bouton « Itinéraire » : coordonnées de la machine si elle en a, sinon
-  // l'adresse du client en texte. Pour une incidence PUBLIQUE (sans ligne de contrat), la RLS
-  // du technicien ne couvre pas machines/contract_machines pour cette machine — on lit avec
-  // service_role, comme la fiche de scan (`/tech/scan/[serie]`) : c'est bien SON incident.
-  let destCoords: LatLng | null = null
-  let destAdresse: string | null = null
-  let destVille: string | null = null
-  let destQuartierCode: string | null = null
+  // Destination pour le bouton « Itinéraire » (`itineraryDestination`). Pour une incidence
+  // PUBLIQUE (sans ligne de contrat), la RLS du technicien ne couvre pas machines/contract_machines
+  // pour cette machine — on lit avec service_role, comme la fiche de scan (`/tech/scan/[serie]`) :
+  // c'est bien SON incident.
+  let destMachine: { lat: number | null; lng: number | null; quartier_code: string | null } | null = null
+  let destClient: { adresse: string | null; ville: string | null; quartier_code: string | null } | null = null
 
   if (incident.contract_machine_id) {
     const { data } = await supabase
@@ -70,12 +66,8 @@ export default async function TechIncidentPage({
         clients: cm.contracts?.clients ?? null,
         machines: cm.machines,
       }
-      if (cm.machines?.lat != null && cm.machines?.lng != null) {
-        destCoords = { lat: cm.machines.lat, lng: cm.machines.lng }
-      }
-      destAdresse = cm.contracts?.clients?.adresse ?? null
-      destVille = cm.contracts?.clients?.ville ?? null
-      destQuartierCode = resolveQuartierCode(cm.machines?.quartier_code, cm.contracts?.clients?.quartier_code)
+      destMachine = cm.machines
+      destClient = cm.contracts?.clients ?? null
     }
   } else if (incident.machine_id) {
     const admin = createAdminClient()
@@ -84,7 +76,7 @@ export default async function TechIncidentPage({
       .select('lat, lng, quartier_code')
       .eq('numero_serie', incident.machine_id)
       .maybeSingle()
-    if (machine?.lat != null && machine?.lng != null) destCoords = { lat: machine.lat, lng: machine.lng }
+    destMachine = machine
 
     const openLine = await getOpenLineForMachine(admin, incident.machine_id)
     if (openLine) {
@@ -93,20 +85,11 @@ export default async function TechIncidentPage({
         .select('clients(adresse, ville, quartier_code)')
         .eq('id', openLine.contract_id)
         .maybeSingle()
-      destAdresse = contract?.clients?.adresse ?? null
-      destVille = contract?.clients?.ville ?? null
-      destQuartierCode = resolveQuartierCode(machine?.quartier_code, contract?.clients?.quartier_code)
-    } else {
-      destQuartierCode = machine?.quartier_code ?? null
+      destClient = contract?.clients ?? null
     }
   }
 
-  let destQuartierLabel: string | null = null
-  if (!destCoords && destQuartierCode) {
-    const quartiers = await getQuartiers()
-    destQuartierLabel = quartiers.find((q) => q.code === destQuartierCode)?.label ?? null
-  }
-  const destText = destCoords ? null : destinationText({ adresse: destAdresse, quartier: destQuartierLabel, ville: destVille })
+  const { coords: destCoords, text: destText } = await itineraryDestination(destMachine, destClient)
 
   const clientName  = contractInfo?.clients?.nom_client ?? null
   const machine     = contractInfo?.machines ?? null

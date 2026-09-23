@@ -6,9 +6,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import { getOpenLineForMachine } from '@/lib/contract-machines'
-import { getQuartiers } from '@/lib/quartiers.server'
-import { resolveQuartierCode } from '@/lib/quartiers'
-import { destinationText, type LatLng } from '@/lib/geo'
+import { itineraryDestination } from '@/lib/geo.server'
 import ItineraryButton from '@/components/tech/ItineraryButton'
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
@@ -87,20 +85,7 @@ export default async function MachineScanPage({
 
   // Destination pour le bouton « Itinéraire » : coordonnées de la machine si elle en a, sinon
   // l'adresse du client (texte).
-  const destCoords: LatLng | null = machine.lat != null && machine.lng != null
-    ? { lat: machine.lat, lng: machine.lng }
-    : null
-  let destQuartierLabel: string | null = null
-  if (!destCoords) {
-    const destQuartierCode = resolveQuartierCode(machine.quartier_code, client?.quartier_code)
-    if (destQuartierCode) {
-      const quartiers = await getQuartiers()
-      destQuartierLabel = quartiers.find((q) => q.code === destQuartierCode)?.label ?? null
-    }
-  }
-  const destText = destCoords
-    ? null
-    : destinationText({ adresse: client?.adresse ?? null, quartier: destQuartierLabel, ville: client?.ville ?? null })
+  const { coords: destCoords, text: destText } = await itineraryDestination(machine, client)
 
   // Auto-transición primer escaneo: assigné → en_cours para incidentes asignados a este técnico en esta máquina.
   // Se ejecuta después del guard machine.active para no mutar incidentes en máquinas dadas de baja.

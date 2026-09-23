@@ -1,10 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
-import { Wrench, AlertTriangle, Navigation, MapPin, Loader2 } from 'lucide-react'
-import { getPositionOnce } from '@/lib/pwa/geolocation'
-import { sortByDistance, distanceMeters, formatDistance, type LatLng } from '@/lib/geo'
+import { Wrench, AlertTriangle, MapPin } from 'lucide-react'
+import { sortByDistance, distanceMeters, formatTaskDistance, type TaskCoords } from '@/lib/geo'
+import { NearestToggle, useNearestSort } from './NearestToggle'
 
 export type VisitRow = {
   id: string
@@ -43,8 +42,8 @@ function fmtDate(dateStr: string): { label: string; isOverdue: boolean } {
   }
 }
 
-/** Coordonnées de la visite (celles de sa machine), lues dans la map envoyée par le serveur. */
-function coordsOf(row: VisitRow, coords: Record<string, LatLng | null>): LatLng | null {
+/** Coordonnées de la visite (celles de sa machine, ou le centre du quartier), lues dans la map envoyée par le serveur. */
+function coordsOf(row: VisitRow, coords: Record<string, TaskCoords | null>): TaskCoords | null {
   return row.serie ? coords[row.serie] ?? null : null
 }
 
@@ -55,31 +54,17 @@ export default function PlanningVisits({
 }: {
   overdueRows: VisitRow[]
   plannedRows: VisitRow[]
-  coords: Record<string, LatLng | null>
+  coords: Record<string, TaskCoords | null>
 }) {
-  const [nearest, setNearest] = useState(false)
-  const [origin, setOrigin] = useState<LatLng | null>(null)
-  const [locating, setLocating] = useState(false)
-  const [noPosition, setNoPosition] = useState(false)
+  const { origin, locating, noPosition, toggle } = useNearestSort()
 
   const overdueGroups = groupByContract(overdueRows)
   const plannedGroups = groupByContract(plannedRows)
   const overdueCount  = overdueRows.length
   const plannedCount  = plannedRows.length
 
-  async function toggleNearest() {
-    if (nearest) { setNearest(false); return }
-    setLocating(true)
-    setNoPosition(false)
-    const pos = await getPositionOnce(6000)
-    setLocating(false)
-    if (!pos) { setNoPosition(true); return }
-    setOrigin({ lat: pos.lat, lng: pos.lng })
-    setNearest(true)
-  }
-
-  const flatRows = nearest && origin
-    ? sortByDistance([...overdueRows, ...plannedRows], origin, r => coordsOf(r, coords))
+  const flatRows = origin
+    ? sortByDistance([...overdueRows, ...plannedRows], origin, r => coordsOf(r, coords)?.coords ?? null)
     : null
 
   return (
@@ -90,18 +75,7 @@ export default function PlanningVisits({
             ? `${overdueCount + plannedCount} visite${overdueCount + plannedCount > 1 ? 's' : ''}`
             : 'Aucune visite'}
         </p>
-        <button
-          onClick={toggleNearest}
-          disabled={locating}
-          className={`flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-xs font-semibold border transition-colors disabled:opacity-60 ${
-            nearest
-              ? 'bg-accent text-white border-transparent'
-              : 'bg-card text-ink-muted border-line hover:border-line'
-          }`}
-        >
-          {locating ? <Loader2 size={13} className="animate-spin" /> : <Navigation size={13} />}
-          Plus proche
-        </button>
+        <NearestToggle active={origin !== null} locating={locating} onToggle={toggle} />
       </div>
 
       {noPosition && (
@@ -117,7 +91,7 @@ export default function PlanningVisits({
           ) : (
             flatRows.map(r => {
               const c = coordsOf(r, coords)
-              const distance = origin && c ? formatDistance(distanceMeters(origin, c)) : null
+              const distance = origin && c ? formatTaskDistance(distanceMeters(origin, c.coords), c.approx) : null
               const { label, isOverdue: dateOverdue } = fmtDate(r.scheduled_date)
               const overdue = r.status === 'en_retard'
               return (

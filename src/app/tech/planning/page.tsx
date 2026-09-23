@@ -7,7 +7,7 @@ import type { BadgeVariant } from '@/components/ui/Badge'
 import PlanningVisits from '@/components/tech/PlanningVisits'
 import type { VisitRow } from '@/components/tech/PlanningVisits'
 import { coordsForMachines } from '@/lib/geo.server'
-import type { LatLng } from '@/lib/geo'
+import type { TaskCoords } from '@/lib/geo'
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
   nuevo: 'info', assigné: 'violet', en_cours: 'warning',
@@ -71,7 +71,7 @@ export default async function TechPlanningPage() {
   // Coordonnées des machines des visites, pour « Plus proche » (Fase 3 §Task 8).
   const series = [...overdueRows, ...plannedRows].map(r => r.serie).filter((s): s is string => !!s)
   const coordsMap = await coordsForMachines(series)
-  const coords: Record<string, LatLng | null> = Object.fromEntries(coordsMap)
+  const coords: Record<string, TaskCoords | null> = Object.fromEntries(coordsMap)
 
   return (
     <div className="p-4 space-y-6 pt-5">
