@@ -629,6 +629,12 @@ export type Database = {
           resolved_via: string | null
           source: string | null
           status: Database["public"]["Enums"]["incident_status"]
+          tech_accuracy_m: number | null
+          tech_distance_m: number | null
+          tech_lat: number | null
+          tech_lng: number | null
+          tech_position_at: string | null
+          tech_presence: string | null
           title: string
           updated_at: string
         }
@@ -657,6 +663,12 @@ export type Database = {
           resolved_via?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["incident_status"]
+          tech_accuracy_m?: number | null
+          tech_distance_m?: number | null
+          tech_lat?: number | null
+          tech_lng?: number | null
+          tech_position_at?: string | null
+          tech_presence?: string | null
           title: string
           updated_at?: string
         }
@@ -685,6 +697,12 @@ export type Database = {
           resolved_via?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["incident_status"]
+          tech_accuracy_m?: number | null
+          tech_distance_m?: number | null
+          tech_lat?: number | null
+          tech_lng?: number | null
+          tech_position_at?: string | null
+          tech_presence?: string | null
           title?: string
           updated_at?: string
         }
@@ -1203,7 +1221,13 @@ export type Database = {
       machines: {
         Row: {
           active: boolean
+          lat: number | null
+          lng: number | null
           localisation: string | null
+          location_accuracy_m: number | null
+          location_set_at: string | null
+          location_set_by: string | null
+          location_source: string | null
           marque: string
           modele: string
           numero_serie: string
@@ -1214,7 +1238,13 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          lat?: number | null
+          lng?: number | null
           localisation?: string | null
+          location_accuracy_m?: number | null
+          location_set_at?: string | null
+          location_set_by?: string | null
+          location_source?: string | null
           marque: string
           modele: string
           numero_serie: string
@@ -1225,7 +1255,13 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          lat?: number | null
+          lng?: number | null
           localisation?: string | null
+          location_accuracy_m?: number | null
+          location_set_at?: string | null
+          location_set_by?: string | null
+          location_source?: string | null
           marque?: string
           modele?: string
           numero_serie?: string
@@ -1235,6 +1271,13 @@ export type Database = {
           type?: Database["public"]["Enums"]["machine_type"] | null
         }
         Relationships: [
+          {
+            foreignKeyName: "machines_location_set_by_fkey"
+            columns: ["location_set_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "machines_quartier_code_fkey"
             columns: ["quartier_code"]
@@ -1335,6 +1378,12 @@ export type Database = {
           qr_verified: boolean
           scheduled_date: string
           status: string
+          tech_accuracy_m: number | null
+          tech_distance_m: number | null
+          tech_lat: number | null
+          tech_lng: number | null
+          tech_position_at: string | null
+          tech_presence: string | null
         }
         Insert: {
           assigned_to?: string | null
@@ -1349,6 +1398,12 @@ export type Database = {
           qr_verified?: boolean
           scheduled_date: string
           status?: string
+          tech_accuracy_m?: number | null
+          tech_distance_m?: number | null
+          tech_lat?: number | null
+          tech_lng?: number | null
+          tech_position_at?: string | null
+          tech_presence?: string | null
         }
         Update: {
           assigned_to?: string | null
@@ -1363,6 +1418,12 @@ export type Database = {
           qr_verified?: boolean
           scheduled_date?: string
           status?: string
+          tech_accuracy_m?: number | null
+          tech_distance_m?: number | null
+          tech_lat?: number | null
+          tech_lng?: number | null
+          tech_position_at?: string | null
+          tech_presence?: string | null
         }
         Relationships: [
           {
