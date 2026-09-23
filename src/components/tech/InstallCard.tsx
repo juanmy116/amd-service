@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Share, SquarePlus, Smartphone, X } from 'lucide-react'
-import { INSTALL_DISMISSED_KEY, installHint, type InstallHint } from '@/lib/pwa/display'
+import { INSTALL_DISMISSED_KEY, installHint, isStandaloneDisplay, type InstallHint } from '@/lib/pwa/display'
 
 function readDismissed(): boolean {
   try { return localStorage.getItem(INSTALL_DISMISSED_KEY) === '1' } catch { return false }
@@ -14,13 +14,10 @@ export function InstallCard() {
   const [hint, setHint] = useState<InstallHint>('none')
 
   useEffect(() => {
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as Navigator & { standalone?: boolean }).standalone === true
     setHint(installHint({
       userAgent: navigator.userAgent,
       maxTouchPoints: navigator.maxTouchPoints,
-      standalone,
+      standalone: isStandaloneDisplay(),
       dismissed: readDismissed(),
     }))
   }, [])
@@ -71,7 +68,8 @@ export function InstallCard() {
         </p>
       )}
       <p className="text-xs text-ink-muted mt-3">
-        Ensuite, ouvrez AMD SAV depuis l&apos;écran d&apos;accueil et reconnectez-vous une fois.
+        Ensuite, ouvrez AMD SAV depuis l&apos;écran d&apos;accueil et reconnectez-vous une fois avec
+        votre email et votre mot de passe.
       </p>
     </div>
   )

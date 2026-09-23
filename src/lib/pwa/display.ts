@@ -12,6 +12,15 @@ type Input = {
   dismissed: boolean
 }
 
+// Solo en el navegador (usa `window`/`navigator`): no se testea con vitest (entorno `node`),
+// se verifica a mano en Safari/instalada. `installHint` la aísla para poder testear el resto.
+export function isStandaloneDisplay(): boolean {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  )
+}
+
 export function installHint({ userAgent, maxTouchPoints, standalone, dismissed }: Input): InstallHint {
   if (standalone || dismissed) return 'none'
   // iPadOS se anuncia como «Macintosh»: lo delata la pantalla táctil.
