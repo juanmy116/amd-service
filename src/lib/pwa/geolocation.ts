@@ -14,9 +14,16 @@ export type CapturedPosition = { lat: number; lng: number; accuracy: number }
 
 const PROMPT_CAP_MS = 30_000
 
+// Estado del permiso, o null si no se sabe. Con su propio tope (1 s): alguna webview deja la
+// promesa colgada, y sin tope `getPositionOnce` no volvería nunca.
 async function permissionState(): Promise<PermissionState | null> {
   try {
-    const status = await navigator.permissions?.query({ name: 'geolocation' })
+    const query = navigator.permissions?.query({ name: 'geolocation' })
+    if (!query) return null
+    const status = await Promise.race([
+      query,
+      new Promise<null>(resolve => setTimeout(() => resolve(null), 1000)),
+    ])
     return status?.state ?? null
   } catch {
     return null
