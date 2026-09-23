@@ -6,6 +6,7 @@ import { LogOut, Clock, CheckCircle, AlertCircle, Printer, ChevronRight } from '
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { InstallCard } from '@/components/tech/InstallCard'
+import { PushToggle } from '@/components/tech/PushToggle'
 import type { BadgeVariant } from '@/components/ui/Badge'
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
@@ -96,6 +97,7 @@ export default async function TechPage() {
       </div>
 
       <InstallCard />
+      <PushToggle />
 
       {/* Header desktop */}
       <div className="hidden lg:block">
