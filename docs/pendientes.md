@@ -16,12 +16,33 @@
 | 🔴 **4** | **Confirmación antes de emitir factura** | «Forcer» emite al instante y las facturas son inmutables. Hace falta antes de encender la facturación. |
 | 🧹 **5** | **Borrar los datos de prueba del 22-09** | Dos notas de ⭐5 que no ha dado ningún cliente están contando en la media. |
 | ⚠️ **6** | **40 visitas el mismo día / sin válvula de escape** | Afecta al uso real del mantenimiento, no bloquea. |
+| ⚠️ **7** | **Escaneo de técnicos: dos cabos sueltos del PR #155** | «En cours» automático al ABRIR la ficha (no al escanear) y sello QR falsificable por un técnico logueado. Aceptados por ahora. |
 
 **Cerrado el 2026-09-22:** el verrou de résolution (ninguna avería se cierra sin rastro, probado en
 uso real) y el CSAT (probado de punta a punta; era el pendiente más antiguo). Ese día también se
 corrigieron tres fallos que solo se ven usando la app: la lista de motivos en blanco sobre blanco en
 la TV, las estrellas de la encuesta que se encendían de una en una, y el 404 de la ficha de
 mantenimiento que llevaba cuatro meses.
+
+---
+
+## ⚠️ Escaneo de técnicos: dos cabos sueltos (detectados en el code-review del PR #155, 2026-09-23)
+
+Ninguno bloquea; se dejan anotados para no olvidarlos.
+
+**a) La ficha marca «en cours» al ABRIRLA, no al escanear.** La auto-transición
+`assigné → en_cours` (historial: «Mise en cours automatique — scan QR») vive en el render de
+`/tech/scan/[serie]` (`src/app/tech/scan/[serie]/page.tsx`). Esa página también se abre desde la
+agenda y desde `/tech/planning` sin escanear nada, así que basta con mirar la ficha desde la
+oficina para poner en curso las averías del técnico en esa máquina. **Propuesta:** moverla a
+`stampQrScan` / `recordQrScanAction` (los dos sitios que sí prueban el escaneo).
+⚠️ `tests/e2e/sav-workflow.spec.ts` depende del comportamiento actual (abre la ficha con
+`page.goto` y espera `en_cours`): habrá que adaptarlo en el mismo PR.
+
+**b) El sello QR lo puede fingir un técnico logueado**, tecleando `/m/<serie>` o llamando a
+`recordQrScanAction` a mano. Es inherente mientras las etiquetas no lleven una firma (el QR solo
+codifica el número de serie). Aceptable por ahora: el sello es un indicio para el semáforo 🟢/🟡,
+no un control de seguridad.
 
 ---
 
