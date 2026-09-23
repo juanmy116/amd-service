@@ -297,6 +297,119 @@ sin permiso explícito para desplegar/tocar la BD de producción.
    kiosko → llega el aviso → tocarlo abre la avería; reasignarla a otro técnico → llega «Tâche
    retirée»; comprobar en `push_notifications` que las filas quedaron `sent`.
 
+### 3d. Geolocalización (Fase 3, migración `20260925100000`)
+
+Cada máquina tiene su posición exacta (se guarda sola al primer escaneo; el admin la corrige), el
+técnico tiene un botón **«Itinéraire»** (Google Maps / Waze / Plans) y un orden **«Plus proche»**,
+y la oficina ve si el técnico **estaba en el sitio** al resolver una avería o cerrar un
+mantenimiento. De paso, el «QR vérifié» de los mantenimientos pasa a ser **real** (antes lo ponía
+siempre `close_maintenance_visit`, ver `docs/pendientes.md` histórico).
+
+**Columnas** (`src/lib/geo.ts` es la lógica pura; todo lo demás la envuelve):
+
+- `machines`: `lat`, `lng`, `location_accuracy_m`, `location_source` (`first_scan` | `admin`),
+  `location_set_at`, `location_set_by`. CHECK `machines_location_complete_chk`: o las 3
+  obligatorias (`lat`, `lng`, `location_source`) van juntas y en rango, o las 3 son NULL — con
+  `IS NOT NULL` explícitos, porque `lat BETWEEN … AND …` con `lat` NULL da NULL y un CHECK que
+  evalúa a NULL se da por cumplido (dejaría pasar `lat` sin `lng`).
+- `incidents` y `maintenance_visits` (mismas 6 columnas en ambas): `tech_lat`, `tech_lng`,
+  `tech_accuracy_m`, `tech_distance_m` (a la máquina), `tech_position_at`, `tech_presence`.
+
+**Veredicto de presencia** (`presenceFor` en `geo.ts`, calculado siempre en el servidor —
+`computePresence`, `src/lib/presence.server.ts` — nunca se acepta del navegador):
+
+| Veredicto | Cuándo | Semáforo |
+|---|---|---|
+| `near` | distancia ≤ **200 m** (`PRESENCE_RADIUS_M`) **y** precisión del GPS ≤ **150 m** (`NEAR_MAX_ACCURACY_M`) | 🟢 «Sur place (à 45 m)» |
+| `far` | sigue lejos aunque se reste el margen de error del GPS (`distancia − precisión > 200 m`) | 🟡 «Loin de la machine (à 2,3 km)» |
+| `imprecise` | ni lo uno ni lo otro: el GPS no da para decidir (p. ej. cerca pero con mucho margen de error, o lejos pero dentro del margen) | 🟡 «Position imprécise (± 180 m)» |
+| `no_position` | sin permiso o sin GPS a tiempo | 🟡 «Position non transmise» |
+| `no_machine_position` | la máquina aún no tiene ubicación registrada | ⚪ «Machine sans position enregistrée» |
+
+`presence: null` (tareas de antes de esta fase, las columnas no existían) no pinta nada —
+`presenceLabel()` devuelve `null`. **Nunca bloquea nada**: sin posición del técnico o sin
+ubicación de la máquina, la avería se resuelve y el mantenimiento se cierra igual, solo cambia el
+semáforo. Decisión del usuario (23/09): si el técnico aparece lejos, **no se le avisa** — solo
+queda registrado para que la oficina lo vea si quiere.
+
+**Cuándo se pide la posición al navegador** (`getPositionOnce`, `src/lib/pwa/geolocation.ts`,
+`maximumAge: 60 000` ms, nunca lanza, nunca espera más que su `timeoutMs`) — **solo en tres
+momentos, nunca en segundo plano** (iOS tampoco lo permitiría a una web):
+
+1. **Al escanear el QR** dentro de la app (`qr-scanner.tsx`, tope 3 s) — `stampQrScan`
+   (`src/lib/scan.server.ts`) sella la incidencia/visita **y**, si la máquina **aún no tiene
+   ubicación** y la precisión es ≤ **100 m** (`FIRST_SCAN_MAX_ACCURACY_M`), esa posición pasa a
+   ser la ubicación de la máquina (`location_source = 'first_scan'`), con `.is('lat', null)` en el
+   propio `UPDATE` para no pisar una ubicación puesta en paralelo (por el admin o por otro
+   escaneo). El escaneo desde `/m/[serie]` (cámara del sistema, sin sesión) **no** manda posición.
+2. **Al resolver una avería** (solo si el estado elegido es `résolu`, `intervention-form.tsx`,
+   tope 4 s) y **al cerrar un mantenimiento** (siempre, es un cierre — `MaintenanceVisitForm.tsx`)
+   — la posición viaja en el `FormData` (`appendPosition`/`readPosition`, validada por el
+   servidor: números finitos y en rango, nunca se fía del cliente) y el servidor calcula y guarda
+   el veredicto contra la ubicación **de la máquina** (`computePresence`).
+3. **«Plus proche»** (`/tech/incidents` y `/tech/planning`, tope 6 s): lee la posición para
+   ordenar la lista por cercanía (`sortByDistance`) y **no la guarda en ningún sitio** — es un
+   orden de pantalla, no una prueba de presencia. Las coordenadas de cada tarea son las de su
+   máquina si las tiene, si no el centro de su barrio efectivo (`coordsForMachines`,
+   `src/lib/geo.server.ts`, vía `resolveQuartierCode`), si no `null` (va al final).
+
+**Botón «Itinéraire»** (`src/components/tech/ItineraryButton.tsx`): menú Google Maps / Waze /
+Plans (`itineraryLinks`). Prefiere las coordenadas de la máquina; sin ellas, la dirección en texto
+del cliente (`destinationText`: adresse + barrio + ville + «Sénégal»). Sin ninguna de las dos, el
+botón no se pinta. En la ficha de avería (`/tech/incidents/[id]`) y en la ficha de escaneo
+(`/tech/scan/[serie]`).
+
+**Admin — ver y corregir la posición de una máquina** (`MachinePositionCard.tsx`, bajo el
+formulario de `/admin/machines/[serie]`): muestra lat/lng, precisión (si la hay), origen («Premier
+scan de X le …» / «Saisie manuelle»), enlace a Google Maps. Corrige pegando un enlace de Google
+Maps o «lat, lng» (`parseLatLng`, también acepta coma decimal a la francesa y prioriza `!3d/!4d`
+sobre `@` en un enlace de lugar; enlaces cortos `maps.app.goo.gl` y de itinerario `/maps/dir/` dan
+`null` — no se pueden resolver sin red) → `setMachinePositionAction`
+(`location_source = 'admin'`, `location_accuracy_m = null`: una saisie manual no tiene margen de
+error GPS). «Effacer la position» (con confirmación) → `clearMachinePositionAction`, vacía las 6
+columnas juntas (lo exige el CHECK).
+
+**Lo que ve la oficina**: fila «Position» en `/admin/incidents/[id]` (junto a «QR machine») y
+columna «Position» en la tabla de visitas de `/admin/maintenance/[id]` (`presenceLabel`). La
+columna QR de mantenimiento **ahora significa algo real**: antes del 25/09/2026 el cierre marcaba
+`qr_verified = true` sin comprobar nada (ver más abajo); las visitas cerradas antes de esa fecha
+siguen mostrando su ✓ antiguo — la ficha lo anota («Avant le 25/09/2026, le QR n'était pas vraiment
+vérifié…») para que nadie lo lea como una prueba real.
+
+**`close_maintenance_visit` deja de forzar `qr_verified = true`.** Antes lo ponía a ciegas en todo
+cierre, así que el 🟢 del mantenimiento no probaba nada; ahora el `UPDATE` de la RPC no lo toca, y
+el único sitio que lo pone a `true` es el escaneo real (`stampQrScan`), igual que en las averías.
+Si nadie escaneó antes de cerrar, se queda como estaba.
+
+**Trigger `guard_field_evidence`** (`BEFORE INSERT OR UPDATE` en `incidents` y
+`maintenance_visits`) — las «pruebas de campo» (posición del técnico, veredicto, y en `incidents`
+también `qr_verified`/`qr_scanned_by`) solo las escribe `service_role`:
+
+- Con la sesión de un usuario (técnico o admin autenticado — `auth.role() = 'authenticated'`,
+  incluso dentro de una RPC `SECURITY DEFINER`), un `INSERT` las deja vacías y un `UPDATE` que
+  intenta **poner** un valor lo descarta en silencio (conserva el anterior) — mismo trato que da
+  la RLS a un `UPDATE` sin permiso, sin error. **Vaciarlas sí se permite** (es lo que hace
+  `clearResolution()` al reabrir una avería), salvo si la tarea sigue **cerrada**: borrar un 🟡
+  «loin» de una avería ya resuelta estaría escondiendo la prueba.
+- Al **reabrir** una avería (`résolu`/`fermé` → un estado vivo) el trigger vacía la posición **para
+  cualquiera**, incluido `service_role`: dónde estaba el técnico la primera vez no prueba nada
+  sobre la segunda intervención. (El sello QR de la incidencia lo vacía ya
+  `tg_guard_incident_resolution`, del verrou de résolution — ver más abajo.)
+- Corregir estas columnas **a mano** (SQL Editor de Supabase) exige la **service_role key**: sin
+  ella, `auth.role()` no da `'service_role'` y el trigger descarta el cambio igual que le pasaría a
+  un usuario cualquiera.
+
+**Permissions-Policy** (`next.config.ts`): `geolocation=(self)` (antes `geolocation=()`, que
+bloqueaba la API en todo el sitio) — sigue prohibida para iframes de terceros, solo el propio
+origen puede pedirla.
+
+**Tests**: `src/lib/geo.test.ts` (distancia haversine, veredicto, `parseLatLng`, enlaces de
+itinerario, formato, orden), `tests/rls/geolocation.test.ts` (CHECK de `machines`, un técnico no
+fija la ubicación de una máquina con su sesión, `guard_field_evidence` en sus dos tablas y sus dos
+sentidos — service_role escribe, un usuario solo puede vaciar con la tarea abierta —, reapertura),
+`tests/e2e/geo.spec.ts` (botón «Itinéraire» con la posición real de una máquina seedeada; el admin
+corrige y borra la posición de otra).
+
 ### 4. Módulo Contadores (`/admin/contadores`) ✅
 - Vista principal agrupa máquinas por cliente con indicador ⚠ de relevés pendientes
 - Clic en cliente → vista detalle con todas sus máquinas y sus últimos relevés

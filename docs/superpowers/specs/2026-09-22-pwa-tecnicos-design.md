@@ -119,6 +119,32 @@ usuario (botón). No hay sonido propio.
 
 ### Fase 3 — Geolocalización
 
+> **Implementada el 2026-09-25** (plan `docs/superpowers/plans/2026-09-23-pwa-tecnicos-fase3-geo.md`,
+> migración `20260925100000`). Detalle real en `docs/architecture.md` §3d. Decisiones del usuario
+> del 23/09, al planear el detalle de esta fase:
+> - Arreglar de paso el falso «QR vérifié» de los mantenimientos (`close_maintenance_visit` ponía
+>   `qr_verified = true` a ciegas en todo cierre — ver histórico en `docs/pendientes.md`).
+> - Si el técnico aparece lejos de la máquina al resolver/cerrar, **no se le avisa** — solo queda
+>   registrado para que la oficina lo vea si quiere.
+> - **«Plus proche»** se pidió tanto en la lista de averías (`/tech/incidents`) como en
+>   `/tech/planning`, no solo en una de las dos.
+>
+> Dos refinamientos sobre lo descrito abajo, hechos durante la implementación:
+> - **Veredicto `imprecise`.** El diseño original solo preveía 🟢 `near` / 🟡 `far` por el umbral de
+>   200 m. En la práctica un GPS impreciso (habitual en interiores en Dakar) puede decir «cerca» o
+>   «lejos» sin que sea cierto. Se añadió un tercer veredicto: `near` exige además que la precisión
+>   del GPS sea ≤ 150 m; `far` exige que la distancia siga siendo mayor que el umbral incluso
+>   restando ese margen de error; lo que queda en medio es `imprecise` — igual de informativo que
+>   `far` para la oficina (🟡), pero sin acusar de «lejos» a alguien que probablemente esté cerca.
+> - **Trigger `guard_field_evidence`.** El diseño original no especificaba quién podía escribir la
+>   posición del técnico ni el sello QR más allá de «lo guarda el servidor». Al implementarlo se vio
+>   que, sin más, un técnico con su propia sesión podía hacer un `PATCH` a PostgREST y ponerse un
+>   🟢 «sur place» él mismo (la RLS ya le permite actualizar sus propias averías/visitas). El
+>   trigger fuerza que esas columnas —posición, distancia, veredicto y `qr_verified`/`qr_scanned_by`
+>   — solo las escriba `service_role`; un usuario puede vaciarlas (lo que hace `clearResolution()`
+>   al reabrir) pero nunca ponerlas, y reabrir una avería las vacía para cualquiera. Ver
+>   `docs/architecture.md` §3d para el detalle completo.
+
 - **Prerrequisito**: cambiar `Permissions-Policy` de `geolocation=()` a `geolocation=(self)` en
   `next.config.ts` — hoy bloquea la geolocalización en todo el sitio (trampa nº 2 detectada al
   planear la Fase 1).

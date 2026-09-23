@@ -17,13 +17,19 @@
 | 🧹 **5** | **Borrar los datos de prueba del 22-09** | Dos notas de ⭐5 que no ha dado ningún cliente están contando en la media. |
 | ⚠️ **6** | **40 visitas el mismo día / sin válvula de escape** | Afecta al uso real del mantenimiento, no bloquea. |
 | ⚠️ **7** | **Escaneo de técnicos: dos cabos sueltos del PR #155** | «En cours» automático al ABRIR la ficha (no al escanear) y sello QR falsificable por un técnico logueado. Aceptados por ahora. |
-| ⚠️ **8** | **Mantenimiento cerrado como «QR vérifié» sin escanear** | `close_maintenance_visit` pone siempre `qr_verified = true`, y el formulario de cierre se alcanza desde la agenda/planning sin escanear. El 🟢 del mantenimiento no prueba nada. |
 
 **Cerrado el 2026-09-22:** el verrou de résolution (ninguna avería se cierra sin rastro, probado en
 uso real) y el CSAT (probado de punta a punta; era el pendiente más antiguo). Ese día también se
 corrigieron tres fallos que solo se ven usando la app: la lista de motivos en blanco sobre blanco en
 la TV, las estrellas de la encuesta que se encendían de una en una, y el 404 de la ficha de
 mantenimiento que llevaba cuatro meses.
+
+**Cerrado el 2026-09-25 (Fase 3 de la PWA de técnicos — geolocalización):** el falso «QR vérifié»
+de los mantenimientos (punto 8 de esta lista). `close_maintenance_visit` ya no pone
+`qr_verified = true` a ciegas; el sello solo lo pone el escaneo real (`stampQrScan`), igual que en
+las averías. Las visitas cerradas **antes** del 25/09/2026 siguen mostrando su ✓ antiguo, que no
+probaba nada — la ficha de `/admin/maintenance/[id]` lo anota para que no se lea como una prueba
+real. Detalle en `docs/architecture.md` §3d.
 
 ---
 
@@ -47,10 +53,17 @@ no un control de seguridad.
 
 ---
 
-## ⚠️ Mantenimiento: se cierra como «QR vérifié» sin haber escaneado (detectado en el code-review del PR #156, 2026-09-23)
+## ✅ Mantenimiento: «QR vérifié» ahora es real — RESUELTO (2026-09-25, Fase 3 geolocalización)
+
+> **Resuelto tal como proponía esta entrada:** `close_maintenance_visit` ya no escribe
+> `qr_verified = true` a ciegas; el sello lo pone solo el escaneo real (`stampQrScan`), igual que
+> en las averías (migración `20260925100000`, trigger `guard_field_evidence` de paso impide que un
+> usuario logueado se lo escriba a mano). Las visitas cerradas **antes** del 25/09/2026 conservan
+> su ✓ antiguo (no se reescribe el histórico) — la ficha de `/admin/maintenance/[id]` lo anota para
+> que no se lea como una prueba real. Detalle en `docs/architecture.md` §3d.
 
 Problema **anterior** a los avisos push (no lo introduce el PR #156; se vio al revisar a dónde
-debía llevar el aviso de un mantenimiento asignado).
+debía llevar el aviso de un mantenimiento asignado). Se deja el análisis original como historial:
 
 - La RPC `close_maintenance_visit` (`supabase/migrations/20260604140000_close_maintenance_visit_rpc.sql`)
   escribe **siempre** `qr_verified = true`, pase lo que pase.
