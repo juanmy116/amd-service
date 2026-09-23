@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createAdminClient } from './supabase/admin'
 import { getOpenLineForMachine } from './contract-machines'
+import { FIRST_SCAN_MAX_ACCURACY_M, type LatLng } from './geo'
 
 /**
  * Deja constancia de que alguien escaneó el QR físico de una máquina.
@@ -19,23 +20,48 @@ import { getOpenLineForMachine } from './contract-machines'
  * la máquina a un técnico sentado en la oficina, que es exactamente lo contrario de lo que el
  * sello debe probar.
  *
- * Nunca bloquea nada: un fallo aquí se registra y se sigue.
+ * Qué deja el escaneo:
+ * - las averías abiertas de la máquina (del que escanea o sin técnico) quedan `qr_verified`;
+ * - las visitas de mantenimiento pendientes (`planifié` / `en_retard`) de su línea abierta,
+ *   igual: del que escanea o sin técnico. Desde la Fase 3 el cierre de la visita ya no pone el
+ *   sello a ciegas (`close_maintenance_visit`), así que este es el único sitio que lo pone;
+ * - si la máquina aún no tiene ubicación y el GPS del escaneo es bastante preciso
+ *   (≤ FIRST_SCAN_MAX_ACCURACY_M), esa posición pasa a ser la de la máquina. Solo el escáner de
+ *   la app manda posición; `/m/[serie]` no (la cámara del sistema no la da).
+ *
+ * Nunca bloquea nada: un fallo aquí se registra y se sigue. Cada paso es independiente: que
+ * falle uno no impide los demás.
  */
-export async function stampQrScan(numeroSerie: string, userId: string): Promise<void> {
+export async function stampQrScan(
+  numeroSerie: string,
+  userId: string,
+  position: (LatLng & { accuracy: number }) | null = null,
+): Promise<void> {
   const admin = createAdminClient()
 
   // El escaneo de la etiqueta de un equipo dado de baja no prueba nada (la propia página de
   // scan muestra «Machine introuvable ou retirée du parc» en ese caso).
   const { data: machine } = await admin
     .from('machines')
-    .select('active')
+    .select('active, lat')
     .eq('numero_serie', numeroSerie)
     .maybeSingle()
   if (!machine?.active) return
 
   const openLine = await getOpenLineForMachine(admin, numeroSerie)
-  const filterExpr = openLine
-    ? `contract_machine_id.eq.${openLine.id},machine_id.eq.${numeroSerie}`
+
+  await stampIncidents(admin, numeroSerie, openLine?.id ?? null, userId)
+  if (openLine) await stampMaintenanceVisits(admin, openLine.id, userId)
+  if (machine.lat === null && position && position.accuracy <= FIRST_SCAN_MAX_ACCURACY_M) {
+    await setFirstScanLocation(admin, numeroSerie, userId, position)
+  }
+}
+
+type Admin = ReturnType<typeof createAdminClient>
+
+async function stampIncidents(admin: Admin, numeroSerie: string, openLineId: string | null, userId: string) {
+  const filterExpr = openLineId
+    ? `contract_machine_id.eq.${openLineId},machine_id.eq.${numeroSerie}`
     : `machine_id.eq.${numeroSerie}`
 
   const { data: rows, error: readError } = await admin
@@ -63,4 +89,41 @@ export async function stampQrScan(numeroSerie: string, userId: string): Promise<
     .update({ qr_verified: true, qr_scanned_by: userId })
     .in('id', targets)
   if (error) console.error('[stampQrScan.write]', error)
+}
+
+// Mismo criterio que las averías (del que escanea o sin técnico). Las visitas no guardan quién
+// escaneó: `qr_verified` a secas, como mostraba ya la oficina.
+async function stampMaintenanceVisits(admin: Admin, openLineId: string, userId: string) {
+  const { error } = await admin
+    .from('maintenance_visits')
+    .update({ qr_verified: true })
+    .eq('contract_machine_id', openLineId)
+    .in('status', ['planifié', 'en_retard'])
+    .or(`assigned_to.eq.${userId},assigned_to.is.null`)
+    .eq('qr_verified', false)
+  if (error) console.error('[stampQrScan.visits]', error)
+}
+
+// Primer escaneo con buen GPS ⇒ ubicación de la máquina. `.is('lat', null)` en el propio UPDATE:
+// si el admin (u otro escaneo) la ha puesto entre la lectura y aquí, no se pisa. Las columnas
+// van todas juntas (CHECK machines_location_complete_chk).
+async function setFirstScanLocation(
+  admin: Admin,
+  numeroSerie: string,
+  userId: string,
+  position: LatLng & { accuracy: number },
+) {
+  const { error } = await admin
+    .from('machines')
+    .update({
+      lat: position.lat,
+      lng: position.lng,
+      location_accuracy_m: position.accuracy,
+      location_source: 'first_scan',
+      location_set_at: new Date().toISOString(),
+      location_set_by: userId,
+    })
+    .eq('numero_serie', numeroSerie)
+    .is('lat', null)
+  if (error) console.error('[stampQrScan.location]', error)
 }
