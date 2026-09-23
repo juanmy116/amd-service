@@ -3,7 +3,8 @@
 // La invoca el trigger de asignación (kick_push_sender, «toque» vía pg_net) nada más encolar
 // una fila, y de red de seguridad el cron de 1 minuto (migración 20260924100000). Reclama la
 // cola con `claim_push_notifications` (FOR UPDATE SKIP LOCKED: varias invocaciones simultáneas
-// no envían dos veces), arma el texto con la función pura de `_shared/push-message.ts` y envía
+// no envían dos veces) de 10 en 10 y procesa esas filas EN PARALELO (el tiempo de pared de la
+// función queda acotado aunque un servicio push tarde), arma el texto con la función pura de `_shared/push-message.ts` y envía
 // Web Push (VAPID) a todas las suscripciones activas del destinatario. Cada fila queda con un
 // estado final (`sent` / `no_subscription` / `failed` / `pending` para reintento) — nunca se
 // deja una fila reclamada sin actualizar, ni un aviso roto detiene a los demás.
@@ -77,7 +78,9 @@ Deno.serve(async (req: Request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  const { data: rows, error: claimErr } = await db.rpc('claim_push_notifications', { p_limit: 50 })
+  // Lote pequeño + en paralelo: cada envío puede tardar hasta 10 s por aparato; 50 filas en serie
+  // podían agotar el tiempo de pared de la Edge Function y dejar filas 'sending' huérfanas.
+  const { data: rows, error: claimErr } = await db.rpc('claim_push_notifications', { p_limit: 10 })
   if (claimErr) {
     console.error('[send-push] claim_push_notifications', claimErr.message)
     return new Response(JSON.stringify({ error: claimErr.message }), { status: 500, headers: JSON_HEADERS })
@@ -86,7 +89,9 @@ Deno.serve(async (req: Request) => {
   const queue = (rows ?? []) as QueueRow[]
   const counts: Counts = { claimed: queue.length, sent: 0, failed: 0, no_subscription: 0, stale: 0 }
 
-  for (const row of queue) {
+  // Cada fila lleva su propio try/catch y deja su estado final; allSettled solo garantiza que
+  // esperamos a TODAS antes de responder, aunque alguna rechace de forma inesperada.
+  await Promise.allSettled(queue.map(async row => {
     try {
       await processRow(db, row, counts)
     } catch (err) {
@@ -97,7 +102,7 @@ Deno.serve(async (req: Request) => {
       if (status === 'failed') counts.failed++
       await updateNotification(db, row.id, { status, error: message })
     }
-  }
+  }))
 
   console.log('[send-push]', JSON.stringify(counts))
   return new Response(JSON.stringify(counts), { headers: JSON_HEADERS })
@@ -130,8 +135,32 @@ function pushErrorDetail(err: unknown): { statusCode: number | undefined; detail
   return { statusCode, detail }
 }
 
+/**
+ * ¿Se le llegó a AVISAR a este técnico de la asignación? Un «Tâche retirée» de algo de lo que
+ * nunca supo (la asignación caducó, no tenía aparato, falló el envío…) solo confunde.
+ */
+async function wasAssignmentNotified(db: SupabaseClient, row: QueueRow): Promise<boolean> {
+  const { data, error } = await db
+    .from('push_notifications')
+    .select('id')
+    .eq('recipient_id', row.recipient_id)
+    .eq('entity_type', row.entity_type)
+    .eq('entity_id', row.entity_id)
+    .eq('kind', 'assigned')
+    .eq('status', 'sent')
+    .limit(1)
+  if (error) throw new Error(`push_notifications (assigned previo): ${error.message}`)
+  return (data ?? []).length > 0
+}
+
 /** Procesa una fila reclamada de principio a fin: carga contexto, envía, deja el estado final. */
 async function processRow(db: SupabaseClient, row: QueueRow, counts: Counts): Promise<void> {
+  if (row.kind === 'unassigned' && !(await wasAssignmentNotified(db, row))) {
+    counts.stale++
+    await updateNotification(db, row.id, { status: 'expired', error: 'stale' })
+    return
+  }
+
   const ctx = await loadContext(db, row)
   if (!ctx) {
     counts.failed++
@@ -238,48 +267,31 @@ async function loadIncidentContext(db: SupabaseClient, row: QueueRow): Promise<L
   if (error) throw new Error(`incidents: ${error.message}`)
   if (!incident) return null
 
-  let contractMachineId: string | null = incident.contract_machine_id
-  let machineSerie: string | null = incident.machine_id
+  // Con línea: esa línea. Incidencia pública (sin contract_machine_id): la línea vigente hoy de
+  // esa máquina, igual que getOpenLineForMachine (src/lib/contract-machines.ts).
+  const line = incident.contract_machine_id
+    ? await loadLine(db, 'id', incident.contract_machine_id)
+    : incident.machine_id
+      ? await loadLine(db, 'machine_id', incident.machine_id)
+      : null
 
-  if (contractMachineId) {
-    const { data: line, error: lineErr } = await db
-      .from('contract_machines')
-      .select('machine_id')
-      .eq('id', contractMachineId)
-      .maybeSingle()
-    if (lineErr) throw new Error(`contract_machines: ${lineErr.message}`)
-    if (line) machineSerie = line.machine_id
-  } else if (machineSerie) {
-    // Incidencia pública (sin contract_machine_id): la línea vigente hoy de esa máquina, igual
-    // que getOpenLineForMachine (src/lib/contract-machines.ts) — solo para hallar al cliente,
-    // el número de serie ya lo tenemos directo de la incidencia.
-    const { data: openLine, error: openErr } = await db
-      .from('contract_machines')
-      .select('id')
-      .eq('machine_id', machineSerie)
-      .is('date_fin', null)
-      .maybeSingle()
-    if (openErr) throw new Error(`contract_machines (línea abierta): ${openErr.message}`)
-    contractMachineId = openLine?.id ?? null
-  }
-
-  const [machineQuartier, client] = await Promise.all([
-    loadMachineQuartier(db, machineSerie),
-    loadClient(db, contractMachineId),
-  ])
-  const quartier = await loadQuartierLabel(db, machineQuartier ?? client?.quartier_code ?? null)
+  // Sin línea (o la línea no se encontró), el barrio de la máquina sigue saliendo del serie
+  // de la propia incidencia.
+  const machineQuartier = line
+    ? line.machineQuartier
+    : await loadMachineQuartier(db, incident.machine_id)
+  const quartier = await loadQuartierLabel(db, machineQuartier ?? line?.client?.quartier_code ?? null)
 
   return {
     kind: row.kind,
     entityType: 'incident',
     entityId: row.entity_id,
-    clientName: client?.nom_client ?? null,
+    clientName: line?.client?.nom_client ?? null,
     quartier,
     incidentTitle: incident.title,
     incidentNumero: incident.numero_incident,
     priority: incident.priority,
     scheduledDate: null,
-    machineSerie,
     assignedTo: incident.assigned_to,
     entityStatus: incident.status,
   }
@@ -294,35 +306,50 @@ async function loadVisitContext(db: SupabaseClient, row: QueueRow): Promise<Load
   if (error) throw new Error(`maintenance_visits: ${error.message}`)
   if (!visit) return null
 
-  const contractMachineId: string = visit.contract_machine_id
-  const { data: line, error: lineErr } = await db
-    .from('contract_machines')
-    .select('machine_id')
-    .eq('id', contractMachineId)
-    .maybeSingle()
-  if (lineErr) throw new Error(`contract_machines: ${lineErr.message}`)
-  const machineSerie: string | null = line?.machine_id ?? null
-
-  const [machineQuartier, client] = await Promise.all([
-    loadMachineQuartier(db, machineSerie),
-    loadClient(db, contractMachineId),
-  ])
-  const quartier = await loadQuartierLabel(db, machineQuartier ?? client?.quartier_code ?? null)
+  const line = await loadLine(db, 'id', visit.contract_machine_id)
+  const quartier = await loadQuartierLabel(db, line?.machineQuartier ?? line?.client?.quartier_code ?? null)
 
   return {
     kind: row.kind,
     entityType: 'visit',
     entityId: row.entity_id,
-    clientName: client?.nom_client ?? null,
+    clientName: line?.client?.nom_client ?? null,
     quartier,
     incidentTitle: null,
     incidentNumero: null,
     priority: null,
     scheduledDate: visit.scheduled_date,
-    machineSerie,
     assignedTo: visit.assigned_to,
     entityStatus: visit.status,
   }
+}
+
+type LineInfo = {
+  /** `machines.quartier_code` (barrio de la instalación). */
+  machineQuartier: string | null
+  /** Cliente de la línea (nombre + barrio de respaldo). */
+  client: { nom_client: string; quartier_code: string | null } | null
+}
+
+/**
+ * Una línea contract_machines con su máquina y su cliente en UNA sola consulta. La relación
+ * contract_machines → machines es única (FK `machine_id`), así que el embed no es ambiguo.
+ * - `by = 'id'`: la línea concreta.
+ * - `by = 'machine_id'`: la línea vigente (sin date_fin) de ese serie — como mucho una (índice
+ *   único `contract_machines_one_open_per_machine`).
+ */
+async function loadLine(db: SupabaseClient, by: 'id' | 'machine_id', value: string): Promise<LineInfo | null> {
+  let query = db
+    .from('contract_machines')
+    .select('machines(quartier_code), contracts(clients(nom_client, quartier_code))')
+    .eq(by, value)
+  if (by === 'machine_id') query = query.is('date_fin', null)
+  const { data, error } = await query.maybeSingle()
+  if (error) throw new Error(`contract_machines: ${error.message}`)
+  if (!data) return null
+  const machine = data.machines as unknown as { quartier_code: string | null } | null
+  const contract = data.contracts as unknown as { clients: { nom_client: string; quartier_code: string | null } | null } | null
+  return { machineQuartier: machine?.quartier_code ?? null, client: contract?.clients ?? null }
 }
 
 /** `machines.quartier_code` de la máquina (barrio de la instalación), si se conoce el serie. */
@@ -335,22 +362,6 @@ async function loadMachineQuartier(db: SupabaseClient, serie: string | null): Pr
     .maybeSingle()
   if (error) throw new Error(`machines: ${error.message}`)
   return data?.quartier_code ?? null
-}
-
-/** Cliente (nombre + barrio de respaldo) de la línea contract_machines → contracts → clients. */
-async function loadClient(
-  db: SupabaseClient,
-  contractMachineId: string | null,
-): Promise<{ nom_client: string; quartier_code: string | null } | null> {
-  if (!contractMachineId) return null
-  const { data, error } = await db
-    .from('contract_machines')
-    .select('contracts(clients(nom_client, quartier_code))')
-    .eq('id', contractMachineId)
-    .maybeSingle()
-  if (error) throw new Error(`contracts/clients: ${error.message}`)
-  const contract = data?.contracts as unknown as { clients: { nom_client: string; quartier_code: string | null } | null } | null
-  return contract?.clients ?? null
 }
 
 /** `quartiers.label` a partir de su `code` (misma regla que el kiosko, src/lib/quartiers.ts). */

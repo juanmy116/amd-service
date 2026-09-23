@@ -16,15 +16,20 @@ self.addEventListener('push', event => {
   // Un payload válido en JSON pero que no es un objeto (número, string, null, array…) no debe
   // saltarse showNotification: iOS exige una notificación por cada push, así venga lo que venga.
   if (!data || typeof data !== 'object') data = {}
-  event.waitUntil(
-    self.registration.showNotification(data.title || 'AMD SAV', {
-      body: data.body || '',
-      tag: data.tag,
-      icon: '/pwa/icon-192.png',
-      badge: '/pwa/icon-192.png',
-      data: { url: data.url || '/tech' },
-    })
-  )
+  const options = {
+    body: data.body || '',
+    icon: '/pwa/icon-192.png',
+    badge: '/pwa/icon-192.png',
+    data: { url: data.url || '/tech' },
+  }
+  // El `tag` sustituye la notificación anterior de la misma tarea. Una asignación nueva debe volver
+  // a sonar/vibrar aunque sustituya a otra (`renotify`); una retirada, no. `renotify` sin `tag`
+  // lanza TypeError (y entonces no se mostraría nada), así que solo se pone si hay `tag`.
+  if (typeof data.tag === 'string' && data.tag) {
+    options.tag = data.tag
+    if (data.kind === 'assigned') options.renotify = true
+  }
+  event.waitUntil(self.registration.showNotification(data.title || 'AMD SAV', options))
 })
 
 // Al tocar: reutilizar una ventana de la PWA (scope /tech) si hay una abierta; si no, o si

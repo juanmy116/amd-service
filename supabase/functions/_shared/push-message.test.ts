@@ -5,7 +5,7 @@ const base: PushContext = {
   kind: 'assigned', entityType: 'incident', entityId: 'inc-1',
   clientName: 'Axa', quartier: 'Plateau',
   incidentTitle: 'Bourrage papier', incidentNumero: 'SAV-2026-0042', priority: 'normale',
-  scheduledDate: null, machineSerie: 'V9314505033',
+  scheduledDate: null,
 }
 
 describe('buildPushMessage', () => {
@@ -15,6 +15,7 @@ describe('buildPushMessage', () => {
       body: 'Bourrage papier · SAV-2026-0042',
       url: '/tech/incidents/inc-1',
       tag: 'incident-inc-1',
+      kind: 'assigned',
     })
   })
 
@@ -27,21 +28,17 @@ describe('buildPushMessage', () => {
     expect(buildPushMessage({ ...base, clientName: null, quartier: null }).title).toBe('Nouvelle panne — Client inconnu')
   })
 
-  it('mantenimiento asignado: fecha en formato francés, abre la visita en su máquina', () => {
+  it('mantenimiento asignado: fecha en formato francés, abre el planning (nunca el cierre de la visita)', () => {
     expect(buildPushMessage({
       ...base, entityType: 'visit', entityId: 'vis-1', scheduledDate: '2026-09-30',
       incidentTitle: null, incidentNumero: null, priority: null,
     })).toEqual({
       title: 'Maintenance assignée — Axa, Plateau',
       body: 'Prévue le 30/09/2026',
-      url: '/tech/scan/V9314505033/maintenance/vis-1',
+      url: '/tech/planning',
       tag: 'visit-vis-1',
+      kind: 'assigned',
     })
-  })
-
-  it('mantenimiento sin serie conocida: abre el planning', () => {
-    expect(buildPushMessage({ ...base, entityType: 'visit', entityId: 'vis-1', machineSerie: null, scheduledDate: '2026-09-30' }).url)
-      .toBe('/tech/planning')
   })
 
   it('tarea retirada (avería y mantenimiento): abre el inicio', () => {
@@ -50,14 +47,10 @@ describe('buildPushMessage', () => {
       body: 'La panne SAV-2026-0042 a été réassignée.',
       url: '/tech',
       tag: 'incident-inc-1',
+      kind: 'unassigned',
     })
     expect(buildPushMessage({ ...base, kind: 'unassigned', entityType: 'visit', entityId: 'vis-1', scheduledDate: '2026-09-30' }).body)
       .toBe('La maintenance du 30/09/2026 a été réassignée.')
-  })
-
-  it('el serie se codifica en la URL', () => {
-    expect(buildPushMessage({ ...base, entityType: 'visit', entityId: 'v', machineSerie: 'A B/1', scheduledDate: '2026-01-02' }).url)
-      .toBe('/tech/scan/A%20B%2F1/maintenance/v')
   })
 
   it('título largo: se trunca a 120 caracteres + …', () => {

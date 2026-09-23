@@ -17,6 +17,7 @@
 | 🧹 **5** | **Borrar los datos de prueba del 22-09** | Dos notas de ⭐5 que no ha dado ningún cliente están contando en la media. |
 | ⚠️ **6** | **40 visitas el mismo día / sin válvula de escape** | Afecta al uso real del mantenimiento, no bloquea. |
 | ⚠️ **7** | **Escaneo de técnicos: dos cabos sueltos del PR #155** | «En cours» automático al ABRIR la ficha (no al escanear) y sello QR falsificable por un técnico logueado. Aceptados por ahora. |
+| ⚠️ **8** | **Mantenimiento cerrado como «QR vérifié» sin escanear** | `close_maintenance_visit` pone siempre `qr_verified = true`, y el formulario de cierre se alcanza desde la agenda/planning sin escanear. El 🟢 del mantenimiento no prueba nada. |
 
 **Cerrado el 2026-09-22:** el verrou de résolution (ninguna avería se cierra sin rastro, probado en
 uso real) y el CSAT (probado de punta a punta; era el pendiente más antiguo). Ese día también se
@@ -43,6 +44,29 @@ oficina para poner en curso las averías del técnico en esa máquina. **Propues
 `recordQrScanAction` a mano. Es inherente mientras las etiquetas no lleven una firma (el QR solo
 codifica el número de serie). Aceptable por ahora: el sello es un indicio para el semáforo 🟢/🟡,
 no un control de seguridad.
+
+---
+
+## ⚠️ Mantenimiento: se cierra como «QR vérifié» sin haber escaneado (detectado en el code-review del PR #156, 2026-09-23)
+
+Problema **anterior** a los avisos push (no lo introduce el PR #156; se vio al revisar a dónde
+debía llevar el aviso de un mantenimiento asignado).
+
+- La RPC `close_maintenance_visit` (`supabase/migrations/20260604140000_close_maintenance_visit_rpc.sql`)
+  escribe **siempre** `qr_verified = true`, pase lo que pase.
+- La ficha de máquina `/tech/scan/[serie]` se abre también desde la agenda y desde `/tech/planning`
+  **sin escanear nada**, y enlaza con el formulario de cierre
+  `/tech/scan/[serie]/maintenance/[visitId]`.
+- Resultado: un técnico puede cerrar una visita desde la oficina (o desde casa) y queda como
+  «verificada por QR».
+
+Por eso el aviso push de un mantenimiento asignado abre `/tech/planning` y **nunca** el formulario de
+cierre (PR #156).
+
+**Propuesta:** sellar `qr_verified` del mantenimiento solo desde el escaneo real — igual que las
+averías con `stampQrScan` — y pasar ese valor a la RPC (`p_qr_verified`) en vez de fijarlo a `true`.
+Relacionado con el punto b) de la sección anterior (el sello QR sigue siendo falsificable por un
+técnico logueado mientras la etiqueta no lleve firma).
 
 ---
 

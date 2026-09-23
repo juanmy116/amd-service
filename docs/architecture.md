@@ -140,12 +140,21 @@ sin dejar rastro) y un lote de asignaciones no bloquea al usuario que las hace.
 2. Trigger `enqueue_assignment_push()` (`AFTER INSERT OR UPDATE OF assigned_to`) **encola** en
    `push_notifications` una fila por cada aviso que corresponda y da un «toque» a la Edge Function
    `send-push` vía `kick_push_sender()` (`pg_net`, no bloqueante).
-3. `send-push` reclama la cola con `claim_push_notifications` (`FOR UPDATE SKIP LOCKED`), carga el
-   contexto real (cliente, barrio, máquina…), arma el texto con la función pura
+3. `send-push` reclama la cola con `claim_push_notifications` (`FOR UPDATE SKIP LOCKED`) **de 10 en
+   10** y procesa esas filas **en paralelo** (`Promise.allSettled`, cada fila con su propio
+   `try/catch` y su estado final) — así el tiempo de pared de la función queda acotado aunque un
+   servicio push tarde. Carga el contexto real (línea + máquina + cliente en una sola consulta
+   embebida, luego el barrio), arma el texto con la función pura
    `supabase/functions/_shared/push-message.ts` y envía Web Push (VAPID) a cada suscripción activa
    del técnico.
 4. El Service Worker (`public/sw.js`) muestra la notificación y, al tocarla, abre/reutiliza una
-   ventana de `/tech` en la tarea correspondiente.
+   ventana de `/tech` en la tarea correspondiente. Destinos: avería asignada → `/tech/incidents/<id>`;
+   mantenimiento asignado → **`/tech/planning`** (nunca `/tech/scan/<serie>/maintenance/<id>`: ese
+   formulario cierra la visita como «QR vérifié» sin escanear, ver `docs/pendientes.md`); tarea
+   retirada → `/tech`. El payload lleva `tag` (`<entity_type>-<id>`, un aviso nuevo de la misma
+   tarea sustituye al anterior) y `kind`: con `kind = 'assigned'` el SW pone `renotify: true` para
+   que la sustitución vuelva a sonar; una retirada sustituye en silencio. `renotify` solo se pone
+   si hay `tag` (sin él, `showNotification` lanza `TypeError`).
 5. Un cron de 1 minuto (`push-notifications-retry`) es la red de seguridad: reintenta lo pendiente,
    da por fallido lo que agotó sus intentos, caduca lo que ya no tiene sentido avisar y purga
    historial viejo.
@@ -204,7 +213,9 @@ confundiría al técnico, así que la fila se marca `expired` / `error: 'stale'`
 - `kind = 'assigned'` caduca si el destinatario ya no es el asignado actual, o si la tarea ya se
   cerró.
 - `kind = 'unassigned'` caduca si el destinatario volvió a ser el asignado (reasignación de ida y
-  vuelta).
+  vuelta), **o si nunca se le llegó a avisar de la asignación** (no existe una fila `assigned` en
+  `status = 'sent'` para el mismo técnico y la misma tarea): un «Tâche retirée» de algo de lo que no
+  sabía nada solo confunde. Esta comprobación va antes de cargar el contexto.
 
 **Cron `push-notifications-retry` (cada minuto, idempotente):**
 1. Da por **`failed`** las filas con `attempts >= 3` que seguían `pending`/`sending`
