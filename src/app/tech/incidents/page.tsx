@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import TechIncidentList from '@/components/tech/TechIncidentList'
 import type { TechIncident } from '@/components/tech/TechIncidentList'
 import { TECH_INCIDENT_SELECT } from '@/lib/incident'
+import { coordsForMachines } from '@/lib/geo.server'
 
 export default async function TechIncidentsPage() {
   const supabase = await createClient()
@@ -18,8 +19,14 @@ export default async function TechIncidentsPage() {
     .eq('assigned_to', user.id)
     .order('created_at', { ascending: false })
 
+  // Nº de série de la machine (interne via contract_machines, publique via machine_id
+  // directement) pour demander ses coordonnées à « Plus proche » (Fase 3 §Task 8).
+  const seriesBySerie = (data ?? []).map((r) => r.contract_machines?.machines?.numero_serie ?? r.machine_id)
+  const coordsBySerie = await coordsForMachines(seriesBySerie.filter((s): s is string => !!s))
+
   const incidents: TechIncident[] = (data ?? []).map((row) => {
     const r = row
+    const serie = r.contract_machines?.machines?.numero_serie ?? r.machine_id
     return {
       id: r.id,
       numero_incident: r.numero_incident,
@@ -29,6 +36,7 @@ export default async function TechIncidentsPage() {
       created_at: r.created_at,
       machine_id: r.machine_id,
       clients: r.contract_machines?.contracts?.clients ?? null,
+      coords: serie ? coordsBySerie.get(serie) ?? null : null,
     }
   })
 

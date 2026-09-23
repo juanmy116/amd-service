@@ -1,23 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Wrench, AlertCircle, AlertTriangle } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
-
-function fmtDate(dateStr: string): { label: string; isOverdue: boolean } {
-  const d = new Date(dateStr + 'T00:00:00')
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const diff = Math.round((d.getTime() - today.getTime()) / 86400000)
-  if (diff < 0)  return { label: `${Math.abs(diff)} jour${Math.abs(diff) > 1 ? 's' : ''} de retard`, isOverdue: true }
-  if (diff === 0) return { label: "Aujourd'hui", isOverdue: false }
-  if (diff === 1) return { label: 'Demain', isOverdue: false }
-  return {
-    label: d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }),
-    isOverdue: false,
-  }
-}
+import PlanningVisits from '@/components/tech/PlanningVisits'
+import type { VisitRow } from '@/components/tech/PlanningVisits'
+import { coordsForMachines } from '@/lib/geo.server'
+import type { LatLng } from '@/lib/geo'
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
   nuevo: 'info', assigné: 'violet', en_cours: 'warning',
@@ -61,15 +51,6 @@ export default async function TechPlanningPage() {
     v.status === 'en_retard' || v.scheduled_date <= in14Str
   )
 
-  type VisitRow = {
-    id: string; scheduled_date: string; status: string
-    serie: string | null
-    marque: string | null
-    modele: string | null
-    client: string
-    lieu: string | null
-  }
-
   function toRow(v: (typeof visits)[number]): VisitRow {
     const line = v.contract_machines
     return {
@@ -84,21 +65,13 @@ export default async function TechPlanningPage() {
     }
   }
 
-  type VisitGroup = { key: string; client: string; lieu: string | null; rows: VisitRow[] }
-  function groupByContract(rows: VisitRow[]): VisitGroup[] {
-    const map = new Map<string, VisitGroup>()
-    for (const r of rows) {
-      const key = `${r.client}|${r.lieu ?? ''}`
-      if (!map.has(key)) map.set(key, { key, client: r.client, lieu: r.lieu, rows: [] })
-      map.get(key)!.rows.push(r)
-    }
-    return [...map.values()]
-  }
+  const overdueRows = visits.filter(v => v.status === 'en_retard').map(toRow)
+  const plannedRows = visits.filter(v => v.status === 'planifié').map(toRow)
 
-  const overdueGroups = groupByContract(visits.filter(v => v.status === 'en_retard').map(toRow))
-  const plannedGroups = groupByContract(visits.filter(v => v.status === 'planifié').map(toRow))
-  const overdueCount  = overdueGroups.reduce((n, g) => n + g.rows.length, 0)
-  const plannedCount  = plannedGroups.reduce((n, g) => n + g.rows.length, 0)
+  // Coordonnées des machines des visites, pour « Plus proche » (Fase 3 §Task 8).
+  const series = [...overdueRows, ...plannedRows].map(r => r.serie).filter((s): s is string => !!s)
+  const coordsMap = await coordsForMachines(series)
+  const coords: Record<string, LatLng | null> = Object.fromEntries(coordsMap)
 
   return (
     <div className="p-4 space-y-6 pt-5">
@@ -112,89 +85,8 @@ export default async function TechPlanningPage() {
         </p>
       </div>
 
-      {/* ── MAINTENANCES EN RETARD ── */}
-      {overdueCount > 0 && (
-        <section className="space-y-2">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={14} className="text-accent" />
-            <p className="text-sm font-semibold text-accent">En retard ({overdueCount})</p>
-          </div>
-          {overdueGroups.map(group => (
-            <div key={group.key} className="bg-card rounded-[var(--radius-card)] border-2 border-accent/30 p-4 space-y-2">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-ink truncate">{group.client}</p>
-                {group.lieu && <p className="text-xs text-ink-muted truncate">{group.lieu}</p>}
-              </div>
-              <div className="space-y-1.5">
-                {group.rows.map(r => {
-                  const { label } = fmtDate(r.scheduled_date)
-                  return (
-                    <Link
-                      key={r.id}
-                      href={r.serie ? `/tech/scan/${encodeURIComponent(r.serie)}` : '/tech'}
-                      className="flex items-center justify-between gap-3 rounded-lg bg-accent-soft/50 px-3 py-2"
-                    >
-                      <span className="text-xs text-ink-soft truncate flex items-center gap-1.5">
-                        <Wrench size={12} className="text-accent shrink-0" />
-                        {r.marque} {r.modele}
-                      </span>
-                      <span className="shrink-0 text-xs font-semibold text-accent whitespace-nowrap">{label}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </section>
-      )}
-
-      {/* ── MAINTENANCES PLANIFIÉES ── */}
-      <section className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Wrench size={14} className="text-ink-muted" />
-          <p className="text-sm font-semibold text-ink-soft">
-            Maintenance — 14 prochains jours
-            {plannedCount > 0 && (
-              <span className="ml-2 text-xs font-normal text-ink-muted">({plannedCount})</span>
-            )}
-          </p>
-        </div>
-
-        {plannedCount === 0 ? (
-          <div className="bg-card rounded-[var(--radius-card)] border border-line p-6 text-center">
-            <p className="text-sm text-ink-muted">Aucune visite planifiée dans 14 jours</p>
-          </div>
-        ) : (
-          plannedGroups.map(group => (
-            <div key={group.key} className="bg-card rounded-[var(--radius-card)] border border-line p-4 space-y-2">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-ink truncate">{group.client}</p>
-                {group.lieu && <p className="text-xs text-ink-muted truncate">{group.lieu}</p>}
-              </div>
-              <div className="space-y-1.5">
-                {group.rows.map(r => {
-                  const { label, isOverdue } = fmtDate(r.scheduled_date)
-                  return (
-                    <Link
-                      key={r.id}
-                      href={r.serie ? `/tech/scan/${encodeURIComponent(r.serie)}` : '/tech'}
-                      className="flex items-center justify-between gap-3 rounded-lg bg-info-soft/40 px-3 py-2"
-                    >
-                      <span className="text-xs text-ink-soft truncate flex items-center gap-1.5">
-                        <Wrench size={12} className="text-info shrink-0" />
-                        {r.marque} {r.modele}
-                      </span>
-                      <span className={`shrink-0 text-xs font-semibold whitespace-nowrap ${isOverdue ? 'text-accent' : 'text-info'}`}>
-                        {label}
-                      </span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-          ))
-        )}
-      </section>
+      {/* ── MAINTENANCES (en retard + 14 prochains jours) ── */}
+      <PlanningVisits overdueRows={overdueRows} plannedRows={plannedRows} coords={coords} />
 
       {/* ── MES INTERVENTIONS ── */}
       <section className="space-y-2">

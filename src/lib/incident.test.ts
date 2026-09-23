@@ -31,9 +31,13 @@ describe('getIncidentDisplayName', () => {
 
 describe('TECH_INCIDENT_SELECT', () => {
   it('referencia la cadena contract_machines → contracts → clients (no columnas legacy)', () => {
-    expect(TECH_INCIDENT_SELECT).toContain('contract_machines(contracts(clients(nom_client)))')
+    expect(TECH_INCIDENT_SELECT).toContain('contracts(clients(nom_client))')
     expect(TECH_INCIDENT_SELECT).toContain('machine_id')
     // No debe volver a colarse el join legacy que vació la lista del técnico.
     expect(TECH_INCIDENT_SELECT).not.toContain('client_id')
+  })
+
+  it('incluye el nº de série de la machine interne, pour « Plus proche »', () => {
+    expect(TECH_INCIDENT_SELECT).toContain('contract_machines(machines(numero_serie)')
   })
 })
