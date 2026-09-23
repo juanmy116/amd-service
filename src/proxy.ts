@@ -54,6 +54,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // El manifest y el service worker los pide iOS SIN cookies: si pasaran por aquí, cada
+    // comprobación de actualización gastaría un round-trip de sesión a Supabase sin necesidad.
+    '/((?!_next/static|_next/image|favicon\\.ico|sw\\.js|amd-sav\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
