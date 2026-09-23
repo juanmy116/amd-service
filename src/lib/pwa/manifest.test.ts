@@ -8,6 +8,7 @@ describe('techManifest', () => {
   it('abre la app de técnicos a pantalla completa', () => {
     expect(techManifest.name).toBe('AMD SAV')
     expect(techManifest.short_name).toBe('AMD SAV')
+    expect(techManifest.id).toBe('/tech')
     expect(techManifest.start_url).toBe('/tech')
     expect(techManifest.scope).toBe('/') // /login y /dashboard deben seguir dentro de la app
     expect(techManifest.display).toBe('standalone')

@@ -12,10 +12,11 @@ export const techManifest: MetadataRoute.Manifest = {
   short_name: 'AMD SAV',
   description: 'Interventions et maintenances AMD Service',
   lang: 'fr',
+  // Identidad estable de la app instalada, aunque cambie start_url.
+  id: '/tech',
   start_url: '/tech',
   scope: '/',
   display: 'standalone',
-  orientation: 'portrait',
   background_color: RED,
   theme_color: RED,
   icons: [
