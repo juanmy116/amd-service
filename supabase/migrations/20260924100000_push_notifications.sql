@@ -173,8 +173,10 @@ REVOKE EXECUTE ON FUNCTION public.claim_push_notifications(int) FROM PUBLIC, ano
 GRANT  EXECUTE ON FUNCTION public.claim_push_notifications(int) TO service_role;
 
 -- 6. Red de seguridad cada minuto: da por fallidas las filas que agotaron sus 3 intentos,
---    caduca lo que ya no tiene sentido avisar (> 1 h), purga historial viejo (cola > 90 días,
---    log de pg_cron > 7 días: este job escribe ~1.440 filas/día) y, si queda algo reclamable,
+--    caduca lo que ya no tiene sentido avisar (> 1 h; nunca una fila que send-push esté
+--    procesando ahora mismo: solo 'pending' o 'sending' huérfana > 5 min), purga historial
+--    viejo (cola > 90 días; log de pg_cron > 7 días SOLO de este job, que escribe ~1.440
+--    filas/día — el historial de los demás jobs no se toca) y, si queda algo reclamable,
 --    vuelve a tocar la función. Idempotente.
 SELECT cron.unschedule('push-notifications-retry') WHERE EXISTS (
   SELECT 1 FROM cron.job WHERE jobname = 'push-notifications-retry'
@@ -187,9 +189,12 @@ SELECT cron.schedule(
    WHERE status IN ('pending', 'sending') AND attempts >= 3
      AND (status = 'pending' OR claimed_at < now() - interval '5 minutes');
   UPDATE public.push_notifications SET status = 'expired'
-   WHERE status IN ('pending', 'sending') AND created_at < now() - interval '1 hour';
+   WHERE created_at < now() - interval '1 hour'
+     AND (status = 'pending' OR (status = 'sending' AND claimed_at < now() - interval '5 minutes'));
   DELETE FROM public.push_notifications WHERE created_at < now() - interval '90 days';
-  DELETE FROM cron.job_run_details WHERE end_time < now() - interval '7 days';
+  DELETE FROM cron.job_run_details
+   WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'push-notifications-retry')
+     AND end_time < now() - interval '7 days';
   SELECT public.kick_push_sender()
    WHERE EXISTS (SELECT 1 FROM public.push_notifications
                   WHERE attempts < 3

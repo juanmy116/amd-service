@@ -210,11 +210,14 @@ confundiría al técnico, así que la fila se marca `expired` / `error: 'stale'`
 1. Da por **`failed`** las filas con `attempts >= 3` que seguían `pending`/`sending`
    (`error = coalesce(error, 'max_attempts')`).
 2. **Caduca** (`expired`) lo que lleva más de 1 hora sin poder avisar — un aviso de hace una hora
-   ya no sirve.
+   ya no sirve. Solo toca filas `pending` o `sending` **huérfanas** (reclamadas hace > 5 min): una
+   fila que `send-push` está procesando en ese momento no se pisa (si no, un envío correcto podría
+   quedar marcado `expired`, o al revés).
 3. **Purga la cola**: borra filas de más de 90 días (evita que `push_notifications` crezca sin
    límite; el propio registro de "se envió o no" ya no aporta pasado ese plazo).
-4. **Purga el log de `pg_cron`**: borra `cron.job_run_details` de más de 7 días (este job solo deja
-   ~1.440 filas/día si no se purgara).
+4. **Purga el log de `pg_cron`**: borra las filas de `cron.job_run_details` de más de 7 días **solo
+   de este job** (`jobid` de `push-notifications-retry`; deja ~1.440 filas/día si no se purgara).
+   El historial de los demás jobs (Princity, recordatorios…) no se toca.
 5. Si queda algo reclamable (`attempts < 3` y `pending`, o `sending` abandonada > 5 min), vuelve a
    tocar `send-push` — red de seguridad ante un «toque» que falló al encolar.
 
