@@ -23,9 +23,15 @@ function frDate(iso: string | null): string {
   return `${d}/${m}/${y}`
 }
 
+/** Recorta a `max` caracteres y añade '…' — evita notificaciones ilegibles con títulos larguísimos. */
+function truncate(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max)}…` : s
+}
+
 export function buildPushMessage(c: PushContext): PushMessage {
   const client = c.clientName?.trim() || 'Client inconnu'
-  const where = c.quartier ? `${client}, ${c.quartier}` : client
+  const quartier = c.quartier?.trim() || null
+  const where = quartier ? `${client}, ${quartier}` : client
   const tag = `${c.entityType}-${c.entityId}`
 
   if (c.kind === 'unassigned') {
@@ -37,7 +43,8 @@ export function buildPushMessage(c: PushContext): PushMessage {
 
   if (c.entityType === 'incident') {
     const urgent = c.priority === 'urgente' ? 'Urgent · ' : ''
-    const body = [c.incidentTitle, c.incidentNumero].filter(Boolean).join(' · ')
+    const title = c.incidentTitle ? truncate(c.incidentTitle, 120) : c.incidentTitle
+    const body = [title, c.incidentNumero].filter(Boolean).join(' · ')
     return { title: `${urgent}Nouvelle panne — ${where}`, body, url: `/tech/incidents/${c.entityId}`, tag }
   }
 

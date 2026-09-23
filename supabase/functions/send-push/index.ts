@@ -36,10 +36,25 @@ type QueueRow = {
   attempts: number
 }
 
-type Counts = { claimed: number; sent: number; failed: number; no_subscription: number }
+type Counts = { claimed: number; sent: number; failed: number; no_subscription: number; stale: number }
+
+/** Actualiza una fila de la cola sin dejar que un fallo de escritura tumbe el resto del lote. */
+async function updateNotification(db: SupabaseClient, id: string, patch: Record<string, unknown>): Promise<void> {
+  const { error } = await db.from('push_notifications').update(patch).eq('id', id)
+  if (error) console.error('[send-push] update push_notifications falló', id, error.message)
+}
+
+/** Idem para una suscripción — un fallo aquí no debe pasar por un envío no registrado. */
+async function updateSubscription(db: SupabaseClient, id: string, patch: Record<string, unknown>): Promise<void> {
+  const { error } = await db.from('push_subscriptions').update(patch).eq('id', id)
+  if (error) console.error('[send-push] update push_subscriptions falló', id, error.message)
+}
 
 Deno.serve(async (req: Request) => {
   const provided = req.headers.get('x-push-secret') ?? ''
+  if (!PUSH_SENDER_SECRET) {
+    console.error('[send-push] PUSH_SENDER_SECRET no configurado')
+  }
   if (!PUSH_SENDER_SECRET || !timingSafeEqual(provided, PUSH_SENDER_SECRET)) {
     return new Response(JSON.stringify({ error: 'Non autorisé' }), { status: 401, headers: JSON_HEADERS })
   }
@@ -50,7 +65,13 @@ Deno.serve(async (req: Request) => {
     console.error('[send-push] VAPID_SUBJECT/VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY manquantes')
     return new Response(JSON.stringify({ error: 'Configuration manquante' }), { status: 500, headers: JSON_HEADERS })
   }
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
+  try {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[send-push] VAPID inválido', message)
+    return new Response(JSON.stringify({ error: 'Configuration invalide' }), { status: 500, headers: JSON_HEADERS })
+  }
 
   const db = createClient(SUPABASE_URL, getSecretKey(), {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -63,7 +84,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const queue = (rows ?? []) as QueueRow[]
-  const counts: Counts = { claimed: queue.length, sent: 0, failed: 0, no_subscription: 0 }
+  const counts: Counts = { claimed: queue.length, sent: 0, failed: 0, no_subscription: 0, stale: 0 }
 
   for (const row of queue) {
     try {
@@ -74,7 +95,7 @@ Deno.serve(async (req: Request) => {
       console.error('[send-push] row', row.id, message)
       const status = row.attempts >= 3 ? 'failed' : 'pending'
       if (status === 'failed') counts.failed++
-      await db.from('push_notifications').update({ status, error: message }).eq('id', row.id)
+      await updateNotification(db, row.id, { status, error: message })
     }
   }
 
@@ -82,14 +103,45 @@ Deno.serve(async (req: Request) => {
   return new Response(JSON.stringify(counts), { headers: JSON_HEADERS })
 })
 
+/** Contexto de un aviso más el estado ACTUAL de la asignación (para detectar avisos caducados). */
+type LoadedContext = PushContext & { assignedTo: string | null; entityStatus: string | null }
+
+/**
+ * Un aviso puede quedar obsoleto entre que se encola y se envía (el cron de 1 min, un reintento…):
+ * la tarea se reasignó otra vez o ya se cerró. Enviarlo confundiría al técnico.
+ * - kind='assigned': caduca si ya no está asignada a este destinatario, o si la tarea ya se cerró.
+ * - kind='unassigned': caduca si el destinatario ha vuelto a ser el asignado (reasignación de ida y vuelta).
+ */
+function isStale(row: QueueRow, ctx: LoadedContext): boolean {
+  if (row.kind === 'assigned') {
+    if (ctx.assignedTo !== row.recipient_id) return true
+    if (ctx.entityType === 'incident') return ctx.entityStatus === 'résolu' || ctx.entityStatus === 'fermé'
+    return ctx.entityStatus === 'fait'
+  }
+  return ctx.assignedTo === row.recipient_id
+}
+
+/** Detalle útil del rechazo de web-push: `WebPushError.message` es siempre el mismo texto genérico. */
+function pushErrorDetail(err: unknown): { statusCode: number | undefined; detail: string } {
+  const statusCode = (err as { statusCode?: number } | null | undefined)?.statusCode
+  const detail = statusCode
+    ? `${statusCode} ${String((err as { body?: unknown }).body ?? '').slice(0, 200)}`
+    : (err instanceof Error ? err.message : String(err))
+  return { statusCode, detail }
+}
+
 /** Procesa una fila reclamada de principio a fin: carga contexto, envía, deja el estado final. */
 async function processRow(db: SupabaseClient, row: QueueRow, counts: Counts): Promise<void> {
   const ctx = await loadContext(db, row)
   if (!ctx) {
     counts.failed++
-    await db.from('push_notifications')
-      .update({ status: 'failed', error: 'entity_not_found' })
-      .eq('id', row.id)
+    await updateNotification(db, row.id, { status: 'failed', error: 'entity_not_found' })
+    return
+  }
+
+  if (isStale(row, ctx)) {
+    counts.stale++
+    await updateNotification(db, row.id, { status: 'expired', error: 'stale' })
     return
   }
 
@@ -105,16 +157,14 @@ async function processRow(db: SupabaseClient, row: QueueRow, counts: Counts): Pr
   if (subsErr) {
     const status = row.attempts >= 3 ? 'failed' : 'pending'
     if (status === 'failed') counts.failed++
-    await db.from('push_notifications').update({ status, error: subsErr.message }).eq('id', row.id)
+    await updateNotification(db, row.id, { status, error: subsErr.message })
     return
   }
 
   const subscriptions = (subs ?? []) as { id: string; endpoint: string; p256dh: string; auth: string }[]
   if (subscriptions.length === 0) {
     counts.no_subscription++
-    await db.from('push_notifications')
-      .update({ status: 'no_subscription', error: null })
-      .eq('id', row.id)
+    await updateNotification(db, row.id, { status: 'no_subscription', error: null })
     return
   }
 
@@ -126,75 +176,63 @@ async function processRow(db: SupabaseClient, row: QueueRow, counts: Counts): Pr
 
   for (const sub of subscriptions) {
     try {
+      // timeout: sin él, un solo servicio push colgado (Apple/Google caído) bloquea todo el lote.
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
         payload,
-        { TTL: 3600, urgency: 'high' },
+        { TTL: 3600, urgency: 'high', timeout: 10_000 },
       )
       sentAny = true
-      await db.from('push_subscriptions')
-        .update({ last_success_at: new Date().toISOString(), last_error: null })
-        .eq('id', sub.id)
+      await updateSubscription(db, sub.id, { last_success_at: new Date().toISOString(), last_error: null })
     } catch (err) {
-      const statusCode = (err as { statusCode?: number } | null | undefined)?.statusCode
-      const message = err instanceof Error ? err.message : String(err)
-      if (firstError === null) firstError = message
+      const { statusCode, detail } = pushErrorDetail(err)
+      if (firstError === null) firstError = detail
+      // Nunca se registra endpoint/keys/secretos — solo el código y el cuerpo de la respuesta.
+      console.error('[send-push] envío fallido', statusCode ?? '', detail)
 
       if (statusCode === 404 || statusCode === 410) {
-        await db.from('push_subscriptions')
-          .update({ disabled_at: new Date().toISOString(), last_error: message })
-          .eq('id', sub.id)
+        await updateSubscription(db, sub.id, { disabled_at: new Date().toISOString(), last_error: detail })
       } else {
         allExpired = false
-        await db.from('push_subscriptions')
-          .update({ last_error: message })
-          .eq('id', sub.id)
+        await updateSubscription(db, sub.id, { last_error: detail })
       }
     }
   }
 
   if (sentAny) {
     counts.sent++
-    await db.from('push_notifications')
-      .update({ status: 'sent', sent_at: new Date().toISOString(), error: null })
-      .eq('id', row.id)
+    await updateNotification(db, row.id, { status: 'sent', sent_at: new Date().toISOString(), error: null })
     return
   }
 
   if (allExpired) {
     counts.no_subscription++
-    await db.from('push_notifications')
-      .update({ status: 'no_subscription', error: firstError })
-      .eq('id', row.id)
+    await updateNotification(db, row.id, { status: 'no_subscription', error: firstError })
     return
   }
 
   if (row.attempts >= 3) {
     counts.failed++
-    await db.from('push_notifications')
-      .update({ status: 'failed', error: firstError })
-      .eq('id', row.id)
+    await updateNotification(db, row.id, { status: 'failed', error: firstError })
     return
   }
 
   // Ni un envío ni todo caducado, y quedan intentos: vuelve a 'pending' para que el cron de
   // 1 minuto la reintente (claim_push_notifications solo recoge 'pending' o 'sending' huérfana).
-  await db.from('push_notifications')
-    .update({ status: 'pending', error: firstError })
-    .eq('id', row.id)
+  await updateNotification(db, row.id, { status: 'pending', error: firstError })
 }
 
 /** Contexto del aviso (cliente, barrio, máquina…) a partir de la fila de la cola. */
-async function loadContext(db: SupabaseClient, row: QueueRow): Promise<PushContext | null> {
+async function loadContext(db: SupabaseClient, row: QueueRow): Promise<LoadedContext | null> {
   return row.entity_type === 'incident'
     ? loadIncidentContext(db, row)
     : loadVisitContext(db, row)
 }
 
-async function loadIncidentContext(db: SupabaseClient, row: QueueRow): Promise<PushContext | null> {
+async function loadIncidentContext(db: SupabaseClient, row: QueueRow): Promise<LoadedContext | null> {
   const { data: incident, error } = await db
     .from('incidents')
-    .select('id, title, numero_incident, priority, machine_id, contract_machine_id')
+    .select('id, title, numero_incident, priority, machine_id, contract_machine_id, assigned_to, status')
     .eq('id', row.entity_id)
     .maybeSingle()
   if (error) throw new Error(`incidents: ${error.message}`)
@@ -242,13 +280,15 @@ async function loadIncidentContext(db: SupabaseClient, row: QueueRow): Promise<P
     priority: incident.priority,
     scheduledDate: null,
     machineSerie,
+    assignedTo: incident.assigned_to,
+    entityStatus: incident.status,
   }
 }
 
-async function loadVisitContext(db: SupabaseClient, row: QueueRow): Promise<PushContext | null> {
+async function loadVisitContext(db: SupabaseClient, row: QueueRow): Promise<LoadedContext | null> {
   const { data: visit, error } = await db
     .from('maintenance_visits')
-    .select('id, scheduled_date, contract_machine_id')
+    .select('id, scheduled_date, contract_machine_id, assigned_to, status')
     .eq('id', row.entity_id)
     .maybeSingle()
   if (error) throw new Error(`maintenance_visits: ${error.message}`)
@@ -280,6 +320,8 @@ async function loadVisitContext(db: SupabaseClient, row: QueueRow): Promise<Push
     priority: null,
     scheduledDate: visit.scheduled_date,
     machineSerie,
+    assignedTo: visit.assigned_to,
+    entityStatus: visit.status,
   }
 }
 
@@ -307,7 +349,7 @@ async function loadClient(
     .eq('id', contractMachineId)
     .maybeSingle()
   if (error) throw new Error(`contracts/clients: ${error.message}`)
-  const contract = data?.contracts as { clients: { nom_client: string; quartier_code: string | null } | null } | null
+  const contract = data?.contracts as unknown as { clients: { nom_client: string; quartier_code: string | null } | null } | null
   return contract?.clients ?? null
 }
 

@@ -59,4 +59,15 @@ describe('buildPushMessage', () => {
     expect(buildPushMessage({ ...base, entityType: 'visit', entityId: 'v', machineSerie: 'A B/1', scheduledDate: '2026-01-02' }).url)
       .toBe('/tech/scan/A%20B%2F1/maintenance/v')
   })
+
+  it('título largo: se trunca a 120 caracteres + …', () => {
+    const long = 'A'.repeat(150)
+    const body = buildPushMessage({ ...base, incidentTitle: long, incidentNumero: null }).body
+    expect(body).toBe(`${'A'.repeat(120)}…`)
+    expect(body.length).toBe(121)
+  })
+
+  it('barrio con espacios de sobra: se recorta', () => {
+    expect(buildPushMessage({ ...base, quartier: '  Plateau  ' }).title).toBe('Nouvelle panne — Axa, Plateau')
+  })
 })
