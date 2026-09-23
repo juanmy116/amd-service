@@ -39,9 +39,20 @@ export async function closeMaintenance(
   _prev: FormState,
   formData: FormData
 ): Promise<FormState> {
-  const { user, profile } = await requireTechnician()
+  const { user, profile, supabase } = await requireTechnician()
 
-  const notes        = ((formData.get('notes') as string) ?? '').trim() || null
+  // Autorización de la visita: los argumentos ligados (visitId, serie) viajan por el cliente y
+  // se pueden reenviar con otros valores, y la RPC de abajo corre con service_role. Sin esto,
+  // cualquier técnico podría cerrar una visita ajena. La RLS (auth_tech_visit_ids) decide si
+  // la ve; el admin las ve todas.
+  const { data: visible } = await supabase
+    .from('maintenance_visits')
+    .select('id')
+    .eq('id', visitId)
+    .maybeSingle()
+  if (!visible) return { error: 'Visite introuvable.' }
+
+  const notes       = ((formData.get('notes') as string) ?? '').trim() || null
   const partIds      = PART_IDS.filter(id => formData.get(`part_${id}`) === 'on')
   const autresPieces = ((formData.get('autres_pieces') as string) ?? '').trim() || null
 
