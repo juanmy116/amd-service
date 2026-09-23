@@ -62,6 +62,11 @@ export function InstallCard() {
           Pour installer l&apos;application, ouvrez cette page dans <strong>Safari</strong> : copiez le lien et
           collez-le dans Safari.
         </p>
+      ) : hint === 'android-other' ? (
+        <p className="text-sm text-ink">
+          Pour installer l&apos;application, ouvrez cette page dans <strong>Chrome</strong> : copiez le lien et
+          collez-le dans Chrome.
+        </p>
       ) : (
         <p className="text-sm text-ink">
           Ouvrez le menu du navigateur (⋮) et choisissez « Installer l&apos;application ».

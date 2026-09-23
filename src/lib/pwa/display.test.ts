@@ -8,6 +8,8 @@ const MAC = IPAD_DESKTOP_UA
 const IPHONE_CHROME = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/128.0.6613.98 Mobile/15E148 Safari/604.1'
 const IPHONE_INAPP_WEBVIEW = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148'
 const ANDROID_TABLET_NO_MOBILE = 'Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36'
+const IPHONE_GSA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) GSA/330.0.664589006 Mobile/15E148 Safari/604.1'
+const ANDROID_WHATSAPP_WEBVIEW = 'Mozilla/5.0 (Linux; Android 14; SM-A546B Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/128.0.6613.127 Mobile Safari/537.36'
 
 describe('installHint', () => {
   it('ya instalada ⇒ no muestra nada', () => {
@@ -44,5 +46,13 @@ describe('installHint', () => {
 
   it('tablet Android sin "Mobile" en el UA ⇒ indicación genérica', () => {
     expect(installHint({ userAgent: ANDROID_TABLET_NO_MOBILE, maxTouchPoints: 5, standalone: false, dismissed: false })).toBe('other')
+  })
+
+  it('iPhone con la app de Google (GSA) ⇒ no puede instalar desde ahí', () => {
+    expect(installHint({ userAgent: IPHONE_GSA, maxTouchPoints: 5, standalone: false, dismissed: false })).toBe('ios-other')
+  })
+
+  it('Android dentro de un navegador integrado (WhatsApp, UA con "; wv)") ⇒ indicación de abrir en Chrome', () => {
+    expect(installHint({ userAgent: ANDROID_WHATSAPP_WEBVIEW, maxTouchPoints: 5, standalone: false, dismissed: false })).toBe('android-other')
   })
 })
