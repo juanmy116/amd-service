@@ -17,6 +17,8 @@
 | 🧹 **5** | **Borrar los datos de prueba del 22-09** | Dos notas de ⭐5 que no ha dado ningún cliente están contando en la media. |
 | ⚠️ **6** | **40 visitas el mismo día / sin válvula de escape** | Afecta al uso real del mantenimiento, no bloquea. |
 | ⚠️ **7** | **Escaneo de técnicos: dos cabos sueltos del PR #155** | «En cours» automático al ABRIR la ficha (no al escanear) y sello QR falsificable por un técnico logueado. Aceptados por ahora. |
+| 🔴 **8** | **Los tests E2E en local apuntan a PRODUCCIÓN** | `.env.local` lleva la URL y las claves de Supabase de prod; `npm run test:e2e` a secas arranca `next dev` con ellas y sembraría/borraría datos de prueba en prod. En CI no pasa (`e2e.yml` pone envs locales). Arreglo: `.env.test` con la pila local y que `playwright.config.ts` lo cargue, o que el script se niegue si la URL no es `127.0.0.1`. |
+| ⚠️ **9** | **Ubicación de una máquina fijable sin escanear** | `recordMachineLocationAction` (Fase 3) no exige un escaneo previo: un técnico podría, llamando a la acción, fijar una máquina sin ubicación en cualquier punto y luego salir 🟢 ahí. Mismo nivel de confianza que el sello QR (el serie y la posición vienen del cliente). Mitiga: el admin ve «Premier scan de X» y puede corregir. Aceptado por ahora. |
 
 **Cerrado el 2026-09-22:** el verrou de résolution (ninguna avería se cierra sin rastro, probado en
 uso real) y el CSAT (probado de punta a punta; era el pendiente más antiguo). Ese día también se
