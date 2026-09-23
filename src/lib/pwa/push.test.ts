@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseSubscription, urlBase64ToUint8Array } from './push'
+import { parseSubscription, sameKey, urlBase64ToUint8Array } from './push'
 
 describe('urlBase64ToUint8Array', () => {
   it('decodifica base64url sin relleno', () => {
@@ -7,8 +7,33 @@ describe('urlBase64ToUint8Array', () => {
   })
 
   it('acepta `-` y `_` (alfabeto base64url)', () => {
-    // '+/+/' en base64 estándar equivale a '-_-_' en base64url.
-    expect(urlBase64ToUint8Array('-_-_')).toEqual(urlBase64ToUint8Array('+/+/'.replace(/\+/g, '-').replace(/\//g, '_')))
+    // '-_-_' equivale a '+/+/' en base64 estándar.
+    expect(urlBase64ToUint8Array('-_-_')).toEqual(new Uint8Array([251, 255, 191]))
+  })
+
+  it('rellena correctamente un caso real de padding (2 caracteres)', () => {
+    expect(urlBase64ToUint8Array('AQ')).toEqual(new Uint8Array([1]))
+  })
+})
+
+describe('sameKey', () => {
+  const key = new Uint8Array([1, 2, 3, 4])
+
+  it('true si el ArrayBuffer tiene los mismos bytes', () => {
+    expect(sameKey(new Uint8Array([1, 2, 3, 4]).buffer, key)).toBe(true)
+  })
+
+  it('false si algún byte difiere', () => {
+    expect(sameKey(new Uint8Array([1, 2, 3, 5]).buffer, key)).toBe(false)
+  })
+
+  it('false si la longitud difiere', () => {
+    expect(sameKey(new Uint8Array([1, 2, 3]).buffer, key)).toBe(false)
+    expect(sameKey(new Uint8Array([1, 2, 3, 4, 5]).buffer, key)).toBe(false)
+  })
+
+  it('false si el existente es null (no hay suscripción previa)', () => {
+    expect(sameKey(null, key)).toBe(false)
   })
 })
 
@@ -38,6 +63,19 @@ describe('parseSubscription', () => {
 
   it('rechaza si el endpoint no es https', () => {
     expect(parseSubscription({ ...valid, endpoint: 'http://fcm.googleapis.com/x' })).toBeNull()
+  })
+
+  it('acepta los hosts reales de los servicios push (Apple, Google)', () => {
+    expect(parseSubscription({ ...valid, endpoint: 'https://web.push.apple.com/abc' })).not.toBeNull()
+    expect(parseSubscription({ ...valid, endpoint: 'https://fcm.googleapis.com/fcm/send/abc' })).not.toBeNull()
+  })
+
+  it('rechaza un host fuera de la lista (SSRF: send-push hace POST directo al endpoint)', () => {
+    expect(parseSubscription({ ...valid, endpoint: 'https://evil.example.com/x' })).toBeNull()
+  })
+
+  it('rechaza un host disfrazado con el dominio real como subdominio falso', () => {
+    expect(parseSubscription({ ...valid, endpoint: 'https://web.push.apple.com.evil.com/x' })).toBeNull()
   })
 
   it('rechaza si faltan las keys', () => {

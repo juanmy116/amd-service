@@ -13,6 +13,9 @@ self.addEventListener('push', event => {
   } catch {
     data = { body: event.data ? event.data.text() : '' }
   }
+  // Un payload válido en JSON pero que no es un objeto (número, string, null, array…) no debe
+  // saltarse showNotification: iOS exige una notificación por cada push, así venga lo que venga.
+  if (!data || typeof data !== 'object') data = {}
   event.waitUntil(
     self.registration.showNotification(data.title || 'AMD SAV', {
       body: data.body || '',
@@ -24,19 +27,33 @@ self.addEventListener('push', event => {
   )
 })
 
-// Al tocar: reutilizar la ventana de la app si está abierta; si no, abrirla en la tarea.
+// Al tocar: reutilizar una ventana de la PWA (scope /tech) si hay una abierta; si no, o si
+// `navigate()` falla, abrir una ventana nueva en la tarea. `navigate()` rechaza en clientes no
+// controlados por este SW (p. ej. una pestaña en /login), así que solo se intenta en ventanas
+// cuyo pathname ya está dentro de /tech.
 self.addEventListener('notificationclick', event => {
   event.notification.close()
-  const url = new URL(event.notification.data?.url || '/tech', self.location.origin).href
+  let url = new URL(event.notification.data?.url || '/tech', self.location.origin)
+  if (url.origin !== self.location.origin) url = new URL('/tech', self.location.origin)
+
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     for (const client of windows) {
-      if ('focus' in client) {
-        await client.focus()
-        if ('navigate' in client) return client.navigate(url)
-        return
+      let pathname
+      try {
+        pathname = new URL(client.url).pathname
+      } catch {
+        continue
+      }
+      if (!pathname.startsWith('/tech')) continue
+
+      await client.focus()
+      try {
+        return await client.navigate(url.href)
+      } catch {
+        // sigue: probar otra ventana /tech, o abrir una nueva si no queda ninguna
       }
     }
-    return self.clients.openWindow(url)
+    return self.clients.openWindow(url.href)
   })())
 })

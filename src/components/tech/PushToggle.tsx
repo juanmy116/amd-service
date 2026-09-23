@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Bell, BellOff } from 'lucide-react'
 import { isStandaloneDisplay } from '@/lib/pwa/display'
-import { urlBase64ToUint8Array } from '@/lib/pwa/push'
+import { sameKey, urlBase64ToUint8Array } from '@/lib/pwa/push'
 import { savePushSubscription } from '@/app/tech/push-actions'
 
 type Status = 'hidden' | 'denied' | 'default' | 'requesting' | 'granted' | 'error'
@@ -23,16 +23,35 @@ function pushSupported(): boolean {
   )
 }
 
+// `navigator.serviceWorker.ready` nunca rechaza: si el SW no llega a activarse (fallo de
+// registro, navegador raro) se queda colgada para siempre. La carrera con un timeout evita que
+// el botón se quede en «Activation en cours…» sin salida.
+function swReady(): Promise<ServiceWorkerRegistration> {
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<ServiceWorkerRegistration>((_, reject) => {
+      setTimeout(() => reject(new Error('sw_timeout')), 10_000)
+    }),
+  ])
+}
+
 async function subscribeAndSave(): Promise<{ ok: true } | { ok: false; error: string }> {
-  const reg = await navigator.serviceWorker.ready
-  const existing = await reg.pushManager.getSubscription()
+  const reg = await swReady()
+  // TS moderno tipa Uint8Array como ArrayBufferLike (incluye SharedArrayBuffer), más estricto
+  // que el BufferSource que pide la lib DOM real: el navegador acepta el Uint8Array sin más.
+  const desiredKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY!)
+  let existing = await reg.pushManager.getSubscription()
+  // Rotación de la clave VAPID: una suscripción firmada con la clave anterior ya no sirve — hay
+  // que darla de baja y volver a suscribirse con la nueva antes de poder guardarla.
+  if (existing && !sameKey(existing.options.applicationServerKey, desiredKey)) {
+    await existing.unsubscribe()
+    existing = null
+  }
   const subscription =
     existing ??
     (await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      // TS moderno tipa Uint8Array como ArrayBufferLike (incluye SharedArrayBuffer), más estricto
-      // que el BufferSource que pide la lib DOM real: el navegador acepta el Uint8Array sin más.
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY!) as BufferSource,
+      applicationServerKey: desiredKey as BufferSource,
     }))
   return savePushSubscription(subscription.toJSON(), navigator.userAgent)
 }
@@ -50,11 +69,22 @@ export function PushToggle() {
     if (permission === 'denied') { setStatus('denied'); return }
     if (permission === 'default') { setStatus('default'); return }
 
-    // 'granted': re-suscribir/guardar en silencio, sin bloquear la pantalla.
-    setStatus('granted')
-    subscribeAndSave().catch(err => {
-      console.error('[push] re-suscripción silenciosa', err)
-    })
+    // 'granted': re-suscribir/guardar en silencio, sin bloquear la pantalla. No marcar 'granted'
+    // hasta confirmar que se guardó — si falla (servidor caído, endpoint dado de baja…), el botón
+    // debe reaparecer para que el técnico pueda reintentar en vez de creerse protegido sin estarlo.
+    subscribeAndSave()
+      .then(result => {
+        if (result.ok) {
+          setStatus('granted')
+        } else {
+          console.error('[push] re-suscripción silenciosa', result.error)
+          setStatus('default')
+        }
+      })
+      .catch(err => {
+        console.error('[push] re-suscripción silenciosa', err)
+        setStatus('default')
+      })
   }, [])
 
   if (status === 'hidden') return null
