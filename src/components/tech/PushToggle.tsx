@@ -53,7 +53,7 @@ export function PushToggle() {
     // 'granted': re-suscribir/guardar en silencio, sin bloquear la pantalla.
     setStatus('granted')
     subscribeAndSave().catch(err => {
-      console.error('[push] re-souscription silencieuse', err)
+      console.error('[push] re-suscripción silenciosa', err)
     })
   }, [])
 
