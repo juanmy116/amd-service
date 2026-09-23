@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isProtectedPath } from '@/lib/protected-routes'
 
-const PROTECTED_ROUTES = ['/admin', '/portal', '/tech', '/atelier']
 const AUTH_ROUTE = '/login'
 
 export async function proxy(request: NextRequest) {
@@ -32,7 +32,7 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const isProtected = PROTECTED_ROUTES.some(r => pathname.startsWith(r))
+  const isProtected = isProtectedPath(pathname)
 
   // Sin sesión intentando acceder a ruta protegida → login
   if (!user && isProtected) {
