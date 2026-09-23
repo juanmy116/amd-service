@@ -78,6 +78,51 @@ _(Scanner eliminado del nav; accesible vía FAB persistente)_
 - `TechIncidentList.tsx` — Client Component: chips de filtro + tarjetas; exporta tipo `TechIncident`
 - `AgendaPanel.tsx`, `MaintenanceVisitForm.tsx` — existentes
 
+### 3b. PWA instalable (`/tech`) ✅ — Fase 1 (2026-09-23)
+Un técnico puede «Añadir a pantalla de inicio» desde Safari y obtener la app «AMD SAV» (icono
+rojo con logo blanco, pantalla completa, abre en `/tech`, nada tapado por la barra de gestos).
+
+- **Manifest en `/amd-sav.webmanifest`** (`src/lib/pwa/manifest.ts` + `src/app/amd-sav.webmanifest/route.ts`),
+  **no** con la convención `app/manifest.ts`: esa convención lo enlazaría en **todas** las
+  páginas, y la web pública no debe ofrecerse como app. Tampoco se llama `/tech...`: aunque
+  `isProtectedPath` (`src/lib/protected-routes.ts`) ya no cae en la trampa del prefijo — protege
+  la ruta exacta o sus subrutas, no cualquier texto que empiece igual —, un nombre que empezara
+  por `/tech` seguiría siendo confuso al lado de las rutas reales de la app. Solo lo enlaza el layout de `/tech`
+  (`metadata.manifest` en `src/app/tech/layout.tsx`), nunca la web pública.
+- **Iconos** en `public/pwa/` (`icon-192.png`, `icon-512.png`, `icon-maskable-512.png`,
+  `apple-touch-icon.png`), generados una vez con `sharp` a partir del logo AMD y versionados en
+  git; se regeneran con `node scripts/generate-pwa-icons.mjs`.
+- **Service worker mínimo en `public/sw.js`**: sin manejador `fetch`, no cachea nada — solo existe
+  para tomar el control (`skipWaiting` + `clients.claim()`) y sentar la base de la Fase 2 (push) y
+  la Fase 4 (offline). Se registra con **`scope: '/tech'`** desde `ServiceWorkerRegister` en el
+  layout de `/tech` (`start_url` del manifest, `/tech`, cae dentro de ese scope): no afecta a
+  admin/kiosko/portal/web pública. Cabeceras `Cache-Control: no-cache, no-store, must-revalidate`
+  en `next.config.ts` para que el navegador siempre pida la versión nueva.
+- **Zonas seguras (`safe-area-inset`)**: `viewport.viewportFit = 'cover'` en el layout de `/tech`
+  + `env(safe-area-inset-bottom)` en el padding del contenido, el FAB «Scanner» y la nav inferior,
+  para que la barra de gestos del iPhone no tape nada en modo instalado. También
+  `env(safe-area-inset-left)`/`-right)` en el contenedor del contenido y en la nav inferior, para
+  el notch en horizontal (landscape).
+- **Tarjeta de instalación** (`src/components/tech/InstallCard.tsx`, en `/tech`): guía al técnico
+  según el navegador, con lógica pura y testeada en `src/lib/pwa/display.ts`
+  (`installHint`/`InstallHint`):
+  - `'ios'` — Safari en iPhone/iPad: pasos «Compartir → Sur l'écran d'accueil → Ajouter».
+  - `'ios-other'` — iPhone fuera de Safari: Chrome/Firefox/Edge/Google/DuckDuckGo/Opera en iOS
+    (`CriOS`/`FxiOS`/`EdgiOS`/`GSA\/`/`DuckDuckGo`/`Ddg\/`/`OPT\/`; pueden instalar desde iOS 16.4
+    pero con otro menú — algunos, como la app de Google, sí llevan `Safari/` en el user-agent, por
+    eso se nombran uno a uno) o un navegador integrado de otra app sin ninguno de esos rastros
+    (típicamente WhatsApp, sin `Safari/` en el user-agent; **no** puede instalar). Mensaje único:
+    abrir el enlace en Safari.
+  - `'android-other'` — Android dentro de un navegador integrado (WebView de WhatsApp, Instagram…,
+    delatado por `; wv)` en el user-agent): **no** puede instalar. Mensaje: abrir el enlace en
+    Chrome.
+  - `'other'` — Android en un navegador normal: indicación genérica del menú del navegador.
+  - `'none'` — ya instalada (`display-mode: standalone` o `navigator.standalone`) o el técnico ya
+    la cerró (recordado en `localStorage`, `INSTALL_DISMISSED_KEY`).
+- **Proxy (`src/proxy.ts`)**: el matcher excluye `sw.js` y `amd-sav.webmanifest` (además de los
+  estáticos ya excluidos) para que las comprobaciones de actualización del manifest/SW no gasten
+  un round-trip de sesión a Supabase — de paso, evita que ese tráfico pase por `getUser()`.
+
 ### 4. Módulo Contadores (`/admin/contadores`) ✅
 - Vista principal agrupa máquinas por cliente con indicador ⚠ de relevés pendientes
 - Clic en cliente → vista detalle con todas sus máquinas y sus últimos relevés

@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isProtectedPath } from '@/lib/protected-routes'
 
-const PROTECTED_ROUTES = ['/admin', '/portal', '/tech', '/atelier']
 const AUTH_ROUTE = '/login'
 
 export async function proxy(request: NextRequest) {
@@ -32,7 +32,7 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const isProtected = PROTECTED_ROUTES.some(r => pathname.startsWith(r))
+  const isProtected = isProtectedPath(pathname)
 
   // Sin sesión intentando acceder a ruta protegida → login
   if (!user && isProtected) {
@@ -54,6 +54,10 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // El manifest y el service worker los pide iOS SIN cookies: si pasaran por aquí, cada
+    // comprobación de actualización gastaría un round-trip de sesión a Supabase sin necesidad.
+    // `$` ancla cada alternativa: sin él, cualquier ruta que EMPEZARA por "sw.js" (p. ej.
+    // "/sw.jsx") también habría quedado excluida del proxy por accidente.
+    '/((?!_next/static|_next/image|favicon\\.ico|sw\\.js$|amd-sav\\.webmanifest$|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
