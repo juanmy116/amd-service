@@ -8,6 +8,10 @@ export const E2E = {
   clientEmail: 'client@e2e.test',
   password: PASSWORD,
   serie: 'TEST-SN-E2E',
+  // Position connue (saisie admin) pour le test « Itinéraire » (geo.spec.ts) : le lien Google
+  // Maps doit contenir exactement ces coordonnées.
+  serieLat: 14.6928,
+  serieLng: -17.4467,
   incidentNumero: 'TEST-E2E-I1',
   // Máquina del mismo contrato SIN incidencias del técnico: solo tiene una visita de
   // mantenimiento asignada a él (la ve por RLS desde la migración 20260923100000).
@@ -57,6 +61,15 @@ export async function seed(): Promise<SeedIds> {
     .insert({ contract_id: contract!.id, machine_id: E2E.serie, date_debut: '2026-01-01', statut: 'actif' })
     .select('id').single()
   if (lErr) throw new Error(`seed line: ${lErr.message}`)
+
+  // Position connue pour geo.spec.ts (bouton « Itinéraire ») — APRÈS la ligne : une nouvelle
+  // ligne de contrat efface la position de la machine (trigger de 20260925100000_geolocation).
+  // lat/lng/location_source arrivent ensemble (CHECK machines_location_complete_chk).
+  const { error: posErr } = await admin
+    .from('machines')
+    .update({ lat: E2E.serieLat, lng: E2E.serieLng, location_source: 'admin' })
+    .eq('numero_serie', E2E.serie)
+  if (posErr) throw new Error(`seed machine position: ${posErr.message}`)
 
   const { data: inc, error: iErr } = await admin
     .from('incidents')

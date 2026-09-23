@@ -4,7 +4,7 @@ import { expectEmpty } from './assert'
 import { seedTenants, SC } from './scenario'
 
 // Aislamiento RLS de tablas INTERNAS admin-only: leads, princity_api_logs,
-// princity_health, pending_counter_imports, csat_responses, push_notifications.
+// princity_health, pending_counter_imports, csat_responses, push_notifications, field_presence.
 // Ningún rol externo (client/technician/anon) debe poder leerlas; solo el admin.
 // (incident_photos NO es admin-only: cliente y técnico ven las fotos de sus
 //  incidencias → su aislamiento vive en incident-photos-isolation.test.ts).
@@ -40,6 +40,12 @@ beforeAll(async () => {
     admin.from('push_notifications').insert({
       recipient_id: t.techA, kind: 'assigned', entity_type: 'incident', entity_id: PUSH_ENTITY_ID,
     }),
+    // Posición del técnico A al resolver la avería del cliente A: ni el cliente ni el propio
+    // técnico deben leerla (solo la oficina).
+    admin.from('field_presence').insert({
+      entity_type: 'incident', entity_id: incidentAId, tech_id: t.techA,
+      lat: 14.6928, lng: -17.4467, accuracy_m: 10, distance_m: 30, presence: 'near',
+    }),
   ])
   const failed = seeds.find((s) => s.error)
   if (failed?.error) throw new Error(`seed admin-only: ${failed.error.message}`)
@@ -57,6 +63,7 @@ const cases: { table: string; column: string; value: string }[] = [
   { table: 'pending_counter_imports', column: 'image_hash_sha256', value: 'TEST-pci-rls' },
   { table: 'csat_responses', column: 'token', value: 'TEST-csat-token' },
   { table: 'push_notifications', column: 'entity_id', value: PUSH_ENTITY_ID },
+  { table: 'field_presence', column: 'entity_type', value: 'incident' },
 ]
 
 describe.each(cases)('RLS admin-only — $table', ({ table, column, value }) => {

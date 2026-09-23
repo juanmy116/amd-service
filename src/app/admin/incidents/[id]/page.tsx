@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Stars } from '@/components/ui/Stars'
 import { RESOLUTION_REASON_LABELS, RESOLVED_VIA_LABELS } from '@/lib/resolution'
 import { parseEnum, RESOLUTION_REASONS, RESOLVED_VIA } from '@/lib/enums'
+import { presenceLabel, PRESENCE_TONE_CLASS, type Presence } from '@/lib/geo'
 
 const STATUS_DOT: Record<string, string> = {
   nouveau:  'bg-blue-500',
@@ -33,9 +34,14 @@ export default async function EditIncidentPage({
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: incident }, { data: technicians }] = await Promise.all([
+  // La presencia del técnico vive aparte (`field_presence`, solo la lee el admin por RLS).
+  const [{ data: incident }, { data: technicians }, { data: fieldPresence }] = await Promise.all([
     supabase.from('incidents').select('*').eq('id', id).single(),
     supabase.from('profiles').select('id, full_name').eq('role', 'technician').order('full_name'),
+    supabase.from('field_presence')
+      .select('presence, distance_m, accuracy_m, lat, lng')
+      .eq('entity_type', 'incident').eq('entity_id', id)
+      .maybeSingle(),
   ])
 
   if (!incident) notFound()
@@ -95,6 +101,14 @@ export default async function EditIncidentPage({
   // que este técnico tuviera la máquina delante.
   const qrByResolver = incident.qr_verified && incident.qr_scanned_by === incident.assigned_to
   const qrScannerName = incident.qr_scanned_by ? profileMap.get(incident.qr_scanned_by) ?? null : null
+  // `presence` viene de un CHECK en BD (no un enum de Postgres): el tipo generado es `string`,
+  // así que se afirma al tipo cerrado que sí es.
+  const position = fieldPresence
+    ? presenceLabel(fieldPresence.presence as Presence, fieldPresence.distance_m, fieldPresence.accuracy_m)
+    : null
+  const positionMapUrl = fieldPresence?.lat != null && fieldPresence.lng != null
+    ? `https://www.google.com/maps?q=${fieldPresence.lat},${fieldPresence.lng}`
+    : null
 
   const boundUpdateAction = updateIncidentAction.bind(null, incident.id)
 
@@ -210,6 +224,25 @@ export default async function EditIncidentPage({
                   <span className="text-ink-muted">Aucun scan enregistré</span>
                 )}
               </div>
+
+              {position && (
+                <div className="flex gap-2">
+                  <span className="text-ink-muted w-24 shrink-0">Position</span>
+                  <span className="flex items-center gap-2">
+                    <span className={PRESENCE_TONE_CLASS[position.tone]}>{position.text}</span>
+                    {positionMapUrl && (
+                      <a
+                        href={positionMapUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-accent hover:underline"
+                      >
+                        voir
+                      </a>
+                    )}
+                  </span>
+                </div>
+              )}
             </div>
           </Card>
         </div>

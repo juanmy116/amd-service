@@ -1,15 +1,39 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { sendCsatForIncident } from '@/lib/csat.server'
 import { PARTS } from '@/lib/parts'
+import { computePresence } from '@/lib/presence.server'
+import { readPosition } from '@/lib/geo'
 import { archivedResolutionNote, buildResolution, clearResolution, historyComment, reopens } from '@/lib/resolution'
 
 type FormState = { error: string } | null
+
+/**
+ * Máquina de la avería: la de su línea de contrato (es la que está hoy en ese puesto) o, en las
+ * averías sin línea (formulario público del QR), su `machine_id`. Sin ninguna ⇒ null, y el
+ * veredicto de presencia queda en «machine sans position».
+ */
+async function incidentSerie(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  incident: { contract_machine_id: string | null; machine_id: string | null },
+): Promise<string | null> {
+  if (incident.contract_machine_id) {
+    const { data, error } = await supabase
+      .from('contract_machines')
+      .select('machine_id')
+      .eq('id', incident.contract_machine_id)
+      .maybeSingle()
+    if (error) console.error('[submitIntervention.serie]', error)
+    if (data?.machine_id) return data.machine_id
+  }
+  return incident.machine_id
+}
 
 export async function submitInterventionAction(
   id: string,
@@ -23,7 +47,7 @@ export async function submitInterventionAction(
   // Verificar que el incidente esté asignado a este técnico
   const { data: incident } = await supabase
     .from('incidents')
-    .select('assigned_to, status, resolved_via, resolution_reason, resolution_note, rapport_intervention')
+    .select('assigned_to, status, resolved_via, resolution_reason, resolution_note, rapport_intervention, contract_machine_id, machine_id')
     .eq('id', id)
     .single()
   if (!incident) return { error: 'Incident introuvable.' }
@@ -53,6 +77,7 @@ export async function submitInterventionAction(
     if (!resolution.ok) return { error: resolution.error }
     Object.assign(updates, resolution.fields)
   }
+
   // Reabrir borra el rastro: si no, la próxima resolución heredaría el informe y la vía de la
   // anterior y la marca diría «intervención» aunque la segunda vez nadie fuese. Cuenta también
   // venir de `fermé`: el envío de la encuesta cierra la avería al instante, así que una
@@ -99,6 +124,22 @@ export async function submitInterventionAction(
   if (error) {
     console.error('[submitIntervention]', error)
     return { error: 'Une erreur est survenue. Veuillez réessayer.' }
+  }
+
+  // Dónde estaba el técnico al resolver (Fase 3). Solo en la transición: volver a guardar una
+  // resuelta no es resolverla otra vez y no debe pisar la posición de entonces. Nunca bloquea:
+  // sin permiso o sin GPS queda «sans position», y un fallo aquí solo se registra.
+  // Va a `field_presence` con el cliente ADMIN: esa tabla solo la escribe service_role y solo
+  // la lee la oficina (el cliente del portal no debe ver dónde estaba el técnico).
+  if (new_status === 'résolu' && old_status !== 'résolu') {
+    const presence = await computePresence({
+      entityType: 'incident', entityId: id, techId: user.id,
+      numeroSerie: await incidentSerie(supabase, incident), position: readPosition(formData),
+    })
+    const { error: presenceError } = await createAdminClient()
+      .from('field_presence')
+      .upsert(presence, { onConflict: 'entity_type,entity_id' })
+    if (presenceError) console.error('[submitIntervention.presence]', presenceError)
   }
 
   // Historial

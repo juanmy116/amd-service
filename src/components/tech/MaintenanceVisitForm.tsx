@@ -1,10 +1,11 @@
 'use client'
 
-import { useActionState } from 'react'
+import { startTransition, useActionState, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, Building2, MapPin, Wrench, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { PARTS } from '@/lib/parts'
+import { appendPosition, getPositionOnce } from '@/lib/pwa/geolocation'
 
 type FormState = { error: string } | null
 
@@ -24,6 +25,22 @@ export default function MaintenanceVisitForm({
   clientName, machineName, machineLocation, planNotes,
 }: Props) {
   const [state, formAction, pending] = useActionState(boundAction, null)
+
+  // Todo cierre lleva la posición del técnico (la oficina ve si estaba en el sitio). Misma
+  // mecánica que al resolver una avería (`intervention-form.tsx`): captura FUERA de la acción
+  // para que «Localisation…» se pinte, nunca más de ~4,5 s con el permiso ya dado (hasta 30 s
+  // si el navegador aún tiene que preguntarlo), y sin permiso o sin GPS se cierra
+  // igual (queda «sans position»).
+  const [locating, setLocating] = useState(false)
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (locating || pending) return
+    const data = new FormData(e.currentTarget)
+    setLocating(true)
+    appendPosition(data, await getPositionOnce(4000))
+    setLocating(false)
+    startTransition(() => formAction(data))
+  }
 
   return (
     <div className="p-4 space-y-5 pb-10">
@@ -75,7 +92,7 @@ export default function MaintenanceVisitForm({
         )}
       </Card>
 
-      <form action={formAction} className="space-y-5">
+      <form action={formAction} onSubmit={handleSubmit} className="space-y-5">
 
         {state?.error && (
           <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
@@ -119,11 +136,11 @@ export default function MaintenanceVisitForm({
 
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || locating}
           className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-semibold text-white bg-accent disabled:opacity-60 transition-opacity"
         >
-          {pending && <Loader2 size={16} className="animate-spin" />}
-          Clôturer la maintenance
+          {(pending || locating) && <Loader2 size={16} className="animate-spin" />}
+          {locating ? 'Localisation…' : 'Clôturer la maintenance'}
         </button>
       </form>
     </div>

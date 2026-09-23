@@ -2,9 +2,12 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import { MapPin } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import { getIncidentDisplayName } from '@/lib/incident'
+import { sortByDistance, distanceMeters, formatTaskDistance, type TaskCoords } from '@/lib/geo'
+import { NearestToggle, useNearestSort } from './NearestToggle'
 
 const PRIORITY_COLOR: Record<string, string> = {
   urgente: '#BF0D0D',
@@ -37,6 +40,8 @@ export type TechIncident = {
   created_at: string
   machine_id: string | null
   clients: { nom_client: string } | null
+  /** Coordonnées de la machine (les siennes, ou — `approx` — le centre de son quartier), pour « Plus proche ». */
+  coords: TaskCoords | null
 }
 
 type Filter = 'all' | 'urgent' | 'today'
@@ -53,15 +58,20 @@ function isToday(dateStr: string): boolean {
 
 export default function TechIncidentList({ incidents }: { incidents: TechIncident[] }) {
   const [filter, setFilter] = useState<Filter>('all')
+  const { origin, locating, noPosition, toggle } = useNearestSort()
 
   const urgentCount = incidents.filter(i => i.priority === 'urgente').length
   const todayCount  = incidents.filter(i => isToday(i.created_at)).length
 
-  const filtered = incidents.filter(i => {
+  let filtered = incidents.filter(i => {
     if (filter === 'urgent') return i.priority === 'urgente'
     if (filter === 'today')  return isToday(i.created_at)
     return true
   })
+  // « Plus proche » ne change pas l'ordre par défaut tant qu'on ne l'a pas activé.
+  if (origin) {
+    filtered = sortByDistance(filtered, origin, i => i.coords?.coords ?? null)
+  }
 
   const chips: { key: Filter; label: string; count: number }[] = [
     { key: 'all',    label: 'Tous',        count: incidents.length },
@@ -71,7 +81,7 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4">
         {chips.map(chip => (
           <button
             key={chip.key}
@@ -85,13 +95,22 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
             {chip.label} ({chip.count})
           </button>
         ))}
+        <NearestToggle active={origin !== null} locating={locating} onToggle={toggle} />
       </div>
+
+      {noPosition && (
+        <p className="text-xs text-ink-muted px-1">Position indisponible.</p>
+      )}
 
       {filtered.length === 0 ? (
         <p className="text-sm text-ink-muted text-center py-12">Aucune intervention</p>
       ) : (
         <div className="space-y-3">
-          {filtered.map(inc => (
+          {filtered.map(inc => {
+            const distance = origin && inc.coords
+              ? formatTaskDistance(distanceMeters(origin, inc.coords.coords), inc.coords.approx)
+              : null
+            return (
             <Link
               key={inc.id}
               href={`/tech/incidents/${inc.id}`}
@@ -120,6 +139,15 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
                   <span className="text-[10px] text-ink-muted">
                     {new Date(inc.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                   </span>
+                  {distance && (
+                    <>
+                      <span className="text-gray-300">·</span>
+                      <span className="flex items-center gap-0.5 text-[10px] text-ink-muted">
+                        <MapPin size={10} />
+                        {distance}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
               <span className="shrink-0 ml-3">
@@ -128,7 +156,8 @@ export default function TechIncidentList({ incidents }: { incidents: TechInciden
                 </Badge>
               </span>
             </Link>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

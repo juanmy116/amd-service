@@ -4,6 +4,8 @@ import { requireTechnician } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { PARTS } from '@/lib/parts'
+import { readPosition } from '@/lib/geo'
+import { computePresence } from '@/lib/presence.server'
 
 type FormState = { error: string } | null
 
@@ -77,6 +79,20 @@ export async function closeMaintenance(
     console.error('[closeMaintenance.rpc]', error)
     return { error: 'Erreur lors de la clôture de la visite.' }
   }
+
+  // Dónde estaba el técnico al cerrar (Fase 3). La visita ya está cerrada: esto es un añadido
+  // best-effort y un fallo solo se registra (el cierre no se deshace ni se avisa al técnico).
+  // Cliente admin: `field_presence` solo la escribe service_role (ver 20260925100000_geolocation.sql).
+  const { error: presenceError } = await admin
+    .from('field_presence')
+    .upsert(
+      await computePresence({
+        entityType: 'visit', entityId: visitId, techId: user.id,
+        numeroSerie: serie, position: readPosition(formData),
+      }),
+      { onConflict: 'entity_type,entity_id' },
+    )
+  if (presenceError) console.error('[closeMaintenance.presence]', presenceError)
 
   // Notificación Matrix: best-effort, fuera de la transacción ya commiteada.
   const r = data as {

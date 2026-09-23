@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import { getOpenLineForMachine } from '@/lib/contract-machines'
+import { itineraryDestination } from '@/lib/geo.server'
+import ItineraryButton from '@/components/tech/ItineraryButton'
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
   nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success',
@@ -66,17 +68,24 @@ export default async function MachineScanPage({
 
   // Obtener línea abierta para la máquina (nuevo modelo contract_machines)
   const openLine = await getOpenLineForMachine(admin, numero_serie)
-  let contract: { id: string; numero_contrat: string; clients: { nom_client: string } | null } | null = null
+  let contract: {
+    id: string; numero_contrat: string
+    clients: { nom_client: string; adresse: string | null; ville: string | null; quartier_code: string | null } | null
+  } | null = null
   if (openLine) {
     const { data } = await admin
       .from('contracts')
-      .select('id, numero_contrat, clients(nom_client)')
+      .select('id, numero_contrat, clients(nom_client, adresse, ville, quartier_code)')
       .eq('id', openLine.contract_id)
       .maybeSingle()
     contract = data
   }
 
   const client = contract?.clients ?? null
+
+  // Destination pour le bouton « Itinéraire » : coordonnées de la machine si elle en a, sinon
+  // l'adresse du client (texte).
+  const { coords: destCoords, text: destText } = await itineraryDestination(machine, client)
 
   // Auto-transición primer escaneo: assigné → en_cours para incidentes asignados a este técnico en esta máquina.
   // Se ejecuta después del guard machine.active para no mutar incidentes en máquinas dadas de baja.
@@ -152,10 +161,11 @@ export default async function MachineScanPage({
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-accent">
             <Printer size={18} className="text-white" />
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-ink">{machine.marque} {machine.modele}</p>
             <p className="font-mono text-xs text-ink-muted">{machine.numero_serie}</p>
           </div>
+          <ItineraryButton coords={destCoords} text={destText} />
         </div>
 
         <div className="grid grid-cols-2 gap-3 pt-1 border-t border-line-subtle">

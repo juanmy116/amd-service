@@ -6,9 +6,13 @@
  * refactor N-máquinas, un `select` apuntando a una columna inexistente
  * (`clients!client_id`) dejó la lista del técnico vacía en producción. Tenerlo
  * en un único sitio reduce el riesgo de que vuelva a divergir.
+ *
+ * `contract_machines(machines(numero_serie))` da el nº de serie de las incidencias internas
+ * (las públicas ya lo tienen en `machine_id`) — lo necesita «Plus proche» (Fase 3) para pedir
+ * las coordenadas de la máquina con `coordsForMachines`.
  */
 export const TECH_INCIDENT_SELECT =
-  'id, numero_incident, title, status, priority, created_at, machine_id, contract_machines(contracts(clients(nom_client)))' as const
+  'id, numero_incident, title, status, priority, created_at, machine_id, contract_machines(machines(numero_serie), contracts(clients(nom_client)))' as const
 
 /**
  * Nombre a mostrar de una incidencia en la lista del técnico:

@@ -60,7 +60,9 @@ const nextConfig: NextConfig = {
           ...globalHeaders,
           // camera=(self): permite acceso solo desde el mismo origen (necesario para el
           // scanner QR en /tech/scan). Bloquea cámara desde iframes de terceros.
-          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=()' },
+          // geolocation=(self): la PWA de técnicos pide la posición solo al escanear, resolver
+          // una avería o cerrar un mantenimiento; sigue prohibida para iframes de terceros.
+          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(self)' },
         ],
       },
       {

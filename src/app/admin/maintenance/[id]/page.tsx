@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card'
 import { PanelHeader } from '@/components/ui/PanelHeader'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
+import { presenceLabel, PRESENCE_TONE_CLASS, type Presence } from '@/lib/geo'
 
 const FREQ_LABEL: Record<string, string> = {
   mensuel:     'Mensuel',
@@ -72,6 +73,16 @@ export default async function MaintenancePlanDetailPage({
   const visits = ((plan.maintenance_visits ?? []) as unknown as Visit[])
     .sort((a, b) => b.scheduled_date.localeCompare(a.scheduled_date))
 
+  // Presencia del técnico al cerrar cada visita: tabla aparte (`field_presence`, solo la lee el
+  // admin por RLS). Una consulta para todas las visitas del plan.
+  const { data: presences } = visits.length > 0
+    ? await supabase.from('field_presence')
+        .select('entity_id, presence, distance_m, accuracy_m')
+        .eq('entity_type', 'visit')
+        .in('entity_id', visits.map((v) => v.id))
+    : { data: [] }
+  const presenceByVisit = new Map((presences ?? []).map((p) => [p.entity_id, p]))
+
   return (
     <div className="p-8 space-y-6 max-w-4xl">
 
@@ -122,6 +133,10 @@ export default async function MaintenancePlanDetailPage({
       {/* Historial visitas */}
       <Card className="overflow-hidden">
         <PanelHeader title="Historique des visites" />
+        <p className="px-4 pt-3 text-xs text-ink-muted">
+          Avant le 25/09/2026, le QR n&apos;était pas vraiment vérifié : la clôture le marquait
+          « ✓ Vérifié » automatiquement, sans scan réel sur la machine.
+        </p>
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-neutral-soft border-b border-line-subtle">
@@ -131,13 +146,14 @@ export default async function MaintenancePlanDetailPage({
               <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Réalisée le</th>
               <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Technicien</th>
               <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">QR</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Position</th>
               <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Notes</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line-subtle">
             {visits.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-ink-muted text-sm">
+                <td colSpan={8} className="px-4 py-10 text-center text-ink-muted text-sm">
                   Aucune visite planifiée
                 </td>
               </tr>
@@ -177,6 +193,15 @@ export default async function MaintenancePlanDetailPage({
                       ? <span className="text-xs text-success font-medium">✓ Vérifié</span>
                       : <span className="text-xs text-ink-muted">—</span>
                     }
+                  </td>
+                  <td className="px-4 py-3.5">
+                    {(() => {
+                      const p = presenceByVisit.get(v.id)
+                      const position = p ? presenceLabel(p.presence as Presence, p.distance_m, p.accuracy_m) : null
+                      return position
+                        ? <span className={`text-xs ${PRESENCE_TONE_CLASS[position.tone]}`}>{position.text}</span>
+                        : <span className="text-xs text-ink-muted">—</span>
+                    })()}
                   </td>
                   <td className="px-4 py-3.5 text-ink-soft text-xs max-w-xs truncate">
                     {v.notes ?? <span className="text-ink-muted">—</span>}

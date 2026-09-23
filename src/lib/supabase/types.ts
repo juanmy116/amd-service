@@ -471,6 +471,50 @@ export type Database = {
           },
         ]
       }
+      field_presence: {
+        Row: {
+          accuracy_m: number | null
+          distance_m: number | null
+          entity_id: string
+          entity_type: string
+          lat: number | null
+          lng: number | null
+          presence: string
+          recorded_at: string
+          tech_id: string | null
+        }
+        Insert: {
+          accuracy_m?: number | null
+          distance_m?: number | null
+          entity_id: string
+          entity_type: string
+          lat?: number | null
+          lng?: number | null
+          presence: string
+          recorded_at?: string
+          tech_id?: string | null
+        }
+        Update: {
+          accuracy_m?: number | null
+          distance_m?: number | null
+          entity_id?: string
+          entity_type?: string
+          lat?: number | null
+          lng?: number | null
+          presence?: string
+          recorded_at?: string
+          tech_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_presence_tech_id_fkey"
+            columns: ["tech_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incident_counters: {
         Row: {
           last_number: number
@@ -1203,7 +1247,13 @@ export type Database = {
       machines: {
         Row: {
           active: boolean
+          lat: number | null
+          lng: number | null
           localisation: string | null
+          location_accuracy_m: number | null
+          location_set_at: string | null
+          location_set_by: string | null
+          location_source: string | null
           marque: string
           modele: string
           numero_serie: string
@@ -1214,7 +1264,13 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          lat?: number | null
+          lng?: number | null
           localisation?: string | null
+          location_accuracy_m?: number | null
+          location_set_at?: string | null
+          location_set_by?: string | null
+          location_source?: string | null
           marque: string
           modele: string
           numero_serie: string
@@ -1225,7 +1281,13 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          lat?: number | null
+          lng?: number | null
           localisation?: string | null
+          location_accuracy_m?: number | null
+          location_set_at?: string | null
+          location_set_by?: string | null
+          location_source?: string | null
           marque?: string
           modele?: string
           numero_serie?: string
@@ -1235,6 +1297,13 @@ export type Database = {
           type?: Database["public"]["Enums"]["machine_type"] | null
         }
         Relationships: [
+          {
+            foreignKeyName: "machines_location_set_by_fkey"
+            columns: ["location_set_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "machines_quartier_code_fkey"
             columns: ["quartier_code"]
