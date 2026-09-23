@@ -79,4 +79,9 @@ AS $$
   WHERE mv.assigned_to = auth.uid();
 $$;
 
+-- Las tres funciones filtran ahora por `maintenance_visits.assigned_to` (como ya hacía
+-- auth_tech_visit_ids): mismo índice que `incidents_assigned_to_idx` para incidencias.
+CREATE INDEX IF NOT EXISTS maintenance_visits_assigned_to_idx
+  ON public.maintenance_visits (assigned_to);
+
 COMMIT;

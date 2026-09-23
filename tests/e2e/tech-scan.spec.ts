@@ -11,25 +11,38 @@ test.describe('Escaneo — cualquier técnico ve cualquier máquina', () => {
     await loginAs(page, E2E.techEmail)
   })
 
-  test('máquina sin incidencias del técnico: se ve la ficha, no 404', async ({ page }) => {
+  // Las comprobaciones se limitan a <main>: en escritorio ancho la agenda lateral del técnico
+  // también muestra cliente y máquina de sus visitas.
+  test('máquina sin nada asignado al técnico: se ve la ficha, sin enlace a una visita ajena', async ({ page }) => {
+    await page.goto(`/tech/scan/${encodeURIComponent(E2E.serieAjena)}`)
+    const main = page.getByRole('main')
+    await expect(main.getByText('Fiche machine')).toBeVisible()
+    await expect(main.getByText(E2E.serieAjena)).toBeVisible()
+    await expect(main.getByText(E2E.clientNombre)).toBeVisible()
+    await expect(main.getByText('Maintenance planifiée')).toHaveCount(0)
+  })
+
+  test('máquina con solo un mantenimiento del técnico: se ve la ficha, no 404', async ({ page }) => {
     await page.goto(`/tech/scan/${encodeURIComponent(E2E.serieLibre)}`)
-    await expect(page.getByText('Fiche machine')).toBeVisible()
-    await expect(page.getByText(E2E.serieLibre)).toBeVisible()
-    await expect(page.getByText(E2E.clientNombre)).toBeVisible()
+    const main = page.getByRole('main')
+    await expect(main.getByText('Fiche machine')).toBeVisible()
+    await expect(main.getByText(E2E.serieLibre)).toBeVisible()
+    await expect(main.getByText(E2E.clientNombre)).toBeVisible()
   })
 
   test('la visita de mantenimiento asignada se ve y se abre', async ({ page }) => {
     await page.goto(`/tech/scan/${encodeURIComponent(E2E.serieLibre)}`)
-    await expect(page.getByText('Maintenance planifiée')).toBeVisible()
+    const main = page.getByRole('main')
+    await expect(main.getByText('Maintenance planifiée')).toBeVisible()
 
-    await page.getByText('Maintenance planifiée').click()
+    await main.getByText('Maintenance planifiée').click()
     await expect(page).toHaveURL(/\/tech\/scan\/.+\/maintenance\/.+/)
-    await expect(page.getByText('TEST E2E')).toBeVisible()
-    await expect(page.getByText(E2E.clientNombre)).toBeVisible()
+    await expect(main.getByText('TEST E2E')).toBeVisible()
+    await expect(main.getByText(E2E.clientNombre)).toBeVisible()
   })
 
   test('serie inexistente: mensaje claro, no 404', async ({ page }) => {
     await page.goto('/tech/scan/NO-EXISTE-E2E')
-    await expect(page.getByText('Machine introuvable ou retirée du parc')).toBeVisible()
+    await expect(page.getByRole('main').getByText('Machine introuvable ou retirée du parc')).toBeVisible()
   })
 })

@@ -10,9 +10,12 @@ export const E2E = {
   serie: 'TEST-SN-E2E',
   incidentNumero: 'TEST-E2E-I1',
   // Máquina del mismo contrato SIN incidencias del técnico: solo tiene una visita de
-  // mantenimiento asignada. Prueba que la ficha se ve por «cualquier técnico ve cualquier
-  // máquina activa», no porque tenga una avería ahí (ver tech-scan.spec.ts).
+  // mantenimiento asignada a él (la ve por RLS desde la migración 20260923100000).
   serieLibre: 'TEST-SN-E2E-LIBRE',
+  // Máquina en la que el técnico NO tiene nada asignado (su visita es de nadie): prueba
+  // «cualquier técnico ve cualquier máquina activa» por la vía de solo lectura (ver
+  // tech-scan.spec.ts).
+  serieAjena: 'TEST-SN-E2E-AJENA',
   clientNombre: 'TEST Client E2E',
 }
 
@@ -67,8 +70,7 @@ export async function seed(): Promise<SeedIds> {
   if (iErr) throw new Error(`seed incident: ${iErr.message}`)
 
   // Segunda máquina del mismo contrato, SIN incidencia del técnico: solo lleva una visita
-  // de mantenimiento asignada. Prueba «cualquier técnico ve cualquier máquina activa» (Task 1)
-  // sin depender de que tenga una avería ahí.
+  // de mantenimiento asignada a él.
   const { error: mLibreErr } = await admin
     .from('machines').insert({ numero_serie: E2E.serieLibre, marque: 'TEST', modele: 'E2E', active: true })
   if (mLibreErr) throw new Error(`seed machine libre: ${mLibreErr.message}`)
@@ -96,6 +98,23 @@ export async function seed(): Promise<SeedIds> {
     })
     .select('id').single()
   if (vErr) throw new Error(`seed maintenance_visits: ${vErr.message}`)
+
+  // Tercera máquina: nada del técnico. Su visita no está asignada a nadie, así que él no debe
+  // ver el enlace a ella (la visibilidad de las visitas sigue siendo por RLS).
+  const { error: mAjenaErr } = await admin
+    .from('machines').insert({ numero_serie: E2E.serieAjena, marque: 'TEST', modele: 'E2E', active: true })
+  if (mAjenaErr) throw new Error(`seed machine ajena: ${mAjenaErr.message}`)
+
+  const { data: lineAjena, error: lAjenaErr } = await admin
+    .from('contract_machines')
+    .insert({ contract_id: contract!.id, machine_id: E2E.serieAjena, date_debut: '2026-01-01', statut: 'actif' })
+    .select('id').single()
+  if (lAjenaErr) throw new Error(`seed line ajena: ${lAjenaErr.message}`)
+
+  const { error: vAjenaErr } = await admin
+    .from('maintenance_visits')
+    .insert({ plan_id: plan!.id, contract_machine_id: lineAjena!.id, scheduled_date: '2026-01-15', status: 'planifié' })
+  if (vAjenaErr) throw new Error(`seed maintenance_visits ajena: ${vAjenaErr.message}`)
 
   return { techId, incidentId: inc!.id, visitId: visit!.id }
 }
