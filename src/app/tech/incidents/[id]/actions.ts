@@ -129,12 +129,16 @@ export async function submitInterventionAction(
   // Dónde estaba el técnico al resolver (Fase 3). Solo en la transición: volver a guardar una
   // resuelta no es resolverla otra vez y no debe pisar la posición de entonces. Nunca bloquea:
   // sin permiso o sin GPS queda «sans position», y un fallo aquí solo se registra.
-  // Con el cliente ADMIN y aparte: la BD solo acepta estas columnas de service_role (ver
-  // guard_field_evidence en 20260925100000_geolocation.sql); con la sesión del técnico se
-  // descartarían en silencio.
+  // Va a `field_presence` con el cliente ADMIN: esa tabla solo la escribe service_role y solo
+  // la lee la oficina (el cliente del portal no debe ver dónde estaba el técnico).
   if (new_status === 'résolu' && old_status !== 'résolu') {
-    const presence = await computePresence(await incidentSerie(supabase, incident), readPosition(formData))
-    const { error: presenceError } = await createAdminClient().from('incidents').update(presence).eq('id', id)
+    const presence = await computePresence({
+      entityType: 'incident', entityId: id, techId: user.id,
+      numeroSerie: await incidentSerie(supabase, incident), position: readPosition(formData),
+    })
+    const { error: presenceError } = await createAdminClient()
+      .from('field_presence')
+      .upsert(presence, { onConflict: 'entity_type,entity_id' })
     if (presenceError) console.error('[submitIntervention.presence]', presenceError)
   }
 

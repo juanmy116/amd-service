@@ -1,26 +1,26 @@
 'use server'
 
 import { requireTechnician } from '@/lib/auth'
-import { stampQrScan } from '@/lib/scan.server'
-import { isValidLatLng, type LatLng } from '@/lib/geo'
-
-type ScanPosition = LatLng & { accuracy: number }
-
-// La posición llega del navegador: se valida aquí (números finitos, en rango, precisión ≥ 0).
-// Cualquier cosa rara ⇒ null, que es lo mismo que no haber dado permiso.
-function validPosition(p: unknown): ScanPosition | null {
-  if (!p || typeof p !== 'object') return null
-  const { lat, lng, accuracy } = p as Record<string, unknown>
-  if (typeof lat !== 'number' || typeof lng !== 'number' || typeof accuracy !== 'number') return null
-  if (!isValidLatLng(lat, lng) || !Number.isFinite(accuracy) || accuracy < 0) return null
-  return { lat, lng, accuracy }
-}
+import { setFirstScanLocation, stampQrScan } from '@/lib/scan.server'
+import { toPosition } from '@/lib/geo'
 
 // Sello «el técnico tuvo la máquina delante» cuando escanea con la cámara DE LA APP. Es tan
-// creíble como `/m/[serie]`: en ambos casos el serie sale de leer la etiqueta física. Con la
-// posición del escaneo, además, la máquina sin ubicación recibe la suya (ver `stampQrScan`).
-// Nunca bloquea (stampQrScan registra y sigue).
-export async function recordQrScanAction(numeroSerie: string, position?: unknown): Promise<void> {
+// creíble como `/m/[serie]`: en ambos casos el serie sale de leer la etiqueta física.
+// Devuelve `needsLocation` (máquina instalada y sin ubicación): solo entonces el escáner espera
+// al GPS y manda la posición con `recordMachineLocationAction`. Nunca bloquea (stampQrScan
+// registra y sigue).
+export async function recordQrScanAction(numeroSerie: string): Promise<{ needsLocation: boolean }> {
   const { user } = await requireTechnician()
-  await stampQrScan(numeroSerie, user.id, validPosition(position))
+  return stampQrScan(numeroSerie, user.id)
+}
+
+// Posición del escaneo para una máquina sin ubicación. Llega del navegador: se valida aquí
+// (`toPosition`) y el servidor vuelve a comprobar todas las condiciones del primer escaneo
+// (activa, instalada, sin ubicación, GPS ≤ 100 m — ver `setFirstScanLocation`).
+export async function recordMachineLocationAction(numeroSerie: string, position: unknown): Promise<void> {
+  const { user } = await requireTechnician()
+  if (!position || typeof position !== 'object') return
+  const { lat, lng, accuracy } = position as Record<string, unknown>
+  const valid = toPosition(lat, lng, accuracy)
+  if (valid) await setFirstScanLocation(numeroSerie, user.id, valid)
 }

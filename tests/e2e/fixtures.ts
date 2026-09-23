@@ -53,12 +53,7 @@ export async function seed(): Promise<SeedIds> {
   if (cErr) throw new Error(`seed contract: ${cErr.message}`)
 
   const { error: mErr } = await admin
-    .from('machines').insert({
-      numero_serie: E2E.serie, marque: 'TEST', modele: 'E2E', active: true,
-      // Position connue pour geo.spec.ts (bouton « Itinéraire ») : lat/lng/location_source
-      // doivent arriver ensemble (CHECK machines_location_complete_chk).
-      lat: E2E.serieLat, lng: E2E.serieLng, location_source: 'admin',
-    })
+    .from('machines').insert({ numero_serie: E2E.serie, marque: 'TEST', modele: 'E2E', active: true })
   if (mErr) throw new Error(`seed machine: ${mErr.message}`)
 
   const { data: line, error: lErr } = await admin
@@ -66,6 +61,15 @@ export async function seed(): Promise<SeedIds> {
     .insert({ contract_id: contract!.id, machine_id: E2E.serie, date_debut: '2026-01-01', statut: 'actif' })
     .select('id').single()
   if (lErr) throw new Error(`seed line: ${lErr.message}`)
+
+  // Position connue pour geo.spec.ts (bouton « Itinéraire ») — APRÈS la ligne : une nouvelle
+  // ligne de contrat efface la position de la machine (trigger de 20260925100000_geolocation).
+  // lat/lng/location_source arrivent ensemble (CHECK machines_location_complete_chk).
+  const { error: posErr } = await admin
+    .from('machines')
+    .update({ lat: E2E.serieLat, lng: E2E.serieLng, location_source: 'admin' })
+    .eq('numero_serie', E2E.serie)
+  if (posErr) throw new Error(`seed machine position: ${posErr.message}`)
 
   const { data: inc, error: iErr } = await admin
     .from('incidents')

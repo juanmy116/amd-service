@@ -28,7 +28,8 @@ export default function MaintenanceVisitForm({
 
   // Todo cierre lleva la posición del técnico (la oficina ve si estaba en el sitio). Misma
   // mecánica que al resolver una avería (`intervention-form.tsx`): captura FUERA de la acción
-  // para que «Localisation…» se pinte, nunca más de ~4,5 s, y sin permiso o sin GPS se cierra
+  // para que «Localisation…» se pinte, nunca más de ~4,5 s con el permiso ya dado (hasta 30 s
+  // si el navegador aún tiene que preguntarlo), y sin permiso o sin GPS se cierra
   // igual (queda «sans position»).
   const [locating, setLocating] = useState(false)
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {

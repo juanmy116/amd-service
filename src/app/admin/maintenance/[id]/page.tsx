@@ -6,13 +6,7 @@ import { Card } from '@/components/ui/Card'
 import { PanelHeader } from '@/components/ui/PanelHeader'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
-import { presenceLabel, type Presence } from '@/lib/geo'
-
-const PRESENCE_TONE_CLASS: Record<'green' | 'amber' | 'grey', string> = {
-  green: 'text-success font-medium',
-  amber: 'text-warning font-medium',
-  grey:  'text-ink-muted',
-}
+import { presenceLabel, PRESENCE_TONE_CLASS, type Presence } from '@/lib/geo'
 
 const FREQ_LABEL: Record<string, string> = {
   mensuel:     'Mensuel',
@@ -54,7 +48,6 @@ export default async function MaintenancePlanDetailPage({
       ),
       maintenance_visits (
         id, scheduled_date, done_at, status, qr_verified, notes, matrix_notified,
-        tech_presence, tech_distance_m, tech_accuracy_m,
         contract_machine_id,
         done_by_profile:profiles!maintenance_visits_done_by_fkey ( full_name ),
         assigned_profile:profiles!maintenance_visits_assigned_to_fkey ( full_name ),
@@ -72,9 +65,6 @@ export default async function MaintenancePlanDetailPage({
     id: string; scheduled_date: string; done_at: string | null
     status: string; qr_verified: boolean; notes: string | null
     matrix_notified: boolean
-    tech_presence: Presence | null
-    tech_distance_m: number | null
-    tech_accuracy_m: number | null
     contract_machine_id: string
     done_by_profile: { full_name: string } | null
     assigned_profile: { full_name: string } | null
@@ -82,6 +72,16 @@ export default async function MaintenancePlanDetailPage({
   }
   const visits = ((plan.maintenance_visits ?? []) as unknown as Visit[])
     .sort((a, b) => b.scheduled_date.localeCompare(a.scheduled_date))
+
+  // Presencia del técnico al cerrar cada visita: tabla aparte (`field_presence`, solo la lee el
+  // admin por RLS). Una consulta para todas las visitas del plan.
+  const { data: presences } = visits.length > 0
+    ? await supabase.from('field_presence')
+        .select('entity_id, presence, distance_m, accuracy_m')
+        .eq('entity_type', 'visit')
+        .in('entity_id', visits.map((v) => v.id))
+    : { data: [] }
+  const presenceByVisit = new Map((presences ?? []).map((p) => [p.entity_id, p]))
 
   return (
     <div className="p-8 space-y-6 max-w-4xl">
@@ -196,7 +196,8 @@ export default async function MaintenancePlanDetailPage({
                   </td>
                   <td className="px-4 py-3.5">
                     {(() => {
-                      const position = presenceLabel(v.tech_presence, v.tech_distance_m, v.tech_accuracy_m)
+                      const p = presenceByVisit.get(v.id)
+                      const position = p ? presenceLabel(p.presence as Presence, p.distance_m, p.accuracy_m) : null
                       return position
                         ? <span className={`text-xs ${PRESENCE_TONE_CLASS[position.tone]}`}>{position.text}</span>
                         : <span className="text-xs text-ink-muted">—</span>

@@ -126,13 +126,6 @@ describe('clearResolution — al reabrir una avería', () => {
       rapport_intervention: null,
       qr_verified: false,
       qr_scanned_by: null,
-      // Y dónde estaba el técnico: la posición de la primera resolución no dice nada de la segunda.
-      tech_lat: null,
-      tech_lng: null,
-      tech_accuracy_m: null,
-      tech_distance_m: null,
-      tech_position_at: null,
-      tech_presence: null,
     })
   })
 })

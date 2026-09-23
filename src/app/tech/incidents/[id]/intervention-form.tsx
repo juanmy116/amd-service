@@ -51,7 +51,8 @@ export default function InterventionForm({
   const [state, formAction, pending] = useActionState(boundAction, null)
 
   // Al RESOLVER se adjunta la posición del técnico (la oficina ve si estaba en el sitio). Se pide
-  // aquí y no en segundo plano; `getPositionOnce` nunca lanza ni espera más de ~4,5 s, y sin
+  // aquí y no en segundo plano; `getPositionOnce` nunca lanza ni espera más de ~4,5 s con el
+  // permiso ya dado (hasta 30 s si el navegador aún tiene que preguntarlo), y sin
   // permiso o sin GPS se envía igual (queda «sans position»). Solo en la transición a `résolu`,
   // que es cuando el servidor la guarda. La captura va FUERA de la acción: dentro, los cambios
   // de estado son de transición y «Localisation…» no se pintaría hasta el final.

@@ -1,9 +1,10 @@
 -- Fase 3 de la PWA de técnicos: geolocalización (2026-09-25).
 -- 1) Ubicación exacta de cada máquina (primer escaneo con buena precisión, o el admin).
--- 2) Dónde estaba el técnico al resolver una avería / cerrar un mantenimiento, y el veredicto
+-- 2) Dónde estaba el técnico al resolver una avería / cerrar un mantenimiento (tabla aparte
+--    `field_presence`, solo la lee el admin: el cliente del portal no la ve), y el veredicto
 --    calculado en el servidor contra la ubicación de la máquina (🟢 near ≤ 200 m con GPS
---    ≤ 150 m / 🟡 far = lejos incluso restando el margen del GPS / 🟡 imprecise = el GPS no
---    permite decir ni una cosa ni otra / 🟡 no_position = no dio permiso o sin GPS /
+--    ≤ 150 m / 🟡 far = lejos incluso restando los márgenes de error del técnico y de la
+--    máquina / 🟡 imprecise = el GPS no permite decir ni una cosa ni otra / 🟡 no_position = no dio permiso o sin GPS /
 --    ⚪ no_machine_position = la máquina aún no tiene ubicación). Nunca bloquea nada.
 -- 3) close_maintenance_visit deja de poner qr_verified = true a ciegas: el sello lo pone el
 --    escaneo real (stampQrScan), igual que en las averías.
@@ -25,45 +26,118 @@ ALTER TABLE public.machines
         AND lat BETWEEN -90 AND 90 AND lng BETWEEN -180 AND 180)
   );
 
--- Mismas columnas de presencia en incidencias y visitas.
-ALTER TABLE public.incidents
-  ADD COLUMN tech_lat          double precision,
-  ADD COLUMN tech_lng          double precision,
-  ADD COLUMN tech_accuracy_m   real,
-  ADD COLUMN tech_distance_m   real,
-  ADD COLUMN tech_position_at  timestamptz,
-  ADD COLUMN tech_presence     text CHECK (tech_presence IN ('near', 'far', 'imprecise', 'no_position', 'no_machine_position'));
+-- Primera ubicación y máquina que se mueve.
+-- La posición del primer escaneo solo vale si la máquina está instalada en un cliente (línea de
+-- contrato abierta, lo comprueba stampQrScan). Y cuando la máquina recibe una línea NUEVA (alta
+-- desde el stock, sustitución, reasignación, importación…) puede haber cambiado de sitio: su
+-- ubicación se borra y el próximo escaneo con buen GPS pone la nueva. Regla simple a propósito:
+-- CUALQUIER línea nueva la borra, aunque la máquina no se haya movido (el coste es un escaneo).
+-- Si el admin quiere fijarla a mano, que lo haga DESPUÉS de crear la línea.
+-- SECURITY DEFINER: las RPC que crean líneas las llama gente sin permiso de UPDATE en machines.
 
-ALTER TABLE public.maintenance_visits
-  ADD COLUMN tech_lat          double precision,
-  ADD COLUMN tech_lng          double precision,
-  ADD COLUMN tech_accuracy_m   real,
-  ADD COLUMN tech_distance_m   real,
-  ADD COLUMN tech_position_at  timestamptz,
-  ADD COLUMN tech_presence     text CHECK (tech_presence IN ('near', 'far', 'imprecise', 'no_position', 'no_machine_position'));
+CREATE OR REPLACE FUNCTION public.reset_machine_location_on_new_line()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+BEGIN
+  UPDATE public.machines
+     SET lat = NULL, lng = NULL, location_accuracy_m = NULL, location_source = NULL,
+         location_set_at = NULL, location_set_by = NULL
+   WHERE numero_serie = NEW.machine_id
+     AND lat IS NOT NULL;
+  RETURN NULL;
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION public.reset_machine_location_on_new_line() FROM PUBLIC, anon, authenticated;
 
--- PRUEBAS DE CAMPO: solo las escribe el servidor.
+COMMENT ON FUNCTION public.reset_machine_location_on_new_line() IS
+  'Una línea de contrato nueva borra la ubicación de su máquina (puede haberse movido). Ver 20260925100000_geolocation.sql';
+
+CREATE TRIGGER trg_reset_machine_location_on_new_line
+  AFTER INSERT ON public.contract_machines
+  FOR EACH ROW EXECUTE FUNCTION public.reset_machine_location_on_new_line();
+
+-- PRESENCIA DEL TÉCNICO: tabla aparte, SOLO para la oficina.
 --
--- La posición del técnico, su veredicto y el sello del QR son la prueba de que alguien estuvo
--- delante de la máquina. Si un técnico pudiera escribirlos con su propia sesión (la RLS le deja
--- actualizar sus averías y sus visitas, p. ej. con un PATCH a PostgREST), se daría a sí mismo un
--- 🟢 «sur place» desde la oficina. Por eso, fuera de service_role (el servidor: stampQrScan,
--- computePresence, las RPC), este trigger:
---   · en INSERT, las deja vacías;
---   · en UPDATE, conserva el valor anterior si alguien intenta PONER uno. VACIARLAS (NULL, o
---     qr_verified = false) sí se permite —es lo que hace `clearResolution()` al reabrir—, salvo
---     si la tarea sigue cerrada: borrar un 🟡 «loin» de una avería resuelta sería esconderlo.
--- No da error: la aplicación ya no manda estas columnas con la sesión del usuario, y un intento
--- a mano simplemente no surte efecto (mismo trato que la RLS da a un UPDATE sin permiso).
+-- Dónde estaba el técnico al resolver una avería / cerrar una visita, y el veredicto contra la
+-- ubicación de la máquina. NO va en `incidents`/`maintenance_visits`: el cliente del portal lee
+-- sus averías fila entera (client_own_incidents_select), así que cualquier columna ahí la vería
+-- con un `select=tech_lat,…` a PostgREST — y la posición de un empleado no es asunto suyo.
+-- Aquí: RLS con SOLO la policy de lectura del admin; escribir, solo service_role (el servidor:
+-- `computePresence` + upsert con el cliente admin). Un técnico no puede darse un 🟢 a sí mismo.
+-- Una fila por tarea (PK entity_type + entity_id); sin FK porque apunta a dos tablas — los
+-- triggers de abajo la borran cuando la tarea desaparece o se reabre.
+
+CREATE TABLE public.field_presence (
+  entity_type text NOT NULL CHECK (entity_type IN ('incident', 'visit')),
+  entity_id   uuid NOT NULL,
+  tech_id     uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  lat         double precision,
+  lng         double precision,
+  accuracy_m  real,
+  distance_m  real,
+  presence    text NOT NULL CHECK (presence IN ('near', 'far', 'imprecise', 'no_position', 'no_machine_position')),
+  recorded_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (entity_type, entity_id)
+);
+
+ALTER TABLE public.field_presence ENABLE ROW LEVEL SECURITY;
+CREATE POLICY field_presence_admin_select ON public.field_presence
+  FOR SELECT TO authenticated USING (public.is_admin());
+REVOKE ALL ON public.field_presence FROM anon;
+REVOKE INSERT, UPDATE, DELETE ON public.field_presence FROM authenticated;
+
+COMMENT ON TABLE public.field_presence IS
+  'Posición del técnico al resolver/cerrar y veredicto de presencia. Lectura: admin. Escritura: service_role. Ver 20260925100000_geolocation.sql';
+
+-- Reabrir una avería (résolu/fermé → viva) borra su presencia, la reabra quien la reabra:
+-- dónde estaba el técnico la primera vez no prueba nada sobre la segunda. Y borrar una avería o
+-- una visita se lleva su fila (no hay FK que lo haga).
+CREATE OR REPLACE FUNCTION public.field_presence_cleanup()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+DECLARE
+  v_type text := CASE TG_TABLE_NAME WHEN 'incidents' THEN 'incident' ELSE 'visit' END;
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    DELETE FROM public.field_presence WHERE entity_type = v_type AND entity_id = OLD.id;
+  ELSIF OLD.status IN ('résolu', 'fermé') AND NEW.status NOT IN ('résolu', 'fermé') THEN
+    DELETE FROM public.field_presence WHERE entity_type = v_type AND entity_id = NEW.id;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION public.field_presence_cleanup() FROM PUBLIC, anon, authenticated;
+
+CREATE TRIGGER trg_field_presence_cleanup
+  AFTER UPDATE OF status OR DELETE ON public.incidents
+  FOR EACH ROW EXECUTE FUNCTION public.field_presence_cleanup();
+
+CREATE TRIGGER trg_field_presence_cleanup
+  AFTER DELETE ON public.maintenance_visits
+  FOR EACH ROW EXECUTE FUNCTION public.field_presence_cleanup();
+
+-- SELLO DEL QR: solo lo escribe el servidor.
 --
--- Y al REABRIR una avería (résolu/fermé → viva) la posición se vacía aquí, para cualquiera:
--- dónde estaba el técnico la primera vez no prueba nada sobre la segunda. El QR lo vacía ya
--- `tg_guard_incident_resolution`. El orden entre los dos triggers da igual: este solo vacía
--- columnas tech_* y en qr_* un vaciado siempre está permitido.
+-- El sello del QR (`qr_verified`, y en incidents `qr_scanned_by`) es la prueba de que alguien
+-- tuvo la etiqueta física delante. Si un técnico pudiera escribirlo con su propia sesión (la RLS
+-- le deja actualizar sus averías y sus visitas, p. ej. con un PATCH a PostgREST), se sellaría
+-- él mismo desde la oficina. Por eso, fuera de service_role (stampQrScan, las RPC), este trigger:
+--   · en INSERT, lo deja vacío;
+--   · en UPDATE, conserva el valor anterior si alguien intenta PONER uno. VACIARLO
+--     (qr_verified = false / qr_scanned_by = NULL) sí se permite —es lo que hace
+--     `clearResolution()` al reabrir—, salvo si la tarea sigue cerrada.
+-- No da error: un intento a mano simplemente no surte efecto (mismo trato que la RLS da a un
+-- UPDATE sin permiso). Al reabrir una avería, el sello lo vacía `tg_guard_incident_resolution`.
 --
 -- `auth.role()` sale del JWT, no del rol de Postgres: una RPC SECURITY DEFINER llamada por un
 -- técnico sigue contando como 'authenticated'. SQL directo sin JWT (editor de Supabase) tampoco
--- pasa: para corregir estas columnas a mano, hacerlo con la service_role key.
+-- pasa: para corregirlo a mano, hacerlo con la service_role key.
 
 CREATE OR REPLACE FUNCTION public.guard_field_evidence()
 RETURNS trigger
@@ -73,35 +147,19 @@ AS $$
 DECLARE
   v_closed boolean;
 BEGIN
+  IF auth.role() IS NOT DISTINCT FROM 'service_role' THEN
+    RETURN NEW;
+  END IF;
+
   -- Ramas por tabla: `qr_scanned_by` solo existe en incidents y citarlo con una visita fallaría.
   IF TG_TABLE_NAME = 'incidents' THEN
-    IF TG_OP = 'UPDATE'
-       AND OLD.status IN ('résolu', 'fermé')
-       AND NEW.status NOT IN ('résolu', 'fermé') THEN
-      NEW.tech_lat         := NULL;
-      NEW.tech_lng         := NULL;
-      NEW.tech_accuracy_m  := NULL;
-      NEW.tech_distance_m  := NULL;
-      NEW.tech_position_at := NULL;
-      NEW.tech_presence    := NULL;
-    END IF;
     v_closed := NEW.status IN ('résolu', 'fermé');
   ELSE
     v_closed := NEW.status = 'fait';
   END IF;
 
-  IF auth.role() IS NOT DISTINCT FROM 'service_role' THEN
-    RETURN NEW;
-  END IF;
-
   IF TG_OP = 'INSERT' THEN
-    NEW.tech_lat         := NULL;
-    NEW.tech_lng         := NULL;
-    NEW.tech_accuracy_m  := NULL;
-    NEW.tech_distance_m  := NULL;
-    NEW.tech_position_at := NULL;
-    NEW.tech_presence    := NULL;
-    NEW.qr_verified      := false;
+    NEW.qr_verified := false;
     IF TG_TABLE_NAME = 'incidents' THEN
       NEW.qr_scanned_by := NULL;
     END IF;
@@ -109,24 +167,6 @@ BEGIN
   END IF;
 
   -- UPDATE: cambiar a un valor = no; vaciar = sí, salvo con la tarea cerrada.
-  IF NEW.tech_lat IS DISTINCT FROM OLD.tech_lat AND (NEW.tech_lat IS NOT NULL OR v_closed) THEN
-    NEW.tech_lat := OLD.tech_lat;
-  END IF;
-  IF NEW.tech_lng IS DISTINCT FROM OLD.tech_lng AND (NEW.tech_lng IS NOT NULL OR v_closed) THEN
-    NEW.tech_lng := OLD.tech_lng;
-  END IF;
-  IF NEW.tech_accuracy_m IS DISTINCT FROM OLD.tech_accuracy_m AND (NEW.tech_accuracy_m IS NOT NULL OR v_closed) THEN
-    NEW.tech_accuracy_m := OLD.tech_accuracy_m;
-  END IF;
-  IF NEW.tech_distance_m IS DISTINCT FROM OLD.tech_distance_m AND (NEW.tech_distance_m IS NOT NULL OR v_closed) THEN
-    NEW.tech_distance_m := OLD.tech_distance_m;
-  END IF;
-  IF NEW.tech_position_at IS DISTINCT FROM OLD.tech_position_at AND (NEW.tech_position_at IS NOT NULL OR v_closed) THEN
-    NEW.tech_position_at := OLD.tech_position_at;
-  END IF;
-  IF NEW.tech_presence IS DISTINCT FROM OLD.tech_presence AND (NEW.tech_presence IS NOT NULL OR v_closed) THEN
-    NEW.tech_presence := OLD.tech_presence;
-  END IF;
   IF NEW.qr_verified IS DISTINCT FROM OLD.qr_verified AND (NEW.qr_verified IS DISTINCT FROM false OR v_closed) THEN
     NEW.qr_verified := OLD.qr_verified;
   END IF;
@@ -141,7 +181,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.guard_field_evidence() IS
-  'Posición del técnico, veredicto de presencia y sello QR: solo los escribe service_role; vaciar se permite con la tarea abierta; reabrir una avería vacía la posición. Ver 20260925100000_geolocation.sql';
+  'Sello QR (qr_verified, qr_scanned_by): solo lo escribe service_role; vaciarlo se permite con la tarea abierta. Ver 20260925100000_geolocation.sql';
 
 CREATE TRIGGER trg_guard_field_evidence
   BEFORE INSERT OR UPDATE ON public.incidents

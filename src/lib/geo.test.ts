@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   distanceMeters, presenceFor, parseLatLng, itineraryLinks, destinationText, formatDistance,
-  sortByDistance, readPosition, presenceLabel, isValidLatLng,
-  PRESENCE_RADIUS_M, FIRST_SCAN_MAX_ACCURACY_M, NEAR_MAX_ACCURACY_M, type LatLng,
+  sortByDistance, readPosition, presenceLabel, isValidLatLng, toPosition, formatTaskDistance,
+  PRESENCE_TONE_CLASS, PRESENCE_RADIUS_M, FIRST_SCAN_MAX_ACCURACY_M, NEAR_MAX_ACCURACY_M, type LatLng,
 } from './geo'
 
 const PLATEAU: LatLng = { lat: 14.6708, lng: -17.4381 }
@@ -75,6 +75,21 @@ describe('presenceFor', () => {
     const r = presenceFor({ tech: at(north(50), 151), machine: PLATEAU })
     expect(r.presence).toBe('imprecise')
     expect(r.distance).toBe(50)
+  })
+
+  it('el margen de la máquina (primer escaneo) también se descuenta antes de decir «loin»', () => {
+    // 250 m, técnico ± 20 m, máquina ± 40 m: podría estar a 190 m ⇒ imprecise.
+    expect(presenceFor({ tech: at(north(250), 20), machine: { ...PLATEAU, accuracy: 40 } }).presence).toBe('imprecise')
+    // Mismo caso con la máquina ± 20 m: 250 − 20 − 20 = 210 > 200 ⇒ far.
+    expect(presenceFor({ tech: at(north(250), 20), machine: { ...PLATEAU, accuracy: 20 } }).presence).toBe('far')
+  })
+
+  it('máquina puesta por el admin (accuracy null) cuenta como margen 0', () => {
+    expect(presenceFor({ tech: at(north(250), 20), machine: { ...PLATEAU, accuracy: null } }).presence).toBe('far')
+  })
+
+  it('«near» no depende del margen de la máquina: ≤ 200 m con GPS del técnico ≤ 150 m', () => {
+    expect(presenceFor({ tech: at(north(150), 10), machine: { ...PLATEAU, accuracy: 90 } }).presence).toBe('near')
   })
 
   it('lejos pero dentro del margen de error ⇒ imprecise (no se acusa de «loin»)', () => {
@@ -278,6 +293,34 @@ describe('readPosition', () => {
   })
 })
 
+describe('toPosition', () => {
+  it('números finitos, en rango y precisión ≥ 0 ⇒ posición', () => {
+    expect(toPosition(14.69, -17.44, 12)).toEqual({ lat: 14.69, lng: -17.44, accuracy: 12 })
+    expect(toPosition(0, 0, 0)).toEqual({ lat: 0, lng: 0, accuracy: 0 })
+  })
+
+  it('cualquier otra cosa ⇒ null', () => {
+    expect(toPosition('14.69', -17.44, 12)).toBeNull()
+    expect(toPosition(14.69, undefined, 12)).toBeNull()
+    expect(toPosition(14.69, -17.44, null)).toBeNull()
+    expect(toPosition(91, -17.44, 12)).toBeNull()
+    expect(toPosition(14.69, -17.44, -1)).toBeNull()
+    expect(toPosition(14.69, -17.44, Infinity)).toBeNull()
+    expect(toPosition(NaN, -17.44, 12)).toBeNull()
+  })
+})
+
+describe('formatTaskDistance', () => {
+  it('coordenadas propias de la máquina ⇒ distancia tal cual', () => {
+    expect(formatTaskDistance(350, false)).toBe('350 m')
+  })
+
+  it('centro del barrio ⇒ aproximada y dicho', () => {
+    expect(formatTaskDistance(350, true)).toBe('≈ 350 m (quartier)')
+    expect(formatTaskDistance(2300, true)).toBe('≈ 2,3 km (quartier)')
+  })
+})
+
 describe('isValidLatLng', () => {
   it('en rango y finito', () => {
     expect(isValidLatLng(14.69, -17.44)).toBe(true)
@@ -323,5 +366,9 @@ describe('presenceLabel', () => {
 
   it('null (tâche antérieure à la phase) ⇒ null, rien à afficher', () => {
     expect(presenceLabel(null, null)).toBeNull()
+  })
+
+  it('chaque ton a sa classe', () => {
+    expect(Object.keys(PRESENCE_TONE_CLASS).sort()).toEqual(['amber', 'green', 'grey'])
   })
 })

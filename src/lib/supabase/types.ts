@@ -471,6 +471,50 @@ export type Database = {
           },
         ]
       }
+      field_presence: {
+        Row: {
+          accuracy_m: number | null
+          distance_m: number | null
+          entity_id: string
+          entity_type: string
+          lat: number | null
+          lng: number | null
+          presence: string
+          recorded_at: string
+          tech_id: string | null
+        }
+        Insert: {
+          accuracy_m?: number | null
+          distance_m?: number | null
+          entity_id: string
+          entity_type: string
+          lat?: number | null
+          lng?: number | null
+          presence: string
+          recorded_at?: string
+          tech_id?: string | null
+        }
+        Update: {
+          accuracy_m?: number | null
+          distance_m?: number | null
+          entity_id?: string
+          entity_type?: string
+          lat?: number | null
+          lng?: number | null
+          presence?: string
+          recorded_at?: string
+          tech_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_presence_tech_id_fkey"
+            columns: ["tech_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incident_counters: {
         Row: {
           last_number: number
@@ -629,12 +673,6 @@ export type Database = {
           resolved_via: string | null
           source: string | null
           status: Database["public"]["Enums"]["incident_status"]
-          tech_accuracy_m: number | null
-          tech_distance_m: number | null
-          tech_lat: number | null
-          tech_lng: number | null
-          tech_position_at: string | null
-          tech_presence: string | null
           title: string
           updated_at: string
         }
@@ -663,12 +701,6 @@ export type Database = {
           resolved_via?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["incident_status"]
-          tech_accuracy_m?: number | null
-          tech_distance_m?: number | null
-          tech_lat?: number | null
-          tech_lng?: number | null
-          tech_position_at?: string | null
-          tech_presence?: string | null
           title: string
           updated_at?: string
         }
@@ -697,12 +729,6 @@ export type Database = {
           resolved_via?: string | null
           source?: string | null
           status?: Database["public"]["Enums"]["incident_status"]
-          tech_accuracy_m?: number | null
-          tech_distance_m?: number | null
-          tech_lat?: number | null
-          tech_lng?: number | null
-          tech_position_at?: string | null
-          tech_presence?: string | null
           title?: string
           updated_at?: string
         }
@@ -1378,12 +1404,6 @@ export type Database = {
           qr_verified: boolean
           scheduled_date: string
           status: string
-          tech_accuracy_m: number | null
-          tech_distance_m: number | null
-          tech_lat: number | null
-          tech_lng: number | null
-          tech_position_at: string | null
-          tech_presence: string | null
         }
         Insert: {
           assigned_to?: string | null
@@ -1398,12 +1418,6 @@ export type Database = {
           qr_verified?: boolean
           scheduled_date: string
           status?: string
-          tech_accuracy_m?: number | null
-          tech_distance_m?: number | null
-          tech_lat?: number | null
-          tech_lng?: number | null
-          tech_position_at?: string | null
-          tech_presence?: string | null
         }
         Update: {
           assigned_to?: string | null
@@ -1418,12 +1432,6 @@ export type Database = {
           qr_verified?: boolean
           scheduled_date?: string
           status?: string
-          tech_accuracy_m?: number | null
-          tech_distance_m?: number | null
-          tech_lat?: number | null
-          tech_lng?: number | null
-          tech_position_at?: string | null
-          tech_presence?: string | null
         }
         Relationships: [
           {

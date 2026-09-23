@@ -7,6 +7,12 @@
 export type LatLng = { lat: number; lng: number }
 
 /**
+ * Coordenadas de una tarea para «Plus proche»: las de su máquina, o (`approx`) el centro del
+ * barrio cuando la máquina aún no tiene ubicación propia.
+ */
+export type TaskCoords = { coords: LatLng; approx: boolean }
+
+/**
  * near = técnico a ≤ PRESENCE_RADIUS_M de la máquina con un GPS fiable · far = lejos incluso
  * descontando el margen de error · imprecise = el GPS es demasiado impreciso para decir ninguna
  * de las dos · no_position = sin permiso o sin GPS · no_machine_position = la máquina aún no
@@ -36,12 +42,14 @@ export function distanceMeters(a: LatLng, b: LatLng): number {
 
 /**
  * Veredicto de presencia. Sin posición del técnico manda eso, aunque la máquina tampoco tenga.
- * `accuracy` es el radio de error del GPS (m): «near» solo si está cerca Y el GPS es fiable;
- * «far» solo si sigue lejos aunque el error juegue a su favor; lo demás, «imprecise».
+ * `accuracy` es el radio de error del GPS (m): el del técnico, y el de la máquina si su ubicación
+ * salió de un primer escaneo (`null` = puesta por el admin, sin margen). «near» solo si está
+ * cerca Y el GPS del técnico es fiable; «far» solo si sigue lejos aunque los DOS márgenes jueguen
+ * a su favor; lo demás, «imprecise».
  */
 export function presenceFor({ tech, machine }: {
   tech: (LatLng & { accuracy: number }) | null
-  machine: LatLng | null
+  machine: (LatLng & { accuracy?: number | null }) | null
 }): {
   presence: Presence
   distance: number | null
@@ -50,7 +58,7 @@ export function presenceFor({ tech, machine }: {
   if (!machine) return { presence: 'no_machine_position', distance: null }
   const distance = Math.round(distanceMeters(tech, machine))
   if (distance <= PRESENCE_RADIUS_M && tech.accuracy <= NEAR_MAX_ACCURACY_M) return { presence: 'near', distance }
-  if (distance - tech.accuracy > PRESENCE_RADIUS_M) return { presence: 'far', distance }
+  if (distance - tech.accuracy - (machine.accuracy ?? 0) > PRESENCE_RADIUS_M) return { presence: 'far', distance }
   return { presence: 'imprecise', distance }
 }
 
@@ -111,24 +119,29 @@ export function parseLatLng(text: string): LatLng | null {
 const DECIMAL_RE = /^-?\d+(\.\d+)?$/
 
 /**
+ * Posición del técnico validada. Viene del navegador: no se fía de nada. Números finitos, en
+ * rango y precisión ≥ 0; cualquier otra cosa ⇒ null (se trata como «sans position»).
+ */
+export function toPosition(lat: unknown, lng: unknown, accuracy: unknown): (LatLng & { accuracy: number }) | null {
+  if (typeof lat !== 'number' || typeof lng !== 'number' || typeof accuracy !== 'number') return null
+  if (!isValidLatLng(lat, lng) || !Number.isFinite(accuracy) || accuracy < 0) return null
+  return { lat, lng, accuracy }
+}
+
+/**
  * Posición del técnico tal como la manda el navegador en un FormData (`pos_lat`, `pos_lng`,
- * `pos_accuracy`, ver `appendPosition` en `src/lib/pwa/geolocation.ts`). Viene del cliente:
- * no se fía de nada. Falta algo, no es un decimal, está fuera de rango o la precisión es
- * negativa ⇒ null (se trata como «sans position»).
+ * `pos_accuracy`, ver `appendPosition` en `src/lib/pwa/geolocation.ts`). Solo decimales
+ * estrictos; luego, las mismas reglas que `toPosition`.
  */
 export function readPosition(fd: FormData): (LatLng & { accuracy: number }) | null {
   const num = (key: string): number => {
     const v = fd.get(key)
     return typeof v === 'string' && DECIMAL_RE.test(v) ? Number(v) : NaN
   }
-  const lat = num('pos_lat')
-  const lng = num('pos_lng')
-  const accuracy = num('pos_accuracy')
-  if (!isValidLatLng(lat, lng) || !Number.isFinite(accuracy) || accuracy < 0) return null
-  return { lat, lng, accuracy }
+  return toPosition(num('pos_lat'), num('pos_lng'), num('pos_accuracy'))
 }
 
-export type ItineraryLinks ={ google: string; waze: string; apple: string }
+export type ItineraryLinks = { google: string; waze: string; apple: string }
 
 /** Enlaces «Itinéraire» para las tres apps. Prefiere coordenadas; si no, la dirección en texto. */
 export function itineraryLinks({ coords, text }: { coords: LatLng | null; text: string | null }): ItineraryLinks | null {
@@ -169,13 +182,29 @@ export function formatDistance(m: number): string {
   return km < 10 ? `${km.toFixed(1).replace('.', ',')} km` : `${Math.round(m / 1000)} km`
 }
 
-export type PresenceLabel = { tone: 'green' | 'amber' | 'grey'; text: string }
+/**
+ * Distancia a una tarea en «Plus proche». `approx` = la máquina no tiene ubicación propia y se
+ * usa el centro de su barrio: se dice, para que nadie tome 350 m por la puerta del cliente.
+ */
+export function formatTaskDistance(m: number, approx: boolean): string {
+  return approx ? `≈ ${formatDistance(m)} (quartier)` : formatDistance(m)
+}
+
+export type PresenceTone = 'green' | 'amber' | 'grey'
+export type PresenceLabel = { tone: PresenceTone; text: string }
+
+/** Clases de texto de cada tono, para las fichas de la oficina. */
+export const PRESENCE_TONE_CLASS: Record<PresenceTone, string> = {
+  green: 'text-success font-medium',
+  amber: 'text-warning font-medium',
+  grey:  'text-ink-muted',
+}
 
 /**
  * Lo que ve la oficina en la ficha de una avería o de una visita: color + texto a partir del
- * veredicto guardado en la fila. `presence: null` es una tarea de antes de esta fase (las
- * columnas no existían): no se muestra nada. `accuracy` (el margen del GPS) solo se usa para
- * «imprecise».
+ * veredicto guardado en `field_presence`. `presence: null` = la tarea no tiene fila (anterior a
+ * esta fase, reabierta o nunca resuelta): no se muestra nada. `accuracy` (el margen del GPS)
+ * solo se usa para «imprecise».
  */
 export function presenceLabel(
   presence: Presence | null,

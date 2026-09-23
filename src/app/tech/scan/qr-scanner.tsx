@@ -6,7 +6,7 @@ import { BrowserMultiFormatReader } from '@zxing/browser'
 import { Camera, AlertCircle } from 'lucide-react'
 import { extractSerie } from '@/lib/qr'
 import { getPositionOnce } from '@/lib/pwa/geolocation'
-import { recordQrScanAction } from './actions'
+import { recordMachineLocationAction, recordQrScanAction } from './actions'
 
 export default function QrScanner() {
   const videoRef    = useRef<HTMLVideoElement>(null)
@@ -14,7 +14,8 @@ export default function QrScanner() {
   const scannedRef  = useRef(false)
   const router      = useRouter()
   const [error, setError]   = useState<string | null>(null)
-  // null = buscando QR · locating = pidiendo la posición · stamping = sellando / abriendo la ficha
+  // null = buscando QR · stamping = sellando / abriendo la ficha · locating = esperando la posición
+  // (solo si la máquina aún no tiene ubicación)
   const [phase, setPhase]   = useState<null | 'locating' | 'stamping'>(null)
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export default function QrScanner() {
     reader.decodeFromVideoDevice(undefined, videoRef.current!, (result) => {
       if (result && !scannedRef.current) {
         scannedRef.current = true
-        setPhase('locating')
+        setPhase('stamping')
 
         const serie = extractSerie(result.getText())
 
@@ -33,20 +34,30 @@ export default function QrScanner() {
         try { BrowserMultiFormatReader.releaseAllStreams() } catch { /* noop */ }
 
         // Sellar ANTES de navegar: la ficha de la máquina ya no pasa por /m (ver comentario de
-        // abajo), así que el sello QR se deja aquí. Primero la posición, siempre fresca (sin
-        // caché: puede fijar la ubicación de la máquina; ≤ ~3,5 s: tope de `getPositionOnce`;
-        // sin permiso o sin GPS ⇒ null al instante o al vencer), luego el
-        // sello con su propio tope de 2,5 s. Ninguno de los dos impide abrir la ficha: con mala
-        // cobertura se navega igualmente (el sello puede llegar después o perderse; la ficha es lo
-        // que el técnico necesita).
+        // abajo), así que el sello QR se deja aquí, con su propio tope de 2,5 s. La posición se
+        // pide A LA VEZ (siempre fresca, sin caché: puede fijar la ubicación de la máquina) pero
+        // solo se espera si el servidor dice que la máquina la necesita (instalada y sin
+        // ubicación, `needsLocation`) — el caso normal navega en cuanto hay sello. Nada de esto
+        // impide abrir la ficha: con mala cobertura se navega igualmente (el sello o la
+        // ubicación pueden perderse; la ficha es lo que el técnico necesita).
+        const positionPromise = getPositionOnce(3000, 0)
         void (async () => {
           try {
-            const position = await getPositionOnce(3000, 0)
-            setPhase('stamping')
-            await Promise.race([
-              recordQrScanAction(serie, position),
-              new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+            const stamp = await Promise.race([
+              recordQrScanAction(serie),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
             ])
+            if (stamp?.needsLocation) {
+              setPhase('locating')
+              // Acotada por `getPositionOnce` (más larga si el navegador aún tiene que pedir permiso).
+              const position = await positionPromise
+              if (position) {
+                await Promise.race([
+                  recordMachineLocationAction(serie, position),
+                  new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+                ])
+              }
+            }
           } catch (err) {
             console.error('[scan] sello QR fallido', err)
           }
