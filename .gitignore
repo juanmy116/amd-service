@@ -56,9 +56,9 @@ supabase/.temp/
 
 # Local-only test fixtures and spike scripts (sesion 23)
 test-fixtures/
-scripts/*
+/scripts/*
 # generador de iconos PWA: sí se versiona
-!scripts/generate-pwa-icons.mjs
+!/scripts/generate-pwa-icons.mjs
 
 # Playwright E2E (Fase 3)
 playwright-report/
