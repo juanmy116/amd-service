@@ -68,7 +68,7 @@ describe('RLS mantenimiento — maintenance_visits', () => {
     expect(ids).not.toContain(t.visitAId)
   })
 
-  it('el técnico A ve una visita en SU máquina aunque esté asignada a otro (rama "por máquina")', async () => {
+  it('el técnico A ve una visita en SU máquina aunque no esté asignada a él (rama "por máquina")', async () => {
     const c = await signInAs(SC.techAEmail)
     const { data, error } = await c.from('maintenance_visits').select('id').in('id', [visitCId, visitBId])
     expect(error).toBeNull()
