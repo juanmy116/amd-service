@@ -82,6 +82,7 @@ export async function closeMaintenance(
 
   // Dónde estaba el técnico al cerrar (Fase 3). La visita ya está cerrada: esto es un añadido
   // best-effort y un fallo solo se registra (el cierre no se deshace ni se avisa al técnico).
+  // Tiene que ser el cliente admin: ver guard_field_evidence (20260925100000_geolocation.sql).
   const { error: presenceError } = await admin
     .from('maintenance_visits')
     .update(await computePresence(serie, readPosition(formData)))

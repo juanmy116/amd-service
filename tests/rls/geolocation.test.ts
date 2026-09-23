@@ -99,11 +99,20 @@ describe('machines — CHECK de ubicación completa', () => {
     if (error) throw new Error(`reset location: ${error.message}`)
   })
 
+  async function readLocation() {
+    const { data, error } = await admin.from('machines')
+      .select('lat, lng, location_source').eq('numero_serie', SC.snB).single()
+    if (error) throw new Error(`read location: ${error.message}`)
+    return data
+  }
+
   it('acepta una ubicación completa y en rango, y volver a vaciarla', async () => {
     const set = await setLocation({ lat: 14.6928, lng: -17.4467, location_source: 'admin' })
     expect(set.error).toBeNull()
+    expect(await readLocation()).toEqual({ lat: 14.6928, lng: -17.4467, location_source: 'admin' })
     const clear = await setLocation({ lat: null, lng: null, location_source: null })
     expect(clear.error).toBeNull()
+    expect(await readLocation()).toEqual({ lat: null, lng: null, location_source: null })
   })
 
   it('rechaza lat sin lng (y lng sin lat)', async () => {
@@ -115,6 +124,31 @@ describe('machines — CHECK de ubicación completa', () => {
   it('rechaza lat fuera de rango', async () => {
     const { error } = await setLocation({ lat: 95, lng: -17.4467, location_source: 'admin' })
     expect(error).not.toBeNull()
+  })
+
+  it('rechaza lng fuera de rango', async () => {
+    const { error } = await setLocation({ lat: 14.6928, lng: -180.5, location_source: 'admin' })
+    expect(error?.code).toBe('23514')
+  })
+
+  it('rechaza NaN (float8 lo admite y NaN no está BETWEEN nada)', async () => {
+    // JSON no tiene NaN: PostgREST recibe el texto 'NaN' y Postgres lo convierte a double
+    // precision. Se exige el código del CHECK (23514) para que no pase por un error de tipo.
+    expect((await setLocation({ lat: 'NaN', lng: -17.4467, location_source: 'admin' })).error?.code).toBe('23514')
+    expect((await setLocation({ lat: 14.6928, lng: 'NaN', location_source: 'admin' })).error?.code).toBe('23514')
+    expect(await readLocation()).toEqual({ lat: null, lng: null, location_source: null })
+  })
+
+  it('el CHECK también vale en INSERT', async () => {
+    const insert = (numero_serie: string, loc: Record<string, unknown>) =>
+      admin.from('machines').insert({ numero_serie, marque: 'TESTGEO', modele: 'G1', ...loc })
+    expect((await insert('TEST-GEO-M1', { lat: 14.6928, location_source: 'admin' })).error?.code).toBe('23514')
+    expect((await insert('TEST-GEO-M2', { lat: 14.6928, lng: 200, location_source: 'admin' })).error?.code).toBe('23514')
+    expect((await insert('TEST-GEO-M3', { lat: 14.6928, lng: -17.4467, location_source: 'first_scan' })).error).toBeNull()
+    const { data, error } = await admin.from('machines')
+      .select('numero_serie, lat, lng, location_source').like('numero_serie', 'TEST-GEO-M%')
+    expect(error).toBeNull()
+    expect(data).toEqual([{ numero_serie: 'TEST-GEO-M3', lat: 14.6928, lng: -17.4467, location_source: 'first_scan' }])
   })
 
   it('rechaza lat/lng sin origen', async () => {
@@ -142,5 +176,146 @@ describe('RLS — el técnico no fija la ubicación de una máquina', () => {
       .select('lat, lng, location_source').eq('numero_serie', SC.snA).single()
     expect(error).toBeNull()
     expect(data).toEqual({ lat: null, lng: null, location_source: null })
+  })
+})
+
+// Pruebas de campo (posición del técnico, veredicto, sello QR): trigger guard_field_evidence.
+// Solo service_role las escribe; un usuario (técnico o admin con su sesión) puede vaciarlas con
+// la tarea abierta, nunca ponerlas; reabrir una avería vacía la posición para cualquiera.
+describe('guard_field_evidence — las pruebas de campo solo las escribe el servidor', () => {
+  const EVIDENCE = {
+    tech_lat: 14.6928, tech_lng: -17.4467, tech_accuracy_m: 12, tech_distance_m: 40,
+    tech_position_at: '2026-09-25T10:00:00+00:00', tech_presence: 'near',
+  }
+  const EMPTY = {
+    tech_lat: null, tech_lng: null, tech_accuracy_m: null, tech_distance_m: null,
+    tech_position_at: null, tech_presence: null,
+  }
+  const SELECT = 'title, status, qr_verified, qr_scanned_by, tech_lat, tech_lng, tech_accuracy_m, tech_distance_m, tech_position_at, tech_presence'
+  const VISIT_SELECT = 'notes, qr_verified, tech_lat, tech_lng, tech_accuracy_m, tech_distance_m, tech_position_at, tech_presence'
+
+  let n = 0
+  async function newIncident(status = 'en_cours'): Promise<string> {
+    const { data, error } = await admin.from('incidents').insert({
+      numero_incident: `TEST-GEO-${++n}`, title: 'Geo', contract_machine_id: t.lineAId,
+      assigned_to: t.techA, status,
+    }).select('id').single()
+    if (error) throw new Error(`seed incident: ${error.message}`)
+    return data!.id as string
+  }
+
+  async function readIncident(id: string) {
+    const { data, error } = await admin.from('incidents').select(SELECT).eq('id', id).single()
+    if (error) throw new Error(`read incident: ${error.message}`)
+    return data as Record<string, unknown>
+  }
+
+  async function readVisitEvidence(id: string) {
+    const { data, error } = await admin.from('maintenance_visits').select(VISIT_SELECT).eq('id', id).single()
+    if (error) throw new Error(`read visit: ${error.message}`)
+    return data as Record<string, unknown>
+  }
+
+  // Resuelta (con rastro) y con la posición que puso el servidor.
+  async function resolvedWithEvidence(presence = 'far'): Promise<string> {
+    const id = await newIncident()
+    const { error } = await admin.from('incidents').update({
+      status: 'résolu', resolved_via: 'intervention', rapport_intervention: 'Rapport geo.',
+      ...EVIDENCE, tech_presence: presence, qr_verified: true, qr_scanned_by: t.techA,
+    }).eq('id', id)
+    if (error) throw new Error(`resolve: ${error.message}`)
+    return id
+  }
+
+  it('el técnico no se pone 🟢 ni el sello QR en su avería abierta (el resto del UPDATE sí entra)', async () => {
+    const id = await newIncident()
+    const c = await signInAs(SC.techAEmail)
+    const { error } = await c.from('incidents')
+      .update({ title: 'Modifié par le tech', ...EVIDENCE, qr_verified: true, qr_scanned_by: t.techA })
+      .eq('id', id)
+    expect(error).toBeNull()
+    const r = await readIncident(id)
+    expect(r.title).toBe('Modifié par le tech')
+    expect(r).toMatchObject({ ...EMPTY, qr_verified: false, qr_scanned_by: null })
+  })
+
+  it('el técnico no cambia la posición que puso el servidor en su avería resuelta, ni la vacía', async () => {
+    const id = await resolvedWithEvidence('far')
+    const c = await signInAs(SC.techAEmail)
+    expect((await c.from('incidents').update({ tech_presence: 'near', tech_distance_m: 10 }).eq('id', id)).error).toBeNull()
+    expect((await c.from('incidents').update({ ...EMPTY, qr_verified: false, qr_scanned_by: null }).eq('id', id)).error).toBeNull()
+    const r = await readIncident(id)
+    expect(r).toMatchObject({ tech_presence: 'far', tech_distance_m: 40, tech_lat: 14.6928, qr_verified: true, qr_scanned_by: t.techA })
+  })
+
+  it('el técnico no se pone 🟢 ni el sello QR en su visita de mantenimiento', async () => {
+    const c = await signInAs(SC.techAEmail)
+    const { error } = await c.from('maintenance_visits')
+      .update({ notes: 'Note du tech', ...EVIDENCE, qr_verified: true })
+      .eq('id', t.visitAId)
+    expect(error).toBeNull()
+    const v = await readVisitEvidence(t.visitAId)
+    expect(v.notes).toBe('Note du tech')
+    expect(v).toMatchObject({ ...EMPTY, qr_verified: false })
+  })
+
+  it('un admin con su sesión (authenticated, no service_role) tampoco puede ponerlas', async () => {
+    const id = await newIncident()
+    const c = await signInAs(SC.adminEmail)
+    expect((await c.from('incidents').update({ ...EVIDENCE, qr_verified: true, qr_scanned_by: t.techA }).eq('id', id)).error).toBeNull()
+    expect(await readIncident(id)).toMatchObject({ ...EMPTY, qr_verified: false, qr_scanned_by: null })
+
+    expect((await c.from('maintenance_visits').update({ ...EVIDENCE, qr_verified: true }).eq('id', t.visitAId)).error).toBeNull()
+    expect(await readVisitEvidence(t.visitAId)).toMatchObject({ ...EMPTY, qr_verified: false })
+  })
+
+  it('service_role sí las escribe (incidencia y visita)', async () => {
+    const id = await newIncident()
+    expect((await admin.from('incidents').update({ ...EVIDENCE, qr_verified: true, qr_scanned_by: t.techA }).eq('id', id)).error).toBeNull()
+    expect(await readIncident(id)).toMatchObject({ ...EVIDENCE, qr_verified: true, qr_scanned_by: t.techA })
+
+    expect((await admin.from('maintenance_visits').update({ ...EVIDENCE, qr_verified: true }).eq('id', t.visitAId)).error).toBeNull()
+    expect(await readVisitEvidence(t.visitAId)).toMatchObject({ ...EVIDENCE, qr_verified: true })
+    // Deja la visita compartida como estaba para los demás casos.
+    expect((await admin.from('maintenance_visits').update({ ...EMPTY, qr_verified: false }).eq('id', t.visitAId)).error).toBeNull()
+  })
+
+  it('con la tarea abierta, el usuario sí puede vaciarlas (lo que hace clearResolution)', async () => {
+    const id = await newIncident()
+    expect((await admin.from('incidents').update({ ...EVIDENCE, qr_verified: true, qr_scanned_by: t.techA }).eq('id', id)).error).toBeNull()
+    const c = await signInAs(SC.techAEmail)
+    expect((await c.from('incidents').update({ ...EMPTY, qr_verified: false, qr_scanned_by: null }).eq('id', id)).error).toBeNull()
+    expect(await readIncident(id)).toMatchObject({ ...EMPTY, qr_verified: false, qr_scanned_by: null })
+  })
+
+  it('reabrir una avería vacía la posición, la reabra el técnico o el servidor', async () => {
+    const byTech = await resolvedWithEvidence('near')
+    const c = await signInAs(SC.techAEmail)
+    expect((await c.from('incidents').update({ status: 'en_cours' }).eq('id', byTech)).error).toBeNull()
+    expect(await readIncident(byTech)).toMatchObject({ status: 'en_cours', ...EMPTY, qr_verified: false })
+
+    const byServer = await resolvedWithEvidence('near')
+    expect((await admin.from('incidents').update({ status: 'assigné' }).eq('id', byServer)).error).toBeNull()
+    expect(await readIncident(byServer)).toMatchObject({ status: 'assigné', ...EMPTY, qr_verified: false })
+  })
+
+  it('un INSERT de usuario llega sin pruebas (cliente: avería; admin: visita)', async () => {
+    const client = await signInAs(SC.clientAEmail)
+    const { error } = await client.from('incidents').insert({
+      numero_incident: 'TEST-GEO-INS', title: 'Geo insert', contract_machine_id: t.lineAId,
+      ...EVIDENCE, qr_verified: true,
+    })
+    expect(error).toBeNull()
+    const { data: inc, error: e1 } = await admin.from('incidents').select(SELECT).eq('numero_incident', 'TEST-GEO-INS').single()
+    expect(e1).toBeNull()
+    expect(inc).toMatchObject({ ...EMPTY, qr_verified: false, qr_scanned_by: null })
+
+    const adminUser = await signInAs(SC.adminEmail)
+    const { data: v, error: e2 } = await adminUser.from('maintenance_visits').insert({
+      plan_id: t.planAId, contract_machine_id: t.lineAId, scheduled_date: '2026-11-15',
+      ...EVIDENCE, qr_verified: true,
+    }).select('id').single()
+    expect(e2).toBeNull()
+    expect(await readVisitEvidence(v!.id as string)).toMatchObject({ ...EMPTY, qr_verified: false })
   })
 })

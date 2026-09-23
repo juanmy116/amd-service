@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { INCIDENT_STATUSES, parseEnum } from '@/lib/enums'
 import type { TablesUpdate } from '@/lib/supabase/types'
 import { redirect } from 'next/navigation'
@@ -77,12 +78,6 @@ export async function submitInterventionAction(
     Object.assign(updates, resolution.fields)
   }
 
-  // Dónde estaba el técnico al resolver (Fase 3). Solo en la transición: volver a guardar una
-  // resuelta no es resolverla otra vez y no debe pisar la posición de entonces. Nunca bloquea:
-  // sin permiso o sin GPS queda «sans position».
-  if (new_status === 'résolu' && old_status !== 'résolu') {
-    Object.assign(updates, await computePresence(await incidentSerie(supabase, incident), readPosition(formData)))
-  }
   // Reabrir borra el rastro: si no, la próxima resolución heredaría el informe y la vía de la
   // anterior y la marca diría «intervención» aunque la segunda vez nadie fuese. Cuenta también
   // venir de `fermé`: el envío de la encuesta cierra la avería al instante, así que una
@@ -129,6 +124,18 @@ export async function submitInterventionAction(
   if (error) {
     console.error('[submitIntervention]', error)
     return { error: 'Une erreur est survenue. Veuillez réessayer.' }
+  }
+
+  // Dónde estaba el técnico al resolver (Fase 3). Solo en la transición: volver a guardar una
+  // resuelta no es resolverla otra vez y no debe pisar la posición de entonces. Nunca bloquea:
+  // sin permiso o sin GPS queda «sans position», y un fallo aquí solo se registra.
+  // Con el cliente ADMIN y aparte: la BD solo acepta estas columnas de service_role (ver
+  // guard_field_evidence en 20260925100000_geolocation.sql); con la sesión del técnico se
+  // descartarían en silencio.
+  if (new_status === 'résolu' && old_status !== 'résolu') {
+    const presence = await computePresence(await incidentSerie(supabase, incident), readPosition(formData))
+    const { error: presenceError } = await createAdminClient().from('incidents').update(presence).eq('id', id)
+    if (presenceError) console.error('[submitIntervention.presence]', presenceError)
   }
 
   // Historial
