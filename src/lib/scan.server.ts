@@ -6,13 +6,18 @@ import { getOpenLineForMachine } from './contract-machines'
 /**
  * Deja constancia de que alguien escaneó el QR físico de una máquina.
  *
- * Vive aquí y se llama desde `/m/[serie]` — la única ruta que codifican las etiquetas
- * impresas — y NO desde `/tech/scan/[serie]`, que parece la página del escaneo pero es un
- * enlace normal: la agenda del técnico (`components/tech/AgendaPanel.tsx`, presente en el
- * layout de todas las páginas `/tech`) y `/tech/planning` apuntan ahí directamente, y al ser
- * `<Link>` con prefetch el servidor puede renderizarla sin que nadie pulse nada. Sellar al
- * renderizar esa página daría por presente en la máquina a un técnico sentado en la oficina,
- * que es exactamente lo contrario de lo que el sello debe probar.
+ * Se llama desde DOS sitios, los únicos que prueban que alguien tuvo la etiqueta física
+ * delante: `/m/[serie]` (la etiqueta impresa abierta con la cámara del sistema, típicamente
+ * en Safari sin sesión) y `recordQrScanAction` (`src/app/tech/scan/actions.ts`, el escáner
+ * de la propia app — necesario porque con la PWA instalada la cámara del iPhone abre los QR
+ * en Safari, donde no hay sesión, así que el único camino real para un técnico logueado es
+ * escanear DENTRO de la app). NO se sella al renderizar `/tech/scan/[serie]`, que parece la
+ * página del escaneo pero es un enlace normal: la agenda del técnico
+ * (`components/tech/AgendaPanel.tsx`, presente en el layout de todas las páginas `/tech`) y
+ * `/tech/planning` apuntan ahí directamente, y al ser `<Link>` con prefetch el servidor puede
+ * renderizarla sin que nadie pulse nada. Sellar al renderizar esa página daría por presente en
+ * la máquina a un técnico sentado en la oficina, que es exactamente lo contrario de lo que el
+ * sello debe probar.
  *
  * Nunca bloquea nada: un fallo aquí se registra y se sigue.
  */
@@ -20,7 +25,7 @@ export async function stampQrScan(numeroSerie: string, userId: string): Promise<
   const admin = createAdminClient()
 
   // El escaneo de la etiqueta de un equipo dado de baja no prueba nada (la propia página de
-  // scan hace `notFound()` en ese caso).
+  // scan muestra «Machine introuvable ou retirée du parc» en ese caso).
   const { data: machine } = await admin
     .from('machines')
     .select('active')

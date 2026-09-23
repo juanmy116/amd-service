@@ -15,7 +15,7 @@ import { seedTenants, SC, type Tenants } from './scenario'
 const admin = adminClient()
 let t: Tenants
 let visitBId: string
-let visitCId: string // en la máquina A (de techA) pero asignada a techB → rama "por máquina"
+let visitCId: string // en la máquina A (de techA), SIN asignar → rama "por máquina"
 
 beforeAll(async () => {
   if (!ANON_KEY || !SERVICE_KEY) {
@@ -35,11 +35,13 @@ beforeAll(async () => {
   if (vErr) throw new Error(`seed visit B: ${vErr.message}`)
   visitBId = visitB!.id as string
 
-  // Tercera visita: en la máquina A (donde techA tiene trabajo asignado) pero asignada
-  // a techB. techA debe verla por la rama "por máquina" de auth_tech_visit_ids, aunque
-  // no sea suya. Ejercita el clause (b) que la migración 20260611150000 añadió.
+  // Tercera visita: en la máquina A (donde techA tiene trabajo asignado), SIN asignar.
+  // techA debe verla por la rama "por máquina" de auth_tech_visit_ids, aunque no sea
+  // suya. Ejercita el clause (b) que la migración 20260611150000 añadió.
+  // NO se asigna a techB: desde 20260923100000 una visita asignada cuenta como trabajo
+  // asignado, así que techB pasaría a tener la máquina A y vería legítimamente la visita A.
   const { data: visitC, error: vcErr } = await admin.from('maintenance_visits')
-    .insert({ plan_id: t.planAId, contract_machine_id: t.lineAId, scheduled_date: '2026-07-03', assigned_to: t.techB })
+    .insert({ plan_id: t.planAId, contract_machine_id: t.lineAId, scheduled_date: '2026-07-03', assigned_to: null })
     .select('id').single()
   if (vcErr) throw new Error(`seed visit C: ${vcErr.message}`)
   visitCId = visitC!.id as string
@@ -66,7 +68,7 @@ describe('RLS mantenimiento — maintenance_visits', () => {
     expect(ids).not.toContain(t.visitAId)
   })
 
-  it('el técnico A ve una visita en SU máquina aunque esté asignada a otro (rama "por máquina")', async () => {
+  it('el técnico A ve una visita en SU máquina aunque no esté asignada a él (rama "por máquina")', async () => {
     const c = await signInAs(SC.techAEmail)
     const { data, error } = await c.from('maintenance_visits').select('id').in('id', [visitCId, visitBId])
     expect(error).toBeNull()

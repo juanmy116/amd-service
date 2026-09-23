@@ -1,6 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { notFound, redirect } from 'next/navigation'
+import { requireTechnician } from '@/lib/auth'
 import Link from 'next/link'
 import { ArrowLeft, Printer, MapPin, Building2, Wrench, AlertTriangle } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
@@ -15,6 +14,18 @@ const STATUS_LABEL: Record<string, string> = {
   nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu',
 }
 
+// Cabecera común a la ficha y a «Machine introuvable»: vuelta al escáner + título.
+function FicheHeader() {
+  return (
+    <div className="flex items-center gap-3 pt-2">
+      <Link href="/tech/scan" className="flex items-center justify-center w-9 h-9 rounded-xl border border-line bg-card shrink-0">
+        <ArrowLeft size={16} className="text-ink-muted" />
+      </Link>
+      <h1 className="text-base font-semibold text-ink font-display">Fiche machine</h1>
+    </div>
+  )
+}
+
 export default async function MachineScanPage({
   params,
 }: {
@@ -22,31 +33,42 @@ export default async function MachineScanPage({
 }) {
   const { serie } = await params
   const numero_serie = decodeURIComponent(serie)
-  const supabase = await createClient()
 
-  // Check explícito de auth y rol — no depender únicamente del proxy o RLS
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-  if (!profile || !['admin', 'technician'].includes(profile.role)) redirect('/login')
+  // Admin o técnico; cualquier otro rol sale (requireTechnician redirige).
+  const { user, supabase } = await requireTechnician()
 
-  const { data: machine } = await supabase
+  // Ficha de SOLO LECTURA: cualquier técnico puede ver cualquier máquina activa (decisión
+  // 2026-09-23: en campo se topa con máquinas que no son suyas). Por eso máquina, línea,
+  // contrato, cliente y plan se leen con service_role tras requireTechnician(). Lo que da
+  // derecho a ACTUAR —incidencias y visitas— se sigue leyendo con el cliente del usuario (RLS).
+  // createAdminClient() bypassa RLS — server-only, nunca llamar desde un Client Component.
+  const admin = createAdminClient()
+
+  const { data: machine } = await admin
     .from('machines')
     .select('*')
     .eq('numero_serie', numero_serie)
-    .single()
+    .maybeSingle()
 
-  if (!machine || !machine.active) notFound()
+  if (!machine || !machine.active) {
+    return (
+      <div className="p-4 space-y-5">
+        <FicheHeader />
+        <Card className="p-6 text-center space-y-2">
+          <AlertTriangle size={24} className="text-warning mx-auto" />
+          <p className="text-sm font-semibold text-ink">Machine introuvable ou retirée du parc</p>
+          <p className="font-mono text-xs text-ink-muted break-all">{numero_serie}</p>
+          <p className="text-xs text-ink-muted">Vérifiez l&apos;étiquette ou prévenez le bureau.</p>
+        </Card>
+      </div>
+    )
+  }
 
   // Obtener línea abierta para la máquina (nuevo modelo contract_machines)
-  const openLine = await getOpenLineForMachine(supabase, numero_serie)
+  const openLine = await getOpenLineForMachine(admin, numero_serie)
   let contract: { id: string; numero_contrat: string; clients: { nom_client: string } | null } | null = null
   if (openLine) {
-    const { data } = await supabase
+    const { data } = await admin
       .from('contracts')
       .select('id, numero_contrat, clients(nom_client)')
       .eq('id', openLine.contract_id)
@@ -58,8 +80,6 @@ export default async function MachineScanPage({
 
   // Auto-transición primer escaneo: assigné → en_cours para incidentes asignados a este técnico en esta máquina.
   // Se ejecuta después del guard machine.active para no mutar incidentes en máquinas dadas de baja.
-  // createAdminClient() bypassa RLS — server-only, nunca llamar desde un Client Component.
-  const admin = createAdminClient()
 
   // Filtrar incidentes por contract_machine_id (nuevo modelo) y machine_id (legacy)
   const filterExpr = openLine
@@ -97,13 +117,14 @@ export default async function MachineScanPage({
     .order('created_at', { ascending: false })
     .limit(5)
 
-  // Mantenimiento pendiente para esta máquina
+  // El enlace a la visita solo aparece si el técnico puede abrirla: la visita se lee con el
+  // cliente del usuario (RLS `auth_tech_visit_ids()`: asignada a él o de sus máquinas).
   let pendingVisit: { id: string; scheduled_date: string; status: string } | null = null
-  if (contract && openLine) {
-    const { data: plan } = await supabase
+  if (openLine) {
+    const { data: plan } = await admin
       .from('maintenance_plans')
       .select('id')
-      .eq('contract_id', contract.id)
+      .eq('contract_id', openLine.contract_id)
       .eq('active', true)
       .maybeSingle()
 
@@ -123,14 +144,7 @@ export default async function MachineScanPage({
 
   return (
     <div className="p-4 space-y-5">
-      <div className="flex items-center gap-3 pt-2">
-        <Link href="/tech/scan" className="flex items-center justify-center w-9 h-9 rounded-xl border border-line bg-card shrink-0">
-          <ArrowLeft size={16} className="text-ink-muted" />
-        </Link>
-        <h1 className="text-base font-semibold text-ink font-display">
-          Fiche machine
-        </h1>
-      </div>
+      <FicheHeader />
 
       {/* Machine info */}
       <Card className="p-4 space-y-4">
