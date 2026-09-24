@@ -6,7 +6,7 @@
 
 ---
 
-## 📍 Por dónde seguir (al 2026-09-22)
+## 📍 Por dónde seguir (al 2026-09-24)
 
 | Prioridad | Qué | Por qué duele |
 |---|---|---|
@@ -19,6 +19,7 @@
 | ⚠️ **7** | **Escaneo de técnicos: dos cabos sueltos del PR #155** | «En cours» automático al ABRIR la ficha (no al escanear) y sello QR falsificable por un técnico logueado. Aceptados por ahora. |
 | 🔴 **8** | **Los tests E2E en local apuntan a PRODUCCIÓN** | `.env.local` lleva la URL y las claves de Supabase de prod; `npm run test:e2e` a secas arranca `next dev` con ellas y sembraría/borraría datos de prueba en prod. En CI no pasa (`e2e.yml` pone envs locales). Arreglo: `.env.test` con la pila local y que `playwright.config.ts` lo cargue, o que el script se niegue si la URL no es `127.0.0.1`. |
 | ⚠️ **9** | **Ubicación de una máquina fijable sin escanear** | `recordMachineLocationAction` (Fase 3) no exige un escaneo previo: un técnico podría, llamando a la acción, fijar una máquina sin ubicación en cualquier punto y luego salir 🟢 ahí. Mismo nivel de confianza que el sello QR (el serie y la posición vienen del cliente). Mitiga: el admin ve «Premier scan de X» y puede corregir. Aceptado por ahora. |
+| 📱 **10** | **PWA técnicos: probar la Fase 3 en iPhone y seguir** | Geolocalización en prod (PR #157) sin probar aún en un iPhone real: permiso de ubicación, «Itinéraire», «Plus proche», 🟢 en la ficha tras resolver. Después: Fase 4 (uso con mala cobertura, solo lectura) del spec `docs/superpowers/specs/2026-09-22-pwa-tecnicos-design.md`. Al instalar la app a cada técnico: que pulse «Activer les notifications» (se ve en Équipe) y escanee siempre desde la app. |
 
 **Cerrado el 2026-09-22:** el verrou de résolution (ninguna avería se cierra sin rastro, probado en
 uso real) y el CSAT (probado de punta a punta; era el pendiente más antiguo). Ese día también se
