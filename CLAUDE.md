@@ -14,9 +14,10 @@ Aplicación web para la gestión de incidencias (SAV) de AMD Service, empresa de
 
 ## Estado actual del desarrollo
 
-La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). Último merge: PR #152 (2026-09-22).
+La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). Último merge: PR #157 (2026-09-23).
 
 **Hitos recientes (septiembre 2026):**
+- **PWA de técnicos «AMD SAV»** (#154–#157, 2026-09-23): `/tech` se instala en el iPhone desde Safari (icono, pantalla completa); el escáner abre cualquier máquina y deja el sello QR; **notificaciones push** al asignar/retirar averías y mantenimientos (cola `push_notifications` + Edge Function `send-push` + Vault); **geolocalización**: ubicación por máquina, «Itinéraire», «Plus proche», y la oficina ve si el técnico estaba en el sitio (tabla admin-only `field_presence`). Fases 1–2 validadas en iPhone real; Fase 3 pendiente de prueba en iPhone; Fase 4 (sin cobertura) sin empezar. Ver `docs/architecture.md` §3b–§3d.
 - **Verrou de résolution** (#143–#147): ninguna avería se cierra sin decir cómo se resolvió — informe obligatorio para el técnico, motivo + explicación en las cuatro puertas de oficina, rastro visible en el listado y la ficha, y un trigger en la BD que lo hace imposible de saltar. Probado en uso real, TV del taller incluida. Ver `docs/architecture.md` §Verrou de résolution.
 - **CSAT vivo** (#141, #149): la encuesta de satisfacción **nunca se había enviado** en toda la vida de la app; ahora sale al email del formulario del QR y está verificada de punta a punta.
 - **Kiosko del taller** (#125–#137): dashboard en TV con mapa de Dakar, campana y Raspberry en el taller, cerrado y verificado.
