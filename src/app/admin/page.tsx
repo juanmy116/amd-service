@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Plus, Activity, ChevronRight, MessageSquare } from 'lucide-react'
+import { Plus, Activity, ChevronRight, MessageSquare, ShieldAlert } from 'lucide-react'
+import { isRateLimiterHealthy } from '@/lib/rate-limit'
 import { CsatTrendChart, IncidentsTrendChart } from '@/components/admin/DashboardCharts'
 import type { CsatPoint, IncidentPoint } from '@/components/admin/DashboardCharts'
 import DashboardKpiStrip from '@/components/admin/DashboardKpiStrip'
@@ -45,6 +46,7 @@ async function getDashboardData() {
     techRes,
     anomaliesRes,
     negativeCsatRes,
+    rateLimiterOk,
   ] = await Promise.all([
     supabase.from('clients').select('*', { count: 'exact', head: true }).eq('active', true),
     supabase.from('machines').select('*', { count: 'exact', head: true }).eq('active', true),
@@ -73,6 +75,7 @@ async function getDashboardData() {
       .select('id')
       .lte('rating', 2)
       .gte('responded_at', new Date(Date.now() - 7 * 86_400_000).toISOString()),
+    isRateLimiterHealthy(),
   ])
 
   const incidents  = incidentsRes.data  ?? []
@@ -154,6 +157,7 @@ async function getDashboardData() {
     techPerf,
     openAnomalies,
     redAnomalies,
+    rateLimiterOk,
     today: now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
   }
 }
@@ -185,6 +189,19 @@ export default async function Dashboard() {
         openIncidents={data.stats.openIncidents}
         avgCsat={data.avgCsat}
       />
+
+      {!data.rateLimiterOk && (
+        <div
+          role="alert"
+          className="flex items-center gap-3 px-4 py-3 rounded-xl border border-accent/30 bg-accent-soft text-sm"
+        >
+          <ShieldAlert size={16} className="text-accent shrink-0" />
+          <span className="text-ink font-medium">
+            Limiteur de tentatives hors service : la connexion et les formulaires publics ne sont plus
+            protégés contre les abus. Prévenir le support technique.
+          </span>
+        </div>
+      )}
 
       {data.negativeCsat > 0 && (
         <Link

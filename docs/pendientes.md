@@ -11,7 +11,7 @@
 | Prioridad | Qué | Por qué duele |
 |---|---|---|
 | 🔴🔴 **1** | **Princity no trae nada** | Tres procesos diarios, meses ejecutándose, **cero datos**. 321 alertas sin convertirse en incidencias y ni una lectura de contador — y los contadores son la materia prima de la facturación. |
-| ⚠️ **2** | **Limitador de intentos: falta el aviso si se cae** | ✅ Rehecho en Supabase y EN PROD (2026-09-25, PR #159), probado en la web real. Falta el AVISO: si la base del limitador falla, hoy solo queda un `console.error` en Vercel que nadie mira. Y borrar `UPSTASH_REDIS_REST_*` de Vercel. |
+| ✅ **2** | **Limitador de intentos** | CERRADO (2026-09-25): rehecho en Supabase y en prod (PR #159), probado en la web real, variables de Upstash borradas, y franja roja en `/admin` si deja de funcionar. |
 | 🔴 **3** | **El aviso de mantenimientos atrasados no se envía** | Si un técnico no hace el mantenimiento, no se entera nadie. |
 | 🔴 **4** | **Confirmación antes de emitir factura** | «Forcer» emite al instante y las facturas son inmutables. Hace falta antes de encender la facturación. |
 | 🧹 **5** | **Borrar los datos de prueba del 22-09** | Dos notas de ⭐5 que no ha dado ningún cliente están contando en la media. |
@@ -179,7 +179,7 @@ técnico logueado mientras la etiqueta no lleve firma).
 
 ---
 
-## ⚠️ Limitador de intentos — EN PROD EN SUPABASE (2026-09-25), falta el aviso
+## ✅ Limitador de intentos — EN PROD EN SUPABASE (2026-09-25), CERRADO
 
 > **Qué pasó (2026-09-14):** la base gratuita de Upstash que limitaba los intentos se borró por
 > inactividad y **nadie podía entrar en la aplicación** (500, «ERROR 3227098399»). Se arregló para
@@ -194,12 +194,9 @@ técnico logueado mientras la etiqueta no lleve firma).
 > web real: 4 POST vacíos a `/api/contact` → `400, 400, 400, 429` (cupo de 3/h). El login usa el
 > mismo camino (5 cada 15 min por IP+email).
 >
-> **Queda (manual):** borrar `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` de Vercel y de
-> `.env.local`: ya no se usan.
->
-> **Pendiente — el aviso:** si la base del limitador falla, se deja pasar y solo queda un
-> `console.error` en Vercel que nadie mira (así estuvo el de Upstash semanas sin verse). Falta un
-> semáforo en `/admin` o un chequeo diario que avise.
+> **Cerrado (2026-09-25):** variables de Upstash borradas de Vercel y `.env.local`. **Aviso:** cada
+> carga de `/admin` hace una prueba en seco del limitador; si falla, franja roja «Limiteur de
+> tentatives hors service» (`isRateLimiterHealthy()` en `src/lib/rate-limit.ts`).
 
 ---
 

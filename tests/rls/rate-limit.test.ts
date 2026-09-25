@@ -65,6 +65,11 @@ describe('check_rate_limit', () => {
     expect(await check('ip:ventana', 1, 1)).toBe(true)
   })
 
+  it('con cupo 0 (prueba en seco del panel /admin) responde «no» y no apunta nada', async () => {
+    expect(await check('ip:seco', 0)).toBe(false)
+    expect(await hits('ip:seco')).toBe(0)
+  })
+
   it('las peticiones simultáneas no se cuelan por encima del cupo', async () => {
     const results = await Promise.all(Array.from({ length: 10 }, () => check('ip:rafaga', 3)))
     expect(results.filter(Boolean)).toHaveLength(3)

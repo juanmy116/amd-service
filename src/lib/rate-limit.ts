@@ -32,6 +32,26 @@ export function getClientIpFromHeaders(h: Headers): string {
   return h.get('x-real-ip') ?? 'unknown'
 }
 
+// Prueba en seco para el aviso del panel /admin: con cupo 0 la función responde «no» sin apuntar
+// nada. Sano = responde `false` sin error. Existe porque checkRateLimit deja pasar cuando la base
+// falla, y ese fallo solo quedaba en los logs de Vercel: así estuvo el limitador de Upstash semanas
+// muerto sin que nadie lo viera.
+export async function isRateLimiterHealthy(): Promise<boolean> {
+  try {
+    const { data, error } = await createAdminClient().rpc('check_rate_limit', {
+      p_bucket: 'health',
+      p_identifier: 'admin-dashboard',
+      p_limit: 0,
+      p_window_seconds: 60,
+    })
+    if (error) throw error
+    return data === false
+  } catch (error) {
+    console.error('[rate-limit] la prueba del panel falla → el limitador no protege', error)
+    return false
+  }
+}
+
 export async function checkRateLimit(key: RateLimiterKey, identifier: string): Promise<boolean> {
   const { limit, windowSeconds } = rateLimiters[key]
   try {
