@@ -1949,6 +1949,27 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_hits: {
+        Row: {
+          bucket: string
+          hit_at: string
+          id: number
+          identifier: string
+        }
+        Insert: {
+          bucket: string
+          hit_at?: string
+          id?: never
+          identifier: string
+        }
+        Update: {
+          bucket?: string
+          hit_at?: string
+          id?: never
+          identifier?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       v_csat_feedback: {
@@ -2076,6 +2097,15 @@ export type Database = {
       auth_tech_incident_ids: { Args: never; Returns: string[] }
       auth_tech_visit_ids: { Args: never; Returns: string[] }
       can_bill: { Args: never; Returns: boolean }
+      check_rate_limit: {
+        Args: {
+          p_bucket: string
+          p_identifier: string
+          p_limit: number
+          p_window_seconds: number
+        }
+        Returns: boolean
+      }
       claim_push_notifications: {
         Args: { p_limit?: number }
         Returns: {
