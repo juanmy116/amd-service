@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-09-25 — **el limitador de intentos vuelve, ahora en Supabase** (§Seguridad): tabla `rate_limit_hits` + RPC `check_rate_limit` solo para `service_role`; Upstash retirado. Anterior 2026-09-17 — **la encuesta CSAT por fin llega a alguien** (§7-bis): se envía al email del formulario del QR, el envío queda trazado y las opiniones se leen en `/admin/avis`, en la ficha de la avería y en una franja del tablero. Ese mismo día: **el kiosko del taller queda CERRADO: montado, sonando y verificado en la TV** (§11; PR #139 docs, tras #137 audio/insistencia). Sigue abierto: **los 3 crons de Princity no importan nada** (§5). Anterior 2026-09-15: rótulo `SERVICE TECHNIQUE` en la etiqueta QR (PR #134, §6). Histórico 2026-09-11/15: kiosko del taller (§11, §11-bis, §11-ter, PRs #125–#131), permiso `can_bill` (#123) y candado de facturación (#122) — ya documentados en sus secciones.
+> Última actualización: 2026-09-25 — **el limitador de intentos vuelve, ahora en Supabase** (§Seguridad): tabla `rate_limit_hits` + RPC `check_rate_limit` solo para `service_role` + cron `rate-limit-purge`; Upstash retirado (PR #159). Y **franja roja en el panel `/admin` si deja de funcionar** (§7 Dashboard, PR #161). Anterior 2026-09-17 — **la encuesta CSAT por fin llega a alguien** (§7-bis): se envía al email del formulario del QR, el envío queda trazado y las opiniones se leen en `/admin/avis`, en la ficha de la avería y en una franja del tablero. Ese mismo día: **el kiosko del taller queda CERRADO: montado, sonando y verificado en la TV** (§11; PR #139 docs, tras #137 audio/insistencia). Sigue abierto: **los 3 crons de Princity no importan nada** (§5). Anterior 2026-09-15: rótulo `SERVICE TECHNIQUE` en la etiqueta QR (PR #134, §6). Histórico 2026-09-11/15: kiosko del taller (§11, §11-bis, §11-ter, PRs #125–#131), permiso `can_bill` (#123) y candado de facturación (#122) — ya documentados en sus secciones.
 >
 > Anterior: 2026-06-25 — **foto adjunta a la incidencia** (el cliente adjunta una foto opcional al abrir la incidencia desde el portal **o desde el formulario público del QR `/signaler`**; la ven técnico, admin y cliente; bucket `incident-photos`, migración `20260625100000`). Histórico 2026-06-15: **tests RLS de cobertura completa** (88 tests de aislamiento por rol sobre todas las tablas sensibles, PR #93), **migración `middleware` → `proxy`** (convención Next.js 16, PR #94) y `main` protegida en GitHub (required check `typecheck · test · build`). Config de prod cerrada: `COMMERCIAL_EMAIL`, `NEXT_PUBLIC_APP_URL`. Histórico previo (2026-06-11): 3 capas de tests montadas (unit + aislamiento RLS + E2E Playwright, ver §Testing), endurecimiento RLS de `maintenance_visits` + `auth_rls_initplan`, borrado/terminación atómicos de contrato (`delete_contract`/`terminate_contract`), cabos de auditoría cerrados y reconstrucción limpia de la BD arreglada (P0-1). PRs #74–#85.
 
@@ -603,6 +603,7 @@ Ruta pública **sin autenticación** para que cualquier persona abra un incident
 - Distribución de estados de incidencias (barras CSS)
 - Tabla "Incidents récents": 8 últimos incidents abiertos con cliente, técnico, estado y fecha
 - Botón "Nouveau Ticket" en la cabecera → `/admin/incidents/new`
+- Franjas de aviso (solo si hay algo que decir): **limitador de intentos hors service** (rojo; prueba en seco `isRateLimiterHealthy()` en cada carga, ver §Seguridad), avis négatifs de la semana, anomalías de consumo abiertas
 
 **Componentes (`src/components/admin/`):**
 - `DashboardKpiStrip.tsx` — franja de 5 KPI cards (clientes, máquinas, contratos, incidents, CSAT)
@@ -1825,6 +1826,20 @@ Cola de revisión + audit log de los contadores recibidos por email. Migración 
 
 > **Bucket `counter-images`** (privado, primer uso de Storage en el repo): políticas `counter_images_service_all` (service_role) + `counter_images_admin_read` (admin vía `is_admin()`); la UI usa signed URLs TTL 1h. RLS de la tabla: `pci_admin_select`/`pci_admin_update` (admin), INSERT solo `service_role`.
 > **RPCs SECURITY DEFINER (guard `service_role`):** `process_counter_extraction(p_pending_id, p_extracted)` (match por serial + validaciones de forma/datos + fija `light`/`validation_errors`; incluye `V_DUP_PENDING` = otra lectura de la misma máquina y mes aún en la cola) · `import_counter_from_pending(p_pending_id, p_reviewed_by, p_overrides)` (confirma → INSERT en `machine_counters`; respeta `machine_counters_one_active_per_month`; rechaza `no_active_line` sin contrato activo) · `register_counter_duplicate(p_hash)` (cuenta los reenvíos del mismo fichero). Detalle del flujo y estado en §"Buzón de Contadores por Email".
+
+### Tabla: `rate_limit_hits` (limitador de intentos, 2026-09-25)
+La «libreta» del limitador de las puertas públicas. Migración `20260925110000_rate_limit_supabase.sql`; sustituye a Upstash. Detalle del mecanismo en §Seguridad.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `id` | bigint identity PK | |
+| `bucket` | text | la puerta: `login`, `signup`, `verify`, `csat`, `contact`, `public_incident_hourly`, `public_incident_daily`, `public_photo_upload` (y `TEST-*` en los tests) |
+| `identifier` | text | quién llama: IP, `IP:email`, `IP:serie`, `IP:token`… (datos personales) |
+| `hit_at` | timestamptz | default `now()`. Solo se apuntan los intentos **aceptados** |
+
+> Índices `(bucket, identifier, hit_at)` y `(hit_at)`. **RLS sin políticas** + `REVOKE ALL` a anon/authenticated: solo `service_role`.
+> **RPC `check_rate_limit(p_bucket, p_identifier, p_limit, p_window_seconds) → boolean`** (SECURITY DEFINER, `EXECUTE` solo `service_role`): ventana deslizante con `pg_advisory_xact_lock` por `(bucket, identifier)`. Con `p_limit = 0` es la prueba en seco del panel: responde `false` sin apuntar.
+> **Cron `rate-limit-purge`** (`17 * * * *`): borra lo de más de 25 h.
 
 ---
 
