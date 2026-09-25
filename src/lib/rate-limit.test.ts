@@ -6,7 +6,7 @@ const rpcMock = vi.fn()
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({ rpc: rpcMock }) }))
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }))
 
-const { checkRateLimit } = await import('./rate-limit')
+const { checkRateLimit, isRateLimiterHealthy } = await import('./rate-limit')
 
 describe('checkRateLimit', () => {
   beforeEach(() => {
@@ -45,5 +45,36 @@ describe('checkRateLimit', () => {
     rpcMock.mockRejectedValue(new Error('fetch failed'))
     expect(await checkRateLimit('contact', 'ip:alguien')).toBe(true)
     expect(console.error).toHaveBeenCalled()
+  })
+})
+
+describe('isRateLimiterHealthy (aviso del panel /admin)', () => {
+  beforeEach(() => {
+    rpcMock.mockReset()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('prueba en seco: cupo 0, para no apuntar nada', async () => {
+    rpcMock.mockResolvedValue({ data: false, error: null })
+    await isRateLimiterHealthy()
+    expect(rpcMock).toHaveBeenCalledWith('check_rate_limit', expect.objectContaining({ p_limit: 0 }))
+  })
+
+  it('sano cuando la base responde «no» sin error', async () => {
+    rpcMock.mockResolvedValue({ data: false, error: null })
+    expect(await isRateLimiterHealthy()).toBe(true)
+  })
+
+  it('avisa si la base devuelve un error (p. ej. falta la función)', async () => {
+    rpcMock.mockResolvedValue({ data: null, error: { message: 'Could not find the function' } })
+    expect(await isRateLimiterHealthy()).toBe(false)
+  })
+
+  it('avisa si la base no responde', async () => {
+    rpcMock.mockRejectedValue(new Error('fetch failed'))
+    expect(await isRateLimiterHealthy()).toBe(false)
   })
 })
