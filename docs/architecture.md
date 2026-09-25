@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-09-17 — **la encuesta CSAT por fin llega a alguien** (§7-bis): se envía al email del formulario del QR, el envío queda trazado y las opiniones se leen en `/admin/avis`, en la ficha de la avería y en una franja del tablero. Ese mismo día: **el kiosko del taller queda CERRADO: montado, sonando y verificado en la TV** (§11; PR #139 docs, tras #137 audio/insistencia). Sigue abierto: **el rate limiting no protege hoy** (§Seguridad) y **los 3 crons de Princity no importan nada** (§5). Anterior 2026-09-15: rótulo `SERVICE TECHNIQUE` en la etiqueta QR (PR #134, §6). Histórico 2026-09-11/15: kiosko del taller (§11, §11-bis, §11-ter, PRs #125–#131), permiso `can_bill` (#123) y candado de facturación (#122) — ya documentados en sus secciones.
+> Última actualización: 2026-09-25 — **el limitador de intentos vuelve, ahora en Supabase** (§Seguridad): tabla `rate_limit_hits` + RPC `check_rate_limit` solo para `service_role`; Upstash retirado. Anterior 2026-09-17 — **la encuesta CSAT por fin llega a alguien** (§7-bis): se envía al email del formulario del QR, el envío queda trazado y las opiniones se leen en `/admin/avis`, en la ficha de la avería y en una franja del tablero. Ese mismo día: **el kiosko del taller queda CERRADO: montado, sonando y verificado en la TV** (§11; PR #139 docs, tras #137 audio/insistencia). Sigue abierto: **los 3 crons de Princity no importan nada** (§5). Anterior 2026-09-15: rótulo `SERVICE TECHNIQUE` en la etiqueta QR (PR #134, §6). Histórico 2026-09-11/15: kiosko del taller (§11, §11-bis, §11-ter, PRs #125–#131), permiso `can_bill` (#123) y candado de facturación (#122) — ya documentados en sus secciones.
 >
 > Anterior: 2026-06-25 — **foto adjunta a la incidencia** (el cliente adjunta una foto opcional al abrir la incidencia desde el portal **o desde el formulario público del QR `/signaler`**; la ven técnico, admin y cliente; bucket `incident-photos`, migración `20260625100000`). Histórico 2026-06-15: **tests RLS de cobertura completa** (88 tests de aislamiento por rol sobre todas las tablas sensibles, PR #93), **migración `middleware` → `proxy`** (convención Next.js 16, PR #94) y `main` protegida en GitHub (required check `typecheck · test · build`). Config de prod cerrada: `COMMERCIAL_EMAIL`, `NEXT_PUBLIC_APP_URL`. Histórico previo (2026-06-11): 3 capas de tests montadas (unit + aislamiento RLS + E2E Playwright, ver §Testing), endurecimiento RLS de `maintenance_visits` + `auth_rls_initplan`, borrado/terminación atómicos de contrato (`delete_contract`/`terminate_contract`), cabos de auditoría cerrados y reconstrucción limpia de la BD arreglada (P0-1). PRs #74–#85.
 
@@ -515,7 +515,7 @@ Ruta pública **sin autenticación** para que cualquier persona abra un incident
 3. Formulario (Client Component): banner máquina + Nom * + Téléphone * + Email (optionnel) + Description * (máx. 500 chars con contador)
 4. Server Action `submitPublicIncident`:
    - Sanitización: strip HTML, control chars, allowlist teléfono `[0-9 +\-().]`, límite server-side en todos los campos
-   - Rate limit: `${ip}:${serie}` — 2/hora y 5/día (Upstash Redis, limiters `public_incident_hourly` / `public_incident_daily`)
+   - Rate limit: `${ip}:${serie}` — 2/hora y 5/día (limiters `public_incident_hourly` / `public_incident_daily`)
    - Si superado → estado `rateLimited` con mensaje "Il y a déjà un incident en attente…"
    - Lookup `machines` (verifica existencia)
    - INSERT en `incidents` con `opened_by=null`, `source='public'`, `machine_id` directo, campos de contacto
@@ -1918,12 +1918,12 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - **`client_profiles` — sin auto-vinculación (2026-06-10):** revocado el `INSERT` directo a `authenticated` y eliminada la policy `client_own_profile_insert`. La única vía de vincular un usuario a un cliente es la verificación de contrato+email (`portal/verify`), que hace el upsert con `service_role`. Cierra el acceso cross-tenant.
 - **`service_role`** solo en servidor (Edge Functions, Server Actions) — nunca expuesto al cliente
 - **`machine_counters`** accesible únicamente por admins — datos de facturación
-- **Rate limiting** con Upstash Redis (sliding window) en endpoints públicos: login (5/15m por IP+email), signup (3/h por IP), verify contrato (10/h por IP+user), CSAT (5/h por IP+token), contact API (3/h por IP), **formulario público QR (2/h · 5/24h por `IP:serie`)**. Helper centralizado en `src/lib/rate-limit.ts`, con **dos comportamientos distintos que conviene no confundir**:
+- **Rate limiting** en Supabase (ventana deslizante) en endpoints públicos: login (5/15m por IP+email), signup (3/h por IP), verify contrato (10/h por IP+user), CSAT (5/h por IP+token), contact API (3/h por IP), **formulario público QR (2/h · 5/24h por `IP:serie`)** y su foto (6/h por `IP:serie`). Helper centralizado en `src/lib/rate-limit.ts` (cupos por puerta) → RPC `check_rate_limit(bucket, identifier, limit, window_seconds)` con `createAdminClient()` (migración `20260925110000`, 2026-09-25):
 
-  - **Sin credenciales de Upstash** (`UPSTASH_REDIS_REST_URL`/`TOKEN` ausentes) → **fail-CLOSED en producción real** (WP-7): deniega, en vez de dejar pasar todo en silencio. Se evalúa con `VERCEL_ENV === 'production'` (no `NODE_ENV`, que vale `'production'` también en los previews de Vercel) → previews/dev quedan permisivos.
-  - **Con credenciales pero backend caído** (host borrado, sin red, timeout) → **fail-OPEN**: permite la petición y registra el error (PR #128, 2026-09-14). Es deliberado: ese día la base gratuita de Upstash se borró por inactividad, `limiter.limit()` empezó a lanzar y la Server Action de login reventaba con un 500 — **nadie podía entrar en la aplicación**, ni con la contraseña correcta; solo seguían dentro quienes ya tenían sesión. Un limitador caído no puede dejar a la empresa fuera de su propia app.
-
-  🔴 **ESTADO REAL (sigue así a 2026-09-17): no hay rate limiting efectivo.** Las variables siguen definidas en Vercel pero apuntan a una base que ya no existe, así que **todos** los endpoints públicos caen en la segunda rama y se permiten. La única protección contra fuerza bruta en el login es hoy la que aplica Supabase Auth por su cuenta. Rehacer el limitador está pendiente en `docs/pendientes.md`.
+  - **La libreta** es la tabla `rate_limit_hits` (un apunte por intento aceptado; los denegados no se apuntan). RLS sin políticas + `REVOKE` a anon/authenticated: contiene IPs y emails. Un cron (`rate-limit-purge`, cada hora) borra lo de más de 25 h (la ventana más larga es de 24 h).
+  - **El portero** es la función `check_rate_limit` (`SECURITY DEFINER`), ejecutable **solo por `service_role`**: si la tuviera anon, cualquiera con la clave pública podría llenar el cupo de otro (p. ej. `IP:email` de un usuario) y dejarlo fuera. Un `pg_advisory_xact_lock` por `(bucket, identifier)` impide que una ráfaga simultánea se cuele por encima del cupo.
+  - **Si la base no responde → fail-OPEN**: permite la petición y registra el error (PR #128, 2026-09-14). Es deliberado: ese día la base gratuita de **Upstash** (el limitador de entonces) se borró por inactividad y la Server Action de login reventaba con un 500 — **nadie podía entrar en la aplicación**, ni con la contraseña correcta. Un limitador caído no puede dejar a la empresa fuera de su propia app. Se retiró Upstash del todo por eso: ya no hay proveedor externo que pueda desaparecer.
+  - Tests: `src/lib/rate-limit.test.ts` (unitarios) y `tests/rls/rate-limit.test.ts` (contra la BD: cupo, ventana, ráfaga, y que anon/authenticated no puedan llamarla ni leer la libreta).
 
 ### Robustez de errores en UI (2026-06-10) — WP-5 / WP-5b
 
@@ -1999,8 +1999,6 @@ Hallazgos P0 confirmados con SQL real contra producción y corregidos en el PR W
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anon para el cliente |
 | `SUPABASE_SECRET_KEY` | Nueva generación (`sb_secret_*`) — usada por `createAdminClient()` para acceso a BD (bypassa RLS) **y** como Bearer hacia la Edge Function `send-email`. |
 | `NEXT_PUBLIC_APP_URL` | `https://amd-service.vercel.app` |
-| `UPSTASH_REDIS_REST_URL` | URL REST de la base Upstash Redis para rate limiting. ⚠️ Definir en **Production y Preview** (con fail-closed por `VERCEL_ENV`, en prod real su ausencia deniega los endpoints públicos). |
-| `UPSTASH_REDIS_REST_TOKEN` | Token REST de la base Upstash Redis para rate limiting (ver nota arriba). |
 | `SAV_NOTIFY_EMAIL` | Destino de la notificación de incidencia pública (`/signaler`). Fallback `savamdservice@gmail.com` si no se define. (WP-7) |
 | `COMMERCIAL_EMAIL` | Destino de la notificación de lead del formulario de contacto. |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Clave pública VAPID (par generado con `npx web-push generate-vapid-keys`) — la usa `PushToggle.tsx` para `pushManager.subscribe()`. Sin ella, `PushToggle` no se muestra (ver §Notificaciones push). |
@@ -2184,7 +2182,7 @@ Seis entregas en producción tras el refactor de contratos N máquinas (PR #23):
 ### Formulario público de incidentes ✅ COMPLETADO (sesión 18, 2026-05-22) — PR #19 (`693c2be`)
 - [x] Nueva ruta `/signaler/[serie]` — formulario público sin auth, estilo AMD (shell idéntica al CSAT)
 - [x] Sanitización defensiva: strip HTML + control chars en todos los campos; allowlist teléfono; límite 500 chars descripción server-side
-- [x] Rate limiting por `IP:serie`: 2 incidentes/hora y 5/día (Upstash Redis, limiters `public_incident_hourly`/`public_incident_daily`)
+- [x] Rate limiting por `IP:serie`: 2 incidentes/hora y 5/día (limiters `public_incident_hourly`/`public_incident_daily`)
 - [x] Migración `20260522120000_public_incident_form.sql`: `contract_id` nullable + columnas `contact_name/phone/email/source` en `incidents`
 - [x] Email de notificación a `savamdservice@gmail.com` al recibir incidente público (template `raw` via Resend, HTML escapado)
 - [x] Detalle admin `/admin/incidents/[id]`: sección "Contact" con badge "Public" cuando `contact_name IS NOT NULL`

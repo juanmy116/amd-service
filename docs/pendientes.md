@@ -11,7 +11,7 @@
 | Prioridad | Qué | Por qué duele |
 |---|---|---|
 | 🔴🔴 **1** | **Princity no trae nada** | Tres procesos diarios, meses ejecutándose, **cero datos**. 321 alertas sin convertirse en incidencias y ni una lectura de contador — y los contadores son la materia prima de la facturación. |
-| 🔴 **2** | **El login no tiene portero** | Sin protección propia contra fuerza bruta desde que se borró la base de Upstash. |
+| ⚠️ **2** | **Limitador de intentos: desplegar y avisar si se cae** | Rehecho en Supabase (2026-09-25). Tras el merge: `db push` + comprobar el 6.º intento en el login. Falta el AVISO: si la base del limitador falla, hoy solo queda un `console.error` en Vercel que nadie mira. |
 | 🔴 **3** | **El aviso de mantenimientos atrasados no se envía** | Si un técnico no hace el mantenimiento, no se entera nadie. |
 | 🔴 **4** | **Confirmación antes de emitir factura** | «Forcer» emite al instante y las facturas son inmutables. Hace falta antes de encender la facturación. |
 | 🧹 **5** | **Borrar los datos de prueba del 22-09** | Dos notas de ⭐5 que no ha dado ningún cliente están contando en la media. |
@@ -179,42 +179,27 @@ técnico logueado mientras la etiqueta no lleve firma).
 
 ---
 
-## 🔴 Rehacer el limitador de intentos (Upstash borrado) — EL «PORTERO» ESTÁ ROTO
+## ⚠️ Limitador de intentos — REHECHO EN SUPABASE (2026-09-25), falta desplegar y el aviso
 
-> **Qué pasó (2026-09-14):** la base de datos gratuita de Upstash que limita los intentos de
-> contraseña **fue eliminada** (host `exotic-wren-125514.upstash.io`, ya no resuelve: `NXDOMAIN`).
-> El código la llamaba en cada login, la llamada lanzaba excepción y **la Server Action de login
-> reventaba con un 500** («ERROR 3227098399» en pantalla). Consecuencia: **nadie podía entrar en
-> la aplicación** —admins, técnicos, clientes y el kiosko del taller—, ni con la contraseña
-> correcta. Solo seguían dentro quienes ya tenían sesión iniciada, porque Supabase la renueva
-> sola y no vuelve a pasar por el login. Por eso el fallo estuvo semanas sin detectarse: se
-> descubrió al montar la Raspberry, que era un equipo nuevo y sí tenía que iniciar sesión.
+> **Qué pasó (2026-09-14):** la base gratuita de Upstash que limitaba los intentos se borró por
+> inactividad y **nadie podía entrar en la aplicación** (500, «ERROR 3227098399»). Se arregló para
+> que un limitador caído deje pasar (PR #128), pero desde entonces las 8 puertas públicas (login,
+> signup, verify, csat, contacto, formulario del QR y su foto) estaban **sin freno**.
 >
-> **Ya hecho:** `checkRateLimit()` ya no propaga el error (`src/lib/rate-limit.ts`): si el backend
-> está configurado pero no responde, **deja pasar y lo registra** en vez de tumbar el login. Con
-> eso la aplicación funciona aunque Upstash no exista. Cubierto por `src/lib/rate-limit.test.ts`.
+> **Hecho (2026-09-25):** el limitador vive ahora en nuestra propia base: tabla `rate_limit_hits` +
+> función `check_rate_limit` (solo `service_role`) + limpieza horaria con `pg_cron`. Migración
+> `20260925110000`. Upstash retirado del código. Detalle en `architecture.md` §Seguridad.
 >
-> **Lo que sigue pendiente: volver a montar el limitador.** Ahora mismo **no hay protección propia
-> contra fuerza bruta**; solo quedan los límites que aplica Supabase Auth por su cuenta.
+> **Pasos tras el merge:**
+> 1. `supabase db push` para aplicar la migración en prod (el despliegue de Vercel es automático).
+> 2. Verificar: fallar 6 veces seguidas el login con el mismo email → el 6.º debe decir
+>    «Trop de tentatives». (Cupo: 5 cada 15 minutos por IP+email.)
+> 3. Borrar `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` de Vercel y de `.env.local`:
+>    ya no se usan.
 >
-> **Pasos:**
-> 1. Crear una base nueva en https://console.upstash.com (Redis, región cercana a `us-east-2`,
->    que es donde está Supabase).
-> 2. Copiar `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`.
-> 3. Ponerlas en **Vercel → Settings → Environment Variables → Production** (y en `.env.local`,
->    que tiene las viejas).
-> 4. **Redesplegar**: Vercel no recoge variables nuevas sin un despliegue.
-> 5. Comprobar que quedó vivo:
->    ```bash
->    curl -H "Authorization: Bearer $UPSTASH_REDIS_REST_TOKEN" "$UPSTASH_REDIS_REST_URL/ping"
->    ```
->    Debe responder `{"result":"PONG"}`.
-> 6. Verificar el límite real: fallar 6 veces seguidas el login y comprobar que a partir del sexto
->    intento sale el aviso de demasiados intentos (cupo: 5 cada 15 minutos).
->
-> **Ojo con el plan gratuito:** esto ha pasado por inactividad y **volverá a pasar**. Al montarlo,
-> decidir una de dos: plan de pago, o revisar cada cierto tiempo que sigue vivo. Mientras el
-> limitador no exista, la aplicación funciona igual pero sin esa protección.
+> **Pendiente — el aviso:** si la base del limitador falla, se deja pasar y solo queda un
+> `console.error` en Vercel que nadie mira (así estuvo el de Upstash semanas sin verse). Falta un
+> semáforo en `/admin` o un chequeo diario que avise.
 
 ---
 

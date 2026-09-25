@@ -23,7 +23,7 @@ La app SAV está **completa y en producción** (`https://amd-service.vercel.app`
 - **Kiosko del taller** (#125–#137): dashboard en TV con mapa de Dakar, campana y Raspberry en el taller, cerrado y verificado.
 - **Facturación APAGADA a propósito** (#122): candado en BD hasta validar el SAV en uso real. Encenderla es un `UPDATE`.
 
-**Lo que NO funciona ahora mismo** (detalle en `docs/pendientes.md`): los tres crons de Princity se ejecutan a diario y **no importan ni un dato** desde hace meses; el limitador de intentos del login **no existe** desde que se borró la base de Upstash; y el aviso de mantenimientos atrasados **nunca se envía**.
+**Lo que NO funciona ahora mismo** (detalle en `docs/pendientes.md`): los tres crons de Princity se ejecutan a diario y **no importan ni un dato** desde hace meses; y el aviso de mantenimientos atrasados **nunca se envía**.
 
 Detalle en `docs/architecture.md` y en las memorias del proyecto.
 
@@ -33,7 +33,7 @@ Detalle en `docs/architecture.md` y en las memorias del proyecto.
 - Sitio web público AMD + página `/location` (SEO Dakar)
 - Back-office admin (`/admin`): clientes, máquinas, contratos, incidencias (Kanban), compteurs, maintenance, calendrier, équipe, Princity
 - Portal cliente (`/portal`) y PWA técnico (`/tech`) con escáner QR
-- Auth por rol, RLS, integraciones (Resend/CSAT, Princity API) · ⚠️ el **rate limiting del login no existe** desde que se borró la base de Upstash (ver `docs/pendientes.md`)
+- Auth por rol, RLS, integraciones (Resend/CSAT, Princity API) · rate limiting de las puertas públicas en Supabase (`check_rate_limit`, ver `docs/architecture.md` §Seguridad)
 - Búsqueda + filtros admin · `numero_incident` (SAV-YYYY-NNNN)
 - **Dashboard Atelier** (`/atelier`): kiosko de taller para TV 32" — cuenta «Atelier» (rol técnico + flag `is_dispatcher`) que asigna incidencias y mantenimientos a los técnicos
 - **Importador CSV de máquinas** (PR #22)
