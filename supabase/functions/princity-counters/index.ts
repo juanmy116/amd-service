@@ -1,10 +1,14 @@
 import { getPrincityClient }                      from '../_shared/princity-client.ts'
 import { getAdminClient, updateHealth, writeLog } from '../_shared/db.ts'
 import { notifyAdmin }                            from '../_shared/notify.ts'
+import { rejectUnlessPrincityCron }               from '../_shared/princity-cron-auth.ts'
 
 const FUNCTION_NAME = 'princity-counters'
 
-Deno.serve(async (_req: Request) => {
+Deno.serve(async (req: Request) => {
+  const denied = rejectUnlessPrincityCron(req, FUNCTION_NAME)
+  if (denied) return denied
+
   const db       = getAdminClient()
   const princity = getPrincityClient()
 
