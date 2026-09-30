@@ -12,9 +12,15 @@ type State =
   | { success: true; numeroIncident: string }
   | null
 
+// La entrada bruta se recorta ANTES de cualquier regex: `/<[^>]*>/g` es cuadrática ante una
+// cadena de muchos '<' sin '>', y estas acciones son anónimas y previas al rate limit (el body de
+// una Server Action admite hasta 2 MB). El margen de 2 × maxLen cubre todo lo que envía el
+// formulario (maxLength, más los saltos de línea del textarea que llegan como CRLF), así que para
+// un uso legítimo el resultado no cambia.
 function sanitizeText(raw: FormDataEntryValue | null, maxLen: number): string {
   if (typeof raw !== 'string') return ''
   return raw
+    .slice(0, maxLen * 2)
     .replace(/<[^>]*>/g, '')
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
     .replace(/[\r\n]+/g, ' ')
@@ -25,6 +31,7 @@ function sanitizeText(raw: FormDataEntryValue | null, maxLen: number): string {
 function sanitizeDescription(raw: FormDataEntryValue | null): string {
   if (typeof raw !== 'string') return ''
   return raw
+    .slice(0, 500 * 2) // mismo tope previo que sanitizeText (ver arriba)
     .replace(/<[^>]*>/g, '')
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
     .trim()
