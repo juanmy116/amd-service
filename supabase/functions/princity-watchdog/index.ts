@@ -1,5 +1,6 @@
 import { getAdminClient, writeLog } from '../_shared/db.ts'
 import { notifyAdmin, notifyEmail }  from '../_shared/notify.ts'
+import { rejectUnlessPrincityCron } from '../_shared/princity-cron-auth.ts'
 
 const FUNCTION_NAME = 'princity-watchdog'
 
@@ -11,7 +12,10 @@ const THRESHOLDS: Record<string, number> = {
 
 const ADMIN_EMAIL = 'info@amd-service.com'
 
-Deno.serve(async (_req: Request) => {
+Deno.serve(async (req: Request) => {
+  const denied = rejectUnlessPrincityCron(req, FUNCTION_NAME)
+  if (denied) return denied
+
   const db  = getAdminClient()
   const now = Date.now()
 

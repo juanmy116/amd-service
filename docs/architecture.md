@@ -469,7 +469,7 @@ corrige y borra la posición de otra).
   - **v3 (POST con filtros tipo SQL)** — usada para queries con filtros (alerts, billingCounters)
 - ⚠️ En esta instancia los endpoints `/v3/companies` y `/v3/devices` están bloqueados con `"Report query error"`. Por eso se usa `/v1/contracts` + `/v1/devices?contract=X` en su lugar.
 
-**4 Edge Functions (Supabase, Deno, `verify_jwt: false`):**
+**4 Edge Functions (Supabase, Deno, `verify_jwt: false`):** `princity-alerts`, `princity-counters` y `princity-watchdog` exigen la cabecera `x-cron-secret` (secreto `PRINCITY_CRON_SECRET`, desde 2026-09-30; sus crons la envían vía `public.invoke_princity_cron`, que la lee de Vault). `princity-sync` exige la secret key solo en modo `initial`.
 
 | Edge Function | Frecuencia | Endpoints Princity | Función |
 |---|---|---|---|
@@ -2041,6 +2041,8 @@ Hallazgos P0 confirmados con SQL real contra producción y corregidos en el PR W
 | `RESEND_API_KEY` | API key Resend para emails del watchdog |
 | `VAPID_SUBJECT` / `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Firma de Web Push en `send-push` (Fase 2 de notificaciones). `VAPID_SUBJECT` debe ser `mailto:<email>` o una URL `https://`. |
 | `PUSH_SENDER_SECRET` | Secreto de `send-push` (cabecera `x-push-secret`, comparación en tiempo constante). El mismo valor vive en Vault de Postgres como `push_sender_secret` — ver §Notificaciones push. |
+| `PRINCITY_CRON_SECRET` | Secreto de `princity-alerts`, `princity-counters` y `princity-watchdog` (cabecera `x-cron-secret`, `_shared/princity-cron-auth.ts`; sin él o si no coincide ⇒ 401). El mismo valor vive en Vault como `princity_cron_secret`, junto a `princity_functions_url`; los crons llaman a `public.invoke_princity_cron('<función>')`, que los lee en cada ejecución (migración `20260930160000`). `princity-sync` no lo usa (su modo `initial` exige la secret key del proyecto). |
+| `MAINTENANCE_CRON_SECRET` | Secreto de `maintenance-cron` (cabecera `x-cron-secret`, comparación en tiempo constante; sin él o si no coincide ⇒ 401). El mismo valor vive en Vault de Postgres como `maintenance_cron_secret`, que el cron `maintenance-daily-check` envía (migración `20260930170000`). |
 
 > Los antiguos secrets `IMAP_HOST`, `IMAP_USER`, `IMAP_PASSWORD` quedaron obsoletos tras retirar `princity-agent`. Pueden borrarse del dashboard de Supabase.
 

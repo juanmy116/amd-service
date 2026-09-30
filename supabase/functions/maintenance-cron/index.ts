@@ -1,9 +1,15 @@
+// Desplegar con: supabase functions deploy maintenance-cron --no-verify-jwt
+// Exige la cabecera `x-cron-secret` (= secreto MAINTENANCE_CRON_SECRET, comparación en tiempo
+// constante); sin ella, o si no coincide, responde 401. Solo la llama pg_cron, que lee el mismo
+// secreto de Vault (`maintenance_cron_secret`, migración 20260930170000).
+
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js'
-import { getSecretKey } from '../_shared/secret-key.ts'
+import { getSecretKey, timingSafeEqual } from '../_shared/secret-key.ts'
 
 const SUPABASE_URL  = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY   = getSecretKey()
+const CRON_SECRET   = Deno.env.get('MAINTENANCE_CRON_SECRET') ?? ''
 const HOMESERVER    = Deno.env.get('MATRIX_HOMESERVER_URL')!
 const BOT_TOKEN     = Deno.env.get('MATRIX_ACCESS_TOKEN')!
 const ROOM_ID       = Deno.env.get('MATRIX_MAINTENANCE_ROOM_ID')!
@@ -24,7 +30,17 @@ async function sendMatrix(message: string): Promise<void> {
   ).catch(err => console.error('[Matrix]', err.message))
 }
 
-Deno.serve(async () => {
+Deno.serve(async (req: Request) => {
+  const provided = req.headers.get('x-cron-secret') ?? ''
+  if (!CRON_SECRET) {
+    console.error('[maintenance-cron] MAINTENANCE_CRON_SECRET no configurado')
+  }
+  if (!CRON_SECRET || !timingSafeEqual(provided, CRON_SECRET)) {
+    return new Response(JSON.stringify({ error: 'Non autorisé' }), {
+      status: 401, headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
   const db = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
@@ -98,16 +114,23 @@ Deno.serve(async () => {
       lines.push('')
       lines.push('Qui prend en charge ?')
 
-      await sendMatrix(lines.join('\n'))
-
-      // Marcar como notificado
-      const { error: updateErr } = await db
+      // Marcar como notificado ANTES de enviar, solo si nadie lo hizo ya: dos ejecuciones
+      // simultáneas no pueden reclamar la misma visita ni enviar el mensaje dos veces.
+      const { data: claimed, error: updateErr } = await db
         .from('maintenance_visits')
         .update({ matrix_notified: true })
         .eq('id', visit.id)
+        .eq('matrix_notified', false)
+        .select('id')
 
-      if (updateErr) errors.push(`Update visit ${visit.id}: ${updateErr.message}`)
-      else results.push(`Notifié: ${machine?.numero_serie ?? visit.id} — ${dateFormatted}`)
+      if (updateErr) {
+        errors.push(`Update visit ${visit.id}: ${updateErr.message}`)
+        continue
+      }
+      if (!claimed || claimed.length === 0) continue
+
+      await sendMatrix(lines.join('\n'))
+      results.push(`Notifié: ${machine?.numero_serie ?? visit.id} — ${dateFormatted}`)
 
     } catch (err) {
       errors.push(`Visit ${visit.id}: ${(err as Error).message}`)
