@@ -474,7 +474,7 @@ corrige y borra la posición de otra).
 | Edge Function | Frecuencia | Endpoints Princity | Función |
 |---|---|---|---|
 | `princity-alerts` | cada hora (`0 * * * *`) | `POST /v3/alerts` con `Alert.deactivationDate IS_NULL` | Detecta pannes y toner-bas; crea incidencias para pannes con máquina+contrato conocidos |
-| `princity-sync` | diario 06:00 UTC (`0 6 * * *`) | `GET /v1/contracts` + `GET /v1/devices?contract=X` (paralelizado en lotes de 10) | Detecta nuevos clientes y equipos; modo `normal` solo INSERT-si-no-existe; modo `initial` ejecuta `wipe_data_tables` + reimport completo |
+| `princity-sync` | diario 06:00 UTC (`0 6 * * *`) | `GET /v1/contracts` + `GET /v1/devices?contract=X` (paralelizado en lotes de 10) | Detecta nuevos clientes y equipos; modo `normal` solo INSERT-si-no-existe; modo `initial` ejecuta `wipe_data_tables` + reimport completo y **exige `Authorization: Bearer <secret key>`** (401 si falta, desde 2026-09-30) |
 | `princity-counters` | 2× al día: 02:00 + 07:00 UTC (`0 2 * * *` y `0 7 * * *`) | `POST /v3/billingCounters` con filtro `BillingCounter.deviceId EQ <id>` | Importa último contador del mes por máquina; aprende el `billing_day` por contrato. Doble ejecución para cubrir variaciones horarias de Princity (idempotente por `(machine_id, year, month, status='actif')`) |
 | `princity-watchdog` | cada 2h (`30 */2 * * *`) | — (consulta `princity_health`) | Alerta por email si alguna función no se ejecuta en su umbral (alerts: 2h, sync: 2d, counters: 35d) |
 
@@ -1636,6 +1636,8 @@ Usa `TRUNCATE TABLE ... RESTART IDENTITY CASCADE` (no `DELETE` — PostgREST blo
 
 Invocada **solo** desde `princity-sync` en `mode: 'initial'` (botón rojo manual en `/admin/princity` con confirmación JavaScript).
 
+> **Puerta de `princity-sync` (PR #163, 2026-09-30):** la función está desplegada con `verify_jwt: false` y hasta esa fecha **no comprobaba quién la llamaba**: un `POST` anónimo con `{"mode":"initial"}` ejecutaba este `TRUNCATE` en producción (hallazgo F1, CRÍTICO, del escaneo de seguridad del 2026-09-29). Ahora el modo `initial` exige `Authorization: Bearer <secret key del proyecto>` validada con `isValidSecretKey` (`_shared/secret-key.ts`, comparación en tiempo constante, falla cerrado); sin ella responde `401 Non autorisé` antes de tocar la BD. El botón de admin la envía solo (`createAdminClient().functions.invoke` usa `SUPABASE_SECRET_KEY`). El modo `normal` (cron diario) sigue sin autenticación: no borra ni inyecta datos, pero gasta cuota de Princity — se cierra con F13 (ver `pendientes.md`). ⚠️ **Nunca probar con el botón:** con clave válida borra los datos de verdad; la prueba segura es llamar **sin** clave y ver el 401. Verificado en prod tras desplegar la v18.
+
 ---
 
 ### Tabla: `machine_counters`
@@ -1945,6 +1947,15 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 
 - **WP-5 (P2-1):** envío/descarga de facturas abortan ante fallo técnico de lectura de `invoice_lines` (nunca un documento sin líneas). Ver §Módulo de Facturación.
 - **WP-5b (P2-4):** las páginas de `/admin` que cargan datos comprueban el `error` de sus queries y **lanzan** (`throw new Error('DATA_FETCH_ERROR')`) ante un fallo TÉCNICO de Supabase, en vez de renderizar una tabla vacía indistinguible de "no hay registros" (o, en `team`, crashear crudo con `users.map` sobre `undefined`). Cubre los listados (clients, contracts, machines, incidents, leads, factures, billing-plans, maintenance, princity, contadores, calendrier, team) y el **detalle de contrato** (`contracts/[id]`: selects vacíos por error de BD podrían llevar a guardar el cliente/máquina/plan equivocado). Un **error boundary** de segmento (`src/app/admin/error.tsx`, `'use client'`) muestra "Erreur technique / Réessayer" conservando el chrome del back-office (el boundary re-lanza `NEXT_REDIRECT`/`notFound`, así que no interfiere con auth ni 404). El módulo de **facturación** mantiene su patrón propio `BillingDataError` (capturado inline en su page para mostrar el bloqueo sin subir al boundary).
+
+### Escaneo de seguridad Claude Security (2026-09-29)
+
+Escaneo de todo el repo (commit `6c54462`, esfuerzo medio, verificado por un panel de 3 revisores): **14 hallazgos — 1 CRÍTICO, 5 MEDIOS, 8 LEVES**. El informe completo y los parches sugeridos viven en `CLAUDE-SECURITY-20260929-132506/` (**fuera de git**, con su propio `.gitignore`); lo pendiente está resumido en `docs/pendientes.md` §«Escaneo de seguridad».
+
+| # | Severidad | Descripción | Estado |
+|---|---|---|---|
+| F1 | CRÍTICO | `princity-sync` (`verify_jwt: false`) no autenticaba al llamante: un `POST` anónimo `{"mode":"initial"}` ejecutaba `wipe_data_tables` en producción. | ✅ **Cerrado** (PR #163, v18 desplegada, 401 verificado en prod) — ver §`wipe_data_tables` |
+| F2–F14 | MEDIO/LEVE | RLS de técnicos/clientes, rutas de fotos, regex del formulario QR, email CSAT, sello QR, Edge Functions de cron sin autenticación. | Pendientes — ver `pendientes.md` |
 
 ### Auditoría de seguridad — Higiene de config (2026-06-10) — WP-7
 

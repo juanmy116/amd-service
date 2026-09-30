@@ -6,10 +6,11 @@
 
 ---
 
-## 📍 Por dónde seguir (al 2026-09-25)
+## 📍 Por dónde seguir (al 2026-09-30)
 
 | Prioridad | Qué | Por qué duele |
 |---|---|---|
+| 🔴 **0** | **Escaneo de seguridad: quedan 13 hallazgos** | F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`) ya está cerrado (PR #163). Quedan 5 medios y 8 leves; 6 tienen parche aprobado listo para aplicar. Ver §«Escaneo de seguridad» abajo. |
 | 🔴🔴 **1** | **Princity no trae nada** | Tres procesos diarios, meses ejecutándose, **cero datos**. 321 alertas sin convertirse en incidencias y ni una lectura de contador — y los contadores son la materia prima de la facturación. |
 | ✅ **2** | **Limitador de intentos** | CERRADO (2026-09-25): rehecho en Supabase y en prod (PR #159), probado en la web real, variables de Upstash borradas, y franja roja en `/admin` si deja de funcionar. |
 | 🔴 **3** | **El aviso de mantenimientos atrasados no se envía** | Si un técnico no hace el mantenimiento, no se entera nadie. |
@@ -36,6 +37,44 @@ real. Detalle en `docs/architecture.md` §3d.
 
 ---
 
+## 🔒 Escaneo de seguridad (2026-09-29): lo que queda
+
+Escaneo Claude Security de todo el repo sobre `6c54462`. Informe y parches en
+`CLAUDE-SECURITY-20260929-132506/` (**fuera de git**: `CLAUDE-SECURITY-RESULTS.md` y
+`patches/PATCHES.md` como índice; cada `F<n>.md` explica el hallazgo y cómo aplicar su parche).
+Resumen en `architecture.md` §Seguridad.
+
+**✅ Cerrado:** F1 (CRÍTICO) — `princity-sync` exige la secret key en modo `initial` (PR #163, en prod).
+
+**Con parche aprobado, listo para aplicar** (revisado por dos agentes independientes; ninguno probado
+en ejecución porque los tests del proyecto no cubren esas partes):
+
+| # | Sev. | Qué arregla | Ojo al aplicar |
+|---|---|---|---|
+| F4 | MEDIO | Un cliente puede leer fotos de otros clientes (inserta en `incident_photos` una ruta ajena y el servidor la firma con service_role) | Migración `20260929100000`. **Choca con F6** (mismos ficheros): aplicar uno y adaptar el otro |
+| F6 | MEDIO | `photo_path` del portal con `../` sale del bucket y lanza peticiones con service_role | Ver F4 |
+| F5 | MEDIO | La regex del formulario QR (`/signaler`) se puede colgar con un texto enorme, antes del limitador | — |
+| F7 | LEVE | Cualquier usuario puede falsear el historial (`incident_history`) de averías ajenas | Migración `20260930100000` |
+| F13 | LEVE | `princity-alerts`/`-counters`/`-watchdog` se pueden lanzar desde fuera | **Antes de desplegar:** crear `PRINCITY_CRON_SECRET` + dos entradas en Vault, o los crons se callan (pasos en `F13.md`) |
+| F14 | LEVE | `maintenance-cron` se puede lanzar desde fuera y duplica avisos Matrix | **Antes de desplegar:** `MAINTENANCE_CRON_SECRET` + Vault (pasos en `F14.md`) |
+
+**Sin parche (necesitan otra vuelta o una decisión):**
+- **F2 (MEDIO)** — un técnico puede reescribir `contract_machine_id`/`machine_id` de su propia avería
+  (y de sus visitas, `tech_update_visits`) y ampliar lo que ve y edita. El 2º intento (trigger
+  `BEFORE UPDATE` en `incidents` y `maintenance_visits`) no llegó a revisarse: **reintentar**.
+- **F3 (MEDIO)** — un cliente puede crear una avería asignada a sí mismo y obtener permisos de técnico.
+  El arreglo rompía `tests/rls/geolocation.test.ts:303`: aceptar `opened_by IS NULL OR = auth.uid()`
+  y limpiar las asignaciones a clientes ya existentes.
+- **F8 (LEVE)** — técnicos leen/insertan piezas de visitas ajenas. **Depende de F2.**
+- **F9 (LEVE)** — `contact_name` del formulario QR entra sin escapar en el email CSAT. Escapar
+  sirve; lo difícil es el saludo con una URL como nombre sin quitarle el saludo a nombres normales.
+- **F10–F12 (LEVE)** — el sello QR «estuve ahí» es falsificable (amplía el punto b) de la sección
+  siguiente). **Decisión tuya:** reimprimir etiquetas con token HMAC por máquina o aceptarlo.
+- De paso, los revisores vieron que `cleanup-orphan-incident-photos` tampoco autentica al llamante
+  (mismo patrón que F14; sin hallazgo propio).
+
+---
+
 ## ⚠️ Escaneo de técnicos: dos cabos sueltos (detectados en el code-review del PR #155, 2026-09-23)
 
 Ninguno bloquea; se dejan anotados para no olvidarlos.
@@ -49,8 +88,8 @@ oficina para poner en curso las averías del técnico en esa máquina. **Propues
 ⚠️ `tests/e2e/sav-workflow.spec.ts` depende del comportamiento actual (abre la ficha con
 `page.goto` y espera `en_cours`): habrá que adaptarlo en el mismo PR.
 
-**b) El sello QR lo puede fingir un técnico logueado**, tecleando `/m/<serie>` o llamando a
-`recordQrScanAction` a mano. Es inherente mientras las etiquetas no lleven una firma (el QR solo
+**b) El sello QR lo puede fingir un técnico logueado** (= hallazgos F10–F12 del escaneo de
+seguridad del 2026-09-29), tecleando `/m/<serie>` o llamando a `recordQrScanAction` a mano. Es inherente mientras las etiquetas no lleven una firma (el QR solo
 codifica el número de serie). Aceptable por ahora: el sello es un indicio para el semáforo 🟢/🟡,
 no un control de seguridad.
 
