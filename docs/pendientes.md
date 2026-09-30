@@ -60,9 +60,14 @@ Resumen en `architecture.md` §Seguridad.
   escribe y que sea técnico (migración `20260930190000`, renombrada desde el `20260930100000` del
   parche para ir detrás de las ya aplicadas). Test `tests/rls/incident-history-isolation.test.ts`
   corrido en local: pasa con la regla nueva y falla (3 ataques) con la antigua.
-- F9 (LEVE) — las plantillas de `send-email` escapan todo valor y solo aceptan URLs http(s); un nombre
-  que parece una dirección se queda sin saludo en la encuesta (los normales lo conservan). Módulo
-  `_shared/email-templates.ts` + 12 tests (6 fallan sin el escapado).
+- F9 (LEVE) — las plantillas de `send-email` escapan todo valor y solo aceptan URLs http(s); en la
+  encuesta solo se saluda a lo que claramente es un nombre (lista de lo permitido, no de dominios:
+  la 1ª versión con lista de TLD la tumbó el `/code-review` con `amd.tv/avis`, IDN, puntos Unicode).
+  Módulo `_shared/email-templates.ts` + 14 tests (6 fallan sin la protección).
+  Fuera de F9, vistos en la revisión: los correos `raw` de facturas (`inv.client_name`) y de
+  `parse-counter-document` (`uploadedBy`) meten datos sin escapar (datos que escribe la oficina, no
+  anónimos); `escapeHtml` está copiado en 3 sitios; `TemplateName` de `src/lib/email.ts` va por
+  detrás del de `_shared`.
 - Cabo suelto visto de paso: el cron `princity-sync-daily` sigue llevando una clave en texto plano
   en `cron.job.command` (los otros 4 ya no). Moverlo a Vault cuando se arregle Princity (fila 1).
 

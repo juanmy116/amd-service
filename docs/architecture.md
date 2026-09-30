@@ -597,9 +597,11 @@ Ruta pública **sin autenticación** para que cualquier persona abra un incident
 - **Plantillas de `send-email` escapadas (2026-09-30, hallazgo F9):** las plantillas viven en
   `supabase/functions/_shared/email-templates.ts` (puro, testeado por vitest). Todo valor de `data`
   se escapa antes de entrar en el HTML y las URLs de un `href` solo pasan si son http(s); `raw` sigue
-  recibiendo el HTML ya construido por quien llama. En la encuesta, un `client_name` que parece una
-  dirección (esquema, `www.`, `@`, dominio con TLD común, IP) se queda **sin saludo**: escapado
-  seguiría llegando como texto que el cliente de correo convierte en enlace, y el correo sale del
+  recibiendo el HTML ya construido por quien llama. En la encuesta solo se saluda a un `client_name`
+  que **claramente es un nombre** (`isPlainName`: lista de lo permitido — letras de cualquier alfabeto,
+  cifras, espacios, `, ' ’ - & ( )`; punto solo tras una inicial o al final de palabra; barra solo con
+  espacio delante). Lo demás se queda **sin saludo**: escapado, un dominio seguiría llegando como
+  texto que el cliente de correo convierte en enlace, y el correo sale del
   remitente real de AMD a la dirección que eligió quien rellenó el formulario del QR. Sin `csat_url`
   válido la plantilla lanza y el envío falla (queda en el historial). Tests:
   `_shared/email-templates.test.ts`.

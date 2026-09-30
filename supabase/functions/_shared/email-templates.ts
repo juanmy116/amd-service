@@ -17,10 +17,10 @@ export function escapeHtml(s: string): string {
 }
 
 // Solo http(s): un `href` con otro esquema (`javascript:`, `data:`) no llega nunca al correo.
-export function safeHttpUrl(raw: string | undefined): string {
+export function safeHttpUrl(raw: unknown): string {
   if (!raw) return ''
   try {
-    const url = new URL(raw)
+    const url = new URL(String(raw))
     return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : ''
   } catch {
     return ''
@@ -28,19 +28,21 @@ export function safeHttpUrl(raw: string | undefined): string {
 }
 
 // Escapado, un nombre como «https://evil.tld/avis-amd» sigue llegando como texto, y muchos
-// clientes de correo convierten solo en enlace lo que parece una dirección. Esos nombres se quedan
-// sin saludo; los normales («Diop & Fils», «M.Diop», «Bureau 2 - Fatou») lo conservan.
-const LINK_TLDS =
-  'com|net|org|info|biz|io|co|me|app|dev|xyz|top|site|online|link|click|shop|store|live|ly|' +
-  'sn|fr|ru|cn|tk|ml|ga|cf|gq|be|ch|de|uk|us|ca|es|it|eu|ci|ma|tn'
-const DOMAIN = new RegExp(`[a-z0-9-]\\.(?:${LINK_TLDS})(?![a-z0-9-])`, 'i')
+// clientes de correo convierten en enlace lo que parece una dirección. Solo se saluda a lo que
+// claramente es un nombre (lista de lo permitido, no de lo prohibido: ningún TLD nuevo, IDN o punto
+// Unicode se cuela): letras de cualquier alfabeto, cifras, espacios y , ' ’ - & ( ). Un punto solo
+// tras una inicial («M.Diop», «A.Ly») o al final de una palabra («Diop Jr.»); una barra solo con
+// espacio delante («Awa / Accueil»). Sin saludo, la encuesta sale igual.
+const NAME_CHARS = /^[\p{L}\p{M}\p{N} ,'’\-&()/.]+$/u
 
-export function looksLikeLink(s: string): boolean {
-  return /[a-z][a-z0-9+.-]*:\/\//i.test(s)
-    || /\bwww\./i.test(s)
-    || s.includes('@')
-    || DOMAIN.test(s)
-    || /\b\d{1,3}(?:\.\d{1,3}){3}\b/.test(s)
+export function isPlainName(s: string): boolean {
+  if (!NAME_CHARS.test(s) || /\S\//.test(s)) return false
+  for (let i = s.indexOf('.'); i !== -1; i = s.indexOf('.', i + 1)) {
+    const afterInitial = /(^|\s)\p{L}$/u.test(s.slice(0, i))
+    const endsWord = i === s.length - 1 || /\s/.test(s[i + 1])
+    if (!afterInitial && !endsWord) return false
+  }
+  return true
 }
 
 export function renderTemplate(
@@ -49,7 +51,7 @@ export function renderTemplate(
 ): { subject: string; html: string } {
   // Texto para el HTML (escapado) y URLs para un `href` (solo http(s), escapadas). Los asuntos
   // van como texto plano al proveedor y no se escapan: saldrían «&amp;» en la bandeja de entrada.
-  const h = (key: string) => escapeHtml(data[key] ?? '')
+  const h = (key: string) => escapeHtml(String(data[key] ?? ''))
   const url = (key: string) => escapeHtml(safeHttpUrl(data[key]))
 
   switch (template) {
@@ -119,8 +121,8 @@ export function renderTemplate(
       if (!csatUrl) throw new Error('csat requiert un csat_url http(s) valide')
 
       const reference  = data.reference ?? ''
-      const name       = (data.client_name ?? '').trim()
-      const greeting   = name && !looksLikeLink(name) ? `<p>Bonjour ${escapeHtml(name)},</p>` : ''
+      const name       = String(data.client_name ?? '').trim()
+      const greeting   = name && isPlainName(name) ? `<p>Bonjour ${escapeHtml(name)},</p>` : ''
       const rows = [
         reference ? ['Référence', h('reference')] : null,
         data.equipement ? ['Équipement', h('equipement')] : null,
@@ -162,14 +164,14 @@ export function renderTemplate(
     }
 
     case 'counter_batch_processed': {
-      const total = escapeHtml(data.total ?? '0')
-      const greens = escapeHtml(data.greens ?? '0')
-      const attention = escapeHtml(data.attention ?? '0')
+      const total = escapeHtml(String(data.total ?? '0'))
+      const greens = escapeHtml(String(data.greens ?? '0'))
+      const attention = escapeHtml(String(data.attention ?? '0'))
       return {
         subject: `[AMD SAV] ${data.total ?? '0'} compteur(s) traité(s) par email`,
         html: `<p><strong>${total}</strong> compteur(s) reçus par email ont été traités.</p>
              <ul><li>🟢 ${greens} prêt(s) à confirmer</li><li>🟡🔴 ${attention} à vérifier</li></ul>
-             <p><a href="${url('url')}">Voir la file d'attente →</a></p>`,
+             ${url('url') ? `<p><a href="${url('url')}">Voir la file d'attente →</a></p>` : ''}`,
       }
     }
 

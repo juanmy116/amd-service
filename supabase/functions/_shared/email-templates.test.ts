@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { looksLikeLink, renderTemplate, safeHttpUrl } from './email-templates'
+import { isPlainName, renderTemplate, safeHttpUrl } from './email-templates'
 
 const csat = (over: Record<string, string> = {}) =>
   renderTemplate('csat', {
@@ -27,13 +27,19 @@ describe('renderTemplate csat (F9)', () => {
     expect(html).not.toContain('evil.tld')
   })
 
-  it('el HTML en el nombre sale como texto', () => {
+  it('un nombre con HTML se queda sin saludo y la etiqueta no llega al correo', () => {
     const { html } = csat({ client_name: 'Awa <b>Ndiaye</b>' })
-    expect(html).toContain('Bonjour Awa &lt;b&gt;Ndiaye&lt;/b&gt;,')
+    expect(html).not.toContain('Bonjour')
+    expect(html).not.toContain('<b>')
   })
 
   it('un nombre que es una dirección web se queda sin saludo', () => {
-    for (const name of ['https://evil.tld/avis-amd', 'www.evil-amd.com', 'amd-avis.com/csat', 'contact@evil.sn', '185.10.2.3']) {
+    for (const name of [
+      'https://evil.tld/avis-amd', 'www.evil-amd.com', 'amd-avis.com/csat', 'contact@evil.sn', '185.10.2.3',
+      // TLD fuera de cualquier lista, IDN, puntos Unicode y subdominios (revisión del PR #171)
+      'amd-service.support/avis', 'amd-sav.ai/csat', 'amd-senegal.africa', 'amd.tv/avis',
+      'amdé.com/avis', 'evil．com', 'evil。com', 'a.evil.com', 'x.com/evil',
+    ]) {
       const { html } = csat({ client_name: name })
       expect(html, name).not.toContain('Bonjour')
       expect(html, name).not.toContain(name)
@@ -41,7 +47,10 @@ describe('renderTemplate csat (F9)', () => {
   })
 
   it('los nombres normales conservan el saludo', () => {
-    for (const name of ['Mamadou Diop (DAF)', 'Diop & Fils', 'Awa / Accueil', 'Bureau 2 - Fatou', 'M.Diop', "Aïssatou N'Diaye"]) {
+    for (const name of [
+      'Mamadou Diop (DAF)', 'Diop & Fils', 'Awa / Accueil', 'Bureau 2 - Fatou', 'M.Diop', "Aïssatou N'Diaye",
+      'A.Ly', 'M. De Souza', 'Diop Jr.', 'Fatou Ly, Accueil', 'Ndèye Fatou Sow', 'Awa Diop 2',
+    ]) {
       expect(csat({ client_name: name }).html, name).toContain('<p>Bonjour ')
     }
     expect(csat({ client_name: 'Diop & Fils' }).html).toContain('Bonjour Diop &amp; Fils,')
@@ -88,10 +97,27 @@ describe('safeHttpUrl', () => {
   })
 })
 
-describe('looksLikeLink', () => {
-  it('no confunde abreviaturas con dominios', () => {
-    expect(looksLikeLink('M.Diop')).toBe(false)
-    expect(looksLikeLink('St.Louis')).toBe(false)
-    expect(looksLikeLink('Evil.COM')).toBe(true)
+describe('isPlainName', () => {
+  it('iniciales y abreviaturas al final de palabra valen; dominios no', () => {
+    expect(isPlainName('M.Diop')).toBe(true)
+    expect(isPlainName('A.Ly')).toBe(true)
+    expect(isPlainName('Diop Jr.')).toBe(true)
+    expect(isPlainName('Evil.COM')).toBe(false)
+    expect(isPlainName('amd.tv')).toBe(false)
+    expect(isPlainName('Awa/Accueil')).toBe(false)
+  })
+})
+
+describe('valores que no son texto', () => {
+  it('un número en data no rompe la plantilla', () => {
+    const data = { total: 3, greens: 1, attention: 2, url: 'https://amd-service.vercel.app/admin/contadores/pendientes' }
+    const { html } = renderTemplate('counter_batch_processed', data as unknown as Record<string, string>)
+    expect(html).toContain('<strong>3</strong>')
+  })
+
+  it('counter_batch_processed sin URL absoluta omite el enlace en vez de dejarlo vacío', () => {
+    const { html } = renderTemplate('counter_batch_processed', { total: '3', url: '/admin/contadores/pendientes' })
+    expect(html).not.toContain('href=""')
+    expect(html).not.toContain('Voir la file')
   })
 })
