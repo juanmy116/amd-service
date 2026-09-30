@@ -1,6 +1,7 @@
 import { getPrincityClient }                      from '../_shared/princity-client.ts'
 import { getAdminClient, updateHealth, writeLog } from '../_shared/db.ts'
 import { notifyAdmin }                            from '../_shared/notify.ts'
+import { isValidSecretKey }                       from '../_shared/secret-key.ts'
 
 const FUNCTION_NAME = 'princity-sync'
 
@@ -191,6 +192,21 @@ Deno.serve(async (req: Request) => {
 
   const body = await req.json().catch(() => ({})) as { mode?: string }
   const mode = body.mode === 'initial' ? 'initial' : 'normal'
+
+  // El modo 'initial' ejecuta wipe_data_tables (TRUNCATE de clientes, contratos, máquinas,
+  // incidencias, contadores…): exige una secret key del proyecto en Authorization, que solo
+  // envía la Server Action de /admin/princity (createAdminClient). El cron diario llama sin
+  // Authorization y en modo 'normal', que solo inserta lo que falta.
+  if (mode === 'initial') {
+    const auth  = req.headers.get('Authorization') ?? ''
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+    if (!isValidSecretKey(token)) {
+      return new Response(JSON.stringify({ ok: false, error: 'Non autorisé' }), {
+        status:  401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+  }
 
   try {
     let result: Record<string, number>
