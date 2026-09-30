@@ -10,7 +10,7 @@
 
 | Prioridad | Qué | Por qué duele |
 |---|---|---|
-| 🔴 **0** | **Escaneo de seguridad: quedan 7 hallazgos** | Cerrados F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`, PR #163), F13/F14 (crons lanzables desde fuera, PR #165), F5 (formulario QR colgable, PR #167) y F4+F6 (fotos de otros clientes, PR #168) y F7 (historial de averías falsificable). Quedan 2 medios y 5 leves, ninguno con parche listo. **Siguiente:** rehacer F2/F3. Ver §«Escaneo de seguridad» abajo. |
+| 🔴 **0** | **Escaneo de seguridad: quedan 6 hallazgos** | Cerrados F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`, PR #163), F13/F14 (crons lanzables desde fuera, PR #165), F5 (formulario QR colgable, PR #167), F4+F6 (fotos de otros clientes, PR #168), F7 (historial de averías falsificable, PR #170) y F9 (enlaces colados en el email de la encuesta). Quedan 2 medios y 4 leves; F10–F12 aceptados como riesgo interno. **Siguiente:** rehacer F2/F3. Ver §«Escaneo de seguridad» abajo. |
 | 🔴🔴 **1** | **Princity no trae nada** | Tres procesos diarios, meses ejecutándose, **cero datos**. 321 alertas sin convertirse en incidencias y ni una lectura de contador — y los contadores son la materia prima de la facturación. |
 | ✅ **2** | **Limitador de intentos** | CERRADO (2026-09-25): rehecho en Supabase y en prod (PR #159), probado en la web real, variables de Upstash borradas, y franja roja en `/admin` si deja de funcionar. |
 | 🔴 **3** | **El aviso de mantenimientos atrasados no se envía** | Si un técnico no hace el mantenimiento, no se entera nadie. |
@@ -60,6 +60,9 @@ Resumen en `architecture.md` §Seguridad.
   escribe y que sea técnico (migración `20260930190000`, renombrada desde el `20260930100000` del
   parche para ir detrás de las ya aplicadas). Test `tests/rls/incident-history-isolation.test.ts`
   corrido en local: pasa con la regla nueva y falla (3 ataques) con la antigua.
+- F9 (LEVE) — las plantillas de `send-email` escapan todo valor y solo aceptan URLs http(s); un nombre
+  que parece una dirección se queda sin saludo en la encuesta (los normales lo conservan). Módulo
+  `_shared/email-templates.ts` + 12 tests (6 fallan sin el escapado).
 - Cabo suelto visto de paso: el cron `princity-sync-daily` sigue llevando una clave en texto plano
   en `cron.job.command` (los otros 4 ya no). Moverlo a Vault cuando se arregle Princity (fila 1).
 
@@ -71,10 +74,11 @@ Resumen en `architecture.md` §Seguridad.
   El arreglo rompía `tests/rls/geolocation.test.ts:303`: aceptar `opened_by IS NULL OR = auth.uid()`
   y limpiar las asignaciones a clientes ya existentes.
 - **F8 (LEVE)** — técnicos leen/insertan piezas de visitas ajenas. **Depende de F2.**
-- **F9 (LEVE)** — `contact_name` del formulario QR entra sin escapar en el email CSAT. Escapar
-  sirve; lo difícil es el saludo con una URL como nombre sin quitarle el saludo a nombres normales.
-- **F10–F12 (LEVE)** — el sello QR «estuve ahí» es falsificable (amplía el punto b) de la sección
-  siguiente). **Decisión tuya:** reimprimir etiquetas con token HMAC por máquina o aceptarlo.
+- **F10–F12 (LEVE) — ACEPTADOS (2026-09-30)** — el sello QR «estuve ahí» es falsificable (amplía el
+  punto b) de la sección siguiente): basta con que un técnico con sesión abra `/m/<serie>` o escanee
+  una foto de la etiqueta, sin saber programar. Solo lo puede hacer alguien de dentro; el sello se
+  toma como pista, no como prueba. Si AMD necesita que valga como prueba: reimprimir etiquetas con
+  token HMAC por máquina.
 - De paso, los revisores vieron que `cleanup-orphan-incident-photos` tampoco autentica al llamante
   (mismo patrón que F14; sin hallazgo propio).
 
