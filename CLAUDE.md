@@ -14,10 +14,10 @@ Aplicación web para la gestión de incidencias (SAV) de AMD Service, empresa de
 
 ## Estado actual del desarrollo
 
-La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). Último merge: PR #165 (2026-09-30).
+La app SAV está **completa y en producción** (`https://amd-service.vercel.app`). Último merge: PR #168 (2026-09-30).
 
 **Hitos recientes (septiembre 2026):**
-- **Escaneo de seguridad** (2026-09-29, #163): 14 hallazgos. El crítico (F1: cualquiera podía vaciar la BD de prod llamando a `princity-sync` en modo `initial`) está **cerrado y verificado en prod**, igual que F13/F14 (crons lanzables desde fuera, #165). Los 11 restantes, con sus parches sugeridos, en `docs/pendientes.md` §Escaneo de seguridad; informe completo en `CLAUDE-SECURITY-20260929-132506/` (fuera de git).
+- **Escaneo de seguridad** (2026-09-29, #163): 14 hallazgos. El crítico (F1: cualquiera podía vaciar la BD de prod llamando a `princity-sync` en modo `initial`) está **cerrado y verificado en prod**, igual que F13/F14 (crons lanzables desde fuera, #165), F5 (formulario QR colgable, #167) y F4+F6 (fotos de otros clientes, #168). Los 8 restantes, con sus parches sugeridos, en `docs/pendientes.md` §Escaneo de seguridad; informe completo en `CLAUDE-SECURITY-20260929-132506/` (fuera de git).
 - **PWA de técnicos «AMD SAV»** (#154–#157, 2026-09-23): `/tech` se instala en el iPhone desde Safari (icono, pantalla completa); el escáner abre cualquier máquina y deja el sello QR; **notificaciones push** al asignar/retirar averías y mantenimientos (cola `push_notifications` + Edge Function `send-push` + Vault); **geolocalización**: ubicación por máquina, «Itinéraire», «Plus proche», y la oficina ve si el técnico estaba en el sitio (tabla admin-only `field_presence`). Fases 1–2 validadas en iPhone real; Fase 3 pendiente de prueba en iPhone; Fase 4 (sin cobertura) sin empezar. Ver `docs/architecture.md` §3b–§3d.
 - **Verrou de résolution** (#143–#147): ninguna avería se cierra sin decir cómo se resolvió — informe obligatorio para el técnico, motivo + explicación en las cuatro puertas de oficina, rastro visible en el listado y la ficha, y un trigger en la BD que lo hace imposible de saltar. Probado en uso real, TV del taller incluida. Ver `docs/architecture.md` §Verrou de résolution.
 - **CSAT vivo** (#141, #149): la encuesta de satisfacción **nunca se había enviado** en toda la vida de la app; ahora sale al email del formulario del QR y está verificada de punta a punta.
