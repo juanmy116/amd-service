@@ -10,7 +10,7 @@
 
 | Prioridad | Qué | Por qué duele |
 |---|---|---|
-| 🔴 **0** | **Escaneo de seguridad: quedan 8 hallazgos** | Cerrados F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`, PR #163), F13/F14 (crons lanzables desde fuera, PR #165), F5 (formulario QR colgable, PR #167) y F4+F6 (fotos de otros clientes, PR #168). Quedan 2 medios y 6 leves; 1 (F7) tiene parche listo. **Siguiente:** F7 (parche listo, renombrar su migración) y luego rehacer F2/F3. Ver §«Escaneo de seguridad» abajo. |
+| 🔴 **0** | **Escaneo de seguridad: quedan 7 hallazgos** | Cerrados F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`, PR #163), F13/F14 (crons lanzables desde fuera, PR #165), F5 (formulario QR colgable, PR #167) y F4+F6 (fotos de otros clientes, PR #168) y F7 (historial de averías falsificable). Quedan 2 medios y 5 leves, ninguno con parche listo. **Siguiente:** rehacer F2/F3. Ver §«Escaneo de seguridad» abajo. |
 | 🔴🔴 **1** | **Princity no trae nada** | Tres procesos diarios, meses ejecutándose, **cero datos**. 321 alertas sin convertirse en incidencias y ni una lectura de contador — y los contadores son la materia prima de la facturación. |
 | ✅ **2** | **Limitador de intentos** | CERRADO (2026-09-25): rehecho en Supabase y en prod (PR #159), probado en la web real, variables de Upstash borradas, y franja roja en `/admin` si deja de funcionar. |
 | 🔴 **3** | **El aviso de mantenimientos atrasados no se envía** | Si un técnico no hace el mantenimiento, no se entera nadie. |
@@ -56,17 +56,12 @@ Resumen en `architecture.md` §Seguridad.
   (migración `20260930180000`) y toda ruta se filtra con `isIncidentPhotoPath` antes de firmarla con
   service_role (galería, kiosko, `incidentPhotoExists`). Combinados en un solo arreglo (los parches
   chocaban) y revisado de nuevo; las 7 fotos de prod pasan el filtro y son de su dueño.
+- F7 (LEVE) — `tech_incident_history_insert` exige además que la avería esté asignada a quien
+  escribe y que sea técnico (migración `20260930190000`, renombrada desde el `20260930100000` del
+  parche para ir detrás de las ya aplicadas). Test `tests/rls/incident-history-isolation.test.ts`
+  corrido en local: pasa con la regla nueva y falla (3 ataques) con la antigua.
 - Cabo suelto visto de paso: el cron `princity-sync-daily` sigue llevando una clave en texto plano
   en `cron.job.command` (los otros 4 ya no). Moverlo a Vault cuando se arregle Princity (fila 1).
-
-**Con parche aprobado, listo para aplicar** (revisado por dos agentes independientes; ninguno probado
-en ejecución porque los tests del proyecto no cubren esas partes). ⚠️ **La migración de F7
-(`20260930100000`) tiene fecha ANTERIOR a las ya aplicadas en prod (`20260930180000`)**:
-renombrarla a una fecha posterior al aplicar el parche, o `db push` la rechazará por estar fuera de orden.
-
-| # | Sev. | Qué arregla | Ojo al aplicar |
-|---|---|---|---|
-| F7 | LEVE | Cualquier usuario puede falsear el historial (`incident_history`) de averías ajenas | Migración `20260930100000` |
 
 **Sin parche (necesitan otra vuelta o una decisión):**
 - **F2 (MEDIO)** — un técnico puede reescribir `contract_machine_id`/`machine_id` de su propia avería
