@@ -1,145 +1,16 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { isValidSecretKey, getAllSecretKeys } from '../_shared/secret-key.ts'
+import { renderTemplate, type TemplateName } from '../_shared/email-templates.ts'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
 const FROM = Deno.env.get('RESEND_FROM') ?? 'AMD Service <noreply@amd-service.com>'
 const RESEND_URL = 'https://api.resend.com/emails'
-
-type TemplateName = 'ticket_open' | 'ticket_assigned' | 'ticket_resolved' | 'csat' | 'counter_batch_processed' | 'raw'
 
 interface EmailPayload {
   template: TemplateName
   to: string | string[]
   data?: Record<string, string>
   attachments?: { filename: string; content: string }[]
-}
-
-function renderTemplate(
-  template: TemplateName,
-  data: Record<string, string>
-): { subject: string; html: string } {
-  switch (template) {
-
-    case 'ticket_open':
-      return {
-        subject: `Demande enregistrée : ${data.title}`,
-        html: `
-          <div style="font-family:Inter,sans-serif;max-width:560px;margin:0 auto;color:#111">
-            <div style="background:#BF0D0D;padding:24px 32px;border-radius:12px 12px 0 0">
-              <p style="color:white;font-weight:700;font-size:18px;margin:0">AMD Service</p>
-            </div>
-            <div style="padding:32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
-              <h2 style="margin-top:0">Votre demande a bien été enregistrée</h2>
-              <p>Référence : <strong>#${data.incident_id ?? ''}</strong></p>
-              <p>Objet : ${data.title}</p>
-              <p>Priorité : <strong>${data.priority ?? ''}</strong></p>
-              <p>Notre équipe prend en charge votre demande dans les meilleurs délais.</p>
-              ${data.portal_url ? `<p><a href="${data.portal_url}" style="color:#BF0D0D">Suivre mon dossier →</a></p>` : ''}
-            </div>
-          </div>
-        `
-      }
-
-    case 'ticket_assigned':
-      return {
-        subject: `Technicien assigné — ${data.title}`,
-        html: `
-          <div style="font-family:Inter,sans-serif;max-width:560px;margin:0 auto;color:#111">
-            <div style="background:#BF0D0D;padding:24px 32px;border-radius:12px 12px 0 0">
-              <p style="color:white;font-weight:700;font-size:18px;margin:0">AMD Service</p>
-            </div>
-            <div style="padding:32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
-              <h2 style="margin-top:0">Un technicien a été assigné à votre demande</h2>
-              <p>Référence : <strong>#${data.incident_id ?? ''}</strong></p>
-              <p>Objet : ${data.title}</p>
-              <p>Technicien : <strong>${data.tech_name ?? ''}</strong></p>
-              <p>Vous serez contacté prochainement pour planifier l'intervention.</p>
-              ${data.portal_url ? `<p><a href="${data.portal_url}" style="color:#BF0D0D">Suivre mon dossier →</a></p>` : ''}
-            </div>
-          </div>
-        `
-      }
-
-    case 'ticket_resolved':
-      return {
-        subject: `Intervention terminée — ${data.title}`,
-        html: `
-          <div style="font-family:Inter,sans-serif;max-width:560px;margin:0 auto;color:#111">
-            <div style="background:#BF0D0D;padding:24px 32px;border-radius:12px 12px 0 0">
-              <p style="color:white;font-weight:700;font-size:18px;margin:0">AMD Service</p>
-            </div>
-            <div style="padding:32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
-              <h2 style="margin-top:0">Votre intervention a été résolue</h2>
-              <p>Référence : <strong>#${data.incident_id ?? ''}</strong></p>
-              <p>Objet : ${data.title}</p>
-              <p>Merci de nous avoir fait confiance.</p>
-            </div>
-          </div>
-        `
-      }
-
-    case 'csat': {
-      const reference  = data.reference ?? ''
-      const greeting   = data.client_name ? `<p>Bonjour ${data.client_name},</p>` : ''
-      const rows = [
-        reference ? ['Référence', reference] : null,
-        data.equipement ? ['Équipement', data.equipement] : null,
-      ].filter((r): r is string[] => r !== null)
-
-      const details = rows.length
-        ? `<table style="margin:20px 0;font-size:14px">${rows
-            .map(([k, v]) =>
-              `<tr><td style="color:#6b7280;padding:2px 16px 2px 0">${k}</td>` +
-              `<td style="color:#111;font-weight:600">${v}</td></tr>`)
-            .join('')}</table>`
-        : ''
-
-      return {
-        subject: reference
-          ? `Votre avis sur notre intervention — ${reference}`
-          : `Votre avis sur notre intervention`,
-        html: `
-          <div style="font-family:Inter,sans-serif;max-width:560px;margin:0 auto;color:#111">
-            <div style="background:#BF0D0D;padding:24px 32px;border-radius:12px 12px 0 0">
-              <p style="color:white;font-weight:700;font-size:18px;margin:0">AMD Service</p>
-            </div>
-            <div style="padding:32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
-              ${greeting}
-              <p>Votre demande a été résolue.</p>
-              ${details}
-              <h2 style="margin:24px 0 12px">Comment s'est passée notre intervention ?</h2>
-              <p>Prenez 30 secondes pour évaluer notre service :</p>
-              <div style="text-align:center;margin:32px 0">
-                <a href="${data.csat_url}" style="background:#BF0D0D;color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px">
-                  Donner mon avis
-                </a>
-              </div>
-              <p style="font-size:12px;color:#9ca3af">Ce lien est valable 7 jours.</p>
-            </div>
-          </div>
-        `
-      }
-    }
-
-    case 'counter_batch_processed': {
-      const total = data.total ?? '0'
-      const greens = data.greens ?? '0'
-      const attention = data.attention ?? '0'
-      return {
-        subject: `[AMD SAV] ${total} compteur(s) traité(s) par email`,
-        html: `<p><strong>${total}</strong> compteur(s) reçus par email ont été traités.</p>
-             <ul><li>🟢 ${greens} prêt(s) à confirmer</li><li>🟡🔴 ${attention} à vérifier</li></ul>
-             <p><a href="${data.url ?? ''}">Voir la file d'attente →</a></p>`,
-      }
-    }
-
-    case 'raw':
-      if (!data.subject || !data.html) throw new Error('raw requiert subject et html dans data')
-      return { subject: data.subject, html: data.html }
-
-    default:
-      throw new Error(`Template inconnu: ${template}`)
-  }
 }
 
 Deno.serve(async (req: Request) => {
