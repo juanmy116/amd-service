@@ -1,5 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isIncidentPhotoPath } from '@/lib/incidentPhotos'
 import { resolveQuartierCode, toQuartiers, type Quartier } from '@/lib/quartiers'
 import type { AtelierIncident, AtelierMaintenanceVisit, Technician } from '@/components/atelier/types'
 import {
@@ -44,6 +45,8 @@ async function signFirstPhotos(
 
   const firstPathByIncident = new Map<string, string>()
   for (const r of photoRows ?? []) {
+    // storage_path lo puede escribir el cliente: nunca se firma una ruta fuera del patrón.
+    if (!isIncidentPhotoPath(r.storage_path)) continue
     if (!firstPathByIncident.has(r.incident_id)) firstPathByIncident.set(r.incident_id, r.storage_path)
   }
   if (firstPathByIncident.size === 0) return urls

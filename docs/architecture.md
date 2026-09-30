@@ -1507,8 +1507,14 @@ propio cliente en la ficha de detalle (componente compartido `src/components/Inc
 > `incidents/public/{uuid}/…` con UUID aleatorio server-generado): `preparePublicIncidentPhotoUploadAction`
 > protegida con rate limit `public_photo_upload` (6/h por IP+serie). La foto la ven admin y el técnico asignado.
 >
-> **Modelo de seguridad de la asociación foto↔incidencia** (la RLS NO valida `storage_path`): al asociar,
-> el portal exige que el path empiece por `incidents/{user.id}/` (anti-IDOR entre clientes) y el público
+> **Modelo de seguridad de la asociación foto↔incidencia** — desde 2026-09-30 (hallazgos F4+F6 del escaneo
+> de seguridad) la **RLS sí valida `storage_path`**: la policy `client_incident_photos_insert` exige la ruta
+> exacta `incidents/<auth.uid()>/<año>/<mes>/<sha256>.<jpeg|png|webp>` (migración `20260930180000`), así que
+> un cliente ya no puede insertar por la API REST la ruta de otro ni un `../`. Además, `isIncidentPhotoPath`
+> (`src/lib/incidentPhotos.ts`) filtra toda ruta antes de firmarla con service_role (`IncidentPhotos.tsx`,
+> `signFirstPhotos` del kiosko y dentro de `incidentPhotoExists`): storage-js mete la ruta en la URL sin
+> codificar y un `../` sacaría la petición del bucket. Al asociar, el portal exige la ruta EXACTA de su
+> usuario (`isIncidentPhotoPathFor(user.id, …)`) y el público
 > lo valida con un regex estricto del patrón con UUID; ambos comprueban además que el objeto exista en
 > Storage (`incidentPhotoExists`, evita filas rotas si el cron de huérfanas ya lo borró). El UUID del path
 > público (solo entregado a quien sube) impide construir la ruta de la foto de otro reporte.
@@ -1958,7 +1964,8 @@ Escaneo de todo el repo (commit `6c54462`, esfuerzo medio, verificado por un pan
 | F13 | LEVE | `princity-alerts`, `princity-counters` y `princity-watchdog` se podían lanzar desde internet con service_role. | ✅ **Cerrado** (PR #165): exigen `x-cron-secret`; sus 4 crons llaman a `invoke_princity_cron` (secreto en Vault). Verificado en prod: sin clave → 401; vía cron → 200 |
 | F14 | LEVE | `maintenance-cron` se podía lanzar desde internet y duplicaba avisos Matrix por carrera. | ✅ **Cerrado** (PR #165): exige `x-cron-secret`, reclama cada visita antes de avisar; `maintenance-daily-check` envía el secreto de Vault. Sin clave → 401 verificado |
 | F5 | MEDIO | La regex de etiquetas de `/signaler` (anónimo, antes del rate limit) era cuadrática sobre la entrada sin recortar: un envío de 2 MB de `<` ocupaba la función hasta el timeout. | ✅ **Cerrado** (fix/signaler-regex-dos): se recorta a 2 × maxLen antes de la regex. 40 000 `<`: 2,99 s → 0,1 ms |
-| F2–F4, F6–F12 | MEDIO/LEVE | RLS de técnicos/clientes, rutas de fotos, email CSAT, sello QR. | Pendientes — ver `pendientes.md` |
+| F4 + F6 | MEDIO | Un cliente podía hacer que el servidor firmara con service_role la ruta de la foto de otro cliente (insertándola por la API REST) o una ruta con `../` que salía del bucket. | ✅ **Cerrado** (fix/incident-photos-paths): la RLS exige la ruta exacta del propio usuario (`20260930180000`) y toda ruta se filtra con `isIncidentPhotoPath` antes de firmarla. Las 7 fotos de prod son de su dueño y siguen visibles |
+| F2, F3, F7–F12 | MEDIO/LEVE | RLS de técnicos/clientes, historial de averías, email CSAT, sello QR. | Pendientes — ver `pendientes.md` |
 
 ### Auditoría de seguridad — Higiene de config (2026-06-10) — WP-7
 

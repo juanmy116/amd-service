@@ -10,7 +10,7 @@
 
 | Prioridad | Qué | Por qué duele |
 |---|---|---|
-| 🔴 **0** | **Escaneo de seguridad: quedan 10 hallazgos** | Cerrados F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`, PR #163), F13/F14 (crons lanzables desde fuera, PR #165) y F5 (formulario QR colgable con un texto enorme). Quedan 4 medios y 6 leves; 3 tienen parche aprobado listo para aplicar. Ver §«Escaneo de seguridad» abajo. |
+| 🔴 **0** | **Escaneo de seguridad: quedan 8 hallazgos** | Cerrados F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`, PR #163), F13/F14 (crons lanzables desde fuera, PR #165), F5 (formulario QR colgable, PR #167) y F4+F6 (fotos de otros clientes). Quedan 2 medios y 6 leves; 1 (F7) tiene parche listo. Ver §«Escaneo de seguridad» abajo. |
 | 🔴🔴 **1** | **Princity no trae nada** | Tres procesos diarios, meses ejecutándose, **cero datos**. 321 alertas sin convertirse en incidencias y ni una lectura de contador — y los contadores son la materia prima de la facturación. |
 | ✅ **2** | **Limitador de intentos** | CERRADO (2026-09-25): rehecho en Supabase y en prod (PR #159), probado en la web real, variables de Upstash borradas, y franja roja en `/admin` si deja de funcionar. |
 | 🔴 **3** | **El aviso de mantenimientos atrasados no se envía** | Si un técnico no hace el mantenimiento, no se entera nadie. |
@@ -52,19 +52,20 @@ Resumen en `architecture.md` §Seguridad.
   `maintenance-daily-check` (08:00 UTC del 2026-10-01) en `net._http_response`.
 - F5 (MEDIO) — el formulario público del QR recorta la entrada antes de la regex de etiquetas
   (2 × maxLen); ya no se puede colgar con un texto enorme. 40 000 `<`: 2,99 s → 0,1 ms.
+- F4 + F6 (MEDIOS) — fotos: la RLS de `incident_photos` exige la ruta exacta del propio cliente
+  (migración `20260930180000`) y toda ruta se filtra con `isIncidentPhotoPath` antes de firmarla con
+  service_role (galería, kiosko, `incidentPhotoExists`). Combinados en un solo arreglo (los parches
+  chocaban) y revisado de nuevo; las 7 fotos de prod pasan el filtro y son de su dueño.
 - Cabo suelto visto de paso: el cron `princity-sync-daily` sigue llevando una clave en texto plano
   en `cron.job.command` (los otros 4 ya no). Moverlo a Vault cuando se arregle Princity (fila 1).
 
 **Con parche aprobado, listo para aplicar** (revisado por dos agentes independientes; ninguno probado
-en ejecución porque los tests del proyecto no cubren esas partes). ⚠️ **Las migraciones de F4
-(`20260929100000`) y F7 (`20260930100000`) tienen fecha ANTERIOR a las ya aplicadas en prod
-(`20260930170000`)**: renombrarlas a una fecha posterior al aplicar el parche, o `db push` las
-rechazará por estar fuera de orden.
+en ejecución porque los tests del proyecto no cubren esas partes). ⚠️ **La migración de F7
+(`20260930100000`) tiene fecha ANTERIOR a las ya aplicadas en prod (`20260930180000`)**:
+renombrarla a una fecha posterior al aplicar el parche, o `db push` la rechazará por estar fuera de orden.
 
 | # | Sev. | Qué arregla | Ojo al aplicar |
 |---|---|---|---|
-| F4 | MEDIO | Un cliente puede leer fotos de otros clientes (inserta en `incident_photos` una ruta ajena y el servidor la firma con service_role) | Migración `20260929100000`. **Choca con F6** (mismos ficheros): aplicar uno y adaptar el otro |
-| F6 | MEDIO | `photo_path` del portal con `../` sale del bucket y lanza peticiones con service_role | Ver F4 |
 | F7 | LEVE | Cualquier usuario puede falsear el historial (`incident_history`) de averías ajenas | Migración `20260930100000` |
 
 **Sin parche (necesitan otra vuelta o una decisión):**

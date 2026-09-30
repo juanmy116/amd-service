@@ -36,6 +36,28 @@ export function isSha256Hex(s: string): boolean {
   return /^[0-9a-f]{64}$/.test(s)
 }
 
+/** Formas de ruta que ha generado el servidor al preparar la subida (createIncidentPhotoUploadUrl):
+ *  `incidents/<user.id>/<año>/<mes>/<sha256>.<ext>` (portal) e `incidents/public/<uuid>/…` (QR),
+ *  más las dos del primer día, sin UUID (`incidents/<año>/…` e `incidents/public/<año>/…`). */
+const INCIDENT_PHOTO_PATH =
+  /^incidents\/(?:public\/)?(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/)?\d{4}\/\d{2}\/[0-9a-f]{64}\.(?:jpeg|png|webp)$/
+
+/** `storage_path` sale de una fila de incident_photos, que el cliente puede escribir: antes de
+ *  firmarlo con service_role hay que comprobar que tiene una de las formas de arriba. Así nunca
+ *  se firma una ruta con `../`, `?`, `#` o `%` que saque la petición de firma del bucket. */
+export function isIncidentPhotoPath(path: string): boolean {
+  return INCIDENT_PHOTO_PATH.test(path)
+}
+
+/** ¿Es `path` EXACTAMENTE la ruta que createIncidentPhotoUploadUrl genera para `prefix`
+ *  (`incidents/<prefix>/<año>/<mes>/<sha256>.<ext>`)? Un simple startsWith del prefijo dejaba
+ *  pasar `incidents/<prefix>/../../…`. */
+export function isIncidentPhotoPathFor(prefix: string, path: string): boolean {
+  const base = `incidents/${prefix}/`
+  return path.startsWith(base)
+    && /^\d{4}\/\d{2}\/[0-9a-f]{64}\.(?:jpeg|png|webp)$/.test(path.slice(base.length))
+}
+
 /** Valida tipo MIME y tamaño de la foto antes de subirla. */
 export function validateIncidentPhoto(file: { type: string; size: number }): PhotoValidation {
   if (!ALLOWED_PHOTO_TYPES.has(file.type)) return { ok: false, error: 'type' }

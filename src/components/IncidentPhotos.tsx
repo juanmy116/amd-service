@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isIncidentPhotoPath } from '@/lib/incidentPhotos'
 import { Card } from '@/components/ui/Card'
 
 // Galería de fotos adjuntas a una incidencia. Lee las filas con el cliente del usuario
@@ -25,8 +26,10 @@ export default async function IncidentPhotos({
   if (!photos || photos.length === 0) return null
 
   const admin = createAdminClient()
+  // storage_path lo puede escribir el cliente: solo se firman rutas con la forma que genera el
+  // servidor (nunca `../` ni nada que saque la firma del bucket).
   const items = await Promise.all(
-    photos.map(async (p) => {
+    photos.filter((p) => isIncidentPhotoPath(p.storage_path)).map(async (p) => {
       const { data } = await admin.storage
         .from('incident-photos')
         .createSignedUrl(p.storage_path, 3600)
