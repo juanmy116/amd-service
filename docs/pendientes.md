@@ -10,7 +10,7 @@
 
 | Prioridad | Qué | Por qué duele |
 |---|---|---|
-| 🔴 **0** | **Escaneo de seguridad: quedan 13 hallazgos** | F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`) ya está cerrado (PR #163). Quedan 5 medios y 8 leves; 6 tienen parche aprobado listo para aplicar. Ver §«Escaneo de seguridad» abajo. |
+| 🔴 **0** | **Escaneo de seguridad: quedan 11 hallazgos** | Cerrados F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`, PR #163) y F13/F14 (crons lanzables desde fuera, PR #165). Quedan 5 medios y 6 leves; 4 tienen parche aprobado listo para aplicar. Ver §«Escaneo de seguridad» abajo. |
 | 🔴🔴 **1** | **Princity no trae nada** | Tres procesos diarios, meses ejecutándose, **cero datos**. 321 alertas sin convertirse en incidencias y ni una lectura de contador — y los contadores son la materia prima de la facturación. |
 | ✅ **2** | **Limitador de intentos** | CERRADO (2026-09-25): rehecho en Supabase y en prod (PR #159), probado en la web real, variables de Upstash borradas, y franja roja en `/admin` si deja de funcionar. |
 | 🔴 **3** | **El aviso de mantenimientos atrasados no se envía** | Si un técnico no hace el mantenimiento, no se entera nadie. |
@@ -44,10 +44,20 @@ Escaneo Claude Security de todo el repo sobre `6c54462`. Informe y parches en
 `patches/PATCHES.md` como índice; cada `F<n>.md` explica el hallazgo y cómo aplicar su parche).
 Resumen en `architecture.md` §Seguridad.
 
-**✅ Cerrado:** F1 (CRÍTICO) — `princity-sync` exige la secret key en modo `initial` (PR #163, en prod).
+**✅ Cerrados:**
+- F1 (CRÍTICO) — `princity-sync` exige la secret key en modo `initial` (PR #163, en prod).
+- F13 + F14 (LEVES) — las 3 funciones de Princity y `maintenance-cron` exigen `x-cron-secret`; sus
+  crons lo envían desde Vault (PR #165, en prod 2026-09-30). Verificado: sin clave → 401;
+  `invoke_princity_cron('princity-watchdog')` → 200. Queda confirmar el primer
+  `maintenance-daily-check` (08:00 UTC del 2026-10-01) en `net._http_response`.
+- Cabo suelto visto de paso: el cron `princity-sync-daily` sigue llevando una clave en texto plano
+  en `cron.job.command` (los otros 4 ya no). Moverlo a Vault cuando se arregle Princity (fila 1).
 
 **Con parche aprobado, listo para aplicar** (revisado por dos agentes independientes; ninguno probado
-en ejecución porque los tests del proyecto no cubren esas partes):
+en ejecución porque los tests del proyecto no cubren esas partes). ⚠️ **Las migraciones de F4
+(`20260929100000`) y F7 (`20260930100000`) tienen fecha ANTERIOR a las ya aplicadas en prod
+(`20260930170000`)**: renombrarlas a una fecha posterior al aplicar el parche, o `db push` las
+rechazará por estar fuera de orden.
 
 | # | Sev. | Qué arregla | Ojo al aplicar |
 |---|---|---|---|
@@ -55,8 +65,6 @@ en ejecución porque los tests del proyecto no cubren esas partes):
 | F6 | MEDIO | `photo_path` del portal con `../` sale del bucket y lanza peticiones con service_role | Ver F4 |
 | F5 | MEDIO | La regex del formulario QR (`/signaler`) se puede colgar con un texto enorme, antes del limitador | — |
 | F7 | LEVE | Cualquier usuario puede falsear el historial (`incident_history`) de averías ajenas | Migración `20260930100000` |
-| F13 | LEVE | `princity-alerts`/`-counters`/`-watchdog` se pueden lanzar desde fuera | **Antes de desplegar:** crear `PRINCITY_CRON_SECRET` + dos entradas en Vault, o los crons se callan (pasos en `F13.md`) |
-| F14 | LEVE | `maintenance-cron` se puede lanzar desde fuera y duplica avisos Matrix | **Antes de desplegar:** `MAINTENANCE_CRON_SECRET` + Vault (pasos en `F14.md`) |
 
 **Sin parche (necesitan otra vuelta o una decisión):**
 - **F2 (MEDIO)** — un técnico puede reescribir `contract_machine_id`/`machine_id` de su propia avería
