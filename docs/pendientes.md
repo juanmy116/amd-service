@@ -10,7 +10,7 @@
 
 | Prioridad | Qué | Por qué duele |
 |---|---|---|
-| 🔴 **0** | **Escaneo de seguridad: quedan 11 hallazgos** | Cerrados F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`, PR #163) y F13/F14 (crons lanzables desde fuera, PR #165). Quedan 5 medios y 6 leves; 4 tienen parche aprobado listo para aplicar. Ver §«Escaneo de seguridad» abajo. |
+| 🔴 **0** | **Escaneo de seguridad: quedan 10 hallazgos** | Cerrados F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`, PR #163), F13/F14 (crons lanzables desde fuera, PR #165) y F5 (formulario QR colgable con un texto enorme). Quedan 4 medios y 6 leves; 3 tienen parche aprobado listo para aplicar. Ver §«Escaneo de seguridad» abajo. |
 | 🔴🔴 **1** | **Princity no trae nada** | Tres procesos diarios, meses ejecutándose, **cero datos**. 321 alertas sin convertirse en incidencias y ni una lectura de contador — y los contadores son la materia prima de la facturación. |
 | ✅ **2** | **Limitador de intentos** | CERRADO (2026-09-25): rehecho en Supabase y en prod (PR #159), probado en la web real, variables de Upstash borradas, y franja roja en `/admin` si deja de funcionar. |
 | 🔴 **3** | **El aviso de mantenimientos atrasados no se envía** | Si un técnico no hace el mantenimiento, no se entera nadie. |
@@ -50,6 +50,8 @@ Resumen en `architecture.md` §Seguridad.
   crons lo envían desde Vault (PR #165, en prod 2026-09-30). Verificado: sin clave → 401;
   `invoke_princity_cron('princity-watchdog')` → 200. Queda confirmar el primer
   `maintenance-daily-check` (08:00 UTC del 2026-10-01) en `net._http_response`.
+- F5 (MEDIO) — el formulario público del QR recorta la entrada antes de la regex de etiquetas
+  (2 × maxLen); ya no se puede colgar con un texto enorme. 40 000 `<`: 2,99 s → 0,1 ms.
 - Cabo suelto visto de paso: el cron `princity-sync-daily` sigue llevando una clave en texto plano
   en `cron.job.command` (los otros 4 ya no). Moverlo a Vault cuando se arregle Princity (fila 1).
 
@@ -63,7 +65,6 @@ rechazará por estar fuera de orden.
 |---|---|---|---|
 | F4 | MEDIO | Un cliente puede leer fotos de otros clientes (inserta en `incident_photos` una ruta ajena y el servidor la firma con service_role) | Migración `20260929100000`. **Choca con F6** (mismos ficheros): aplicar uno y adaptar el otro |
 | F6 | MEDIO | `photo_path` del portal con `../` sale del bucket y lanza peticiones con service_role | Ver F4 |
-| F5 | MEDIO | La regex del formulario QR (`/signaler`) se puede colgar con un texto enorme, antes del limitador | — |
 | F7 | LEVE | Cualquier usuario puede falsear el historial (`incident_history`) de averías ajenas | Migración `20260930100000` |
 
 **Sin parche (necesitan otra vuelta o una decisión):**

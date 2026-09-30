@@ -1957,7 +1957,8 @@ Escaneo de todo el repo (commit `6c54462`, esfuerzo medio, verificado por un pan
 | F1 | CRÍTICO | `princity-sync` (`verify_jwt: false`) no autenticaba al llamante: un `POST` anónimo `{"mode":"initial"}` ejecutaba `wipe_data_tables` en producción. | ✅ **Cerrado** (PR #163, v18 desplegada, 401 verificado en prod) — ver §`wipe_data_tables` |
 | F13 | LEVE | `princity-alerts`, `princity-counters` y `princity-watchdog` se podían lanzar desde internet con service_role. | ✅ **Cerrado** (PR #165): exigen `x-cron-secret`; sus 4 crons llaman a `invoke_princity_cron` (secreto en Vault). Verificado en prod: sin clave → 401; vía cron → 200 |
 | F14 | LEVE | `maintenance-cron` se podía lanzar desde internet y duplicaba avisos Matrix por carrera. | ✅ **Cerrado** (PR #165): exige `x-cron-secret`, reclama cada visita antes de avisar; `maintenance-daily-check` envía el secreto de Vault. Sin clave → 401 verificado |
-| F2–F12 | MEDIO/LEVE | RLS de técnicos/clientes, rutas de fotos, regex del formulario QR, email CSAT, sello QR. | Pendientes — ver `pendientes.md` |
+| F5 | MEDIO | La regex de etiquetas de `/signaler` (anónimo, antes del rate limit) era cuadrática sobre la entrada sin recortar: un envío de 2 MB de `<` ocupaba la función hasta el timeout. | ✅ **Cerrado** (fix/signaler-regex-dos): se recorta a 2 × maxLen antes de la regex. 40 000 `<`: 2,99 s → 0,1 ms |
+| F2–F4, F6–F12 | MEDIO/LEVE | RLS de técnicos/clientes, rutas de fotos, email CSAT, sello QR. | Pendientes — ver `pendientes.md` |
 
 ### Auditoría de seguridad — Higiene de config (2026-06-10) — WP-7
 
