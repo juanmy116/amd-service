@@ -47,9 +47,28 @@ describe('RLS — incident_photos', () => {
   it('el cliente dueño puede adjuntar una foto a su incidencia', async () => {
     const c = await signInAs(SC.clientAEmail)
     const { error } = await c.from('incident_photos').insert({
-      incident_id: incidentAId, uploaded_by: t.clientAUid, storage_path: 'incidents/2026/06/test-photo-a2.jpg',
+      incident_id: incidentAId, uploaded_by: t.clientAUid,
+      storage_path: `incidents/${t.clientAUid}/2026/06/${'a'.repeat(64)}.jpeg`,
     })
     expect(error).toBeNull()
+  })
+
+  it('el cliente dueño NO puede asociar a su incidencia una ruta de otro usuario', async () => {
+    const c = await signInAs(SC.clientAEmail)
+    const { error } = await c.from('incident_photos').insert({
+      incident_id: incidentAId, uploaded_by: t.clientAUid,
+      storage_path: `incidents/${t.clientBUid}/2026/06/${'b'.repeat(64)}.jpeg`,
+    })
+    expect(error).not.toBeNull()
+  })
+
+  it('el cliente dueño NO puede asociar una ruta con path traversal', async () => {
+    const c = await signInAs(SC.clientAEmail)
+    const { error } = await c.from('incident_photos').insert({
+      incident_id: incidentAId, uploaded_by: t.clientAUid,
+      storage_path: `incidents/${t.clientAUid}/../../object/sign/counter-images/x.jpeg`,
+    })
+    expect(error).not.toBeNull()
   })
 
   it('un cliente ajeno NO ve la foto', async () => {
@@ -60,7 +79,9 @@ describe('RLS — incident_photos', () => {
   it('un cliente ajeno NO puede adjuntar foto a una incidencia que no es suya', async () => {
     const c = await signInAs(SC.clientBEmail)
     const { error } = await c.from('incident_photos').insert({
-      incident_id: incidentAId, uploaded_by: t.clientBUid, storage_path: 'incidents/2026/06/hack.jpg',
+      incident_id: incidentAId, uploaded_by: t.clientBUid,
+      // Ruta válida de B: así el test aísla la condición «la incidencia tiene que ser suya».
+      storage_path: `incidents/${t.clientBUid}/2026/06/${'c'.repeat(64)}.jpeg`,
     })
     expect(error).not.toBeNull()
   })

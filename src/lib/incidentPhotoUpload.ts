@@ -2,7 +2,7 @@ import 'server-only'
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
-  validateIncidentPhoto, extensionForType, PHOTO_ERROR_MESSAGES, isSha256Hex,
+  validateIncidentPhoto, extensionForType, PHOTO_ERROR_MESSAGES, isSha256Hex, isIncidentPhotoPath,
 } from './incidentPhotos'
 
 // Lógica común a las dos Server Actions que preparan la subida de una foto de incidencia
@@ -41,6 +41,9 @@ export async function createIncidentPhotoUploadUrl(
 // crear una fila incident_photos que apunte a un objeto inexistente (p.ej. el cron de huérfanas
 // lo borró tras 24 h con el formulario abandonado, o una ruta manipulada que nunca se subió).
 export async function incidentPhotoExists(path: string): Promise<boolean> {
+  // La ruta llega del formulario y storage-js la mete en la URL sin codificar: sin esto, un `../`
+  // sacaría del bucket la petición service_role (path traversal).
+  if (!isIncidentPhotoPath(path)) return false
   try {
     const admin = createAdminClient()
     const { error } = await admin.storage.from('incident-photos').createSignedUrl(path, 60)
