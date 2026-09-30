@@ -6,11 +6,11 @@
 
 ---
 
-## 📍 Por dónde seguir (al 2026-09-30)
+## 📍 Por dónde seguir (al 2026-09-30, cierre de sesión)
 
 | Prioridad | Qué | Por qué duele |
 |---|---|---|
-| 🔴 **0** | **Escaneo de seguridad: quedan 8 hallazgos** | Cerrados F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`, PR #163), F13/F14 (crons lanzables desde fuera, PR #165), F5 (formulario QR colgable, PR #167) y F4+F6 (fotos de otros clientes). Quedan 2 medios y 6 leves; 1 (F7) tiene parche listo. Ver §«Escaneo de seguridad» abajo. |
+| 🔴 **0** | **Escaneo de seguridad: quedan 8 hallazgos** | Cerrados F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`, PR #163), F13/F14 (crons lanzables desde fuera, PR #165), F5 (formulario QR colgable, PR #167) y F4+F6 (fotos de otros clientes, PR #168). Quedan 2 medios y 6 leves; 1 (F7) tiene parche listo. **Siguiente:** F7 (parche listo, renombrar su migración) y luego rehacer F2/F3. Ver §«Escaneo de seguridad» abajo. |
 | 🔴🔴 **1** | **Princity no trae nada** | Tres procesos diarios, meses ejecutándose, **cero datos**. 321 alertas sin convertirse en incidencias y ni una lectura de contador — y los contadores son la materia prima de la facturación. |
 | ✅ **2** | **Limitador de intentos** | CERRADO (2026-09-25): rehecho en Supabase y en prod (PR #159), probado en la web real, variables de Upstash borradas, y franja roja en `/admin` si deja de funcionar. |
 | 🔴 **3** | **El aviso de mantenimientos atrasados no se envía** | Si un técnico no hace el mantenimiento, no se entera nadie. |
