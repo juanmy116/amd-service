@@ -6,7 +6,13 @@
 
 ---
 
-## 📍 Por dónde seguir (al 2026-09-30, cierre de sesión)
+## 📍 Por dónde seguir (al 2026-10-01, cierre de sesión)
+
+> **🚀 2026-10-01: empieza el uso real** — piloto con 2AS (40 máquinas): etiquetas QR en las
+> máquinas y la app en los iPhone de los técnicos. Prod limpia de datos de prueba (fila 5) y
+> numeración reiniciada (la 1ª avería real será `SAV-2026-0001`). **Desde hoy, todo cambio sigue
+> `docs/cambios-en-produccion.md`**; sus preparativos (§1: Supabase Pro, fila 8, cuenta y máquina
+> de prueba) van antes del primer cambio.
 
 | Prioridad | Qué | Por qué duele |
 |---|---|---|
@@ -15,7 +21,8 @@
 | ✅ **2** | **Limitador de intentos** | CERRADO (2026-09-25): rehecho en Supabase y en prod (PR #159), probado en la web real, variables de Upstash borradas, y franja roja en `/admin` si deja de funcionar. |
 | 🔴 **3** | **El aviso de mantenimientos atrasados no se envía** | Si un técnico no hace el mantenimiento, no se entera nadie. |
 | 🔴 **4** | **Confirmación antes de emitir factura** | «Forcer» emite al instante y las facturas son inmutables. Hace falta antes de encender la facturación. |
-| 🧹 **5** | **Borrar los datos de prueba del 22-09** | Dos notas de ⭐5 que no ha dado ningún cliente están contando en la media. |
+| ✅ **5** | **Borrar los datos de prueba** | HECHO (2026-10-01): sistema limpio para el piloto con 2AS. Ver §«Datos de prueba borrados». |
+| 🔎 **5b** | **Comprobar el 2026-10-02 que el cron borró las 7 fotos huérfanas** | `select count(*) from storage.objects where bucket_id='incident-photos'` debe dar **0**. Si siguen 7, el borrado físico de `cleanup-orphan-incident-photos` falla (nunca se ha visto funcionar en prod: hasta hoy no había huérfanas). No bloquea el piloto. |
 | ⚠️ **6** | **40 visitas el mismo día / sin válvula de escape** | Afecta al uso real del mantenimiento, no bloquea. |
 | ⚠️ **7** | **Escaneo de técnicos: dos cabos sueltos del PR #155** | «En cours» automático al ABRIR la ficha (no al escanear) y sello QR falsificable por un técnico logueado. Aceptados por ahora. |
 | 🔴 **8** | **Los tests E2E en local apuntan a PRODUCCIÓN** | `.env.local` lleva la URL y las claves de Supabase de prod; `npm run test:e2e` a secas arranca `next dev` con ellas y sembraría/borraría datos de prueba en prod. En CI no pasa (`e2e.yml` pone envs locales). Arreglo: `.env.test` con la pila local y que `playwright.config.ts` lo cargue, o que el script se niegue si la URL no es `127.0.0.1`. |
@@ -384,6 +391,10 @@ técnico logueado mientras la etiqueta no lleve firma).
 > verificado que los avisos lleguen de verdad. **Ocasión inmediata:** las 40 visitas creadas el
 > 2026-09-22 a las 21:34 están fechadas el **23/09**, así que el cron de mañana a las 8:00 debería
 > mandar 40 avisos. Si no llega ninguno, es que Matrix no está configurado.
+>
+> **Actualización 2026-10-01:** fallo confirmado en prod — el cron de las 8:00 del 2026-10-01
+> respondió `«Aucune visite à notifier»` con las 40 visitas en `en_retard`. Esas 40 visitas (y su
+> plan) eran de prueba y se borraron ese mismo día; Matrix sigue sin verificarse.
 
 ---
 
@@ -413,31 +424,32 @@ técnico logueado mientras la etiqueta no lleve firma).
 
 ---
 
-## 🧹 Borrar los datos de prueba del 2026-09-22 (verrou + CSAT)
+## ✅ Datos de prueba borrados — HECHO (2026-10-01), antes del piloto con 2AS
 
-> **Qué hay que quitar:** las averías de prueba **`SAV-2026-0011`, `0012`, `0013` y `0014`**, las
-> **dos respuestas de encuesta** asociadas (⭐5 «Parfait» del 18-09 y ⭐5 «Nice» del 22-09) y la
-> cuenta de técnico **`testsav@amd-service.com`**, creada solo para la prueba.
->
-> **Por qué importa:** esas dos notas de cinco estrellas **no las ha dado ningún cliente**, y están
-> contando en la satisfacción media de `/admin` y en `/admin/avis`. Cuando llegue la primera
-> opinión real quedará mezclada con ellas y la media dejará de significar nada. Y `testsav` es una
-> cuenta de técnico con contraseña conocida que ya no hace falta.
->
-> **Hacerlo antes de que entre la primera opinión de verdad.** No corre prisa, pero tampoco
-> conviene olvidarlo.
->
-> **El orden importa** (comprobado en las claves ajenas de prod):
-> 1. `csat_responses` tiene `ON DELETE NO ACTION` → **bloquea** el borrado de su avería. Hay que
->    borrar la respuesta primero.
-> 2. `incident_history`, `incident_parts` e `incident_photos` van en **CASCADE**: se borran solas.
-> 3. `princity_alerts.incident_id` también es `NO ACTION`, pero estas averías vienen del QR, no de
->    Princity, así que no estorba.
->
-> ⚠️ **Ojo con el botón «Supprimer» de la ficha:** `deleteIncidentAction` no comprueba el error del
-> borrado. Si la encuesta lo bloquea, la pantalla redirige como si todo hubiera ido bien y la
-> avería sigue ahí. Conviene arreglar eso de paso —un borrado que falla en silencio es de la misma
-> familia que el CSAT que nunca se enviaba— o al menos saberlo al hacer la limpieza.
+Borrado en prod en una sola transacción (con comprobación de cifras; si algo no cuadraba, se
+deshacía entero):
+
+- **Las 7 averías** que había (`SAV-2026-0008` a `0014`): todas eran pruebas (QR abierto por el
+  usuario, `test@test.com` o asignadas a `testsav`). Con ellas, en cascada, su historial, piezas y
+  filas de fotos. Antes, sus **3 filas de encuesta** (`csat_responses` es `NO ACTION`).
+- **El plan de mantenimiento mensual de 2AS** (`c057b685…`, creado el 22-09 como prueba) y sus
+  **40 visitas** (todas `en_retard`, fechadas el 23-09, ninguna hecha ni asignada).
+- **Numeración reiniciada:** `incident_counters` 2026 → 0; la primera avería real será
+  `SAV-2026-0001`.
+- **Cuenta `testsav@amd-service.com`** (técnico con contraseña conocida): borrada de `auth.users`
+  (perfil y suscripción push en cascada). Se borró **después** de las averías para que el
+  `SET NULL` de `assigned_to` no disparara avisos push. Verificado: 0 avisos generados.
+- Los **7 archivos de foto** siguen en el bucket `incident-photos`, ya sin fila: los borra solo el
+  cron diario `cleanup-orphan-incident-photos` (huérfanas de más de 24 h).
+  Comprobado el 2026-10-01: el cron (jobid 8, `30 2 * * *` UTC) está activo y se lanzó esa noche,
+  y `orphan_incident_photo_paths()` devuelve las 7. **No verificado:** que la llamada a la API de
+  Storage las borre de verdad (la respuesta de pg_net solo dura ~6 h y `get_logs` del MCP no
+  funciona). Verificar el 2026-10-02 (fila 5b de la tabla).
+
+⚠️ Sigue pendiente lo de abajo (§«40 visitas el mismo día»): el diseño que crea todas las visitas
+del plan el mismo día no ha cambiado. Al crear el plan **real** de 2AS, repartir las fechas.
+El botón «Supprimer» de la ficha de avería (`deleteIncidentAction`) sigue sin comprobar el error
+del borrado.
 
 ---
 

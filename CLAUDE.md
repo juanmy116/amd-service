@@ -8,7 +8,8 @@ Aplicación web para la gestión de incidencias (SAV) de AMD Service, empresa de
 
 **Documentación completa de arquitectura:** `./docs/architecture.md`  
 **Guía comercial AMD:** `../docs/amd-service-guide.md`  
-**Tareas pendientes / backlog:** `./docs/pendientes.md`
+**Tareas pendientes / backlog:** `./docs/pendientes.md`  
+**⚠️ Cambios en producción (app en uso real desde 2026-10-01):** `./docs/cambios-en-produccion.md` — leer ANTES de cualquier cambio
 
 ---
 
