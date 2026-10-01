@@ -16,6 +16,7 @@
 | 🔴 **3** | **El aviso de mantenimientos atrasados no se envía** | Si un técnico no hace el mantenimiento, no se entera nadie. |
 | 🔴 **4** | **Confirmación antes de emitir factura** | «Forcer» emite al instante y las facturas son inmutables. Hace falta antes de encender la facturación. |
 | ✅ **5** | **Borrar los datos de prueba** | HECHO (2026-10-01): sistema limpio para el piloto con 2AS. Ver §«Datos de prueba borrados». |
+| 🔎 **5b** | **Comprobar el 2026-10-02 que el cron borró las 7 fotos huérfanas** | `select count(*) from storage.objects where bucket_id='incident-photos'` debe dar **0**. Si siguen 7, el borrado físico de `cleanup-orphan-incident-photos` falla (nunca se ha visto funcionar en prod: hasta hoy no había huérfanas). No bloquea el piloto. |
 | ⚠️ **6** | **40 visitas el mismo día / sin válvula de escape** | Afecta al uso real del mantenimiento, no bloquea. |
 | ⚠️ **7** | **Escaneo de técnicos: dos cabos sueltos del PR #155** | «En cours» automático al ABRIR la ficha (no al escanear) y sello QR falsificable por un técnico logueado. Aceptados por ahora. |
 | 🔴 **8** | **Los tests E2E en local apuntan a PRODUCCIÓN** | `.env.local` lleva la URL y las claves de Supabase de prod; `npm run test:e2e` a secas arranca `next dev` con ellas y sembraría/borraría datos de prueba en prod. En CI no pasa (`e2e.yml` pone envs locales). Arreglo: `.env.test` con la pila local y que `playwright.config.ts` lo cargue, o que el script se niegue si la URL no es `127.0.0.1`. |
@@ -430,6 +431,10 @@ deshacía entero):
   `SET NULL` de `assigned_to` no disparara avisos push. Verificado: 0 avisos generados.
 - Los **7 archivos de foto** siguen en el bucket `incident-photos`, ya sin fila: los borra solo el
   cron diario `cleanup-orphan-incident-photos` (huérfanas de más de 24 h).
+  Comprobado el 2026-10-01: el cron (jobid 8, `30 2 * * *` UTC) está activo y se lanzó esa noche,
+  y `orphan_incident_photo_paths()` devuelve las 7. **No verificado:** que la llamada a la API de
+  Storage las borre de verdad (la respuesta de pg_net solo dura ~6 h y `get_logs` del MCP no
+  funciona). Verificar el 2026-10-02 (fila 5b de la tabla).
 
 ⚠️ Sigue pendiente lo de abajo (§«40 visitas el mismo día»): el diseño que crea todas las visitas
 del plan el mismo día no ha cambiado. Al crear el plan **real** de 2AS, repartir las fechas.
