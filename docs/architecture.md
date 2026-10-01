@@ -293,7 +293,8 @@ sin permiso explícito para desplegar/tocar la BD de producción.
    select vault.create_secret('<el mismo secreto del paso 1>', 'push_sender_secret');
    ```
 6. Vercel: `NEXT_PUBLIC_VAPID_PUBLIC_KEY=<clave pública>` (entorno *Production*) y redeploy.
-7. Prueba en iPhone: activar los avisos desde `/tech` → asignar una avería a `testsav` desde el
+7. Prueba en iPhone: activar los avisos desde `/tech` → asignar una avería a `testsav` (cuenta de
+   prueba borrada el 2026-10-01: usar la cuenta de técnico de prueba de `docs/cambios-en-produccion.md`) desde el
    kiosko → llega el aviso → tocarlo abre la avería; reasignarla a otro técnico → llega «Tâche
    retirée»; comprobar en `push_notifications` que las filas quedaron `sent`.
 

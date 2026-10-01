@@ -6,7 +6,13 @@
 
 ---
 
-## 📍 Por dónde seguir (al 2026-09-30, cierre de sesión)
+## 📍 Por dónde seguir (al 2026-10-01, cierre de sesión)
+
+> **🚀 2026-10-01: empieza el uso real** — piloto con 2AS (40 máquinas): etiquetas QR en las
+> máquinas y la app en los iPhone de los técnicos. Prod limpia de datos de prueba (fila 5) y
+> numeración reiniciada (la 1ª avería real será `SAV-2026-0001`). **Desde hoy, todo cambio sigue
+> `docs/cambios-en-produccion.md`**; sus preparativos (§1: Supabase Pro, fila 8, cuenta y máquina
+> de prueba) van antes del primer cambio.
 
 | Prioridad | Qué | Por qué duele |
 |---|---|---|
@@ -385,6 +391,10 @@ técnico logueado mientras la etiqueta no lleve firma).
 > verificado que los avisos lleguen de verdad. **Ocasión inmediata:** las 40 visitas creadas el
 > 2026-09-22 a las 21:34 están fechadas el **23/09**, así que el cron de mañana a las 8:00 debería
 > mandar 40 avisos. Si no llega ninguno, es que Matrix no está configurado.
+>
+> **Actualización 2026-10-01:** fallo confirmado en prod — el cron de las 8:00 del 2026-10-01
+> respondió `«Aucune visite à notifier»` con las 40 visitas en `en_retard`. Esas 40 visitas (y su
+> plan) eran de prueba y se borraron ese mismo día; Matrix sigue sin verificarse.
 
 ---
 
