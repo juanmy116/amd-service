@@ -11,7 +11,7 @@ export default function AgendaPanelWrapper({ children }: { children: React.React
       {/* Panel: inline en xl+; en < xl es un drawer que se desliza desde la derecha.
           Siempre montado: cerrado queda `invisible` (fuera del orden de Tab) y fuera de pantalla. */}
       <div
-        className={`flex flex-col fixed inset-y-0 right-0 w-80 z-50 overflow-hidden bg-card transition-[transform,visibility] duration-300 ease-out xl:relative xl:inset-auto xl:w-72 xl:h-screen xl:shrink-0 xl:z-auto xl:translate-x-0 xl:visible xl:shadow-none xl:transition-none ${
+        className={`flex flex-col fixed inset-y-0 right-0 w-80 z-50 overflow-hidden bg-card transition-[translate,visibility] duration-300 ease-out xl:relative xl:inset-auto xl:w-72 xl:h-screen xl:shrink-0 xl:z-auto xl:translate-x-0 xl:visible xl:shadow-none xl:transition-none ${
           open ? 'translate-x-0 visible shadow-2xl' : 'translate-x-full invisible'
         }`}
       >

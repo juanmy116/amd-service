@@ -4,6 +4,7 @@ import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/re
 import { useEffect, useState } from 'react'
 import { RESOLUTION_REASON_LABELS, MIN_NOTE_LENGTH, type OfficeResolution } from '@/lib/resolution'
 import { RESOLUTION_REASONS } from '@/lib/enums'
+import { DIALOG_BACKDROP_TRANSITION, DIALOG_PANEL_TRANSITION } from '@/components/ui/dialogTransitions'
 
 /**
  * Ventana obligatoria para dar una avería por resuelta SIN intervención registrada.
@@ -73,11 +74,7 @@ export default function ResolutionDialog({
     <Dialog open={open} onClose={onCancel} className="relative z-50">
       <DialogBackdrop
         transition={!kiosk}
-        className={
-          kiosk
-            ? 'fixed inset-0 bg-black/50 backdrop-blur-sm'
-            : 'fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-200 ease-out data-closed:opacity-0 data-leave:duration-150 data-leave:ease-in'
-        }
+        className={`fixed inset-0 bg-black/50 backdrop-blur-sm${kiosk ? '' : ` ${DIALOG_BACKDROP_TRANSITION}`}`}
       />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <DialogPanel
@@ -85,7 +82,7 @@ export default function ResolutionDialog({
           className={
             kiosk
               ? 'w-full max-w-2xl space-y-5 rounded-2xl border-2 border-white/10 bg-[#15151C] p-7 text-white'
-              : 'w-full max-w-lg space-y-4 rounded-xl border border-line bg-card p-6 shadow-xl transition duration-200 ease-out data-closed:opacity-0 data-closed:scale-95 data-leave:duration-150 data-leave:ease-in'
+              : `w-full max-w-lg space-y-4 rounded-xl border border-line bg-card p-6 shadow-xl ${DIALOG_PANEL_TRANSITION}`
           }
         >
           <div>

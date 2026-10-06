@@ -3,6 +3,7 @@
 import { useState, useOptimistic, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { X } from 'lucide-react'
 import {
   DndContext,
   DragEndEvent,
@@ -179,6 +180,8 @@ export default function KanbanBoard({
   // Avería soltada en «Résolu» y pendiente de que alguien explique por qué. La tarjeta no se
   // mueve hasta entonces: si la ventana se cancela, nada ha pasado.
   const [pendingResolution, setPendingResolution] = useState<KanbanIncident | null>(null)
+  // Título de la ventana de resolución: se conserva al cerrar para que no quede vacío durante el fundido de salida
+  const [resolutionLabel, setResolutionLabel] = useState('')
   const [resolutionError, setResolutionError] = useState<string | null>(null)
   // Fallo al mover una tarjeta sin ventana: el optimista revierte solo, pero sin este aviso la
   // tarjeta «rebotaba» a su sitio sin decir por qué. Se limpia al empezar el siguiente arrastre.
@@ -222,6 +225,7 @@ export default function KanbanBoard({
       if (dropped) {
         setResolutionError(null)
         setPendingResolution(dropped)
+        setResolutionLabel(`${dropped.numero_incident} · ${dropped.title}`)
         setResolutionTarget(newStatus)
       }
       return
@@ -264,9 +268,15 @@ export default function KanbanBoard({
   return (
     <DndContext id="admin-kanban" sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
       {moveError && (
-        <p role="alert" className="mb-3 rounded-lg border border-accent/20 bg-accent-soft px-4 py-2.5 text-sm text-accent">
-          Le statut n&apos;a pas pu être modifié : {moveError}. La carte a été remise à sa place.
-        </p>
+        <div role="alert" className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-accent/20 bg-accent-soft px-4 py-2.5 text-sm text-accent">
+          <div>
+            <p className="font-semibold">Le statut n&apos;a pas pu être modifié — la carte a été remise à sa place.</p>
+            <p className="mt-0.5 text-xs">{moveError}</p>
+          </div>
+          <button type="button" onClick={() => setMoveError(null)} aria-label="Fermer" className="shrink-0 rounded p-0.5 hover:bg-accent/10 transition-colors">
+            <X size={14} />
+          </button>
+        </div>
       )}
       <div className="flex gap-4 overflow-x-auto pb-4">
         {COLUMNS.map((col) => (
@@ -284,11 +294,7 @@ export default function KanbanBoard({
 
       <ResolutionDialog
         open={pendingResolution !== null}
-        incidentLabel={
-          pendingResolution
-            ? `${pendingResolution.numero_incident} · ${pendingResolution.title}`
-            : ''
-        }
+        incidentLabel={resolutionLabel}
         technicians={technicians}
         busy={pending}
         error={resolutionError}
