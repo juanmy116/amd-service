@@ -1,6 +1,6 @@
 'use client'
 
-import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
+import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react'
 import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ReplaceState } from '@/app/admin/contracts/[id]/replace-actions'
@@ -42,9 +42,9 @@ export default function ReplaceMachineModal({ outLineId, outMachineId, replaceme
       </button>
 
       <Dialog open={open} onClose={() => setOpen(false)} className="relative z-50">
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" aria-hidden="true" />
+        <DialogBackdrop transition className="fixed inset-0 bg-black/30 backdrop-blur-sm transition-opacity duration-200 ease-out data-closed:opacity-0 data-leave:duration-150 data-leave:ease-in" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <DialogPanel className="w-full max-w-lg rounded-xl bg-card border border-line shadow-xl p-6">
+          <DialogPanel transition className="w-full max-w-lg rounded-xl bg-card border border-line shadow-xl p-6 transition duration-200 ease-out data-closed:opacity-0 data-closed:scale-95 data-leave:duration-150 data-leave:ease-in">
             <DialogTitle className="text-base font-semibold text-ink mb-1">
               Remplacer la machine
             </DialogTitle>
