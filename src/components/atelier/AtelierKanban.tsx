@@ -13,7 +13,6 @@ import {
   useDroppable,
   useDraggable,
 } from '@dnd-kit/core'
-import { CSS } from '@dnd-kit/utilities'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
 import ResolutionDialog from '@/components/admin/ResolutionDialog'
 import ArchivedToast from './ArchivedToast'
@@ -52,19 +51,19 @@ function IncidentCard({
   isOverlay?: boolean
   onOpen?: (incident: AtelierIncident) => void
 }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+  // Sin `transform` a propósito: con DragOverlay, dnd-kit se lo sigue entregando a la tarjeta
+  // original; aplicarlo la hacía arrastrarse (con retraso) detrás de la copia, como un fantasma.
+  const { attributes, listeners, setNodeRef } = useDraggable({
     id: incident.id,
     data: { status: incident.status },
     disabled: isOverlay,
   })
 
   const isDraggingThis = draggingId === incident.id && !isOverlay
-  const style = !isOverlay && transform ? { transform: CSS.Translate.toString(transform) } : undefined
 
   return (
     <div
       ref={isOverlay ? undefined : setNodeRef}
-      style={style}
       {...(isOverlay ? {} : attributes)}
       {...(isOverlay ? {} : listeners)}
       onClick={() => { if (!isOverlay && onOpen) onOpen(incident) }}
@@ -73,7 +72,7 @@ function IncidentCard({
         isDraggingThis ? 'opacity-30' : '',
         isOverlay
           ? 'shadow-2xl rotate-2 cursor-grabbing'
-          : 'cursor-grab hover:ring-2 hover:ring-accent/40 transition-all',
+          : 'cursor-grab hover:ring-2 hover:ring-accent/40 transition-shadow',
       ].join(' ')}
     >
       <div className="flex items-center justify-between gap-2">
