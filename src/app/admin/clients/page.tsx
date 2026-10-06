@@ -18,7 +18,7 @@ const SEARCH_COLUMNS = ['nom_client', 'ninea', 'ville'] as const
 /** Valor del filtro de quartier que significa «los que aún no tienen ninguno». */
 const NO_QUARTIER = 'none'
 const RESULT_LIMIT = 200
-const TH = 'text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-6 py-2.5'
+const TH = 'text-left text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-6 py-2.5'
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 

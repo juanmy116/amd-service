@@ -1,8 +1,9 @@
 'use client'
 
-import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
+import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react'
 import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { DIALOG_BACKDROP_TRANSITION, DIALOG_PANEL_TRANSITION } from '@/components/ui/dialogTransitions'
 import type { TerminateState } from '@/app/admin/contracts/[id]/terminate-actions'
 
 type OpenLine = { id: string; machine_id: string }
@@ -53,9 +54,9 @@ export default function TerminateContractModal({ openLines, action }: Props) {
       </button>
 
       <Dialog open={open} onClose={() => setOpen(false)} className="relative z-50">
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" aria-hidden="true" />
+        <DialogBackdrop transition className={`fixed inset-0 bg-black/30 backdrop-blur-sm ${DIALOG_BACKDROP_TRANSITION}`} />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <DialogPanel className="w-full max-w-lg rounded-xl bg-card border border-line shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+          <DialogPanel transition className={`w-full max-w-lg rounded-xl bg-card border border-line shadow-xl p-6 ${DIALOG_PANEL_TRANSITION} max-h-[90vh] overflow-y-auto`}>
             <DialogTitle className="text-base font-semibold text-ink mb-1">
               Terminer le contrat
             </DialogTitle>

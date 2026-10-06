@@ -26,7 +26,7 @@ function KpiCard({ label, value, sub, icon: Icon, iconColor, iconBg, gradientFro
       style={{ background: `linear-gradient(135deg, ${gradientFrom} 0%, #FFFFFF 55%)` }}
     >
       <div className="flex items-start justify-between mb-3">
-        <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-[0.07em] leading-none">
+        <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.07em] leading-none">
           {label}
         </p>
         <div
@@ -50,7 +50,7 @@ function CsatCard({ avg }: { avg: number }) {
       style={{ background: 'linear-gradient(135deg, #FFFBEB 0%, #FFFFFF 55%)' }}
     >
       <div className="flex items-start justify-between mb-3">
-        <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-[0.07em] leading-none">
+        <p className="text-[10px] font-semibold text-ink-soft uppercase tracking-[0.07em] leading-none">
           CSAT moyen
         </p>
         <div

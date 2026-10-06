@@ -17,7 +17,7 @@ import { parseEnum, MACHINE_TYPES } from '@/lib/enums'
 
 const SEARCH_COLUMNS = ['numero_serie', 'marque', 'modele'] as const
 const RESULT_LIMIT = 200
-const TH = 'text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-5 py-2.5'
+const TH = 'text-left text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-5 py-2.5'
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 

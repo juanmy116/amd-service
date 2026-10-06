@@ -1,9 +1,10 @@
 'use client'
 
-import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
+import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react'
 import { useEffect, useState } from 'react'
 import { RESOLUTION_REASON_LABELS, MIN_NOTE_LENGTH, type OfficeResolution } from '@/lib/resolution'
 import { RESOLUTION_REASONS } from '@/lib/enums'
+import { DIALOG_BACKDROP_TRANSITION, DIALOG_PANEL_TRANSITION } from '@/components/ui/dialogTransitions'
 
 /**
  * Ventana obligatoria para dar una avería por resuelta SIN intervención registrada.
@@ -71,13 +72,17 @@ export default function ResolutionDialog({
 
   return (
     <Dialog open={open} onClose={onCancel} className="relative z-50">
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" />
+      <DialogBackdrop
+        transition={!kiosk}
+        className={`fixed inset-0 bg-black/50 backdrop-blur-sm${kiosk ? '' : ` ${DIALOG_BACKDROP_TRANSITION}`}`}
+      />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <DialogPanel
+          transition={!kiosk}
           className={
             kiosk
               ? 'w-full max-w-2xl space-y-5 rounded-2xl border-2 border-white/10 bg-[#15151C] p-7 text-white'
-              : 'w-full max-w-lg space-y-4 rounded-xl border border-line bg-card p-6 shadow-xl'
+              : `w-full max-w-lg space-y-4 rounded-xl border border-line bg-card p-6 shadow-xl ${DIALOG_PANEL_TRANSITION}`
           }
         >
           <div>

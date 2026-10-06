@@ -3,6 +3,7 @@
 import { useState, useOptimistic, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { X } from 'lucide-react'
 import {
   DndContext,
   DragEndEvent,
@@ -14,7 +15,6 @@ import {
   useDroppable,
   useDraggable,
 } from '@dnd-kit/core'
-import { CSS } from '@dnd-kit/utilities'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
@@ -61,26 +61,26 @@ function IncidentCard({
   draggingId?: string
   isOverlay?: boolean
 }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+  // Sin `transform` a propósito: con DragOverlay, dnd-kit se lo sigue entregando a la tarjeta
+  // original; aplicarlo la hacía arrastrarse (con retraso) detrás de la copia, como un fantasma.
+  const { attributes, listeners, setNodeRef } = useDraggable({
     id: incident.id,
     data: { status: incident.status },
     disabled: isOverlay,
   })
 
   const isDraggingThis = draggingId === incident.id && !isOverlay
-  const style = !isOverlay && transform ? { transform: CSS.Translate.toString(transform) } : undefined
   const priority = PRIORITY[incident.priority]
 
   return (
     <div
       ref={isOverlay ? undefined : setNodeRef}
-      style={style}
       {...(isOverlay ? {} : attributes)}
       {...(isOverlay ? {} : listeners)}
       className={[
         'bg-card rounded-card border border-line p-3.5 select-none',
         isDraggingThis  ? 'opacity-30' : '',
-        isOverlay       ? 'shadow-raised rotate-1 cursor-grabbing' : 'cursor-grab hover:shadow-card transition-all',
+        isOverlay       ? 'shadow-raised rotate-1 cursor-grabbing' : 'cursor-grab hover:shadow-card transition-shadow',
       ].join(' ')}
     >
       <p className="font-mono text-[11px] font-semibold text-accent mb-1.5 tracking-wide">
@@ -180,7 +180,12 @@ export default function KanbanBoard({
   // Avería soltada en «Résolu» y pendiente de que alguien explique por qué. La tarjeta no se
   // mueve hasta entonces: si la ventana se cancela, nada ha pasado.
   const [pendingResolution, setPendingResolution] = useState<KanbanIncident | null>(null)
+  // Título de la ventana de resolución: se conserva al cerrar para que no quede vacío durante el fundido de salida
+  const [resolutionLabel, setResolutionLabel] = useState('')
   const [resolutionError, setResolutionError] = useState<string | null>(null)
+  // Fallo al mover una tarjeta sin ventana: el optimista revierte solo, pero sin este aviso la
+  // tarjeta «rebotaba» a su sitio sin decir por qué. Se limpia al empezar el siguiente arrastre.
+  const [moveError, setMoveError] = useState<string | null>(null)
   // A qué columna se soltó: «Résolu» o «Fermé» (las dos piden explicación desde una abierta).
   const [resolutionTarget, setResolutionTarget] = useState<string>('résolu')
 
@@ -195,6 +200,7 @@ export default function KanbanBoard({
   )
 
   function onDragStart(event: DragStartEvent) {
+    setMoveError(null)
     setActiveIncident(optimisticIncidents.find((i) => i.id === event.active.id) ?? null)
   }
 
@@ -219,6 +225,7 @@ export default function KanbanBoard({
       if (dropped) {
         setResolutionError(null)
         setPendingResolution(dropped)
+        setResolutionLabel(`${dropped.numero_incident} · ${dropped.title}`)
         setResolutionTarget(newStatus)
       }
       return
@@ -227,7 +234,8 @@ export default function KanbanBoard({
     startTransition(async () => {
       updateOptimistic({ id: active.id as string, newStatus })
       const result = await updateIncidentStatusAction(active.id as string, newStatus)
-      if (!result?.error) router.refresh()
+      if (result?.error) setMoveError(result.error)
+      else router.refresh()
     })
   }
 
@@ -259,6 +267,17 @@ export default function KanbanBoard({
 
   return (
     <DndContext id="admin-kanban" sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      {moveError && (
+        <div role="alert" className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-accent/20 bg-accent-soft px-4 py-2.5 text-sm text-accent">
+          <div>
+            <p className="font-semibold">Le statut n&apos;a pas pu être modifié — la carte a été remise à sa place.</p>
+            <p className="mt-0.5 text-xs">{moveError}</p>
+          </div>
+          <button type="button" onClick={() => setMoveError(null)} aria-label="Fermer" className="shrink-0 rounded p-0.5 hover:bg-accent/10 transition-colors">
+            <X size={14} />
+          </button>
+        </div>
+      )}
       <div className="flex gap-4 overflow-x-auto pb-4">
         {COLUMNS.map((col) => (
           <KanbanColumn
@@ -275,11 +294,7 @@ export default function KanbanBoard({
 
       <ResolutionDialog
         open={pendingResolution !== null}
-        incidentLabel={
-          pendingResolution
-            ? `${pendingResolution.numero_incident} · ${pendingResolution.title}`
-            : ''
-        }
+        incidentLabel={resolutionLabel}
         technicians={technicians}
         busy={pending}
         error={resolutionError}

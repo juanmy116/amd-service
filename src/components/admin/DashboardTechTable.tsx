@@ -36,19 +36,19 @@ export default function DashboardTechTable({ techPerf }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-neutral-soft border-b border-line-subtle">
-              <th className="text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+              <th className="text-left text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-4 py-2.5">
                 Technicien
               </th>
-              <th className="text-right text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+              <th className="text-right text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-4 py-2.5">
                 Total
               </th>
-              <th className="text-right text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+              <th className="text-right text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-4 py-2.5">
                 Résolus
               </th>
-              <th className="text-right text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+              <th className="text-right text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-4 py-2.5">
                 En cours
               </th>
-              <th className="text-right text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+              <th className="text-right text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-4 py-2.5">
                 Taux
               </th>
             </tr>

@@ -598,7 +598,7 @@ export default function ContractForm({
                 <div key={r.id} className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-line bg-neutral-soft">
                   <span className="flex-1 text-sm font-mono text-ink-soft line-through">{r.machine_id}</span>
                   <div>
-                    <label className="block text-[10px] font-medium text-ink-muted mb-1">Date de fin</label>
+                    <label className="block text-[10px] font-medium text-ink-soft mb-1">Date de fin</label>
                     <input
                       type="date"
                       value={r.date_fin}

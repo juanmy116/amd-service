@@ -45,19 +45,19 @@ export default async function DashboardRecentIncidents() {
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-neutral-soft border-b border-line-subtle">
-            <th className="text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+            <th className="text-left text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-4 py-2.5">
               Titre
             </th>
-            <th className="text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+            <th className="text-left text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-4 py-2.5">
               Client
             </th>
-            <th className="text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+            <th className="text-left text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-4 py-2.5">
               Statut
             </th>
-            <th className="text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+            <th className="text-left text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-4 py-2.5">
               Technicien
             </th>
-            <th className="text-right text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5">
+            <th className="text-right text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-4 py-2.5">
               Date
             </th>
           </tr>
