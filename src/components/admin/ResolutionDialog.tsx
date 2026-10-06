@@ -77,7 +77,7 @@ export default function ResolutionDialog({
           className={
             kiosk
               ? 'w-full max-w-2xl space-y-5 rounded-2xl border-2 border-white/10 bg-[#15151C] p-7 text-white'
-              : 'w-full max-w-lg space-y-4 rounded-xl border border-line bg-surface p-6 shadow-xl'
+              : 'w-full max-w-lg space-y-4 rounded-xl border border-line bg-card p-6 shadow-xl'
           }
         >
           <div>
