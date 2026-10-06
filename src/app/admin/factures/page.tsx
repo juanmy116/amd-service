@@ -54,7 +54,7 @@ export default async function FacturesPage() {
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 {inv.has_estimated && <span className="text-[10px] font-medium text-warning bg-warning-soft rounded-full px-2 py-0.5">Estimée</span>}
-                {inv.status === 'annulee' && <span className="text-[10px] font-medium text-ink-muted bg-neutral-soft rounded-full px-2 py-0.5">Annulée</span>}
+                {inv.status === 'annulee' && <span className="text-[10px] font-medium text-ink-soft bg-neutral-soft rounded-full px-2 py-0.5">Annulée</span>}
                 <span className={`text-sm font-bold ${inv.status === 'annulee' ? 'text-ink-muted line-through' : 'text-ink'}`}>
                   {formatPrice(inv.total_amount)}
                 </span>

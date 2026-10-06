@@ -140,14 +140,14 @@ export default async function MaintenancePlanDetailPage({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-neutral-soft border-b border-line-subtle">
-              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Machine</th>
-              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Date planifiée</th>
-              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Statut</th>
-              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Réalisée le</th>
-              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Technicien</th>
-              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">QR</th>
-              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Position</th>
-              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Notes</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Machine</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Date planifiée</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Statut</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Réalisée le</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Technicien</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">QR</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Position</th>
+              <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Notes</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line-subtle">

@@ -17,7 +17,7 @@ import { parseEnum, CONTRACT_STATUSES } from '@/lib/enums'
 const RESULT_LIMIT = 200
 // Límite holgado para el lookup intermedio de clientes que alimenta el filtro.
 const LOOKUP_LIMIT = 1000
-const TH = 'text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-5 py-2.5'
+const TH = 'text-left text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-5 py-2.5'
 
 const STATUT: Record<string, { label: string; variant: BadgeVariant }> = {
   actif:    { label: 'Actif',    variant: 'success' },

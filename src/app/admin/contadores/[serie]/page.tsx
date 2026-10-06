@@ -142,12 +142,12 @@ export default async function ContadoresDetailPage({
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-neutral-soft border-b border-line-subtle">
-                  <th className="text-left px-5 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Période</th>
-                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">N&amp;B total</th>
-                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Δ N&amp;B</th>
-                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Couleur total</th>
-                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Δ Couleur</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Statut</th>
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Période</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">N&amp;B total</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Δ N&amp;B</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Couleur total</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Δ Couleur</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Statut</th>
                   <th />
                 </tr>
               </thead>

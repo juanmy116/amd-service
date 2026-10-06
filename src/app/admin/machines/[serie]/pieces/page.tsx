@@ -94,12 +94,12 @@ export default async function MachinePartsHistoryPage({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-neutral-soft border-b border-line-subtle">
-              <th className="text-left px-5 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Date</th>
-              <th className="text-left px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Origine</th>
-              <th className="text-left px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Pièce</th>
-              <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Qté</th>
-              <th className="text-left px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Technicien</th>
-              <th className="text-left px-4 py-3 text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em]">Référence</th>
+              <th className="text-left px-5 py-3 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Date</th>
+              <th className="text-left px-4 py-3 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Origine</th>
+              <th className="text-left px-4 py-3 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Pièce</th>
+              <th className="text-right px-4 py-3 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Qté</th>
+              <th className="text-left px-4 py-3 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Technicien</th>
+              <th className="text-left px-4 py-3 text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em]">Référence</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line-subtle">

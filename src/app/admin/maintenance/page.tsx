@@ -17,7 +17,7 @@ const RESULT_LIMIT = 300
 // Límite holgado para lookups intermedios que alimentan filtros: si truncaran,
 // el filtro de búsqueda devolvería resultados incompletos sin avisar.
 const LOOKUP_LIMIT = 1000
-const TH = 'text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-5 py-2.5'
+const TH = 'text-left text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-5 py-2.5'
 
 const FREQ_LABEL: Record<string, string> = {
   mensuel:     'Mensuel',

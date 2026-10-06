@@ -51,7 +51,7 @@ function ResolutionCell({ via, reason }: { via: ResolvedVia | null; reason: Reso
         {RESOLVED_VIA_LABELS[via]}
       </Badge>
       {reason && (
-        <span className="text-[10px] text-ink-muted leading-tight">
+        <span className="text-[10px] text-ink-soft leading-tight">
           {RESOLUTION_REASON_LABELS[reason]}
         </span>
       )}
@@ -59,7 +59,7 @@ function ResolutionCell({ via, reason }: { via: ResolvedVia | null; reason: Reso
   )
 }
 
-const TH = 'text-left text-[10px] font-semibold text-ink-muted uppercase tracking-[0.06em] px-4 py-2.5'
+const TH = 'text-left text-[10px] font-semibold text-ink-soft uppercase tracking-[0.06em] px-4 py-2.5'
 
 export default function IncidentsListView({ incidents }: { incidents: IncidentRow[] }) {
   if (incidents.length === 0) {
