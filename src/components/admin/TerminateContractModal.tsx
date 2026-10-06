@@ -47,7 +47,7 @@ export default function TerminateContractModal({ openLines, action }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-btn border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-600 hover:text-white transition-colors"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-600 hover:text-white transition-colors"
       >
         Terminer le contrat
       </button>
@@ -55,7 +55,7 @@ export default function TerminateContractModal({ openLines, action }: Props) {
       <Dialog open={open} onClose={() => setOpen(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <DialogPanel className="w-full max-w-lg rounded-xl bg-surface border border-line shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+          <DialogPanel className="w-full max-w-lg rounded-xl bg-card border border-line shadow-xl p-6 max-h-[90vh] overflow-y-auto">
             <DialogTitle className="text-base font-semibold text-ink mb-1">
               Terminer le contrat
             </DialogTitle>
@@ -124,14 +124,14 @@ export default function TerminateContractModal({ openLines, action }: Props) {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="rounded-btn border border-line px-4 py-2 text-sm text-ink-soft hover:bg-surface-hover transition-colors"
+                  className="rounded-lg border border-line px-4 py-2 text-sm text-ink-soft hover:bg-neutral-soft transition-colors"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-btn bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60 transition-colors"
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60 transition-colors"
                 >
                   {pending ? 'En cours…' : 'Confirmer la clôture'}
                 </button>

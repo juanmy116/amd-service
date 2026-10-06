@@ -36,7 +36,7 @@ export default function ReplaceMachineModal({ outLineId, outMachineId, replaceme
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-btn border border-accent/30 bg-accent-soft px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent hover:text-white transition-colors"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent-soft px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent hover:text-white transition-colors"
       >
         Remplacer
       </button>
@@ -44,7 +44,7 @@ export default function ReplaceMachineModal({ outLineId, outMachineId, replaceme
       <Dialog open={open} onClose={() => setOpen(false)} className="relative z-50">
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <DialogPanel className="w-full max-w-lg rounded-xl bg-surface border border-line shadow-xl p-6">
+          <DialogPanel className="w-full max-w-lg rounded-xl bg-card border border-line shadow-xl p-6">
             <DialogTitle className="text-base font-semibold text-ink mb-1">
               Remplacer la machine
             </DialogTitle>
@@ -158,14 +158,14 @@ export default function ReplaceMachineModal({ outLineId, outMachineId, replaceme
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="rounded-btn border border-line px-4 py-2 text-sm text-ink-soft hover:bg-surface-hover transition-colors"
+                  className="rounded-lg border border-line px-4 py-2 text-sm text-ink-soft hover:bg-neutral-soft transition-colors"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={pending || replacementCandidates.length === 0}
-                  className="rounded-btn bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60 transition-colors"
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60 transition-colors"
                 >
                   {pending ? 'En cours…' : 'Confirmer le remplacement'}
                 </button>

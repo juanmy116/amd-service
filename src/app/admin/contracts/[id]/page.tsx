@@ -94,7 +94,7 @@ export default async function EditContractPage({
       />
 
       {initialLines.length > 0 && (
-        <section className="rounded-xl bg-surface border border-line p-6">
+        <section className="rounded-xl bg-card border border-line p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-sm font-semibold text-ink mb-1">Étiquettes QR</h2>
@@ -116,7 +116,7 @@ export default async function EditContractPage({
       )}
 
       {initialLines.length > 0 && (
-        <section className="rounded-xl bg-surface border border-line p-6">
+        <section className="rounded-xl bg-card border border-line p-6">
           <h2 className="text-sm font-semibold text-ink mb-4">Remplacement de machine</h2>
           <div className="divide-y divide-line">
             {initialLines.map((line) => {
@@ -138,7 +138,7 @@ export default async function EditContractPage({
       )}
 
       {canTerminate && (
-        <section className="rounded-xl bg-surface border border-line p-6">
+        <section className="rounded-xl bg-card border border-line p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-sm font-semibold text-ink mb-1">Clôture du contrat</h2>
