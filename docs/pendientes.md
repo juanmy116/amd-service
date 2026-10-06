@@ -6,7 +6,10 @@
 
 ---
 
-## 📍 Por dónde seguir (al 2026-10-01, cierre de sesión)
+## 📍 Por dónde seguir (al 2026-10-06, cierre de sesión)
+
+> **2026-10-06:** auditoría de estilo `/apple-design` de `/admin` — PRs #174–#177 en prod (ver
+> «Cerrado el 2026-10-06» bajo la tabla). Nuevas filas 11 y 12.
 
 > **🚀 2026-10-01: empieza el uso real** — piloto con 2AS (40 máquinas): etiquetas QR en las
 > máquinas y la app en los iPhone de los técnicos. Prod limpia de datos de prueba (fila 5) y
@@ -28,6 +31,17 @@
 | 🔴 **8** | **Los tests E2E en local apuntan a PRODUCCIÓN** | `.env.local` lleva la URL y las claves de Supabase de prod; `npm run test:e2e` a secas arranca `next dev` con ellas y sembraría/borraría datos de prueba en prod. En CI no pasa (`e2e.yml` pone envs locales). Arreglo: `.env.test` con la pila local y que `playwright.config.ts` lo cargue, o que el script se niegue si la URL no es `127.0.0.1`. |
 | ⚠️ **9** | **Ubicación de una máquina fijable sin escanear** | `recordMachineLocationAction` (Fase 3) no exige un escaneo previo: un técnico podría, llamando a la acción, fijar una máquina sin ubicación en cualquier punto y luego salir 🟢 ahí. Mismo nivel de confianza que el sello QR (el serie y la posición vienen del cliente). Mitiga: el admin ve «Premier scan de X» y puede corregir. Aceptado por ahora. |
 | 📱 **10** | **PWA técnicos: probar la Fase 3 en iPhone y seguir** | Geolocalización en prod (PR #157) sin probar aún en un iPhone real: permiso de ubicación, «Itinéraire», «Plus proche», 🟢 en la ficha tras resolver. Después: Fase 4 (uso con mala cobertura, solo lectura) del spec `docs/superpowers/specs/2026-09-22-pwa-tecnicos-design.md`. Al instalar la app a cada técnico: que pulse «Activer les notifications» (se ve en Équipe) y escanee siempre desde la app. |
+| 🔴 **11** | **No existe «Mot de passe oublié»** | Ni enlace en `/login` ni página para fijar la contraseña nueva: el enlace de recuperación de Supabase no aterriza en ningún sitio. El 2026-10-06 el admin perdió la suya y hubo que fijarla con un script local (`auth.admin.updateUserById` con la clave secreta). Con técnicos y clientes reales, el próximo que la olvide se queda fuera. PR propio. |
+| 🎨 **12** | **PR C de la auditoría `/apple-design` de `/admin`** | Unificar los títulos de página (hoy 6 combinaciones), limpiar ~150 `gray-*`/`red-*` sueltos y las variables heredadas de `:root` en `globals.css` (`--bg-surface`… — de ahí salió el fallo de #174), Agenda flotante con Escape y foco (convertirla en `Dialog` de Headless UI), `active:` en los botones sueltos y quitar la dependencia `@dnd-kit/utilities` (sin uso desde #176). Sin prisa: es pulido. |
+
+**Cerrado el 2026-10-06 (auditoría `/apple-design` de `/admin`, solo presentación):** ventanas
+transparentes por clases inexistentes (#174); PR B — pulsación, contraste AA, Kanban sin tarjeta
+fantasma y con aviso de error, ventanas con fundido, Agenda deslizante (#175, plan en
+`docs/superpowers/plans/2026-10-06-pr-b-apple-design-admin.md`); el mismo fantasma en la TV del
+taller (#176, probado en la TV); y la suite **E2E en rojo desde el 2026-09-25**: el limitador de
+login (5 / 15 min por `ip:email`) bloqueaba al técnico de prueba a partir del 6º login — `loginAs`
+vacía ahora el cupo de ese email `@e2e.test` (#177, 16/16 en verde). No se había visto porque e2e
+solo corre si cambian ciertas rutas.
 
 **Cerrado el 2026-09-22:** el verrou de résolution (ninguna avería se cierra sin rastro, probado en
 uso real) y el CSAT (probado de punta a punta; era el pendiente más antiguo). Ese día también se
