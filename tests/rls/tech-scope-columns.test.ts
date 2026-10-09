@@ -7,6 +7,7 @@ import { seedTenants, SC, type Tenants } from './scenario'
 // apuntarla a otra máquina (o mover su visita a otra línea) y las funciones auth_tech_* le
 // abrían esa máquina, sus visitas, su contrato y la ficha de su cliente. La oficina y
 // service_role (taller, Server Actions) siguen pudiendo mover y reasignar.
+// Desde 20261009140000 tampoco puede renombrar el número SAV de su avería.
 // Corre contra Supabase LOCAL efímero.
 
 const admin = adminClient()
@@ -77,6 +78,15 @@ describe('F2 — el técnico no puede ampliar su propio alcance', () => {
       .update({ contract_machine_id: t.lineBId }).eq('id', t.visitAId)
     expect(error?.code).toBe('42501')
     expect((await visitA()).contract_machine_id).toBe(t.lineAId)
+  })
+
+  it('no puede cambiar el número SAV de su avería', async () => {
+    const c = await signInAs(SC.techAEmail)
+    const { error } = await c.from('incidents')
+      .update({ numero_incident: 'SAV-2099-0001' }).eq('id', incidentAId)
+    expect(error?.code).toBe('42501')
+    const { data } = await admin.from('incidents').select('numero_incident').eq('id', incidentAId).single()
+    expect(data!.numero_incident).toBe(SC.incidentNumA)
   })
 
   it('no puede reasignar una visita', async () => {
