@@ -75,18 +75,25 @@ ensayo en la nube. Consecuencias:
 4. Comprobación del §5 sobre lo que se tocó.
 5. Si falla: *Instant Rollback* en Vercel y después revert del PR.
 
-### B. Cambio de base de datos (migraciones, RLS — aquí van F2/F3/F8)
+### B. Cambio de base de datos (migraciones, RLS)
 
 1. Escribir la migración **y su inversa**.
 2. **Ensayar en local:** `supabase db reset --local` (aplica todo el historial desde cero, así se
    ve que la migración encaja) + `npm run test:rls` con las variables locales explícitas.
    Comprobar también que el test **falla** sin la migración (prueba de que el test mira lo
    correcto).
+   Los E2E, para un veredicto fiable, con la app **compilada** como en CI (`next dev` da fallos
+   sueltos y distintos en cada pasada): exportar a la app las claves locales
+   (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SECRET_KEY`), `npm run
+   build`, `npm run start` y `CI=1 npx playwright test`.
 3. Preguntarse: **¿la app que está publicada ahora sigue funcionando con este cambio?** Si no,
    partir el cambio (regla 5).
 4. PR → CI → revisión.
 5. Antes del `db push`: comprobar en el panel de Supabase que **existe la copia de seguridad del
-   día**.
+   día**. Mientras el plan sea Free (no hay copias), hacer una **copia manual** fuera de git (lleva
+   datos de clientes):
+   `B="../backups/$(date +%F)-antes-<cambio>"; mkdir -p "$B"; supabase db dump --linked -f "$B/schema.sql"; supabase db dump --linked --data-only --use-copy -f "$B/data.sql"; supabase db dump --linked --role-only -f "$B/roles.sql"`
+   (desde `web-amd/`; así se hizo el 2026-10-09, `backups/2026-10-09-*`).
 6. `supabase db push` en buena hora (lo lanza el usuario).
 7. **Justo después:** verificar en `pg_policies` / `pg_proc` que está lo esperado, y la
    comprobación del §5 **entrando con cada rol que el cambio afecte** (técnico, oficina, taller).

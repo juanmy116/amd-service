@@ -6,10 +6,17 @@
 
 ---
 
-## 📍 Por dónde seguir (al 2026-10-06, cierre de sesión)
+## 📍 Por dónde seguir (al 2026-10-09, cierre de sesión)
+
+> **2026-10-09:** seguridad — **fila 0 cerrada** (F2, F8, F3 y la numeración SAV, PRs #180–#184,
+> todo en prod) y **fila 8 cerrada** (los E2E en local ya no pueden tocar producción, #179). Ver
+> «Cerrado el 2026-10-09» bajo la tabla. **Siguiente recomendado:** Supabase Pro (copias diarias) y
+> un entorno de ensayo (segundo proyecto Supabase para las previews de Vercel) antes de seguir
+> cambiando la app; después filas 1 y 11.
 
 > **2026-10-06:** auditoría de estilo `/apple-design` de `/admin` — PRs #174–#177 en prod (ver
-> «Cerrado el 2026-10-06» bajo la tabla). Nuevas filas 11 y 12.
+> «Cerrado el 2026-10-06» bajo la tabla). Nuevas filas 11 y 12. Fila 13: ideas de la plantilla
+> shadcnstore, para más adelante.
 
 > **🚀 2026-10-01: empieza el uso real** — piloto con 2AS (40 máquinas): etiquetas QR en las
 > máquinas y la app en los iPhone de los técnicos. Prod limpia de datos de prueba (fila 5) y
@@ -19,7 +26,7 @@
 
 | Prioridad | Qué | Por qué duele |
 |---|---|---|
-| 🔴 **0** | **Escaneo de seguridad: quedan 6 hallazgos** | Cerrados F1 (cualquiera podía vaciar la BD de prod vía `princity-sync`, PR #163), F13/F14 (crons lanzables desde fuera, PR #165), F5 (formulario QR colgable, PR #167), F4+F6 (fotos de otros clientes, PR #168), F7 (historial de averías falsificable, PR #170) y F9 (enlaces colados en el email de la encuesta). Quedan 2 medios y 4 leves; F10–F12 aceptados como riesgo interno. **Siguiente:** rehacer F2/F3. Ver §«Escaneo de seguridad» abajo. |
+| ✅ **0** | **Escaneo de seguridad** | CERRADO (2026-10-09): los 14 hallazgos están cerrados en prod (F2 #180, F8 #181, F3 #182 los últimos) o aceptados (F10–F12, riesgo interno), más la numeración SAV bloqueable que salió en la revisión de F3 (#183, #184). Quedan mejoras menores, sin riesgo de ampliar permisos: ver §«Escaneo de seguridad» abajo. |
 | 🔴🔴 **1** | **Princity no trae nada** | Tres procesos diarios, meses ejecutándose, **cero datos**. 321 alertas sin convertirse en incidencias y ni una lectura de contador — y los contadores son la materia prima de la facturación. |
 | ✅ **2** | **Limitador de intentos** | CERRADO (2026-09-25): rehecho en Supabase y en prod (PR #159), probado en la web real, variables de Upstash borradas, y franja roja en `/admin` si deja de funcionar. |
 | 🔴 **3** | **El aviso de mantenimientos atrasados no se envía** | Si un técnico no hace el mantenimiento, no se entera nadie. |
@@ -28,11 +35,23 @@
 | 🔎 **5b** | **Comprobar el 2026-10-02 que el cron borró las 7 fotos huérfanas** | `select count(*) from storage.objects where bucket_id='incident-photos'` debe dar **0**. Si siguen 7, el borrado físico de `cleanup-orphan-incident-photos` falla (nunca se ha visto funcionar en prod: hasta hoy no había huérfanas). No bloquea el piloto. |
 | ⚠️ **6** | **40 visitas el mismo día / sin válvula de escape** | Afecta al uso real del mantenimiento, no bloquea. |
 | ⚠️ **7** | **Escaneo de técnicos: dos cabos sueltos del PR #155** | «En cours» automático al ABRIR la ficha (no al escanear) y sello QR falsificable por un técnico logueado. Aceptados por ahora. |
-| 🔴 **8** | **Los tests E2E en local apuntan a PRODUCCIÓN** | `.env.local` lleva la URL y las claves de Supabase de prod; `npm run test:e2e` a secas arranca `next dev` con ellas y sembraría/borraría datos de prueba en prod. En CI no pasa (`e2e.yml` pone envs locales). Arreglo: `.env.test` con la pila local y que `playwright.config.ts` lo cargue, o que el script se niegue si la URL no es `127.0.0.1`. |
+| ✅ **8** | **Los tests E2E en local apuntaban a PRODUCCIÓN** | CERRADO (2026-10-09, #179): `playwright.config.ts` se niega a arrancar si los tests no apuntan a un Supabase local, y la app que arranca para los tests usa esa base local en vez del `.env.local`. Cómo correrlos: `docs/cambios-en-produccion.md` §1. |
 | ⚠️ **9** | **Ubicación de una máquina fijable sin escanear** | `recordMachineLocationAction` (Fase 3) no exige un escaneo previo: un técnico podría, llamando a la acción, fijar una máquina sin ubicación en cualquier punto y luego salir 🟢 ahí. Mismo nivel de confianza que el sello QR (el serie y la posición vienen del cliente). Mitiga: el admin ve «Premier scan de X» y puede corregir. Aceptado por ahora. |
 | 📱 **10** | **PWA técnicos: probar la Fase 3 en iPhone y seguir** | Geolocalización en prod (PR #157) sin probar aún en un iPhone real: permiso de ubicación, «Itinéraire», «Plus proche», 🟢 en la ficha tras resolver. Después: Fase 4 (uso con mala cobertura, solo lectura) del spec `docs/superpowers/specs/2026-09-22-pwa-tecnicos-design.md`. Al instalar la app a cada técnico: que pulse «Activer les notifications» (se ve en Équipe) y escanee siempre desde la app. |
 | 🔴 **11** | **No existe «Mot de passe oublié»** | Ni enlace en `/login` ni página para fijar la contraseña nueva: el enlace de recuperación de Supabase no aterriza en ningún sitio. El 2026-10-06 el admin perdió la suya y hubo que fijarla con un script local (`auth.admin.updateUserById` con la clave secreta). Con técnicos y clientes reales, el próximo que la olvide se queda fuera. PR propio. |
 | 🎨 **12** | **PR C de la auditoría `/apple-design` de `/admin`** | Unificar los títulos de página (hoy 6 combinaciones), limpiar ~150 `gray-*`/`red-*` sueltos y las variables heredadas de `:root` en `globals.css` (`--bg-surface`… — de ahí salió el fallo de #174), Agenda flotante con Escape y foco (convertirla en `Dialog` de Headless UI), `active:` en los botones sueltos y quitar la dependencia `@dnd-kit/utilities` (sin uso desde #176). Sin prisa: es pulido. |
+| 💡 **13** | **Ideas rescatables de la plantilla shadcnstore** (`silicondeck/shadcn-dashboard-landing-template`, MIT) | No duele: es para más adelante, detrás de las filas 0, 1 y 11. **Solo como inspiración, rehaciéndolo con nuestras piezas** (`Card`, `Badge`, `Button`…): copiar su código metería Radix al lado de Headless UI, dos librerías para lo mismo. Con valor real: **(a)** página «Mon compte» para cambiar la contraseña (los usuarios `juansav`/`josesav`/`amarsav` la tienen pendiente de cambiar); hacerla junto a la fila 11; **(b)** listados con ordenar por columna, paginar y elegir columnas, para cuando estén cargados los 1.200+ equipos (antes, comprobar si los listados ya paginan). Detalles menores: página «En maintenance», tarjetas KPI con tendencia («+12 % vs mois dernier») para `DashboardCharts`, menú lateral de `/admin` plegable a iconos. Descartado: mail, chat, tareas, calendario (maquetas sin datos; ya hay Kanban y FullCalendar), landing, precios, «billing» de SaaS y el personalizador de temas. |
+
+**Cerrado el 2026-10-09 (seguridad, todo en prod y comprobado):** E2E en local solo contra un
+Supabase local (#179). F2 — un técnico ya no puede cambiar la máquina, la asignación ni el número
+de su avería o visita para ampliar lo que ve (trigger `trg_guard_tech_scope_columns`, #180 y #184).
+F8 — piezas de mantenimiento y planes aislados por técnico (#181). F3 — un cliente solo crea
+averías como el portal: nuevas, sin técnico y firmadas por él (#182). Numeración SAV — el cliente no
+elige el número y el contador se salta los ocupados, así que nadie puede bloquear las altas
+(#183). Cada cambio: prueba del ataque que falla sin el arreglo, ensayo en local (RLS + E2E con la
+app compilada), revisión independiente, copia manual de prod (`../backups/2026-10-09-*`, fuera de
+git, con datos de clientes) y simulación en prod dentro de una transacción que se deshace.
+Reversiones en `docs/rollback-2026-10-09-*.md`.
 
 **Cerrado el 2026-10-06 (auditoría `/apple-design` de `/admin`, solo presentación):** ventanas
 transparentes por clases inexistentes (#174); PR B — pulsación, contraste AA, Kanban sin tarjeta
@@ -91,15 +110,29 @@ Resumen en `architecture.md` §Seguridad.
   detrás del de `_shared`.
 - Cabo suelto visto de paso: el cron `princity-sync-daily` sigue llevando una clave en texto plano
   en `cron.job.command` (los otros 4 ya no). Moverlo a Vault cuando se arregle Princity (fila 1).
+- **F2 (MEDIO), 2026-10-09** — trigger `BEFORE UPDATE` `trg_guard_tech_scope_columns` en `incidents` y
+  `maintenance_visits`: un técnico o cliente ya no cambia `contract_machine_id`, `assigned_to` ni
+  (en incidents) `machine_id`, `opened_by`, `source` y `numero_incident` (#180, #184).
+- **F8 (LEVE), 2026-10-09** — `tech_read_parts`, `tech_insert_parts` y `tech_read_plans` limitadas a
+  `auth_tech_visit_ids()` (#181).
+- **F3 (MEDIO), 2026-10-09** — `client_create_incidents` exige la fila del portal: `nouveau`, sin
+  técnico, `opened_by` vacío o propio, sin resolución (#182). No había asignaciones a clientes que
+  limpiar (0 cuentas de cliente).
+- **Numeración SAV (visto en la revisión de F3), 2026-10-09** — un cliente podía ocupar el número que
+  tocaba al contador y bloquear todas las altas. `set_incident_numero` fuerza el contador para
+  cliente/técnico/anónimo y `next_incident_number` se salta los números ocupados (#183).
 
-**Sin parche (necesitan otra vuelta o una decisión):**
-- **F2 (MEDIO)** — un técnico puede reescribir `contract_machine_id`/`machine_id` de su propia avería
-  (y de sus visitas, `tech_update_visits`) y ampliar lo que ve y edita. El 2º intento (trigger
-  `BEFORE UPDATE` en `incidents` y `maintenance_visits`) no llegó a revisarse: **reintentar**.
-- **F3 (MEDIO)** — un cliente puede crear una avería asignada a sí mismo y obtener permisos de técnico.
-  El arreglo rompía `tests/rls/geolocation.test.ts:303`: aceptar `opened_by IS NULL OR = auth.uid()`
-  y limpiar las asignaciones a clientes ya existentes.
-- **F8 (LEVE)** — técnicos leen/insertan piezas de visitas ajenas. **Depende de F2.**
+**Mejoras menores que quedan (ninguna amplía permisos):**
+- `tech_update_visits` deja al técnico cambiar `status`, `scheduled_date`, `notes`, `done_by` o
+  `plan_id` de las visitas de sus máquinas (también de otro técnico). Se cerraría como F2: añadir
+  esas columnas al trigger, o quitar la política (la app cierra las visitas por RPC con service_role).
+- `tech_insert_parts` no la usa la app (las piezas entran por la RPC `close_maintenance_visit`):
+  podría borrarse.
+- Las políticas `tech_*` y las funciones `auth_tech_*` siguen sin mirar `profiles.role`; hoy no hay
+  ninguna vía para que un no técnico sea `assigned_to`, pero un admin o el taller podrían asignar
+  por error una avería a una cuenta de cliente (nada en la BD lo impide).
+
+**Sin parche (decisión tomada):**
 - **F10–F12 (LEVE) — ACEPTADOS (2026-09-30)** — el sello QR «estuve ahí» es falsificable (amplía el
   punto b) de la sección siguiente): basta con que un técnico con sesión abra `/m/<serie>` o escanee
   una foto de la etiqueta, sin saber programar. Solo lo puede hacer alguien de dentro; el sello se
