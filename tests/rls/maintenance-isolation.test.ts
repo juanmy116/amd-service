@@ -8,9 +8,10 @@ import { seedTenants, SC, type Tenants } from './scenario'
 //     (assigned_to) O en una máquina donde tengo trabajo asignado". Antes de la tarea 7
 //     (migración 20260611150000) un técnico veía las de TODOS — esto es la red contra
 //     esa regresión, y prueba LAS DOS ramas (asignación directa y por máquina).
-//   maintenance_plans: NO están aislados por técnico — CUALQUIER técnico ve TODOS los
-//     planes (tech_read_plans filtra solo por role='technician'). El cliente no ve
-//     mantenimiento (no hay policy de cliente en ninguna de las dos tablas).
+//   maintenance_plans: aislados por técnico desde F8 (migración 20261009110000): ve los
+//     planes de sus visitas (auth_tech_visit_ids). El detalle vive en
+//     maintenance-parts-isolation.test.ts. El cliente no ve mantenimiento (no hay policy
+//     de cliente en ninguna de las dos tablas).
 
 const admin = adminClient()
 let t: Tenants
@@ -116,7 +117,7 @@ describe('RLS mantenimiento — maintenance_plans', () => {
     expectEmpty(await c.from('maintenance_plans').select('id').in('id', [t.planAId]))
   })
 
-  it('el técnico A ve los planes (NO están aislados por técnico)', async () => {
+  it('el técnico A ve el plan de su visita', async () => {
     const c = await signInAs(SC.techAEmail)
     const { data, error } = await c.from('maintenance_plans').select('id').eq('id', t.planAId)
     expect(error).toBeNull()
