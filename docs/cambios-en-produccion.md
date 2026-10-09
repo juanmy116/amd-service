@@ -17,7 +17,7 @@ después.**
 | Hecho | Qué | Por qué |
 |---|---|---|
 | ☐ | **Supabase Free → Pro** | El plan gratuito **no hace copias de seguridad**. Sin copia, un cambio que estropee datos no tiene vuelta atrás. Pro guarda una copia diaria (7 días). |
-| ☐ | **Arreglar que los tests E2E en local apuntan a producción** (`docs/pendientes.md`, fila 8) | `.env.local` lleva la URL y las claves de prod: un `npm run test:e2e` en el Mac crearía y borraría datos de prueba **en la base real**. En CI no pasa (`e2e.yml` usa una base local). Es la mina más peligrosa que queda. |
+| ✅ | **Arreglar que los tests E2E en local apuntan a producción** (`docs/pendientes.md`, fila 8) | HECHO (2026-10-09): `playwright.config.ts` se niega a arrancar si los tests no apuntan a un Supabase local (`tests/e2e/local-only.ts`), y la app que arranca para los tests usa esa misma base local en vez del `.env.local`. Para correrlos en el Mac: `supabase start` + `eval "$(supabase status -o env)"` + `npm run test:e2e`. |
 | ☐ | **Decidir la «máquina de prueba» y la «cuenta de técnico de prueba»** | La comprobación del §5 necesita probar en prod sin ensuciar estadísticas ni molestar a un técnico real. La cuenta `testsav` se borró el 2026-10-01 porque tenía contraseña conocida: la nueva, con contraseña fuerte que solo conozca el responsable, y la máquina fuera de cualquier contrato. |
 | ☐ | **Avisar a los técnicos**: «si veis algo raro en la app, WhatsApp a …» | En las primeras semanas ellos son el mejor sistema de alarma. |
 

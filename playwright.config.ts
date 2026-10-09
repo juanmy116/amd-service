@@ -1,9 +1,16 @@
 import { defineConfig, devices } from '@playwright/test'
 
+import { assertLocalSupabase } from './tests/e2e/local-only'
+import { ANON_KEY, SERVICE_KEY, URL as SUPABASE_URL } from './tests/rls/helpers'
+
 // Tests E2E (Fase 3): recorrido SAV de punta a punta con navegador real, contra
 // la app + un Supabase LOCAL efímero. NO entran en `npm test` (vitest). Corren con
 // `npm run test:e2e`. En CI los arranca el job .github/workflows/e2e.yml (que
 // levanta Supabase, exporta env y arranca la app); en local se puede usar webServer.
+
+// Se niega a arrancar si los tests no apuntan a un Supabase local: siembran y borran datos.
+assertLocalSupabase()
+
 export default defineConfig({
   testDir: './tests/e2e',
   globalSetup: './tests/e2e/global-setup.ts',
@@ -26,7 +33,17 @@ export default defineConfig({
     : {
         command: 'npm run dev',
         url: 'http://localhost:3000',
-        reuseExistingServer: true,
+        // Nunca reutilizar un `npm run dev` ya abierto: lleva el .env.local, que es producción.
+        reuseExistingServer: false,
         timeout: 120_000,
+        // En Next, process.env gana a .env.local: la app arranca contra el mismo Supabase local
+        // que los tests, y sin Matrix para no avisar al canal real de mantenimiento.
+        env: {
+          NEXT_PUBLIC_SUPABASE_URL: SUPABASE_URL,
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ANON_KEY,
+          SUPABASE_SECRET_KEY: SERVICE_KEY,
+          NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
+          MATRIX_HOMESERVER_URL: '',
+        },
       },
 })
