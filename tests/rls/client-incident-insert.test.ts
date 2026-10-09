@@ -6,20 +6,39 @@ import { seedTenants, SC, type Tenants } from './scenario'
 // averías como las crea el portal: nuevas, sin técnico, sin resolución y abiertas por él mismo
 // (o sin `opened_by`). Antes la política solo miraba que la línea fuese suya: el cliente podía
 // asignarse la avería y heredar las políticas de técnico (assigned_to = auth.uid()) sobre esa
-// máquina, sus visitas, su contrato y su ficha. Corre contra Supabase LOCAL efímero.
+// máquina, sus visitas, su contrato y su ficha.
+//
+// Numeración (migración 20261009130000): el número SAV lo pone siempre el contador para las
+// sesiones de cliente y técnico, y el contador se salta los números ya ocupados. Antes un cliente
+// podía elegir el siguiente número y, al chocar con el UNIQUE, ninguna avería nueva entraba.
+//
+// Las averías que crea un cliente reciben un número SAV real, no `TEST-`: se reconocen por el
+// título y se borran aquí, antes de `cleanup`. Corre contra Supabase LOCAL efímero.
 
 const admin = adminClient()
+const TITLE = 'TEST F3'
 let t: Tenants
 let n = 0
 
 function incident(extra: Record<string, unknown> = {}) {
   n += 1
-  return { numero_incident: `TEST-F3-${n}`, title: 'TEST F3', contract_machine_id: t.lineAId, ...extra }
+  return { title: `${TITLE} ${n}`, contract_machine_id: t.lineAId, ...extra }
 }
 
-async function exists(numero: string): Promise<boolean> {
-  const { data } = await admin.from('incidents').select('id').eq('numero_incident', numero)
-  return (data ?? []).length > 0
+async function numeroOf(title: string): Promise<string | null> {
+  const { data } = await admin.from('incidents').select('numero_incident').eq('title', title)
+  return data?.[0]?.numero_incident ?? null
+}
+
+async function exists(title: string): Promise<boolean> {
+  return (await numeroOf(title)) !== null
+}
+
+async function nextCounterNumero(): Promise<string> {
+  const year = new Date().getFullYear()
+  const { data } = await admin.from('incident_counters').select('last_number').eq('year', year).maybeSingle()
+  const next = (data?.last_number ?? 0) + 1
+  return `SAV-${year}-${String(next).padStart(4, '0')}`
 }
 
 beforeAll(async () => {
@@ -31,6 +50,8 @@ beforeAll(async () => {
 }, 60_000)
 
 afterAll(async () => {
+  const { error } = await admin.from('incidents').delete().like('title', `${TITLE}%`)
+  if (error) throw new Error(`borrar averías de cliente: ${error.message}`)
   await cleanup(admin)
 })
 
@@ -40,7 +61,7 @@ describe('F3 — el cliente crea averías solo como el portal', () => {
     const row = incident({ machine_id: null, source: null, category: 'autre', priority: 'normale', status: 'nouveau', opened_by: t.clientAUid })
     const { error } = await c.from('incidents').insert(row)
     expect(error).toBeNull()
-    expect(await exists(row.numero_incident)).toBe(true)
+    expect(await exists(row.title)).toBe(true)
   })
 
   it('crea una avería sin opened_by (los valores por defecto bastan)', async () => {
@@ -48,7 +69,7 @@ describe('F3 — el cliente crea averías solo como el portal', () => {
     const row = incident()
     const { error } = await c.from('incidents').insert(row)
     expect(error).toBeNull()
-    expect(await exists(row.numero_incident)).toBe(true)
+    expect(await exists(row.title)).toBe(true)
   })
 
   it('no puede asignarse la avería a sí mismo', async () => {
@@ -56,7 +77,7 @@ describe('F3 — el cliente crea averías solo como el portal', () => {
     const row = incident({ assigned_to: t.clientAUid })
     const { error } = await c.from('incidents').insert(row)
     expect(error).not.toBeNull()
-    expect(await exists(row.numero_incident)).toBe(false)
+    expect(await exists(row.title)).toBe(false)
   })
 
   it('no puede asignarla a un técnico', async () => {
@@ -64,7 +85,7 @@ describe('F3 — el cliente crea averías solo como el portal', () => {
     const row = incident({ assigned_to: t.techA })
     const { error } = await c.from('incidents').insert(row)
     expect(error).not.toBeNull()
-    expect(await exists(row.numero_incident)).toBe(false)
+    expect(await exists(row.title)).toBe(false)
   })
 
   it('no puede crearla en otro estado que «nouveau»', async () => {
@@ -72,7 +93,7 @@ describe('F3 — el cliente crea averías solo como el portal', () => {
     const row = incident({ status: 'en_cours' })
     const { error } = await c.from('incidents').insert(row)
     expect(error).not.toBeNull()
-    expect(await exists(row.numero_incident)).toBe(false)
+    expect(await exists(row.title)).toBe(false)
   })
 
   it('no puede crearla ya resuelta', async () => {
@@ -83,7 +104,7 @@ describe('F3 — el cliente crea averías solo como el portal', () => {
     })
     const { error } = await c.from('incidents').insert(row)
     expect(error).not.toBeNull()
-    expect(await exists(row.numero_incident)).toBe(false)
+    expect(await exists(row.title)).toBe(false)
   })
 
   it('no puede firmarla en nombre de otro usuario', async () => {
@@ -91,7 +112,7 @@ describe('F3 — el cliente crea averías solo como el portal', () => {
     const row = incident({ opened_by: t.clientBUid })
     const { error } = await c.from('incidents').insert(row)
     expect(error).not.toBeNull()
-    expect(await exists(row.numero_incident)).toBe(false)
+    expect(await exists(row.title)).toBe(false)
   })
 
   it('sigue sin poder crearla en la línea de otro cliente', async () => {
@@ -99,6 +120,34 @@ describe('F3 — el cliente crea averías solo como el portal', () => {
     const row = incident({ contract_machine_id: t.lineBId })
     const { error } = await c.from('incidents').insert(row)
     expect(error).not.toBeNull()
-    expect(await exists(row.numero_incident)).toBe(false)
+    expect(await exists(row.title)).toBe(false)
+  })
+})
+
+describe('Numeración — el cliente no elige el número SAV', () => {
+  it('el número que envía el cliente se ignora: lo pone el contador', async () => {
+    const c = await signInAs(SC.clientAEmail)
+    const row = incident({ numero_incident: 'SAV-2099-9999' })
+    const { error } = await c.from('incidents').insert(row)
+    expect(error).toBeNull()
+    const numero = await numeroOf(row.title)
+    expect(numero).not.toBe('SAV-2099-9999')
+    expect(numero).toMatch(/^SAV-\d{4}-\d{4}$/)
+  })
+
+  it('reservar el siguiente número no bloquea las altas: el contador se lo salta', async () => {
+    // Alguien de confianza (service_role) ocupa el número que tocaba al contador.
+    const taken = await nextCounterNumero()
+    const squat = incident({ numero_incident: taken })
+    expect((await admin.from('incidents').insert(squat)).error).toBeNull()
+    expect(await numeroOf(squat.title)).toBe(taken)
+
+    const c = await signInAs(SC.clientAEmail)
+    const row = incident()
+    const { error } = await c.from('incidents').insert(row)
+    expect(error).toBeNull()
+    const numero = await numeroOf(row.title)
+    expect(numero).not.toBe(taken)
+    expect(numero).toMatch(/^SAV-\d{4}-\d{4}$/)
   })
 })

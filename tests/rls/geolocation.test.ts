@@ -302,14 +302,20 @@ describe('guard_field_evidence — el sello QR solo lo escribe el servidor', () 
 
   it('un INSERT de usuario llega sin sello (cliente: avería; admin: visita)', async () => {
     const client = await signInAs(SC.clientAEmail)
-    const { error } = await client.from('incidents').insert({
-      numero_incident: 'TEST-GEO-INS', title: 'Geo insert', contract_machine_id: t.lineAId, qr_verified: true,
-    })
+    // El cliente no elige el número SAV (lo pone el contador): se lee por id y se borra aquí,
+    // porque `cleanup` solo barre los números `TEST-`.
+    const { data: created, error } = await client.from('incidents').insert({
+      title: 'Geo insert', contract_machine_id: t.lineAId, qr_verified: true,
+    }).select('id').single()
     expect(error).toBeNull()
-    const { data: inc, error: e1 } = await admin.from('incidents')
-      .select('qr_verified, qr_scanned_by').eq('numero_incident', 'TEST-GEO-INS').single()
-    expect(e1).toBeNull()
-    expect(inc).toEqual({ qr_verified: false, qr_scanned_by: null })
+    try {
+      const { data: inc, error: e1 } = await admin.from('incidents')
+        .select('qr_verified, qr_scanned_by').eq('id', created!.id).single()
+      expect(e1).toBeNull()
+      expect(inc).toEqual({ qr_verified: false, qr_scanned_by: null })
+    } finally {
+      expect((await admin.from('incidents').delete().eq('id', created!.id)).error).toBeNull()
+    }
 
     const adminUser = await signInAs(SC.adminEmail)
     const { data: v, error: e2 } = await adminUser.from('maintenance_visits').insert({
