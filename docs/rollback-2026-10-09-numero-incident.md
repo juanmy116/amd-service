@@ -64,3 +64,11 @@ $function$;
 
 Si se revierte a mano, la migración `20261009130000` sigue en el historial de `supabase_migrations`:
 para que git y la BD no se desalineen, añadir después una migración con el mismo SQL.
+
+## Guard del UPDATE (`20261009140000`)
+
+Segunda migración del mismo día: `guard_tech_scope_columns()` (el trigger de F2) rechaza además
+que una sesión de técnico o cliente cambie `numero_incident` en `incidents`. Para deshacer solo
+esto, volver a la función de F2 tal como quedó en `20261009100000_guard_tech_scope_columns.sql`
+(copiar su `CREATE OR REPLACE FUNCTION public.guard_tech_scope_columns()` y ejecutarlo). Los
+triggers no hay que tocarlos: siguen apuntando a la misma función.
