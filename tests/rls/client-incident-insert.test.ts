@@ -50,7 +50,8 @@ beforeAll(async () => {
 }, 60_000)
 
 afterAll(async () => {
-  await admin.from('incidents').delete().like('title', `${TITLE}%`)
+  const { error } = await admin.from('incidents').delete().like('title', `${TITLE}%`)
+  if (error) throw new Error(`borrar averías de cliente: ${error.message}`)
   await cleanup(admin)
 })
 

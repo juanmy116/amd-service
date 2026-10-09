@@ -1,5 +1,5 @@
--- Numeración SAV: el cliente (o el técnico) no elige el número, y un número ocupado no bloquea
--- las altas. Visto en la revisión de F3 (2026-10-09).
+-- Numeración SAV: al crear una avería, el cliente (o el técnico) no elige el número, y un número
+-- ocupado no bloquea las altas. Visto en la revisión de F3 (2026-10-09).
 --
 -- `set_incident_numero` respetaba el `numero_incident` que enviase quien inserta. Un cliente del
 -- portal podía crear su avería con el número que tocaba al contador (p. ej. `SAV-2026-0004`):
@@ -12,7 +12,9 @@
 --      siempre el contador, envíen lo que envíen. La app nunca lo envía. Siguen pudiendo fijarlo
 --      la oficina, service_role y las sesiones directas a la BD (tests, scripts, migraciones).
 --   2. El contador se salta los números que ya existan, así que un número ocupado por cualquier
---      vía ya no deja la numeración atascada.
+--      vía ya no deja la numeración atascada. Cubre también el UPDATE: el técnico asignado aún
+--      puede renombrar su avería (`tech_assigned_incidents_update` no limita columnas), pero ya
+--      no atasca las altas.
 --
 -- Deshacer: docs/rollback-2026-10-09-numero-incident.md
 

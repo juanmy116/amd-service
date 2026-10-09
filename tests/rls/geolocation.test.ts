@@ -308,11 +308,14 @@ describe('guard_field_evidence — el sello QR solo lo escribe el servidor', () 
       title: 'Geo insert', contract_machine_id: t.lineAId, qr_verified: true,
     }).select('id').single()
     expect(error).toBeNull()
-    const { data: inc, error: e1 } = await admin.from('incidents')
-      .select('qr_verified, qr_scanned_by').eq('id', created!.id).single()
-    expect(e1).toBeNull()
-    expect(inc).toEqual({ qr_verified: false, qr_scanned_by: null })
-    expect((await admin.from('incidents').delete().eq('id', created!.id)).error).toBeNull()
+    try {
+      const { data: inc, error: e1 } = await admin.from('incidents')
+        .select('qr_verified, qr_scanned_by').eq('id', created!.id).single()
+      expect(e1).toBeNull()
+      expect(inc).toEqual({ qr_verified: false, qr_scanned_by: null })
+    } finally {
+      expect((await admin.from('incidents').delete().eq('id', created!.id)).error).toBeNull()
+    }
 
     const adminUser = await signInAs(SC.adminEmail)
     const { data: v, error: e2 } = await adminUser.from('maintenance_visits').insert({
