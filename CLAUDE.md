@@ -87,6 +87,8 @@ Google OAuth necesita la URL de producción añadida en el panel de Google Cloud
 ```
 /                    → sitio web público AMD (ya existe)
 /login               → auth compartida (todos los roles)
+/mot-de-passe-oublie → pedir el correo para cambiar la contraseña (público)
+/nouveau-mot-de-passe → fijar la contraseña nueva desde el enlace del correo (público)
 /admin/*             → back-office AMD (rol: admin)
 /portal/*            → portal cliente (rol: client)
 /tech/*              → PWA técnico (rol: technician)

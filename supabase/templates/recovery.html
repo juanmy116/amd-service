@@ -1,0 +1,22 @@
+<!--
+  Plantilla «Reset Password» de Supabase Auth.
+  - En local la carga supabase/config.toml ([auth.email.template.recovery]).
+  - En PRODUCCIÓN NO viaja sola: hay que pegarla a mano en el panel de Supabase →
+    Authentication → Emails → Reset Password (asunto: «Réinitialisation de votre mot de passe»).
+  El enlace lleva token_hash (y no el {{ .ConfirmationURL }} por defecto) para que funcione aunque
+  el correo se abra en otro navegador o en el iPhone fuera de la app, y lo canjea la página
+  /nouveau-mot-de-passe al enviar el formulario.
+-->
+<div style="font-family: Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1f2937;">
+  <p style="font-size: 20px; font-weight: bold; color: #BF0D0D; margin: 0 0 24px;">AMD Service</p>
+  <p>Bonjour,</p>
+  <p>Nous avons reçu une demande pour changer le mot de passe du compte <strong>{{ .Email }}</strong>.</p>
+  <p style="margin: 28px 0;">
+    <a href="{{ .SiteURL }}/nouveau-mot-de-passe?token_hash={{ .TokenHash }}&amp;type=recovery"
+       style="background: #BF0D0D; color: #ffffff; padding: 12px 20px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+      Choisir un nouveau mot de passe
+    </a>
+  </p>
+  <p style="font-size: 14px; color: #6b7280;">Ce lien ne fonctionne qu'une fois et pendant une durée limitée.</p>
+  <p style="font-size: 14px; color: #6b7280;">Si vous n'êtes pas à l'origine de cette demande, ignorez cet email : votre mot de passe actuel reste valable.</p>
+</div>

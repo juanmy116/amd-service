@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
+import { getAppOrigin } from '@/lib/app-origin'
 
 type AuthState = { error: string } | null
 
@@ -61,10 +62,7 @@ export async function registerClientAction(
   if (password !== confirm) return { error: 'Les mots de passe ne correspondent pas.' }
   if (password.length < 8)  return { error: 'Le mot de passe doit contenir au moins 8 caractères.' }
 
-  const h = await headers()
-  const host  = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
-  const proto = h.get('x-forwarded-proto') ?? 'http'
-  const origin = process.env.NEXT_PUBLIC_APP_URL ?? `${proto}://${host}`
+  const origin = await getAppOrigin()
 
   const { error } = await supabase.auth.signUp({
     email,
