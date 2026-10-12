@@ -15,6 +15,7 @@ export async function requestPasswordResetAction(
 
   const ip = await getClientIp()
   const ok = await checkRateLimit('password_reset', `${ip}:${email}`)
+    && await checkRateLimit('password_reset_ip', ip)
   if (!ok) return { error: 'Trop de demandes. Réessayez dans une heure.' }
 
   const supabase = await createClient()

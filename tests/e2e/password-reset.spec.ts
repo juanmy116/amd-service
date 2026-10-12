@@ -34,6 +34,9 @@ async function restoreTechPassword() {
   const tech = data.users.find(u => u.email === E2E.techEmail)
   if (tech) await admin.auth.admin.updateUserById(tech.id, { password: E2E.password })
   await admin.from('rate_limit_hits').delete().eq('bucket', 'password_reset').like('identifier', `%:${E2E.techEmail}`)
+  // El tope por IP sola (10/h) lo llenarían varias pasadas seguidas de la suite. Base local siempre
+  // (local-only.ts), así que vaciarlo entero no toca a nadie.
+  await admin.from('rate_limit_hits').delete().eq('bucket', 'password_reset_ip')
 }
 
 test.describe('Mot de passe oublié', () => {

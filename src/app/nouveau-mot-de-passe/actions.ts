@@ -35,7 +35,9 @@ export async function setNewPasswordAction(
   // `same_password`: ha escrito la que ya tenía. No se cambia nada, pero ya la conoce: vale.
   if (error && error.code !== 'same_password') {
     console.error('[new-password]', error.status, error.code, error.message)
-    await supabase.auth.signOut()
+    // Solo la sesión de recuperación de este navegador: la contraseña no ha cambiado, así que las
+    // demás sesiones (p. ej. la app del iPhone) siguen siendo legítimas.
+    await supabase.auth.signOut({ scope: 'local' })
     return {
       error: error.code === 'weak_password'
         ? 'Ce mot de passe est trop faible. Demandez un nouveau lien et choisissez-en un plus long.'
@@ -46,6 +48,13 @@ export async function setNewPasswordAction(
 
   // Cierra TODAS las sesiones de la cuenta (también la de quien la estuviera usando sin permiso)
   // y la persona entra con la contraseña nueva, que así queda probada.
-  await supabase.auth.signOut({ scope: 'global' })
+  const { error: signOutError } = await supabase.auth.signOut({ scope: 'global' })
+  if (signOutError) {
+    // Si Supabase falla (5xx, red), auth-js devuelve el error SIN borrar nada: las demás sesiones
+    // siguen vivas. La contraseña ya está cambiada; al menos se cierra la de este navegador y
+    // queda rastro en los logs de Vercel.
+    console.error('[new-password] no se pudieron cerrar todas las sesiones', signOutError.status, signOutError.message)
+    await supabase.auth.signOut({ scope: 'local' })
+  }
   redirect('/login?message=mot-de-passe-modifie')
 }
