@@ -15,6 +15,11 @@ export default async function LoginPage({
             Vérifiez votre boîte email et cliquez sur le lien de confirmation pour activer votre compte.
           </div>
         )}
+        {message === 'mot-de-passe-modifie' && (
+          <div className="rounded-xl border border-success/20 bg-success-soft px-4 py-3 text-sm text-ink">
+            Mot de passe modifié. Connectez-vous avec votre nouveau mot de passe.
+          </div>
+        )}
         <LoginForm />
       </div>
     </div>

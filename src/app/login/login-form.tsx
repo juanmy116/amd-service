@@ -1,7 +1,9 @@
 'use client'
 
 import { useActionState, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { signInWithEmail, signInWithGoogle, registerClientAction } from './actions'
+import { AuthHeader } from './auth-header'
 import { Loader2 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { isStandaloneDisplay } from '@/lib/pwa/display'
@@ -23,16 +25,7 @@ export default function LoginForm() {
   return (
     <div className="w-full max-w-md mx-auto">
 
-      {/* Header */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4 bg-accent">
-          <span className="text-white font-bold text-lg font-display">A</span>
-        </div>
-        <h1 className="text-2xl font-semibold text-ink font-display">
-          AMD Service
-        </h1>
-        <p className="text-sm text-ink-muted mt-1">Connectez-vous à votre espace</p>
-      </div>
+      <AuthHeader subtitle="Connectez-vous à votre espace" />
 
       {/* Card */}
       <Card className="p-8">
@@ -69,7 +62,12 @@ export default function LoginForm() {
                 <input id="email" name="email" type="email" autoComplete="email" required className={inputClass} placeholder="vous@entreprise.com" />
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-ink-soft mb-1.5">Mot de passe</label>
+                <div className="flex items-baseline justify-between mb-1.5">
+                  <label htmlFor="password" className="block text-sm font-medium text-ink-soft">Mot de passe</label>
+                  <Link href="/mot-de-passe-oublie" className="text-xs text-ink-muted hover:text-accent transition-colors">
+                    Mot de passe oublié ?
+                  </Link>
+                </div>
                 <input id="password" name="password" type="password" autoComplete="current-password" required className={inputClass} placeholder="••••••••" />
               </div>
               <button type="submit" disabled={loginPending} className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium text-white bg-accent transition-opacity disabled:opacity-60 mt-2">

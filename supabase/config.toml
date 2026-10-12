@@ -238,6 +238,11 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# «Mot de passe oublié»: copia local de la plantilla que en prod se pega a mano en el panel.
+[auth.email.template.recovery]
+subject = "Réinitialisation de votre mot de passe"
+content_path = "./supabase/templates/recovery.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

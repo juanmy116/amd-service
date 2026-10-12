@@ -6,6 +6,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 export const rateLimiters = {
   login:                  { limit: 5,  windowSeconds: 15 * 60 },
   signup:                 { limit: 3,  windowSeconds: 60 * 60 },
+  // «Mot de passe oublié»: cada intento manda un correo. Por `ip:email`, para que nadie use la
+  // página para llenar de correos el buzón de otro.
+  password_reset:         { limit: 3,  windowSeconds: 60 * 60 },
   verify:                 { limit: 10, windowSeconds: 60 * 60 },
   csat:                   { limit: 5,  windowSeconds: 60 * 60 },
   contact:                { limit: 3,  windowSeconds: 60 * 60 },
