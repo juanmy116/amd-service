@@ -1,5 +1,6 @@
 'use server'
 
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { validateNewPassword } from '@/lib/password'
@@ -9,6 +10,19 @@ import { validateNewPassword } from '@/lib/password'
 export type NewPasswordState = { error: string; relink?: boolean } | null
 
 const EXPIRED = 'Ce lien a expiré ou a déjà été utilisé. Demandez-en un nouveau.'
+
+// Cierra la sesión de ESTE navegador pase lo que pase. `signOut({ scope: 'local' })` también llama
+// al servidor de Supabase, y si esa llamada falla (5xx, red) auth-js no borra nada: la cookie
+// seguiría ahí y el proxy metería a la persona en el panel. En ese caso se borran a mano las
+// cookies de sesión (`sb-<proyecto>-auth-token`, troceada en `.0`, `.1`… si es larga).
+async function endBrowserSession(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { error } = await supabase.auth.signOut({ scope: 'local' })
+  if (!error) return
+  const store = await cookies()
+  for (const { name } of store.getAll()) {
+    if (/^sb-.+-auth-token/.test(name)) store.delete(name)
+  }
+}
 
 export async function setNewPasswordAction(
   _prev: NewPasswordState,
@@ -37,7 +51,7 @@ export async function setNewPasswordAction(
     console.error('[new-password]', error.status, error.code, error.message)
     // Solo la sesión de recuperación de este navegador: la contraseña no ha cambiado, así que las
     // demás sesiones (p. ej. la app del iPhone) siguen siendo legítimas.
-    await supabase.auth.signOut({ scope: 'local' })
+    await endBrowserSession(supabase)
     return {
       error: error.code === 'weak_password'
         ? 'Ce mot de passe est trop faible. Demandez un nouveau lien et choisissez-en un plus long.'
@@ -51,10 +65,10 @@ export async function setNewPasswordAction(
   const { error: signOutError } = await supabase.auth.signOut({ scope: 'global' })
   if (signOutError) {
     // Si Supabase falla (5xx, red), auth-js devuelve el error SIN borrar nada: las demás sesiones
-    // siguen vivas. La contraseña ya está cambiada; al menos se cierra la de este navegador y
-    // queda rastro en los logs de Vercel.
+    // siguen vivas. La contraseña ya está cambiada; se cierra la de este navegador y queda rastro
+    // en los logs de Vercel.
     console.error('[new-password] no se pudieron cerrar todas las sesiones', signOutError.status, signOutError.message)
-    await supabase.auth.signOut({ scope: 'local' })
+    await endBrowserSession(supabase)
   }
   redirect('/login?message=mot-de-passe-modifie')
 }
