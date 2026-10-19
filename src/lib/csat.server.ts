@@ -69,11 +69,22 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
     .eq('incident_id', incidentId)
     .maybeSingle()
 
-  if (existing?.responded_at) return
+  // En los dos cortes de abajo la encuesta ya hizo su trabajo, así que la avería se cierra igual:
+  // `résolu` es una sala de espera de la que solo saca este proceso. Volver sin cerrar la dejaba
+  // clavada ahí para siempre — le pasó a SAV-2026-0004, que la TV del taller devolvió de «Fermé»
+  // a «Résolu» con el tablero sin refrescar, y también a cualquier avería reabierta y vuelta a
+  // resolver dentro de los 7 días del enlace.
+  if (existing?.responded_at) {
+    await closeAfterSurvey(admin, incidentId, "Fermé automatiquement — le client a déjà répondu à l'enquête")
+    return
+  }
 
   // Ya se envió y el enlace sigue vigente: reenviarlo solo duplicaría el email del cliente
-  // y pisaría `sent_to`/`sent_at`. No es un fallo, así que no deja rastro.
-  if (isSurveyStillValid(existing?.sent_at, existing?.expires_at)) return
+  // y pisaría `sent_to`/`sent_at`.
+  if (isSurveyStillValid(existing?.sent_at, existing?.expires_at)) {
+    await closeAfterSurvey(admin, incidentId, 'Fermé automatiquement — enquête déjà envoyée')
+    return
+  }
 
   const { data: incident } = await admin
     .from('incidents')
@@ -196,6 +207,18 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
     })
     .eq('incident_id', incidentId)
 
+  await closeAfterSurvey(admin, incidentId, 'Fermé automatiquement — email CSAT envoyé')
+}
+
+/**
+ * Saca la avería de `résolu` una vez resuelta su encuesta. El `.eq('status', 'résolu')` hace que
+ * no toque una avería que alguien ya movió, y solo se apunta en el historial si cerró de verdad.
+ */
+async function closeAfterSurvey(
+  admin: ReturnType<typeof createAdminClient>,
+  incidentId: string,
+  comment: string,
+): Promise<void> {
   const { data: closed } = await admin
     .from('incidents')
     .update({ status: 'fermé', closed_at: new Date().toISOString() })
@@ -209,7 +232,7 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
       changed_by: null,
       old_status: 'résolu',
       new_status: 'fermé',
-      comment: 'Fermé automatiquement — email CSAT envoyé',
+      comment,
     })
   }
 }
