@@ -582,6 +582,10 @@ Ruta pública **sin autenticación** para que cualquier persona abra un incident
   default de la BD, lo que valida `/csat/[token]` y lo que promete el email. Al enviar se **refresca**
   `expires_at`: si no, un reintento semanas después mandaría un token ya muerto y lo apuntaría como
   enviado. Y si la encuesta ya salió y sigue vigente, **no se reenvía** (`isSurveyStillValid`).
+- **Si la encuesta ya salió (vigente) o ya está respondida, la avería se cierra igualmente**
+  (`closeAfterSurvey`, 2026-10-19). Antes esas dos salidas volvían sin cerrar y la avería se quedaba
+  en `résolu` para siempre: pasó con SAV-2026-0004, que la TV del taller devolvió de «Fermé» a
+  «Résolu» con el tablero sin refrescar. Mismo hueco al reabrir y volver a resolver dentro de los 7 días.
 - ⚠️ **Las notas internas NO se enseñan al cliente.** `incident_history` se pinta en el portal del
   cliente y en la ficha admin; el portal filtra **en la consulta** (`.not('new_status','is',null)`)
   para que el texto no viaje siquiera al navegador. El discriminador es **`new_status IS NULL`**, no
