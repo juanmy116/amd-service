@@ -11,30 +11,24 @@ const STATUS_BADGE: Record<string, { label: string; variant: BadgeVariant }> = {
   en_cours: { label: 'En cours', variant: 'neutral' },
 }
 
-type RecentIncident = {
-  id: string
-  title: string
-  status: string
-  created_at: string
-  clients: { nom_client: string } | null
-  profiles: { full_name: string } | null
-}
-
 export default async function DashboardRecentIncidents() {
   const supabase = await createClient()
 
-  const { data } = await supabase
+  // El cliente cuelga de la línea de contrato: `incidents` no tiene columna de cliente.
+  const { data, error } = await supabase
     .from('incidents')
     .select(`
       id, title, status, created_at,
-      clients!client_id ( nom_client ),
+      contract_machines ( contracts ( clients ( nom_client ) ) ),
       profiles!assigned_to ( full_name )
     `)
     .not('status', 'in', '("résolu","fermé")')
     .order('created_at', { ascending: false })
     .limit(8)
+  // Un fallo se dice: tratarlo como «Aucun incident ouvert» escondía que este cuadro estaba roto.
+  if (error) console.error('[DashboardRecentIncidents]', error)
 
-  const incidents = (data ?? []) as unknown as RecentIncident[]
+  const incidents = data ?? []
 
   return (
     <Card className="overflow-hidden">
@@ -66,7 +60,7 @@ export default async function DashboardRecentIncidents() {
           {incidents.length === 0 ? (
             <tr>
               <td colSpan={5} className="px-4 py-10 text-center text-sm text-ink-muted">
-                Aucun incident ouvert
+                {error ? 'Impossible de charger les incidents' : 'Aucun incident ouvert'}
               </td>
             </tr>
           ) : (
@@ -82,7 +76,7 @@ export default async function DashboardRecentIncidents() {
                       {inc.title}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-ink-soft">{inc.clients?.nom_client ?? '—'}</td>
+                  <td className="px-4 py-3 text-ink-soft">{inc.contract_machines?.contracts?.clients?.nom_client ?? '—'}</td>
                   <td className="px-4 py-3">
                     {badge ? (
                       <Badge variant={badge.variant}>
