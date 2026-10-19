@@ -5,6 +5,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import { sendEmail } from '@/lib/email'
 import { createIncidentPhotoUploadUrl, incidentPhotoExists, type PrepareUploadResult } from '@/lib/incidentPhotoUpload'
 import { validateContactEmail } from '@/lib/publicIncident'
+import { getOpenLineForMachine } from '@/lib/contract-machines'
 
 type State =
   | { error: string }
@@ -114,11 +115,17 @@ export async function submitPublicIncident(
 
   const title = `Incident QR — ${machine.marque} ${machine.modele} (${serie})`
 
+  // Si la máquina está en un contrato (línea abierta), la incidencia se cuelga de esa línea,
+  // como las internas: así todas las pantallas encuentran cliente y contrato. Sin línea (máquina
+  // en el almacén) o si la búsqueda falla, se guarda solo la máquina: nunca se bloquea el aviso.
+  // Mismo criterio que `princity-alerts`.
+  const openLine = await getOpenLineForMachine(admin, serie)
+
   const { data: incident, error: insertError } = await admin
     .from('incidents')
     .insert({
-      machine_id:          serie,          // FK directa a machines, conservada para públicas
-      contract_machine_id: null,           // por XOR — incidencias públicas no tienen línea
+      contract_machine_id: openLine?.id ?? null,
+      machine_id:          openLine ? null : serie,   // XOR con contract_machine_id
       opened_by:           null,
       title,
       description,

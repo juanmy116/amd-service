@@ -519,11 +519,11 @@ Ruta pública **sin autenticación** para que cualquier persona abra un incident
    - Rate limit: `${ip}:${serie}` — 2/hora y 5/día (limiters `public_incident_hourly` / `public_incident_daily`)
    - Si superado → estado `rateLimited` con mensaje "Il y a déjà un incident en attente…"
    - Lookup `machines` (verifica existencia)
-   - INSERT en `incidents` con `opened_by=null`, `source='public'`, `machine_id` directo, campos de contacto
+   - INSERT en `incidents` con `opened_by=null`, `source='public'`, campos de contacto. Si la máquina tiene línea de contrato abierta (`getOpenLineForMachine`) se guarda `contract_machine_id` (como las internas); si no, `machine_id` directo (XOR). Mismo criterio que `princity-alerts` (2026-10-19; antes siempre `machine_id`, y admin/técnico no veían cliente ni contrato).
    - Email de notificación al equipo SAV (destino en la env var `SAV_NOTIFY_EMAIL`, fallback `savamdservice@gmail.com`; template `raw` via Resend, contenido HTML escapado)
 5. Estado de éxito: mensaje de agradecimiento + número de referencia `SAV-YYYY-NNNN`
 
-**Seguridad:** datos del reporter anónimo (`contact_name/phone/email`) son visibles solo en el detalle de admin. El portal del cliente los excluye con filtro `.or('source.is.null,source.neq.public')` en listado y detalle. Las incidencias públicas se vinculan por `machine_id` directo (sin `contract_machine_id`).
+**Seguridad:** datos del reporter anónimo (`contact_name/phone/email`) son visibles solo en el detalle de admin. El portal del cliente los excluye con filtro `.or('source.is.null,source.neq.public')` en listado y detalle. Las incidencias públicas de una máquina en contrato se cuelgan de su línea (`contract_machine_id`); solo las de máquinas sin contrato usan `machine_id` directo. El filtro `source` del portal sigue ocultándolas al cliente.
 
 ### 7. Sistema CSAT ✅
 
