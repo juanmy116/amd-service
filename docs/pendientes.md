@@ -6,7 +6,14 @@
 
 ---
 
-## 📍 Por dónde seguir (al 2026-10-09, cierre de sesión)
+## 📍 Por dónde seguir (al 2026-10-19, cierre de sesión)
+
+> **2026-10-19:** SAV en uso real — tres arreglos en prod (PRs #187–#189): las incidencias del QR se
+> cuelgan de la línea de contrato (salen cliente y contrato en admin y técnico; las 5 antiguas
+> corregidas en BD, inverso en `docs/rollback-2026-10-19-incidencias-qr.md`); el cuadro «Incidents
+> récents» de `/admin` cargaba siempre vacío (consulta rota); y una avería ya no se queda atascada
+> en `résolu` si su encuesta ya salió (SAV-2026-0004, devuelta a «Résolu» desde la TV; cerrada a
+> mano). Fila 14 nueva. El resto de la tabla sigue igual.
 
 > **2026-10-09:** seguridad — **fila 0 cerrada** (F2, F8, F3 y la numeración SAV, PRs #180–#184,
 > todo en prod) y **fila 8 cerrada** (los E2E en local ya no pueden tocar producción, #179). Ver
@@ -41,6 +48,7 @@
 | 🟡 **11** | **«Mot de passe oublié» — código hecho, falta el panel de Supabase** | Rama `feat/mot-de-passe-oublie` (2026-10-12): enlace en `/login`, páginas `/mot-de-passe-oublie` y `/nouveau-mot-de-passe`, plantilla de correo `supabase/templates/recovery.html`, E2E en verde. **Antes de darlo por cerrado (en este orden, tras publicar la app):** (1) Supabase → Authentication → Emails → **Reset Password**: asunto «Réinitialisation de votre mot de passe» y pegar el HTML de la plantilla; (2) Authentication → URL Configuration → **Site URL** = `https://amd-service.vercel.app`; (3) Authentication → Emails → **SMTP**: comprobar que hay uno propio (p. ej. Resend, ya verificado para `amd-service.com`) — con el de Supabase por defecto los correos solo llegan a los miembros del equipo; (4) Authentication → Providers → Email → **reglas de contraseña**: si exigen más que «mínimo 8» (caracteres obligatorios, contraseñas filtradas), igualarlas en `src/lib/password.ts` — si no, Supabase rechaza la contraseña después de gastar el enlace; (5) prueba real **justo después** de pegar la plantilla (entre el deploy y la plantilla, el enlace del correo por defecto no funciona): pedir el enlace con una cuenta propia, cambiar la contraseña y entrar. Detalle en `docs/architecture.md` §Seguridad → Recuperación de contraseña. |
 | 🎨 **12** | **PR C de la auditoría `/apple-design` de `/admin`** | Unificar los títulos de página (hoy 6 combinaciones), limpiar ~150 `gray-*`/`red-*` sueltos y las variables heredadas de `:root` en `globals.css` (`--bg-surface`… — de ahí salió el fallo de #174), Agenda flotante con Escape y foco (convertirla en `Dialog` de Headless UI), `active:` en los botones sueltos y quitar la dependencia `@dnd-kit/utilities` (sin uso desde #176). Sin prisa: es pulido. |
 | 💡 **13** | **Ideas rescatables de la plantilla shadcnstore** (`silicondeck/shadcn-dashboard-landing-template`, MIT) | No duele: es para más adelante, detrás de las filas 0, 1 y 11. **Solo como inspiración, rehaciéndolo con nuestras piezas** (`Card`, `Badge`, `Button`…): copiar su código metería Radix al lado de Headless UI, dos librerías para lo mismo. Con valor real: **(a)** página «Mon compte» para cambiar la contraseña (los usuarios `juansav`/`josesav`/`amarsav` la tienen pendiente de cambiar); hacerla junto a la fila 11; **(b)** listados con ordenar por columna, paginar y elegir columnas, para cuando estén cargados los 1.200+ equipos (antes, comprobar si los listados ya paginan). Detalles menores: página «En maintenance», tarjetas KPI con tendencia («+12 % vs mois dernier») para `DashboardCharts`, menú lateral de `/admin` plegable a iconos. Descartado: mail, chat, tareas, calendario (maquetas sin datos; ya hay Kanban y FullCalendar), landing, precios, «billing» de SaaS y el personalizador de temas. |
+| 🔎 **14** | **Comprobar con la próxima incidencia real del QR** (tras #187) | En su ficha de `/admin` y en el listado deben salir el cliente y el contrato, y el cuadro «Incidents récents» del inicio debe mostrarla. No se ha podido probar en prod sin crear una avería de verdad (no hay aún «máquina de prueba», `docs/cambios-en-produccion.md` §1). De paso: el email de contacto de SAV-2026-0003 (WOORADVICE) tiene una errata (`wooradvicesebegal.com`); si hay que escribirle, usar el de SAV-2026-0006. |
 
 **Cerrado el 2026-10-09 (seguridad, todo en prod y comprobado):** E2E en local solo contra un
 Supabase local (#179). F2 — un técnico ya no puede cambiar la máquina, la asignación ni el número
