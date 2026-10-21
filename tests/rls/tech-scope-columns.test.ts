@@ -48,10 +48,11 @@ describe('F2 — el técnico no puede ampliar su propio alcance', () => {
   it('el técnico sigue pudiendo trabajar su avería (estado, informe)', async () => {
     // Desde el doble escaneo (20261021110000) cerrar exige dos escaneos del ciclo: se siembran con
     // service_role, como hace la ruta de escaneo. El test prueba que el guard de columnas no estorba.
-    await admin.from('incident_scans').insert([
+    const { error: seedError } = await admin.from('incident_scans').insert([
       { incident_id: incidentAId, scanned_by: t.techA, scanned_at: new Date(Date.now() - 20 * 60_000).toISOString() },
       { incident_id: incidentAId, scanned_by: t.techA, scanned_at: new Date(Date.now() - 2 * 60_000).toISOString() },
     ])
+    if (seedError) throw new Error(`seed scans: ${seedError.message}`)
     const c = await signInAs(SC.techAEmail)
     const { error } = await c.from('incidents')
       .update({

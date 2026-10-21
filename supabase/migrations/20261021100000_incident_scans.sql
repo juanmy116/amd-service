@@ -21,9 +21,10 @@ CREATE INDEX incident_scans_incident_scanned_by_at_idx
 
 ALTER TABLE public.incident_scans ENABLE ROW LEVEL SECURITY;
 
+-- `(select ...)`: Postgres evalúa is_admin() una vez por consulta, no una por fila.
 CREATE POLICY incident_scans_admin_select ON public.incident_scans
   FOR SELECT TO authenticated
-  USING (public.is_admin());
+  USING ((select public.is_admin()));
 
 -- Supabase concede ALL a anon/authenticated por defecto en `public`; la falta de policy ya
 -- bloquea, pero se quita el privilegio también (defensa en profundidad).

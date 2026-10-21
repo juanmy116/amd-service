@@ -105,7 +105,7 @@ export default async function TechIncidentPage({
   const needsStart = mustScan && ['nouveau', 'assigné'].includes(incident.status)
   const gate: CloseGate = mustScan
     ? await getCloseGate(incident.id, user.id, incident.resolved_at)
-    : { canClose: true, closeUntil: null }
+    : { canClose: true, closeUntil: null, reason: null, firstScanAt: null, nextScanAfter: null }
 
   const checkedParts = new Map((parts ?? []).map((p) => [p.part_id, p.quantity]))
   const boundAction  = submitInterventionAction.bind(null, incident.id)
@@ -122,7 +122,13 @@ export default async function TechIncidentPage({
       destText={destText}
       checkedParts={checkedParts}
       needsStart={needsStart}
-      closeGate={{ canClose: gate.canClose, closeUntil: gate.closeUntil?.toISOString() ?? null }}
+      closeGate={{
+        canClose: gate.canClose,
+        closeUntil: gate.closeUntil?.toISOString() ?? null,
+        reason: gate.reason,
+        firstScanAt: gate.firstScanAt?.toISOString() ?? null,
+        nextScanAfter: gate.nextScanAfter?.toISOString() ?? null,
+      }}
       photos={<IncidentPhotos incidentId={incident.id} />}
     />
   )

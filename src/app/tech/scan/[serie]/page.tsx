@@ -30,10 +30,15 @@ function FicheHeader() {
 
 export default async function MachineScanPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ serie: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { serie } = await params
+  // El escáner de la app llega con `?scan=echec` si el sello no se grabó (sin red o error):
+  // sin él, el técnico no podrá empezar ni cerrar, así que se le avisa nada más llegar.
+  const scanFailed = (await searchParams).scan === 'echec'
   const numero_serie = decodeURIComponent(serie)
 
   // Admin o técnico; cualquier otro rol sale (requireTechnician redirige).
@@ -128,6 +133,12 @@ export default async function MachineScanPage({
   return (
     <div className="p-4 space-y-5">
       <FicheHeader />
+
+      {scanFailed && (
+        <div role="alert" className="px-4 py-3 rounded-xl bg-accent-soft border border-accent/20 text-sm text-accent">
+          Scan non enregistré — vérifiez la connexion et scannez à nouveau.
+        </div>
+      )}
 
       {/* Machine info */}
       <Card className="p-4 space-y-4">
