@@ -8,6 +8,15 @@
 
 ## 📍 Por dónde seguir (al 2026-10-19, cierre de sesión)
 
+> **2026-10-21:** doble escaneo obligatorio para los técnicos (rama `feat/doble-escaneo-tecnicos`, aún
+> sin fusionar): empezar una avería = escanear el QR (abrir la ficha ya no la pasa a `en_cours`) y
+> cerrarla = un 2º escaneo, con 60 min para el informe; tabla `incident_scans` + trigger en la BD.
+> Cierra la parte a de la fila 7; el Atelier, los admins y los mantenimientos no cambian. **Antes de
+> publicar:** avisar a los técnicos (texto en el plan). Orden (la BD siempre ANTES del merge): aplicar
+> la migración `20261021100000` (tabla) y después fusionar el PR A; comprobar el PR A en prod; aplicar
+> la migración `20261021110000` (trigger) y después fusionar el PR B. Deshacer: ver
+> `docs/rollback-2026-10-21-doble-escaneo.md` (trigger primero, luego app, luego tabla).
+
 > **2026-10-19:** SAV en uso real — tres arreglos en prod (PRs #187–#189): las incidencias del QR se
 > cuelgan de la línea de contrato (salen cliente y contrato en admin y técnico; las 5 antiguas
 > corregidas en BD, inverso en `docs/rollback-2026-10-19-incidencias-qr.md`); el cuadro «Incidents
@@ -41,7 +50,7 @@
 | ✅ **5** | **Borrar los datos de prueba** | HECHO (2026-10-01): sistema limpio para el piloto con 2AS. Ver §«Datos de prueba borrados». |
 | 🔎 **5b** | **Comprobar el 2026-10-02 que el cron borró las 7 fotos huérfanas** | `select count(*) from storage.objects where bucket_id='incident-photos'` debe dar **0**. Si siguen 7, el borrado físico de `cleanup-orphan-incident-photos` falla (nunca se ha visto funcionar en prod: hasta hoy no había huérfanas). No bloquea el piloto. |
 | ⚠️ **6** | **40 visitas el mismo día / sin válvula de escape** | Afecta al uso real del mantenimiento, no bloquea. |
-| ⚠️ **7** | **Escaneo de técnicos: dos cabos sueltos del PR #155** | «En cours» automático al ABRIR la ficha (no al escanear) y sello QR falsificable por un técnico logueado. Aceptados por ahora. |
+| ⚠️ **7** | **Escaneo de técnicos: queda un cabo suelto del PR #155** | ~~«En cours» automático al ABRIR la ficha~~ — cerrado el 2026-10-21 (doble escaneo: se pasa a «En cours» al escanear de verdad). Queda: sello QR falsificable por un técnico logueado tecleando `/m/<serie>` (F10–F12); ahora cuesta dos escaneos separados ≥ 1 min, no es imposible. Aceptado por ahora. |
 | ✅ **8** | **Los tests E2E en local apuntaban a PRODUCCIÓN** | CERRADO (2026-10-09, #179): `playwright.config.ts` se niega a arrancar si los tests no apuntan a un Supabase local, y la app que arranca para los tests usa esa base local en vez del `.env.local`. Cómo correrlos: `docs/cambios-en-produccion.md` §1. |
 | ⚠️ **9** | **Ubicación de una máquina fijable sin escanear** | `recordMachineLocationAction` (Fase 3) no exige un escaneo previo: un técnico podría, llamando a la acción, fijar una máquina sin ubicación en cualquier punto y luego salir 🟢 ahí. Mismo nivel de confianza que el sello QR (el serie y la posición vienen del cliente). Mitiga: el admin ve «Premier scan de X» y puede corregir. Aceptado por ahora. |
 | 📱 **10** | **PWA técnicos: probar la Fase 3 en iPhone y seguir** | Geolocalización en prod (PR #157) sin probar aún en un iPhone real: permiso de ubicación, «Itinéraire», «Plus proche», 🟢 en la ficha tras resolver. Después: Fase 4 (uso con mala cobertura, solo lectura) del spec `docs/superpowers/specs/2026-09-22-pwa-tecnicos-design.md`. Al instalar la app a cada técnico: que pulse «Activer les notifications» (se ve en Équipe) y escanee siempre desde la app. |

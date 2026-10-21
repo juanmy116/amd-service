@@ -402,11 +402,13 @@ describe('field_presence — privada de la oficina, escrita solo por el servidor
     }
   })
 
-  it('reabrir una avería borra su presencia, la reabra el técnico o el servidor', async () => {
-    const byTech = await resolvedIncident()
-    const c = await signInAs(SC.techAEmail)
-    expect((await c.from('incidents').update({ status: 'en_cours' }).eq('id', byTech)).error).toBeNull()
-    expect(await presenceOf(byTech)).toEqual([])
+  it('reabrir una avería borra su presencia, la reabra la oficina o el servidor', async () => {
+    // Con el doble escaneo (20261021110000) un técnico ya no reabre con su sesión: pasar a
+    // `en_cours` exige escanear, así que la reapertura por sesión de usuario es la de la oficina.
+    const byOffice = await resolvedIncident()
+    const c = await signInAs(SC.adminEmail)
+    expect((await c.from('incidents').update({ status: 'en_cours' }).eq('id', byOffice)).error).toBeNull()
+    expect(await presenceOf(byOffice)).toEqual([])
 
     const byServer = await resolvedIncident()
     expect((await admin.from('incidents').update({ status: 'assigné' }).eq('id', byServer)).error).toBeNull()

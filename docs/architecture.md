@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-10-19 — **incidencias QR colgadas de la línea de contrato** (§6b, PR #187: si la máquina tiene línea abierta se guarda `contract_machine_id`, si no `machine_id`), **cuadro «Incidents récents» de `/admin` arreglado** (#188) y **cierre tras encuesta ya enviada o respondida** (§7-bis, `closeAfterSurvey`, #189). Sin cambios de esquema; dos correcciones de datos en prod (5 incidencias QR reasignadas, SAV-2026-0004 cerrada). Anterior 2026-10-12 — **«Mot de passe oublié»** (§Seguridad → Recuperación de contraseña): páginas `/mot-de-passe-oublie` y `/nouveau-mot-de-passe`, plantilla de correo propia con `token_hash` (`supabase/templates/recovery.html`, se pega a mano en el panel de Supabase). Sin cambios de BD. Anterior 2026-10-06 — **auditoría de estilo `/apple-design` de `/admin`** (§Sistema de Diseño, PRs #174–#176): ventanas con fundido vía `src/components/ui/dialogTransitions.ts`, `Button` con reacción al pulsar, Kanban (admin y TV) sin tarjeta fantasma, Agenda deslizante; y **E2E de nuevo en verde** (§Testing, PR #177: `loginAs` vacía el cupo del limitador del usuario de prueba). Sin cambios de BD. Anterior 2026-09-25 — **el limitador de intentos vuelve, ahora en Supabase** (§Seguridad): tabla `rate_limit_hits` + RPC `check_rate_limit` solo para `service_role` + cron `rate-limit-purge`; Upstash retirado (PR #159). Y **franja roja en el panel `/admin` si deja de funcionar** (§7 Dashboard, PR #161). Anterior 2026-09-17 — **la encuesta CSAT por fin llega a alguien** (§7-bis): se envía al email del formulario del QR, el envío queda trazado y las opiniones se leen en `/admin/avis`, en la ficha de la avería y en una franja del tablero. Ese mismo día: **el kiosko del taller queda CERRADO: montado, sonando y verificado en la TV** (§11; PR #139 docs, tras #137 audio/insistencia). Sigue abierto: **los 3 crons de Princity no importan nada** (§5). Anterior 2026-09-15: rótulo `SERVICE TECHNIQUE` en la etiqueta QR (PR #134, §6). Histórico 2026-09-11/15: kiosko del taller (§11, §11-bis, §11-ter, PRs #125–#131), permiso `can_bill` (#123) y candado de facturación (#122) — ya documentados en sus secciones.
+> Última actualización: 2026-10-21 — **doble escaneo obligatorio para los técnicos** (§Verrou de résolution → «El QR: doble escaneo para el técnico», §3, tabla `incident_scans`): para empezar una avería hay que escanear el QR de la máquina y para cerrarla hay que escanear una segunda vez (después, 60 min para escribir el informe); abrir la ficha ya no cambia nada. Nueva tabla `incident_scans` y trigger `trg_guard_tech_scan_required` (migraciones `20261021100000` y `20261021110000`, reversión en `docs/rollback-2026-10-21-doble-escaneo.md`). Anterior 2026-10-19 — **incidencias QR colgadas de la línea de contrato** (§6b, PR #187: si la máquina tiene línea abierta se guarda `contract_machine_id`, si no `machine_id`), **cuadro «Incidents récents» de `/admin` arreglado** (#188) y **cierre tras encuesta ya enviada o respondida** (§7-bis, `closeAfterSurvey`, #189). Sin cambios de esquema; dos correcciones de datos en prod (5 incidencias QR reasignadas, SAV-2026-0004 cerrada). Anterior 2026-10-12 — **«Mot de passe oublié»** (§Seguridad → Recuperación de contraseña): páginas `/mot-de-passe-oublie` y `/nouveau-mot-de-passe`, plantilla de correo propia con `token_hash` (`supabase/templates/recovery.html`, se pega a mano en el panel de Supabase). Sin cambios de BD. Anterior 2026-10-06 — **auditoría de estilo `/apple-design` de `/admin`** (§Sistema de Diseño, PRs #174–#176): ventanas con fundido vía `src/components/ui/dialogTransitions.ts`, `Button` con reacción al pulsar, Kanban (admin y TV) sin tarjeta fantasma, Agenda deslizante; y **E2E de nuevo en verde** (§Testing, PR #177: `loginAs` vacía el cupo del limitador del usuario de prueba). Sin cambios de BD. Anterior 2026-09-25 — **el limitador de intentos vuelve, ahora en Supabase** (§Seguridad): tabla `rate_limit_hits` + RPC `check_rate_limit` solo para `service_role` + cron `rate-limit-purge`; Upstash retirado (PR #159). Y **franja roja en el panel `/admin` si deja de funcionar** (§7 Dashboard, PR #161). Anterior 2026-09-17 — **la encuesta CSAT por fin llega a alguien** (§7-bis): se envía al email del formulario del QR, el envío queda trazado y las opiniones se leen en `/admin/avis`, en la ficha de la avería y en una franja del tablero. Ese mismo día: **el kiosko del taller queda CERRADO: montado, sonando y verificado en la TV** (§11; PR #139 docs, tras #137 audio/insistencia). Sigue abierto: **los 3 crons de Princity no importan nada** (§5). Anterior 2026-09-15: rótulo `SERVICE TECHNIQUE` en la etiqueta QR (PR #134, §6). Histórico 2026-09-11/15: kiosko del taller (§11, §11-bis, §11-ter, PRs #125–#131), permiso `can_bill` (#123) y candado de facturación (#122) — ya documentados en sus secciones.
 >
 > Anterior: 2026-06-25 — **foto adjunta a la incidencia** (el cliente adjunta una foto opcional al abrir la incidencia desde el portal **o desde el formulario público del QR `/signaler`**; la ven técnico, admin y cliente; bucket `incident-photos`, migración `20260625100000`). Histórico 2026-06-15: **tests RLS de cobertura completa** (88 tests de aislamiento por rol sobre todas las tablas sensibles, PR #93), **migración `middleware` → `proxy`** (convención Next.js 16, PR #94) y `main` protegida en GitHub (required check `typecheck · test · build`). Config de prod cerrada: `COMMERCIAL_EMAIL`, `NEXT_PUBLIC_APP_URL`. Histórico previo (2026-06-11): 3 capas de tests montadas (unit + aislamiento RLS + E2E Playwright, ver §Testing), endurecimiento RLS de `maintenance_visits` + `auth_rls_initplan`, borrado/terminación atómicos de contrato (`delete_contract`/`terminate_contract`), cabos de auditoría cerrados y reconstrucción limpia de la BD arreglada (P0-1). PRs #74–#85.
 
@@ -53,7 +53,7 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 ### 3. App de Campo — PWA Técnico (`/tech`) ✅
 - Login para técnicos
 - Escaneo de QR → ficha de la máquina con incidencias activas + mantenimiento pendiente
-- **Auto-transición 1er escaneo:** al cargar `/tech/scan/[serie]`, los incidentes `assigné` asignados al técnico pasan automáticamente a `en_cours` (usando `createAdminClient()` server-only). Registrado en `incident_history` con `comment: 'Mise en cours automatique — scan QR'`. Solo ejecuta si la máquina está activa (`machine.active`).
+- **Empezar = escanear (2026-10-21):** abrir `/tech/scan/[serie]` **ya no cambia nada** (antes pasaba las `assigné` a `en_cours` al cargar la ficha; un `<Link>` con prefetch o un técnico sentado en la oficina bastaban). Quien pasa a `en_cours` es el **escaneo real**: `stampQrScan` (`src/lib/scan.server.ts`) apunta el escaneo en `incident_scans` y mueve las averías `assigné` **del técnico que escanea** a `en_cours` (`createAdminClient()` server-only), con `incident_history` `comment: 'Mise en cours — scan QR'`. Si la avería sigue `assigné` la ficha muestra el aviso «Scanner la machine» y la acción rechaza el paso a `en_cours` sin escaneos. Para cerrar hace falta el segundo escaneo (ver §Verrou de résolution → «El QR: doble escaneo para el técnico»). Un técnico ya no puede reabrir una avería él mismo (lo hace la oficina). Los mantenimientos preventivos no cambian.
 - **Cualquier técnico ve cualquier máquina activa (decisión 2026-09-23):** en campo un técnico se topa con máquinas que no son suyas (préstamo, sustitución, otra ronda). `/tech/scan/[serie]` lee la parte de **solo lectura** (máquina, línea, contrato, cliente, plan de mantenimiento activo) con `createAdminClient()` tras `requireTechnician()` — antes esa lectura pasaba por RLS (`tech_machines_select` / `auth_tech_assigned_machine_ids()`, solo máquinas con incidencia asignada) y daba **404** en cuanto la máquina no era «suya», incluso teniendo una visita de mantenimiento pendiente ahí. Lo que da derecho a **actuar** sigue sin cambios y sigue por RLS con el cliente del usuario: la lista de incidencias (solo las suyas) y la visibilidad/edición de visitas de mantenimiento (`auth_tech_visit_ids()`: asignada a él o de una máquina donde tiene trabajo asignado). La página de la visita (`/tech/scan/[serie]/maintenance/[visitId]`) sigue el mismo patrón: autoriza la visita con el cliente del usuario (si RLS no la deja ver, `notFound()`) y pinta máquina/cliente/notas del plan con `createAdminClient()`. Una máquina inexistente o dada de baja ya no es un 404 desnudo: la ficha muestra «Machine introuvable ou retirée du parc» + el serie leído, con CTA para avisar al bureau. Spec en `docs/superpowers/plans/2026-09-23-escaneo-tecnicos.md`. **Ajustes del code-review (mismo PR #155):** (1) migración `20260923100000_tech_visibility_includes_maintenance_visits.sql` — una visita de mantenimiento asignada al técnico cuenta como trabajo asignado en la RLS (ver §Seguridad), para que `/tech/planning` y la agenda pinten máquina/cliente de esas visitas; (2) `closeMaintenance` comprueba con el cliente del usuario que la visita le es visible antes de la RPC con `service_role` (los argumentos ligados de la Server Action se pueden reenviar con otro `visitId`); (3) una visita ya cerrada muestra «Visite déjà clôturée» en vez del formulario, y un error al leer el detalle se lanza en vez de acabar en 404.
 - Vista de intervenciones asignadas
 - Formulario de intervención: informe + checkboxes de piezas + campo libre + estado
@@ -695,8 +695,9 @@ Route handler que recibe el formulario de contacto del sitio web público y capt
 >
 > ⚠️ **Sin válvula de escape:** un mantenimiento hecho sin escanear (etiqueta despegada, móvil sin
 > batería) **no se puede registrar de ninguna manera** y esa visita queda `en_retard` para siempre.
-> En las averías se decidió lo contrario a propósito (el QR es semáforo, nunca bloqueo — ver
-> §Verrou de résolution). Pendiente de decidir si aquí compensa el bloqueo duro.
+> En las averías se decidió primero lo contrario (el QR era semáforo, nunca bloqueo) y desde el
+> 2026-10-21 el técnico de campo sí necesita escanear dos veces — con válvula de escape: la oficina
+> cierra sin escaneo (ver §Verrou de résolution → «El QR: doble escaneo para el técnico»). Pendiente de decidir si aquí compensa el bloqueo duro.
 >
 > ✅ **Corregido el 2026-09-22 (PR #151):** la ficha del plan (`/admin/maintenance/[id]`) devolvía
 > **404 desde el 21 de mayo**. Los tres enlaces del listado —cliente, contrato y «Détail»— apuntan
@@ -1026,13 +1027,13 @@ pg_cron `princity-alerts-hourly` (cada hora)
   → Insert en princity_alerts con idempotencia (code + device_id_raw + received_at)
   → Si alert_type = 'panne' y machine+contract conocidos → incidents (status: nouveau)
   → Admin asigna técnico → incidents (status: assigné)
-  → Técnico escanea QR → /tech/scan/[serie] → auto-transición assigné → en_cours (automático)
-  → Técnico completa formulario + piezas → résolu (el informe es OBLIGATORIO, ver §Verrou)
+  → Técnico escanea QR (1er escaneo) → stampQrScan → assigné → en_cours (al escanear, no al abrir la ficha)
+  → Técnico escanea otra vez (2º escaneo) → completa formulario + piezas → résolu (el informe es OBLIGATORIO y el 2º escaneo también, ver §Verrou)
   → sendCsatForIncident: Resend envía CSAT al contacto del QR (o a la cuenta de portal)
     + auto-transición résolu → fermé — SOLO si el email sale de verdad (§7-bis)
 ```
 
-> **Flujo QR automático (sesión 12):** el 1er escaneo QR del técnico dispara `assigné → en_cours` sin acción manual. Al resolver (`résolu`), `src/lib/csat.server.ts` envía el email CSAT y cierra automáticamente a `fermé` (guard `.eq('status','résolu')` + comprobación de filas actualizadas antes de insertar en `incident_history`). El admin puede seguir cerrando manualmente desde el kanban en casos donde no hay portal cliente.
+> **Flujo QR automático (sesión 12; desde 2026-10-21 el paso a `en_cours` ocurre al escanear, no al abrir la ficha):** el 1er escaneo QR del técnico dispara `assigné → en_cours` sin acción manual. Al resolver (`résolu`), `src/lib/csat.server.ts` envía el email CSAT y cierra automáticamente a `fermé` (guard `.eq('status','résolu')` + comprobación de filas actualizadas antes de insertar en `incident_history`). El admin puede seguir cerrando manualmente desde el kanban en casos donde no hay portal cliente.
 
 ### Creada por el cliente (portal)
 ```
@@ -1108,13 +1109,58 @@ real — peor que antes, porque hoy un informe vacío al menos es una señal.
   La copia se escribe **antes** de borrar nada: si no entra, la avería no se toca.
 - `sendsSurvey(via)` — solo `intervention` pide opinión al cliente.
 
-### El QR: semáforo, nunca bloqueo
+### El QR: doble escaneo para el técnico (2026-10-21)
 
-Escanear el QR de la máquina con la avería abierta marca `qr_verified` y guarda `qr_scanned_by`
-(`src/lib/scan.server.ts`, función `stampQrScan`). La ficha lo enseña en verde **solo si quien
-escaneó es quien resolvió**. No bloquea nunca: una etiqueta despegada o un móvil sin cobertura no
-pueden dejar a un técnico sin poder cerrar lo que acaba de arreglar — buscaría un atajo y
-volveríamos al principio.
+Hasta el 2026-10-20 el QR era «semáforo, nunca bloqueo»: escanear marcaba `qr_verified` y
+`qr_scanned_by` (`stampQrScan`, `src/lib/scan.server.ts`) y la ficha lo enseñaba en verde **solo si
+quien escaneó es quien resolvió**, pero cerrar nunca dependía de ello. Eso sigue siendo cierto para
+la **oficina**; para el **técnico de campo** hay ahora una regla dura.
+
+**La regla.** Un técnico (`role = 'technician'` y no `is_dispatcher`) necesita **escanear el QR de la
+máquina para empezar** (pasa a `en_cours` al escanear, no al abrir la ficha) y **escanear una segunda
+vez para cerrar**. Cada escaneo real deja una fila con hora en `incident_scans` (dedupe de 60 s por
+técnico y avería). Puede cerrar cuando, en el **ciclo actual** (escaneos posteriores al `resolved_at`
+anterior: una avería reabierta exige escanear de nuevo), hay:
+- al menos **2 escaneos suyos**,
+- el primero y el último separados **≥ 60 s** (un doble disparo del lector, con milésimas de
+  diferencia, no cuenta como «empezar» y «terminar»),
+- el último de **hace 60 min como máximo** (ese es el plazo para escribir el informe; la ficha dice
+  «Clôture possible jusqu'à HH:MM»).
+
+**Quién queda fuera:** el Atelier (técnico con `is_dispatcher`: reparte desde el taller, no está
+delante de la máquina) y los admins; siguen cerrando con el formulario de oficina. Un técnico que no
+puede escanear (etiqueta dañada, avería resuelta por teléfono) llama al bureau, que cierra por la vía
+`bureau`. Las visitas de mantenimiento no cambian (siguen con su `qr_verified` propio).
+
+**Dónde vive la regla.**
+- `src/lib/scanGate.ts` (puro, sin Supabase, probado con vitest): `closeGate(scans, resolvedAt, now)`
+  y `requiresScan(profile)`; lo usan la ficha y la acción, así no pueden divergir. Las constantes
+  `CLOSE_SCAN_WINDOW_MINUTES` y `SCAN_DEDUPE_SECONDS` (60 y 60) se repiten en el trigger: si cambian
+  aquí, cambian allí.
+- `getCloseGate` (`scan.server.ts`) lee los escaneos para la ficha de la avería
+  (`/tech/incidents/[id]`: aviso «Scanner la machine» para empezar, «Résolu» deshabilitado hasta el
+  2º escaneo, con el motivo —`reason`: falta el 2º escaneo y desde qué hora, o la hora venció—) y
+  para `submitInterventionAction`, que rechaza empezar y cerrar sin escaneos con mensajes en francés.
+  La ficha guarda un borrador del informe en `sessionStorage` por avería, para que salir a escanear
+  no lo pierda. `/tech/scan/[serie]` es la ficha de la máquina: no sella ni bloquea nada, solo avisa
+  («Scan non enregistré…», `?scan=echec`) si el escáner de la app no logró grabar el escaneo.
+- El escaneo empieza (`→ en_cours`) las averías del técnico en `nouveau` o `assigné`: la oficina
+  puede devolver a «Nouveau» una tarjeta ya asignada sin quitar el técnico.
+- Trigger `trg_guard_tech_scan_required` (migración `20261021110000_guard_tech_scan_required.sql`,
+  `guard_tech_scan_required()`, SECURITY DEFINER): la misma regla en la BD para **sesiones de
+  técnico** (`auth.role() = 'authenticated'` con perfil técnico de campo) cuando cambia `status`:
+  empezar (`en_cours`) nunca con su sesión —lo graba el servidor con `service_role`— y cerrar solo con
+  el ciclo de escaneos de arriba. Pasan `service_role`, admin, Atelier y las sesiones sin JWT (SQL
+  Editor, migraciones, pg_cron). Sin él, una llamada directa a PostgREST con el JWT del técnico se
+  saltaba la app.
+
+**Límite conocido (hallazgos F10–F12, aceptados):** el sello sigue pudiendo falsificarse tecleando
+`/m/<serie>` sin tener la etiqueta delante. La regla nueva lo hace más pesado (dos escaneos separados
+al menos un minuto, dentro de una hora), no imposible.
+
+**Lo que se conserva del semáforo:** la insignia verde/ámbar del QR en las fichas (`qr_verified` +
+`qr_scanned_by`, verde solo si escaneó quien resolvió) sigue existiendo, y la oficina sigue cerrando
+sin escaneo.
 
 **Dos orígenes del sello (2026-09-23), los únicos que prueban que alguien tuvo la etiqueta física
 delante:**
@@ -1418,7 +1464,7 @@ Núcleo del sistema SAV.
 | `resolved_via` | text | `intervention` / `bureau`, nullable — cómo se resolvió. NULL = sin resolver o histórico anterior al verrou |
 | `resolution_reason` | text | solo si `bureau`: `fausse_alerte` / `telephone` / `client` / `technicien_non_enregistre` / `doublon` / `autre` |
 | `resolution_note` | text | explicación de quien resolvió (el informe del técnico, o la justificación de oficina) |
-| `qr_verified` | boolean NOT NULL DEFAULT false | true si alguien escaneó el QR físico con la avería abierta. **Semáforo, nunca bloqueo** |
+| `qr_verified` | boolean NOT NULL DEFAULT false | true si alguien escaneó el QR físico con la avería abierta. Insignia verde/ámbar; para el técnico de campo el cierre exige además 2 escaneos en `incident_scans` (2026-10-21) |
 | `qr_scanned_by` | UUID | FK → profiles, nullable — quién escaneó. El verde exige que sea quien resolvió |
 | `contact_name` | text | nullable — nombre del reporter (incidentes públicos vía QR) |
 | `contact_phone` | text | nullable — teléfono del reporter |
@@ -1492,6 +1538,20 @@ Piezas reemplazadas por intervención (tabla puente).
 | `quantity` | int | NOT NULL DEFAULT 1, CHECK > 0 (mig. `20260616094356`) |
 
 Escritura vía RPC `set_incident_parts(p_incident_id, p_parts jsonb)` (`SECURITY INVOKER`, mig. `20260616101329`): reemplaza el set de piezas de forma atómica (borra + reinserta en una transacción), respetando la RLS del técnico.
+
+---
+
+### Tabla: `incident_scans` (doble escaneo, 2026-10-21)
+Un registro por **escaneo real** del QR de una máquina por un técnico con una avería suya abierta. Es lo que `closeGate` cuenta para dejar cerrar (ver §Verrou de résolution → «El QR: doble escaneo para el técnico»). Migración `20261021100000_incident_scans.sql`; reversión en `docs/rollback-2026-10-21-doble-escaneo.md`.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `id` | UUID PK | `gen_random_uuid()` |
+| `incident_id` | UUID NOT NULL | FK → incidents, `ON DELETE CASCADE` |
+| `scanned_by` | UUID NOT NULL | FK → profiles — el técnico que escaneó |
+| `scanned_at` | timestamptz NOT NULL | default `now()` |
+
+> Índice `(incident_id, scanned_by, scanned_at)`. **RLS activada** con una sola policy `SELECT` para `is_admin()`; sin policies de escritura y `REVOKE INSERT, UPDATE, DELETE` a anon/authenticated: **escribe solo `service_role`** (`stampQrScan`, con dedupe de 60 s por técnico y avería). El técnico no la lee: la ficha usa `getCloseGate` en el servidor. El trigger `trg_guard_tech_scan_required` (SECURITY DEFINER) la consulta para las sesiones de técnico.
 
 ---
 
