@@ -39,3 +39,12 @@ export function closeGate(scans: Date[], resolvedAt: Date | null, now: Date = ne
   const closeUntil = new Date(last + CLOSE_SCAN_WINDOW_MINUTES * 60_000)
   return { canClose: closeUntil.getTime() >= now.getTime(), closeUntil }
 }
+
+/**
+ * ¿Debe este perfil cumplir el doble escaneo? Solo el técnico de campo. El Atelier (técnico con
+ * `is_dispatcher`) reparte trabajo desde el taller y no está delante de la máquina; el admin que
+ * entra a la PWA tampoco. `is_dispatcher` null cuenta como «no dispatcher»: ante la duda, se exige.
+ */
+export function requiresScan(profile: { role: string; is_dispatcher: boolean | null }): boolean {
+  return profile.role === 'technician' && profile.is_dispatcher !== true
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CLOSE_SCAN_WINDOW_MINUTES, SCAN_DEDUPE_SECONDS, closeGate } from './scanGate'
+import { CLOSE_SCAN_WINDOW_MINUTES, SCAN_DEDUPE_SECONDS, closeGate, requiresScan } from './scanGate'
 
 const NOW = new Date('2026-10-21T12:00:00Z')
 const minAgo = (m: number) => new Date(NOW.getTime() - m * 60_000)
@@ -69,5 +69,20 @@ describe('closeGate', () => {
     const a = minAgo(10)
     const pair = [a, new Date(a.getTime() + 1000)]
     expect(closeGate([minAgo(50), ...pair], minAgo(30), NOW).canClose).toBe(false)
+  })
+})
+
+describe('requiresScan', () => {
+  it('el técnico de campo debe escanear', () => {
+    expect(requiresScan({ role: 'technician', is_dispatcher: false })).toBe(true)
+  })
+  it('el técnico con is_dispatcher null (sin marcar) debe escanear', () => {
+    expect(requiresScan({ role: 'technician', is_dispatcher: null })).toBe(true)
+  })
+  it('el Atelier (técnico dispatcher) queda excluido', () => {
+    expect(requiresScan({ role: 'technician', is_dispatcher: true })).toBe(false)
+  })
+  it('el admin queda excluido', () => {
+    expect(requiresScan({ role: 'admin', is_dispatcher: false })).toBe(false)
   })
 })
