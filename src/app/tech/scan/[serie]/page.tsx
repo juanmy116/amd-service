@@ -37,7 +37,7 @@ export default async function MachineScanPage({
   const numero_serie = decodeURIComponent(serie)
 
   // Admin o técnico; cualquier otro rol sale (requireTechnician redirige).
-  const { user, supabase } = await requireTechnician()
+  const { supabase } = await requireTechnician()
 
   // Ficha de SOLO LECTURA: cualquier técnico puede ver cualquier máquina activa (decisión
   // 2026-09-23: en campo se topa con máquinas que no son suyas). Por eso máquina, línea,
@@ -87,36 +87,10 @@ export default async function MachineScanPage({
   // l'adresse du client (texte).
   const { coords: destCoords, text: destText } = await itineraryDestination(machine, client)
 
-  // Auto-transición primer escaneo: assigné → en_cours para incidentes asignados a este técnico en esta máquina.
-  // Se ejecuta después del guard machine.active para no mutar incidentes en máquinas dadas de baja.
-
   // Filtrar incidentes por contract_machine_id (nuevo modelo) y machine_id (legacy)
   const filterExpr = openLine
     ? `contract_machine_id.eq.${openLine.id},machine_id.eq.${numero_serie}`
     : `machine_id.eq.${numero_serie}`
-
-  const { data: toTransition } = await admin
-    .from('incidents')
-    .select('id')
-    .or(filterExpr)
-    .eq('assigned_to', user.id)
-    .eq('status', 'assigné')
-
-  if (toTransition && toTransition.length > 0) {
-    await admin
-      .from('incidents')
-      .update({ status: 'en_cours' })
-      .in('id', toTransition.map((i) => i.id))
-    await admin.from('incident_history').insert(
-      toTransition.map((i) => ({
-        incident_id: i.id,
-        changed_by: user.id,
-        old_status: 'assigné',
-        new_status: 'en_cours',
-        comment: 'Mise en cours automatique — scan QR',
-      }))
-    )
-  }
 
   const { data: incidents } = await supabase
     .from('incidents')

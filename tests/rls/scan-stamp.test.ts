@@ -118,3 +118,91 @@ describe('primer escaneo — ubicación de la máquina', () => {
     expect(await location(serie)).toMatchObject({ lat: null, location_source: null })
   })
 })
+
+describe('stampQrScan — averías', () => {
+  const PREFIX = 'TEST-SCAN-'
+  let seq = 0
+
+  async function newIncident(assignedTo: string | null, status: string): Promise<string> {
+    const { data, error } = await admin.from('incidents')
+      .insert({
+        numero_incident: `${PREFIX}${Date.now()}-${seq++}`, title: 'Scan test',
+        contract_machine_id: t.lineAId, assigned_to: assignedTo, status,
+      })
+      .select('id').single()
+    if (error) throw new Error(`seed incident: ${error.message}`)
+    return data!.id as string
+  }
+
+  async function scansOf(id: string) {
+    const { data, error } = await admin.from('incident_scans')
+      .select('scanned_by, scanned_at').eq('incident_id', id).order('scanned_at')
+    if (error) throw new Error(`read scans: ${error.message}`)
+    return data ?? []
+  }
+
+  async function statusOf(id: string): Promise<string> {
+    const { data, error } = await admin.from('incidents').select('status').eq('id', id).single()
+    if (error) throw new Error(`read status: ${error.message}`)
+    return data!.status as string
+  }
+
+  beforeEach(async () => {
+    // Solo las averías de este describe (las borra en cascada sus escaneos e historial).
+    const { error } = await admin.from('incidents').delete().like('numero_incident', `${PREFIX}%`)
+    if (error) throw new Error(`reset incidents: ${error.message}`)
+  })
+
+  it('inserta un escaneo por avería del técnico y por avería sin técnico', async () => {
+    const mine = await newIncident(t.techA, 'assigné')
+    const free = await newIncident(null, 'nouveau')
+    await scan.stampQrScan(SC.snA, t.techA)
+    expect((await scansOf(mine)).map((s) => s.scanned_by)).toEqual([t.techA])
+    expect((await scansOf(free)).map((s) => s.scanned_by)).toEqual([t.techA])
+  })
+
+  it('no inserta en averías de otro técnico ni las cambia de estado', async () => {
+    const others = await newIncident(t.techB, 'assigné')
+    await scan.stampQrScan(SC.snA, t.techA)
+    expect(await scansOf(others)).toHaveLength(0)
+    expect(await statusOf(others)).toBe('assigné')
+  })
+
+  it('dos escaneos en menos de 60 s dejan una sola fila', async () => {
+    const mine = await newIncident(t.techA, 'assigné')
+    await scan.stampQrScan(SC.snA, t.techA)
+    await scan.stampQrScan(SC.snA, t.techA)
+    expect(await scansOf(mine)).toHaveLength(1)
+  })
+
+  it('un escaneo de hace más de 60 s no bloquea el siguiente', async () => {
+    const mine = await newIncident(t.techA, 'assigné')
+    await scan.stampQrScan(SC.snA, t.techA)
+    const old = new Date(Date.now() - 120_000).toISOString()
+    const { error } = await admin.from('incident_scans').update({ scanned_at: old }).eq('incident_id', mine)
+    if (error) throw new Error(`backdate: ${error.message}`)
+    await scan.stampQrScan(SC.snA, t.techA)
+    expect(await scansOf(mine)).toHaveLength(2)
+  })
+
+  it('assigné del técnico → en_cours, con línea de historial', async () => {
+    const mine = await newIncident(t.techA, 'assigné')
+    const free = await newIncident(null, 'nouveau')
+    await scan.stampQrScan(SC.snA, t.techA)
+    expect(await statusOf(mine)).toBe('en_cours')
+    expect(await statusOf(free)).toBe('nouveau')
+    const { data, error } = await admin.from('incident_history')
+      .select('changed_by, old_status, new_status, comment').eq('incident_id', mine)
+    expect(error).toBeNull()
+    expect(data).toContainEqual({
+      changed_by: t.techA, old_status: 'assigné', new_status: 'en_cours', comment: 'Mise en cours — scan QR',
+    })
+  })
+
+  it('en_cours puesta por la oficina: escanear no cambia el estado pero sí deja fila', async () => {
+    const mine = await newIncident(t.techA, 'en_cours')
+    await scan.stampQrScan(SC.snA, t.techA)
+    expect(await statusOf(mine)).toBe('en_cours')
+    expect(await scansOf(mine)).toHaveLength(1)
+  })
+})
