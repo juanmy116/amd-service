@@ -6,10 +6,18 @@
  * cierre) como el cliente (para habilitar el botón), y así las dos lecturas no pueden divergir.
  */
 
-/** Cuánto tiempo, desde el último escaneo, sigue abierta la posibilidad de cerrar. */
+/**
+ * Cuánto tiempo, desde el último escaneo, sigue abierta la posibilidad de cerrar.
+ * La BD aplica la misma ventana: `guard_tech_scan_required()` en
+ * supabase/migrations/20261021110000_guard_tech_scan_required.sql. Si cambia aquí, cambia allí.
+ */
 export const CLOSE_SCAN_WINDOW_MINUTES = 60
 
-/** Escaneos del mismo técnico en la misma avería dentro de este margen cuentan como uno (rebote del lector). */
+/**
+ * Escaneos del mismo técnico en la misma avería dentro de este margen cuentan como uno (rebote del lector).
+ * También lo exige el trigger `guard_tech_scan_required()` (mismo fichero de migración que arriba,
+ * `interval '60 seconds'`). Si cambia aquí, cambia allí.
+ */
 export const SCAN_DEDUPE_SECONDS = 60
 
 export type CloseGate = { canClose: boolean; closeUntil: Date | null }
