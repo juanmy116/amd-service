@@ -35,7 +35,7 @@ CREATE OR REPLACE FUNCTION public.guard_tech_scan_required()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog, public
 AS $function$
 DECLARE
   v_count integer;
@@ -48,6 +48,9 @@ BEGIN
   END IF;
 
   -- Solo el técnico de campo. SECURITY DEFINER para leer `profiles` sin depender de su RLS.
+  -- Sin perfil se deja pasar: la RLS de `incidents` ya le impide este UPDATE (solo actualiza el
+  -- asignado, y `assigned_to` apunta a `profiles`, o el admin). La acción de la app, en cambio,
+  -- falla cerrada (exige escanear): allí un perfil ilegible puede ser un fallo de lectura.
   IF NOT EXISTS (
     SELECT 1 FROM public.profiles p
     WHERE p.id = auth.uid()
