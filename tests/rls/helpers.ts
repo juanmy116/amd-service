@@ -82,6 +82,11 @@ export async function cleanup(admin: SupabaseClient): Promise<void> {
   // 'TESTINV ' (fuera de este barrido) para que sus facturas nunca bloqueen el
   // borrado de los clientes 'TEST '. Ver tests/rls/billing-isolation.test.ts.
   await admin.from('csat_responses').delete().like('token', 'TEST-%')           // RESTRICT → incidents
+  // Al resolver una avería de prueba la app crea su encuesta con token aleatorio (no TEST-%):
+  // se borra por avería, o el borrado de incidents falla por la FK.
+  const { data: testIncidents } = await admin.from('incidents').select('id').like('numero_incident', 'TEST-%')
+  const testIncidentIds = (testIncidents ?? []).map((i) => i.id)
+  if (testIncidentIds.length) await admin.from('csat_responses').delete().in('incident_id', testIncidentIds)
   await admin.from('machine_counters').delete().like('machine_id', 'TEST-%')    // RESTRICT → machines
   await admin.from('machine_anomalies').delete().like('machine_id', 'TEST-%')   // RESTRICT → machines
   await admin.from('leads').delete().like('name', 'TEST %')

@@ -6,6 +6,8 @@ import IncidentPhotos from '@/components/IncidentPhotos'
 import { submitInterventionAction } from './actions'
 import { getOpenLineForMachine } from '@/lib/contract-machines'
 import { itineraryDestination } from '@/lib/geo.server'
+import { requiresScan, type CloseGate } from '@/lib/scanGate'
+import { getCloseGate } from '@/lib/scan.server'
 
 export default async function TechIncidentPage({
   params,
@@ -19,7 +21,7 @@ export default async function TechIncidentPage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_dispatcher')
     .eq('id', user.id)
     .single()
   if (!profile || !['admin', 'technician'].includes(profile.role)) redirect('/login')
@@ -97,6 +99,14 @@ export default async function TechIncidentPage({
   const machineLocation = machine?.localisation ?? null
   const contractNumber = contractInfo?.numero_contrat ?? null
 
+  // Doble escaneo: solo el técnico de campo lo cumple (Atelier y admin quedan fuera). La ficha
+  // lo refleja para que el técnico sepa qué falta, pero quien manda es la acción del servidor.
+  const mustScan = requiresScan(profile)
+  const needsStart = mustScan && ['nouveau', 'assigné'].includes(incident.status)
+  const gate: CloseGate = mustScan
+    ? await getCloseGate(incident.id, user.id, incident.resolved_at)
+    : { canClose: true, closeUntil: null }
+
   const checkedParts = new Map((parts ?? []).map((p) => [p.part_id, p.quantity]))
   const boundAction  = submitInterventionAction.bind(null, incident.id)
 
@@ -111,6 +121,8 @@ export default async function TechIncidentPage({
       destCoords={destCoords}
       destText={destText}
       checkedParts={checkedParts}
+      needsStart={needsStart}
+      closeGate={{ canClose: gate.canClose, closeUntil: gate.closeUntil?.toISOString() ?? null }}
       photos={<IncidentPhotos incidentId={incident.id} />}
     />
   )

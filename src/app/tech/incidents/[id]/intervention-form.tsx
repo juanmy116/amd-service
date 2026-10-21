@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useState, type FormEvent, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, MapPin, Building2, FileText } from 'lucide-react'
+import { ArrowLeft, Loader2, MapPin, Building2, FileText, ScanLine } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import type { BadgeVariant } from '@/components/ui/Badge'
@@ -22,7 +22,7 @@ const STATUS_BADGE: Record<string, BadgeVariant> = {
   nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success',
 }
 const STATUS_LABEL: Record<string, string> = {
-  nuevo: 'Nuevo', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu',
+  nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu',
 }
 
 type Props = {
@@ -42,11 +42,15 @@ type Props = {
   checkedParts: Map<number, number>
   /** Galería de fotos del cliente (Server Component pasado como slot). */
   photos?: ReactNode
+  /** Avería sin empezar (`nouveau`/`assigné`) de un técnico de campo: hay que escanear el QR antes. */
+  needsStart: boolean
+  /** Doble escaneo: `closeUntil` viaja como ISO porque un Date no cruza al cliente. */
+  closeGate: { canClose: boolean; closeUntil: string | null }
 }
 
 export default function InterventionForm({
   incident, boundAction, clientName, machineName, machineLocation, contractNumber,
-  destCoords, destText, checkedParts, photos,
+  destCoords, destText, checkedParts, photos, needsStart, closeGate,
 }: Props) {
   const [state, formAction, pending] = useActionState(boundAction, null)
 
@@ -77,6 +81,26 @@ export default function InterventionForm({
       : ''
   )
   const resolving = status === 'résolu'
+
+  // Controlado a propósito: si el servidor rechaza el cierre (ventana de 1 h vencida), el
+  // informe tecleado no debe perderse; un campo no controlado puede vaciarse al completarse
+  // la acción del formulario.
+  const [rapport, setRapport] = useState(incident.rapport_intervention ?? '')
+
+  // Una avería ya resuelta conserva su opción marcada aunque el ciclo de escaneo esté gastado.
+  const resolveLocked = !closeGate.canClose && incident.status !== 'résolu'
+  const closeUntilLabel = closeGate.closeUntil
+    ? new Date(closeGate.closeUntil).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    : null
+  const scanButton = (
+    <Link
+      href="/tech/scan"
+      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold text-white bg-accent"
+    >
+      <ScanLine size={16} />
+      Scanner la machine
+    </Link>
+  )
 
   return (
     <div className="p-4 space-y-5 pb-8">
@@ -136,7 +160,14 @@ export default function InterventionForm({
       {/* Photo signalée par le client */}
       {photos}
 
-      {/* Formulaire intervention */}
+      {needsStart ? (
+        <Card className="p-4 space-y-3">
+          <p className="text-sm text-ink-soft">
+            Scannez le QR de la machine pour démarrer l&apos;intervention.
+          </p>
+          {scanButton}
+        </Card>
+      ) : (
       <form action={formAction} onSubmit={handleSubmit} className="space-y-5">
         {state?.error && (
           <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
@@ -148,20 +179,35 @@ export default function InterventionForm({
         <Card className="p-4">
           <p className="text-sm font-semibold text-ink-soft mb-3">Statut de l&apos;intervention</p>
           <div className="space-y-2">
-            {STATUS_OPTIONS.map((o) => (
-              <label key={o.value} className="flex items-center gap-3 p-3 rounded-xl border border-line cursor-pointer">
+            {STATUS_OPTIONS.map((o) => {
+              const locked = o.value === 'résolu' && resolveLocked
+              return (
+              <label key={o.value} className={`flex items-center gap-3 p-3 rounded-xl border border-line ${locked ? 'opacity-60' : 'cursor-pointer'}`}>
                 <input
                   type="radio"
                   name="status"
                   value={o.value}
                   checked={status === o.value}
+                  disabled={locked}
                   onChange={() => setStatus(o.value)}
                   className="accent-red-600"
                 />
                 <span className="text-sm text-ink-soft">{o.label}</span>
               </label>
-            ))}
+              )
+            })}
           </div>
+          {resolveLocked && (
+            <div className="mt-3 space-y-3">
+              <p className="text-sm text-ink-soft">
+                Scannez à nouveau le QR de la machine pour clôturer (valable 1 heure).
+              </p>
+              {scanButton}
+            </div>
+          )}
+          {!resolveLocked && closeUntilLabel && incident.status !== 'résolu' && (
+            <p className="mt-3 text-xs text-ink-muted">Clôture possible jusqu&apos;à {closeUntilLabel}</p>
+          )}
         </Card>
 
         {/* Rapport */}
@@ -179,7 +225,8 @@ export default function InterventionForm({
             name="rapport"
             rows={4}
             required={resolving}
-            defaultValue={incident.rapport_intervention ?? ''}
+            value={rapport}
+            onChange={(e) => setRapport(e.target.value)}
             placeholder="Décrivez les actions effectuées, l'état de la machine, les pièces changées..."
             className="w-full px-3 py-2.5 rounded-xl border border-line text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
           />
@@ -242,6 +289,7 @@ export default function InterventionForm({
           {locating ? 'Localisation…' : <>Enregistrer l&apos;intervention</>}
         </button>
       </form>
+      )}
     </div>
   )
 }
