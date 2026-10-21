@@ -647,6 +647,42 @@ export type Database = {
           },
         ]
       }
+      incident_scans: {
+        Row: {
+          id: string
+          incident_id: string
+          scanned_at: string
+          scanned_by: string
+        }
+        Insert: {
+          id?: string
+          incident_id: string
+          scanned_at?: string
+          scanned_by: string
+        }
+        Update: {
+          id?: string
+          incident_id?: string
+          scanned_at?: string
+          scanned_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_scans_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_scans_scanned_by_fkey"
+            columns: ["scanned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incidents: {
         Row: {
           assigned_to: string | null

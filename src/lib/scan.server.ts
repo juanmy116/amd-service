@@ -3,6 +3,7 @@ import 'server-only'
 import { createAdminClient } from './supabase/admin'
 import { getOpenLineForMachine } from './contract-machines'
 import { FIRST_SCAN_MAX_ACCURACY_M, type LatLng } from './geo'
+import { SCAN_DEDUPE_SECONDS, closeGate, type CloseGate } from './scanGate'
 
 /**
  * Deja constancia de que alguien escaneó el QR físico de una máquina.
@@ -22,6 +23,12 @@ import { FIRST_SCAN_MAX_ACCURACY_M, type LatLng } from './geo'
  *
  * Qué deja el escaneo:
  * - las averías abiertas de la máquina (del que escanea o sin técnico) quedan `qr_verified`;
+ * - esas mismas averías reciben una fila en `incident_scans` (quién y cuándo), salvo que ese
+ *   usuario ya escaneara la misma avería hace menos de SCAN_DEDUPE_SECONDS (doble lectura de la
+ *   cámara). Es el rastro que luego permite exigir un segundo escaneo para cerrar;
+ * - las del propio técnico sin empezar (`nouveau` o `assigné`) pasan a `en_cours` («Mise en cours —
+ *   scan QR»): empezar la avería es escanear, ya no basta con abrir la ficha (esa página no
+ *   cambia nada);
  * - la visita de mantenimiento QUE TOCA de su línea abierta: la pendiente (`planifié` /
  *   `en_retard`) más antigua con fecha ≤ hoy + VISIT_STAMP_WINDOW_DAYS, del que escanea o sin
  *   técnico. Solo esa: escanear hoy no prueba nada sobre la visita del trimestre que viene. Desde
@@ -97,6 +104,33 @@ export async function setFirstScanLocation(
   if (error) console.error('[setFirstScanLocation.write]', error)
 }
 
+/**
+ * Lee los escaneos de ESTE técnico en ESTA avería y aplica la regla del doble escaneo
+ * (`closeGate`). Cliente admin: la tabla `incident_scans` no es legible por el técnico, y el
+ * filtro por usuario se hace aquí a mano. Ante un error de lectura se cierra el candado
+ * (`canClose: false`): mejor no dejar cerrar que dejar cerrar sin prueba.
+ *
+ * `resolvedAt` es la fecha de la última resolución (null si nunca se resolvió); solo cuentan los
+ * escaneos posteriores, así que una avería reabierta exige volver a escanear.
+ */
+export async function getCloseGate(incidentId: string, userId: string, resolvedAt: string | null): Promise<CloseGate> {
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('incident_scans')
+    .select('scanned_at')
+    .eq('incident_id', incidentId)
+    .eq('scanned_by', userId)
+  if (error) {
+    console.error('[getCloseGate.read]', error)
+    // Sin motivo: no sabemos qué escaneos hay, así que la ficha muestra el texto genérico.
+    return { canClose: false, closeUntil: null, reason: null, firstScanAt: null, nextScanAfter: null }
+  }
+  return closeGate(
+    (data ?? []).map((s) => new Date(s.scanned_at)),
+    resolvedAt ? new Date(resolvedAt) : null,
+  )
+}
+
 /** El escaneo sella la visita pendiente más antigua con fecha dentro de esta ventana. */
 export const VISIT_STAMP_WINDOW_DAYS = 14
 
@@ -109,7 +143,7 @@ async function stampIncidents(admin: Admin, numeroSerie: string, openLineId: str
 
   const { data: rows, error: readError } = await admin
     .from('incidents')
-    .select('id, assigned_to, qr_verified, qr_scanned_by')
+    .select('id, assigned_to, status, qr_verified, qr_scanned_by')
     .or(filterExpr)
     .in('status', ['nouveau', 'assigné', 'en_cours'])
   if (readError) {
@@ -117,21 +151,81 @@ async function stampIncidents(admin: Admin, numeroSerie: string, openLineId: str
     return
   }
 
-  // Se sellan las averías del que escanea y también las que aún no tienen técnico: es
+  // Se tratan las averías del que escanea y también las que aún no tienen técnico: es
   // frecuente que el técnico llegue, escanee y solo entonces se le asigne la avería (o que
   // esté abierta desde el formulario público del QR). Guardar QUIÉN escaneó permite que la
   // lectura del semáforo exija que fuese quien la resolvió.
-  const targets = (rows ?? [])
-    .filter((r) => r.assigned_to === null || r.assigned_to === userId)
-    .filter((r) => !(r.qr_verified && r.qr_scanned_by === userId))
-    .map((r) => r.id)
-  if (targets.length === 0) return
+  const mine = (rows ?? []).filter((r) => r.assigned_to === null || r.assigned_to === userId)
+  if (mine.length === 0) return
+
+  const toStamp = mine.filter((r) => !(r.qr_verified && r.qr_scanned_by === userId)).map((r) => r.id)
+  if (toStamp.length > 0) {
+    const { error } = await admin
+      .from('incidents')
+      .update({ qr_verified: true, qr_scanned_by: userId })
+      .in('id', toStamp)
+    if (error) console.error('[stampQrScan.write]', error)
+  }
+
+  await recordScans(admin, mine.map((r) => r.id), userId)
+
+  // Empezar la avería: solo las asignadas a quien escanea y aún sin empezar. Cuenta también
+  // `nouveau` con técnico: pasa cuando la oficina devuelve a «Nouveau» una tarjeta ya asignada
+  // (`assigned_to` se conserva) y, como la ficha pide escanear en ambos estados, sin esto el
+  // técnico quedaría atascado. El filtro de estado en el propio UPDATE evita pisar un cambio
+  // hecho entre la lectura y aquí (p. ej. la oficina la puso en en_cours o la cerró). El
+  // historial se escribe solo de las filas que de verdad cambiaron, con el estado leído.
+  const toStart = mine.filter((r) => r.assigned_to === userId && (r.status === 'nouveau' || r.status === 'assigné'))
+  if (toStart.length === 0) return
+  const oldStatus = new Map(toStart.map((r) => [r.id, r.status]))
+  const { data: started, error: startError } = await admin
+    .from('incidents')
+    .update({ status: 'en_cours' })
+    .in('id', toStart.map((r) => r.id))
+    .in('status', ['nouveau', 'assigné'])
+    .select('id')
+  if (startError) {
+    console.error('[stampQrScan.start]', startError)
+    return
+  }
+  if (!started || started.length === 0) return
+  const { error: historyError } = await admin.from('incident_history').insert(
+    started.map((i) => ({
+      incident_id: i.id,
+      changed_by: userId,
+      old_status: oldStatus.get(i.id) ?? null,
+      new_status: 'en_cours',
+      comment: 'Mise en cours — scan QR',
+    })),
+  )
+  if (historyError) console.error('[stampQrScan.start.history]', historyError)
+}
+
+// Una fila por avería y escaneo. Se compara con el ÚLTIMO escaneo de ese usuario en esa avería
+// (de cualquier ciclo): si es de hace menos de SCAN_DEDUPE_SECONDS, es la misma lectura repetida.
+async function recordScans(admin: Admin, incidentIds: string[], userId: string) {
+  const { data: last, error: readError } = await admin
+    .from('incident_scans')
+    .select('incident_id, scanned_at')
+    .eq('scanned_by', userId)
+    .in('incident_id', incidentIds)
+  if (readError) {
+    console.error('[stampQrScan.scans.read]', readError)
+    return
+  }
+  const latest = new Map<string, number>()
+  for (const s of last ?? []) {
+    const at = new Date(s.scanned_at).getTime()
+    if (at > (latest.get(s.incident_id) ?? 0)) latest.set(s.incident_id, at)
+  }
+  const cutoff = Date.now() - SCAN_DEDUPE_SECONDS * 1000
+  const fresh = incidentIds.filter((id) => (latest.get(id) ?? 0) <= cutoff)
+  if (fresh.length === 0) return
 
   const { error } = await admin
-    .from('incidents')
-    .update({ qr_verified: true, qr_scanned_by: userId })
-    .in('id', targets)
-  if (error) console.error('[stampQrScan.write]', error)
+    .from('incident_scans')
+    .insert(fresh.map((id) => ({ incident_id: id, scanned_by: userId })))
+  if (error) console.error('[stampQrScan.scans.write]', error)
 }
 
 // Mismo criterio que las averías (del que escanea o sin técnico), pero UNA visita: la que toca

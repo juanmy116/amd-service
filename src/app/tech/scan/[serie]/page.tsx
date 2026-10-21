@@ -30,14 +30,19 @@ function FicheHeader() {
 
 export default async function MachineScanPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ serie: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { serie } = await params
+  // El escáner de la app llega con `?scan=echec` si el sello no se grabó (sin red o error):
+  // sin él, el técnico no podrá empezar ni cerrar, así que se le avisa nada más llegar.
+  const scanFailed = (await searchParams).scan === 'echec'
   const numero_serie = decodeURIComponent(serie)
 
   // Admin o técnico; cualquier otro rol sale (requireTechnician redirige).
-  const { user, supabase } = await requireTechnician()
+  const { supabase } = await requireTechnician()
 
   // Ficha de SOLO LECTURA: cualquier técnico puede ver cualquier máquina activa (decisión
   // 2026-09-23: en campo se topa con máquinas que no son suyas). Por eso máquina, línea,
@@ -87,36 +92,10 @@ export default async function MachineScanPage({
   // l'adresse du client (texte).
   const { coords: destCoords, text: destText } = await itineraryDestination(machine, client)
 
-  // Auto-transición primer escaneo: assigné → en_cours para incidentes asignados a este técnico en esta máquina.
-  // Se ejecuta después del guard machine.active para no mutar incidentes en máquinas dadas de baja.
-
   // Filtrar incidentes por contract_machine_id (nuevo modelo) y machine_id (legacy)
   const filterExpr = openLine
     ? `contract_machine_id.eq.${openLine.id},machine_id.eq.${numero_serie}`
     : `machine_id.eq.${numero_serie}`
-
-  const { data: toTransition } = await admin
-    .from('incidents')
-    .select('id')
-    .or(filterExpr)
-    .eq('assigned_to', user.id)
-    .eq('status', 'assigné')
-
-  if (toTransition && toTransition.length > 0) {
-    await admin
-      .from('incidents')
-      .update({ status: 'en_cours' })
-      .in('id', toTransition.map((i) => i.id))
-    await admin.from('incident_history').insert(
-      toTransition.map((i) => ({
-        incident_id: i.id,
-        changed_by: user.id,
-        old_status: 'assigné',
-        new_status: 'en_cours',
-        comment: 'Mise en cours automatique — scan QR',
-      }))
-    )
-  }
 
   const { data: incidents } = await supabase
     .from('incidents')
@@ -154,6 +133,12 @@ export default async function MachineScanPage({
   return (
     <div className="p-4 space-y-5">
       <FicheHeader />
+
+      {scanFailed && (
+        <div role="alert" className="px-4 py-3 rounded-xl bg-accent-soft border border-accent/20 text-sm text-accent">
+          Scan non enregistré — vérifiez la connexion et scannez à nouveau.
+        </div>
+      )}
 
       {/* Machine info */}
       <Card className="p-4 space-y-4">

@@ -10,6 +10,8 @@ import { sendCsatForIncident } from '@/lib/csat.server'
 import { PARTS } from '@/lib/parts'
 import { computePresence } from '@/lib/presence.server'
 import { readPosition } from '@/lib/geo'
+import { getCloseGate } from '@/lib/scan.server'
+import { CLOSE_SCAN_ERROR, START_SCAN_ERROR, requiresScan } from '@/lib/scanGate'
 import { archivedResolutionNote, buildResolution, clearResolution, historyComment, reopens } from '@/lib/resolution'
 
 type FormState = { error: string } | null
@@ -47,7 +49,7 @@ export async function submitInterventionAction(
   // Verificar que el incidente esté asignado a este técnico
   const { data: incident } = await supabase
     .from('incidents')
-    .select('assigned_to, status, resolved_via, resolution_reason, resolution_note, rapport_intervention, contract_machine_id, machine_id')
+    .select('assigned_to, status, resolved_via, resolution_reason, resolution_note, rapport_intervention, contract_machine_id, machine_id, resolved_at')
     .eq('id', id)
     .single()
   if (!incident) return { error: 'Incident introuvable.' }
@@ -60,6 +62,29 @@ export async function submitInterventionAction(
   // abierta hace rato manda el estado de entonces, y con él se decidían el historial, el
   // `resolved_at` y el envío de la encuesta.
   const old_status = incident.status
+
+  // Doble escaneo: el técnico de campo empieza escaneando el QR de la máquina y solo puede
+  // cerrar si ha escaneado otra vez (ventana de 1 h). Se rechaza ANTES de escribir nada (ni
+  // archivo de rastro ni `update`). Reabrir es cosa de la oficina, por eso `en_cours` desde otro
+  // estado tampoco se permite aquí. Atelier y admin quedan fuera (`requiresScan`).
+  // Si el perfil no se puede leer se trata como obligado a escanear (fail closed): ante un
+  // fallo de lectura es preferible pedir un escaneo de más que dejar saltarse la regla.
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, is_dispatcher')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (!profile || requiresScan(profile)) {
+    if (new_status === 'en_cours' && old_status !== 'en_cours') {
+      return { error: START_SCAN_ERROR }
+    }
+    if (new_status === 'résolu' && old_status !== 'résolu') {
+      const gate = await getCloseGate(id, user.id, incident.resolved_at)
+      if (!gate.canClose) {
+        return { error: CLOSE_SCAN_ERROR }
+      }
+    }
+  }
 
   const rapport           = (formData.get('rapport') as string).trim() || null
   const autres_pieces     = (formData.get('autres_pieces') as string).trim() || null
@@ -123,6 +148,10 @@ export async function submitInterventionAction(
   const { error } = await supabase.from('incidents').update(updates).eq('id', id)
   if (error) {
     console.error('[submitIntervention]', error)
+    // 23514 (check_violation) lo lanzan los guards de la BD con un texto para el técnico: p. ej.
+    // la ventana de 1 h vence entre la comprobación de arriba y este UPDATE. Mostrarlo tal cual
+    // le dice qué hacer (volver a escanear) en vez de un «réessayez» que fallaría igual.
+    if (error.code === '23514') return { error: error.message }
     return { error: 'Une erreur est survenue. Veuillez réessayer.' }
   }
 

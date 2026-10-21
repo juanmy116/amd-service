@@ -39,14 +39,19 @@ export default function QrScanner() {
         // solo se espera si el servidor dice que la máquina la necesita (instalada y sin
         // ubicación, `needsLocation`) — el caso normal navega en cuanto hay sello. Nada de esto
         // impide abrir la ficha: con mala cobertura se navega igualmente (el sello o la
-        // ubicación pueden perderse; la ficha es lo que el técnico necesita).
+        // ubicación pueden perderse; la ficha es lo que el técnico necesita). Pero desde el doble
+        // escaneo el sello es lo que deja empezar y cerrar la avería: si no llega (tope vencido o
+        // error), la ficha lo avisa (`?scan=echec`) para que el técnico vuelva a escanear en vez de
+        // descubrirlo al intentar cerrar.
         const positionPromise = getPositionOnce(3000, 0)
         void (async () => {
+          let recorded = false
           try {
             const stamp = await Promise.race([
               recordQrScanAction(serie),
               new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
             ])
+            recorded = stamp !== null
             if (stamp?.needsLocation) {
               setPhase('locating')
               // Acotada por `getPositionOnce` (más larga si el navegador aún tiene que pedir permiso).
@@ -64,7 +69,7 @@ export default function QrScanner() {
           // Navegación DIRECTA a la ficha. Ya estamos dentro de la PWA técnico, así que
           // no pasamos por el gateway /m (cuyo redirect server-side dejaba la página en
           // blanco hasta recargar).
-          router.push(`/tech/scan/${encodeURIComponent(serie)}`)
+          router.push(`/tech/scan/${encodeURIComponent(serie)}${recorded ? '' : '?scan=echec'}`)
         })()
       }
     }).catch(() => {
