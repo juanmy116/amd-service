@@ -54,7 +54,12 @@ test('recorrido: admin asigna → técnico ve → scan → en_cours → segundo 
   // 3) Abrir la ficha de la máquina ya NO arranca la avería.
   await page.goto(`/tech/scan/${encodeURIComponent(E2E.serie)}`)
   await expect(page.getByText(E2E.serie)).toBeVisible()
+  await expect(page.getByText('Scan non enregistré')).toHaveCount(0)
   expect(await statusOf(ids.incidentId)).toBe('assigné')
+
+  // Si el escáner de la app no logra grabar el sello, llega con ?scan=echec y la ficha lo avisa.
+  await page.goto(`/tech/scan/${encodeURIComponent(E2E.serie)}?scan=echec`)
+  await expect(page.getByText('Scan non enregistré — vérifiez la connexion et scannez à nouveau.')).toBeVisible()
 
   // La ficha de la avería pide escanear en vez de mostrar el formulario.
   await page.goto(`/tech/incidents/${ids.incidentId}`)
@@ -71,10 +76,10 @@ test('recorrido: admin asigna → técnico ve → scan → en_cours → segundo 
     .eq('new_status', 'en_cours')
   expect((hist.data ?? []).length).toBeGreaterThan(0)
 
-  // 5) Con un solo escaneo, «Résolu» está deshabilitado.
+  // 5) Con un solo escaneo, «Résolu» está deshabilitado y la ficha dice desde cuándo escanear.
   await page.goto(`/tech/incidents/${ids.incidentId}`)
   await expect(page.getByRole('radio', { name: /Résolu/ })).toBeDisabled()
-  await expect(page.getByText('Scannez à nouveau le QR de la machine pour clôturer (valable 1 heure).')).toBeVisible()
+  await expect(page.getByText(/^1er scan enregistré à \d{2}:\d{2} — scannez à nouveau la machine à partir de \d{2}:\d{2}\.$/)).toBeVisible()
 
   // 6) Segundo escaneo (el primero se retrasa 2 min para saltar la deduplicación) → habilitado.
   await backdateScans(ids.incidentId, 2)
@@ -90,7 +95,7 @@ test('recorrido: admin asigna → técnico ve → scan → en_cours → segundo 
   await expect.poll(() => statusOf(ids.incidentId), { timeout: 20_000 }).toBe('résolu')
 })
 
-test('cierre con la ventana vencida: error de cierre y el informe tecleado sigue en el textarea', async ({ page }) => {
+test('cierre con la ventana vencida: error, escanear de nuevo y el informe tecleado sobrevive', async ({ page }) => {
   const ids = seedIds()
   const admin = adminClient()
 
@@ -98,7 +103,8 @@ test('cierre con la ventana vencida: error de cierre y el informe tecleado sigue
   const { error: e1 } = await admin.from('incidents')
     .update({ status: 'en_cours', resolved_at: null }).eq('id', ids.incidentId)
   if (e1) throw new Error(`reset incidente: ${e1.message}`)
-  await admin.from('incident_scans').delete().eq('incident_id', ids.incidentId)
+  const { error: e0 } = await admin.from('incident_scans').delete().eq('incident_id', ids.incidentId)
+  if (e0) throw new Error(`reset escaneos: ${e0.message}`)
   const now = Date.now()
   const { error: e2 } = await admin.from('incident_scans').insert([
     { incident_id: ids.incidentId, scanned_by: ids.techId, scanned_at: new Date(now - 120 * 60_000).toISOString() },
@@ -117,7 +123,34 @@ test('cierre con la ventana vencida: error de cierre y el informe tecleado sigue
   await backdateScans(ids.incidentId, 2)
 
   await page.getByRole('button', { name: "Enregistrer l'intervention" }).click()
-  await expect(page.getByText('Scannez à nouveau le QR de la machine pour clôturer (valable 1 heure).').first()).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('Scannez à nouveau le QR de la machine pour clôturer (valable 1 heure).')).toBeVisible({ timeout: 20_000 })
   await expect(page.locator('textarea[name="rapport"]')).toHaveValue(texto)
   expect(await statusOf(ids.incidentId)).toBe('en_cours')
+
+  // Tras el rechazo, «Résolu» queda bloqueado, sin la hora de cierre ya pasada, y aparece el botón
+  // de escanear.
+  await expect(page.getByRole('radio', { name: /Résolu/ })).toBeDisabled()
+  await expect(page.getByText(/Clôture possible jusqu'à/)).toHaveCount(0)
+  await page.getByRole('link', { name: 'Scanner la machine' }).click()
+  await expect(page).toHaveURL(/\/tech\/scan$/)
+
+  // Segundo escaneo (pasarela /m) y vuelta a la ficha: lo tecleado sigue ahí (borrador por avería).
+  await page.goto(`/m/${encodeURIComponent(E2E.serie)}`)
+  await expect.poll(async () => {
+    const r = await admin.from('incident_scans').select('id').eq('incident_id', ids.incidentId)
+    return r.data?.length
+  }, { timeout: 15_000 }).toBe(3)
+  await page.goto(`/tech/incidents/${ids.incidentId}`)
+  await expect(page.locator('textarea[name="rapport"]')).toHaveValue(texto)
+  await expect(page.getByRole('radio', { name: /Résolu/ })).toBeEnabled()
+
+  // Cerrar ahora sí: el informe guardado es el del borrador y el borrador se borra.
+  await page.getByRole('radio', { name: /Résolu/ }).check()
+  await page.getByRole('button', { name: "Enregistrer l'intervention" }).click()
+  await expect.poll(() => statusOf(ids.incidentId), { timeout: 20_000 }).toBe('résolu')
+  const { data: closed } = await admin.from('incidents').select('rapport_intervention').eq('id', ids.incidentId).single()
+  expect(closed?.rapport_intervention).toBe(texto)
+  await expect.poll(() => page.evaluate(
+    (id) => Object.keys(sessionStorage).filter((k) => k.includes(id)).length, ids.incidentId,
+  )).toBe(0)
 })

@@ -11,7 +11,7 @@ import { PARTS } from '@/lib/parts'
 import { computePresence } from '@/lib/presence.server'
 import { readPosition } from '@/lib/geo'
 import { getCloseGate } from '@/lib/scan.server'
-import { requiresScan } from '@/lib/scanGate'
+import { CLOSE_SCAN_ERROR, START_SCAN_ERROR, requiresScan } from '@/lib/scanGate'
 import { archivedResolutionNote, buildResolution, clearResolution, historyComment, reopens } from '@/lib/resolution'
 
 type FormState = { error: string } | null
@@ -76,12 +76,12 @@ export async function submitInterventionAction(
     .maybeSingle()
   if (!profile || requiresScan(profile)) {
     if (new_status === 'en_cours' && old_status !== 'en_cours') {
-      return { error: 'Scannez le QR de la machine pour démarrer l\'intervention.' }
+      return { error: START_SCAN_ERROR }
     }
     if (new_status === 'résolu' && old_status !== 'résolu') {
       const gate = await getCloseGate(id, user.id, incident.resolved_at)
       if (!gate.canClose) {
-        return { error: 'Scannez à nouveau le QR de la machine pour clôturer (valable 1 heure).' }
+        return { error: CLOSE_SCAN_ERROR }
       }
     }
   }
@@ -148,6 +148,10 @@ export async function submitInterventionAction(
   const { error } = await supabase.from('incidents').update(updates).eq('id', id)
   if (error) {
     console.error('[submitIntervention]', error)
+    // 23514 (check_violation) lo lanzan los guards de la BD con un texto para el técnico: p. ej.
+    // la ventana de 1 h vence entre la comprobación de arriba y este UPDATE. Mostrarlo tal cual
+    // le dice qué hacer (volver a escanear) en vez de un «réessayez» que fallaría igual.
+    if (error.code === '23514') return { error: error.message }
     return { error: 'Une erreur est survenue. Veuillez réessayer.' }
   }
 

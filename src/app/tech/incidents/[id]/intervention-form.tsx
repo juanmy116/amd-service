@@ -1,6 +1,6 @@
 'use client'
 
-import { startTransition, useActionState, useState, type FormEvent, type ReactNode } from 'react'
+import { startTransition, useActionState, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, MapPin, Building2, FileText, ScanLine } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
@@ -10,6 +10,7 @@ import { PARTS } from '@/lib/parts'
 import { appendPosition, getPositionOnce } from '@/lib/pwa/geolocation'
 import type { LatLng } from '@/lib/geo'
 import ItineraryButton from '@/components/tech/ItineraryButton'
+import { CLOSE_SCAN_ERROR, type CloseBlockReason } from '@/lib/scanGate'
 
 type FormState = { error: string } | null
 
@@ -24,6 +25,38 @@ const STATUS_BADGE: Record<string, BadgeVariant> = {
 const STATUS_LABEL: Record<string, string> = {
   nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu',
 }
+
+// Borrador del informe por avería, en sessionStorage. Si «Résolu» está bloqueado, el único camino
+// es «Scanner la machine», que sale de la ficha; al volver, la página se recarga de la BD y lo
+// tecleado se perdería. Se guarda en cada cambio y se borra al enviar (si el envío falla, se
+// vuelve a guardar). El almacenamiento puede lanzar o venir vacío (modo privado, datos
+// borrados): todo va en try/catch y sin borrador la ficha funciona igual.
+type Draft = { rapport: string; autres_pieces: string }
+const draftKey = (incidentId: string) => `amd:tech-intervention-draft:${incidentId}`
+
+function readDraft(incidentId: string): Draft | null {
+  try {
+    const raw = sessionStorage.getItem(draftKey(incidentId))
+    if (!raw) return null
+    const d: unknown = JSON.parse(raw)
+    if (!d || typeof d !== 'object') return null
+    const { rapport, autres_pieces } = d as Record<string, unknown>
+    if (typeof rapport !== 'string' || typeof autres_pieces !== 'string') return null
+    return { rapport, autres_pieces }
+  } catch {
+    return null
+  }
+}
+
+function writeDraft(incidentId: string, draft: Draft) {
+  try { sessionStorage.setItem(draftKey(incidentId), JSON.stringify(draft)) } catch { /* sin borrador: se sigue */ }
+}
+
+function clearDraft(incidentId: string) {
+  try { sessionStorage.removeItem(draftKey(incidentId)) } catch { /* noop */ }
+}
+
+const hhmm = (d: Date) => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
 type Props = {
   incident: {
@@ -44,8 +77,14 @@ type Props = {
   photos?: ReactNode
   /** Avería sin empezar (`nouveau`/`assigné`) de un técnico de campo: hay que escanear el QR antes. */
   needsStart: boolean
-  /** Doble escaneo: `closeUntil` viaja como ISO porque un Date no cruza al cliente. */
-  closeGate: { canClose: boolean; closeUntil: string | null }
+  /** Doble escaneo (ver `CloseGate`): las fechas viajan como ISO porque un Date no cruza al cliente. */
+  closeGate: {
+    canClose: boolean
+    closeUntil: string | null
+    reason: CloseBlockReason | null
+    firstScanAt: string | null
+    nextScanAfter: string | null
+  }
 }
 
 export default function InterventionForm({
@@ -62,6 +101,9 @@ export default function InterventionForm({
   // de estado son de transición y «Localisation…» no se pintaría hasta el final.
   const [locating, setLocating] = useState(false)
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    // Si el envío acaba bien, la acción redirige y el borrador ya está en la BD; si falla, el
+    // efecto de abajo lo vuelve a guardar.
+    clearDraft(incident.id)
     if (status !== 'résolu' || incident.status === 'résolu') return // envío normal
     e.preventDefault()
     if (locating || pending) return
@@ -86,12 +128,50 @@ export default function InterventionForm({
   // informe tecleado no debe perderse; un campo no controlado puede vaciarse al completarse
   // la acción del formulario.
   const [rapport, setRapport] = useState(incident.rapport_intervention ?? '')
+  const [autresPieces, setAutresPieces] = useState(incident.autres_pieces ?? '')
+
+  // Borrador: se restaura al montar (no en el estado inicial: el servidor no ve sessionStorage y
+  // la hidratación no casaría).
+  useEffect(() => {
+    const draft = readDraft(incident.id)
+    if (!draft) return
+    setRapport(draft.rapport)
+    setAutresPieces(draft.autres_pieces)
+  }, [incident.id])
+
+  function updateDraft(next: Partial<Draft>) {
+    writeDraft(incident.id, { rapport, autres_pieces: autresPieces, ...next })
+  }
+
+  // Envío rechazado: lo tecleado sigue en pantalla pero el borrador se borró al enviar.
+  useEffect(() => {
+    if (state?.error) writeDraft(incident.id, { rapport, autres_pieces: autresPieces })
+    // Solo al llegar una respuesta nueva; los cambios de texto ya se guardan en su onChange.
+  }, [state]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // El servidor rechazó el cierre por el escaneo (p. ej. la ventana de 1 h venció con la ficha
+  // abierta): la ficha no se recarga, así que el candado de la carga ya no vale. Se trata como
+  // bloqueado para ofrecer el botón de escanear y no mostrar una hora de cierre ya pasada.
+  const closeRejected = state?.error === CLOSE_SCAN_ERROR
 
   // Una avería ya resuelta conserva su opción marcada aunque el ciclo de escaneo esté gastado.
-  const resolveLocked = !closeGate.canClose && incident.status !== 'résolu'
-  const closeUntilLabel = closeGate.closeUntil
-    ? new Date(closeGate.closeUntil).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-    : null
+  const resolveLocked = (!closeGate.canClose || closeRejected) && incident.status !== 'résolu'
+  // Un radio deshabilitado no viaja en el formulario: si «Résolu» queda bloqueado estando
+  // marcado, se vuelve a «En cours» para que el siguiente envío (guardar el informe) sea válido.
+  if (resolveLocked && status === 'résolu') setStatus('en_cours')
+  const closeUntilLabel = closeGate.closeUntil ? hhmm(new Date(closeGate.closeUntil)) : null
+
+  // Qué le falta al técnico para cerrar. Con el cierre recién rechazado el motivo de la carga ya
+  // no es fiable: se queda el texto genérico. La hora «à partir de» se redondea al minuto
+  // siguiente: escanear dentro del minuto mostrado podría caer aún en el margen de rebote.
+  let closeHint = 'Scannez à nouveau le QR de la machine pour clôturer (valable 1 heure).'
+  if (!closeRejected && (closeGate.reason === 'one_scan' || closeGate.reason === 'too_close')
+      && closeGate.firstScanAt && closeGate.nextScanAfter) {
+    const next = new Date(Math.ceil(new Date(closeGate.nextScanAfter).getTime() / 60_000) * 60_000)
+    closeHint = `1er scan enregistré à ${hhmm(new Date(closeGate.firstScanAt))} — scannez à nouveau la machine à partir de ${hhmm(next)}.`
+  } else if (!closeRejected && closeGate.reason === 'expired') {
+    closeHint = 'Le dernier scan date de plus d\'1 heure — scannez à nouveau la machine.'
+  }
   const scanButton = (
     <Link
       href="/tech/scan"
@@ -199,9 +279,8 @@ export default function InterventionForm({
           </div>
           {resolveLocked && (
             <div className="mt-3 space-y-3">
-              <p className="text-sm text-ink-soft">
-                Scannez à nouveau le QR de la machine pour clôturer (valable 1 heure).
-              </p>
+              {/* Tras un rechazo, el error de arriba ya dice lo mismo que el texto genérico. */}
+              {!closeRejected && <p className="text-sm text-ink-soft">{closeHint}</p>}
               {scanButton}
             </div>
           )}
@@ -226,7 +305,7 @@ export default function InterventionForm({
             rows={4}
             required={resolving}
             value={rapport}
-            onChange={(e) => setRapport(e.target.value)}
+            onChange={(e) => { setRapport(e.target.value); updateDraft({ rapport: e.target.value }) }}
             placeholder="Décrivez les actions effectuées, l'état de la machine, les pièces changées..."
             className="w-full px-3 py-2.5 rounded-xl border border-line text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
           />
@@ -261,7 +340,8 @@ export default function InterventionForm({
             <input
               name="autres_pieces"
               type="text"
-              defaultValue={incident.autres_pieces ?? ''}
+              value={autresPieces}
+              onChange={(e) => { setAutresPieces(e.target.value); updateDraft({ autres_pieces: e.target.value }) }}
               placeholder="Autres pièces (libre)"
               className="w-full px-3 py-2.5 rounded-xl border border-line text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />

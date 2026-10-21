@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
-import { adminClient, cleanup, URL, ANON_KEY, SERVICE_KEY } from './helpers'
+import { adminClient, cleanup, signInAs, URL, ANON_KEY, SERVICE_KEY } from './helpers'
 import { seedTenants, SC, type Tenants } from './scenario'
 
 // Escaneo del QR (Fase 3, `src/lib/scan.server.ts`) contra la BD local real:
@@ -199,10 +199,46 @@ describe('stampQrScan — averías', () => {
     })
   })
 
+  it('nouveau con técnico (la oficina la devolvió a «Nouveau») → en_cours, historial desde nouveau', async () => {
+    const mine = await newIncident(t.techA, 'nouveau')
+    await scan.stampQrScan(SC.snA, t.techA)
+    expect(await statusOf(mine)).toBe('en_cours')
+    const { data, error } = await admin.from('incident_history')
+      .select('changed_by, old_status, new_status, comment').eq('incident_id', mine)
+    expect(error).toBeNull()
+    expect(data).toContainEqual({
+      changed_by: t.techA, old_status: 'nouveau', new_status: 'en_cours', comment: 'Mise en cours — scan QR',
+    })
+  })
+
+  it('nouveau de otro técnico: escanear no la empieza', async () => {
+    const others = await newIncident(t.techB, 'nouveau')
+    await scan.stampQrScan(SC.snA, t.techA)
+    expect(await statusOf(others)).toBe('nouveau')
+  })
+
   it('en_cours puesta por la oficina: escanear no cambia el estado pero sí deja fila', async () => {
     const mine = await newIncident(t.techA, 'en_cours')
     await scan.stampQrScan(SC.snA, t.techA)
     expect(await statusOf(mine)).toBe('en_cours')
+    expect(await scansOf(mine)).toHaveLength(1)
+  })
+
+  // Policy de 20261021100000: solo el admin lee; nadie con sesión escribe (lo hace service_role).
+  it('incident_scans: el admin lee, el técnico ni lee ni se fabrica escaneos', async () => {
+    const mine = await newIncident(t.techA, 'en_cours')
+    await scan.stampQrScan(SC.snA, t.techA)
+
+    const office = await signInAs(SC.adminEmail)
+    const asAdmin = await office.from('incident_scans').select('scanned_by').eq('incident_id', mine)
+    expect(asAdmin.error).toBeNull()
+    expect(asAdmin.data).toEqual([{ scanned_by: t.techA }])
+
+    const tech = await signInAs(SC.techAEmail)
+    const asTech = await tech.from('incident_scans').select('id').eq('incident_id', mine)
+    expect(asTech.data ?? []).toHaveLength(0)
+    const forged = await tech.from('incident_scans').insert({ incident_id: mine, scanned_by: t.techA })
+    expect(forged.error).not.toBeNull()
     expect(await scansOf(mine)).toHaveLength(1)
   })
 

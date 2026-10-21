@@ -13,7 +13,7 @@ describe('constantes', () => {
 
 describe('closeGate', () => {
   it('sin escaneos no se puede cerrar', () => {
-    expect(closeGate([], null, NOW)).toEqual({ canClose: false, closeUntil: null })
+    expect(closeGate([], null, NOW)).toMatchObject({ canClose: false, closeUntil: null })
   })
 
   it('un solo escaneo no basta', () => {
@@ -69,6 +69,49 @@ describe('closeGate', () => {
     const a = minAgo(10)
     const pair = [a, new Date(a.getTime() + 1000)]
     expect(closeGate([minAgo(50), ...pair], minAgo(30), NOW).canClose).toBe(false)
+  })
+})
+
+describe('closeGate — por qué no se puede cerrar y cuándo', () => {
+  it('sin escaneos: no_scans, sin horas', () => {
+    expect(closeGate([], null, NOW)).toEqual({
+      canClose: false, closeUntil: null, reason: 'no_scans', firstScanAt: null, nextScanAfter: null,
+    })
+  })
+
+  it('un escaneo: one_scan, el siguiente vale desde ese escaneo + 60 s', () => {
+    const first = minAgo(5)
+    expect(closeGate([first], null, NOW)).toEqual({
+      canClose: false, closeUntil: null, reason: 'one_scan',
+      firstScanAt: first, nextScanAfter: new Date(first.getTime() + SCAN_DEDUPE_SECONDS * 1000),
+    })
+  })
+
+  it('dos escaneos a 1 s: too_close, el siguiente vale desde el ÚLTIMO + 60 s (el rebote se mide contra el último)', () => {
+    const first = minAgo(5)
+    const last = new Date(first.getTime() + 1000)
+    expect(closeGate([last, first], null, NOW)).toEqual({
+      canClose: false, closeUntil: null, reason: 'too_close',
+      firstScanAt: first, nextScanAfter: new Date(last.getTime() + SCAN_DEDUPE_SECONDS * 1000),
+    })
+  })
+
+  it('ventana vencida: expired, conserva closeUntil para saber cuándo venció', () => {
+    const last = minAgo(61)
+    expect(closeGate([minAgo(120), last], null, NOW)).toEqual({
+      canClose: false, closeUntil: new Date(last.getTime() + 60 * 60_000), reason: 'expired',
+      firstScanAt: minAgo(120), nextScanAfter: null,
+    })
+  })
+
+  it('se puede cerrar: reason null', () => {
+    const r = closeGate([minAgo(30), minAgo(5)], null, NOW)
+    expect(r).toMatchObject({ canClose: true, reason: null, firstScanAt: minAgo(30), nextScanAfter: null })
+  })
+
+  it('reabierta: los escaneos anteriores a resolvedAt no cuentan ni para el motivo', () => {
+    expect(closeGate([minAgo(50), minAgo(40)], minAgo(30), NOW).reason).toBe('no_scans')
+    expect(closeGate([minAgo(50), minAgo(10)], minAgo(30), NOW)).toMatchObject({ reason: 'one_scan', firstScanAt: minAgo(10) })
   })
 })
 

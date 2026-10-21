@@ -26,8 +26,9 @@ import { SCAN_DEDUPE_SECONDS, closeGate, type CloseGate } from './scanGate'
  * - esas mismas averías reciben una fila en `incident_scans` (quién y cuándo), salvo que ese
  *   usuario ya escaneara la misma avería hace menos de SCAN_DEDUPE_SECONDS (doble lectura de la
  *   cámara). Es el rastro que luego permite exigir un segundo escaneo para cerrar;
- * - las del propio técnico en `assigné` pasan a `en_cours` («Mise en cours — scan QR»): empezar
- *   la avería es escanear, ya no basta con abrir la ficha (esa página no cambia nada);
+ * - las del propio técnico sin empezar (`nouveau` o `assigné`) pasan a `en_cours` («Mise en cours —
+ *   scan QR»): empezar la avería es escanear, ya no basta con abrir la ficha (esa página no
+ *   cambia nada);
  * - la visita de mantenimiento QUE TOCA de su línea abierta: la pendiente (`planifié` /
  *   `en_retard`) más antigua con fecha ≤ hoy + VISIT_STAMP_WINDOW_DAYS, del que escanea o sin
  *   técnico. Solo esa: escanear hoy no prueba nada sobre la visita del trimestre que viene. Desde
@@ -121,7 +122,8 @@ export async function getCloseGate(incidentId: string, userId: string, resolvedA
     .eq('scanned_by', userId)
   if (error) {
     console.error('[getCloseGate.read]', error)
-    return { canClose: false, closeUntil: null }
+    // Sin motivo: no sabemos qué escaneos hay, así que la ficha muestra el texto genérico.
+    return { canClose: false, closeUntil: null, reason: null, firstScanAt: null, nextScanAfter: null }
   }
   return closeGate(
     (data ?? []).map((s) => new Date(s.scanned_at)),
@@ -167,16 +169,20 @@ async function stampIncidents(admin: Admin, numeroSerie: string, openLineId: str
 
   await recordScans(admin, mine.map((r) => r.id), userId)
 
-  // Empezar la avería: solo las asignadas a quien escanea. `.eq('status','assigné')` en el propio
-  // UPDATE evita pisar un cambio hecho entre la lectura y aquí (p. ej. la oficina la puso en
-  // en_cours o la cerró). El historial se escribe solo de las filas que de verdad cambiaron.
-  const toStart = mine.filter((r) => r.assigned_to === userId && r.status === 'assigné').map((r) => r.id)
+  // Empezar la avería: solo las asignadas a quien escanea y aún sin empezar. Cuenta también
+  // `nouveau` con técnico: pasa cuando la oficina devuelve a «Nouveau» una tarjeta ya asignada
+  // (`assigned_to` se conserva) y, como la ficha pide escanear en ambos estados, sin esto el
+  // técnico quedaría atascado. El filtro de estado en el propio UPDATE evita pisar un cambio
+  // hecho entre la lectura y aquí (p. ej. la oficina la puso en en_cours o la cerró). El
+  // historial se escribe solo de las filas que de verdad cambiaron, con el estado leído.
+  const toStart = mine.filter((r) => r.assigned_to === userId && (r.status === 'nouveau' || r.status === 'assigné'))
   if (toStart.length === 0) return
+  const oldStatus = new Map(toStart.map((r) => [r.id, r.status]))
   const { data: started, error: startError } = await admin
     .from('incidents')
     .update({ status: 'en_cours' })
-    .in('id', toStart)
-    .eq('status', 'assigné')
+    .in('id', toStart.map((r) => r.id))
+    .in('status', ['nouveau', 'assigné'])
     .select('id')
   if (startError) {
     console.error('[stampQrScan.start]', startError)
@@ -187,7 +193,7 @@ async function stampIncidents(admin: Admin, numeroSerie: string, openLineId: str
     started.map((i) => ({
       incident_id: i.id,
       changed_by: userId,
-      old_status: 'assigné',
+      old_status: oldStatus.get(i.id) ?? null,
       new_status: 'en_cours',
       comment: 'Mise en cours — scan QR',
     })),
