@@ -58,7 +58,7 @@ BEGIN
   END IF;
 
   IF NEW.status = 'en_cours' THEN
-    RAISE EXCEPTION 'Scannez le QR de la machine pour commencer l''intervention.'
+    RAISE EXCEPTION 'Scannez le QR de la machine pour démarrer l''intervention.'
       USING ERRCODE = 'check_violation';
   END IF;
 
@@ -74,7 +74,7 @@ BEGIN
     IF v_count < 2
        OR v_last < now() - interval '60 minutes'
        OR v_last - v_first < interval '60 seconds' THEN
-      RAISE EXCEPTION 'Scannez le QR de la machine au début et à la fin de l''intervention pour la clôturer.'
+      RAISE EXCEPTION 'Scannez à nouveau le QR de la machine pour clôturer (valable 1 heure).'
         USING ERRCODE = 'check_violation';
     END IF;
   END IF;

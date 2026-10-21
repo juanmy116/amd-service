@@ -10,6 +10,9 @@ import { seedTenants, SC, type Tenants } from './scenario'
 
 const admin = adminClient()
 
+const MSG_START = 'Scannez le QR de la machine pour démarrer l\'intervention.'
+const MSG_CLOSE = 'Scannez à nouveau le QR de la machine pour clôturer (valable 1 heure).'
+
 const REPORT = { resolved_via: 'intervention', rapport_intervention: 'TEST rapport doble scan.' }
 const BUREAU = {
   resolved_via: 'bureau', resolution_reason: 'telephone', resolution_note: 'Réglé au téléphone.',
@@ -63,7 +66,7 @@ describe('doble escaneo — el técnico de campo con su sesión', () => {
     const c = await signInAs(SC.techAEmail)
     const { error } = await c.from('incidents').update({ status: 'en_cours' }).eq('id', id)
     expect(error?.code).toBe('23514')
-    expect(error?.message).toContain('Scannez')
+    expect(error?.message).toBe(MSG_START)
     expect(await statusOf(id)).toBe('assigné')
   })
 
@@ -72,7 +75,7 @@ describe('doble escaneo — el técnico de campo con su sesión', () => {
     const c = await signInAs(SC.techAEmail)
     const { error } = await c.from('incidents').update({ status: 'résolu', ...REPORT }).eq('id', id)
     expect(error?.code).toBe('23514')
-    expect(error?.message).toContain('Scannez')
+    expect(error?.message).toBe(MSG_CLOSE)
     expect(await statusOf(id)).toBe('en_cours')
   })
 
@@ -82,6 +85,7 @@ describe('doble escaneo — el técnico de campo con su sesión', () => {
     const c = await signInAs(SC.techAEmail)
     const { error } = await c.from('incidents').update({ status: 'résolu', ...REPORT }).eq('id', id)
     expect(error?.code).toBe('23514')
+    expect(error?.message).toBe(MSG_CLOSE)
     expect(await statusOf(id)).toBe('en_cours')
   })
 
@@ -102,6 +106,7 @@ describe('doble escaneo — el técnico de campo con su sesión', () => {
     const c = await signInAs(SC.techAEmail)
     const { error } = await c.from('incidents').update({ status: 'résolu', ...REPORT }).eq('id', id)
     expect(error?.code).toBe('23514')
+    expect(error?.message).toBe(MSG_CLOSE)
     expect(await statusOf(id)).toBe('en_cours')
   })
 
@@ -113,6 +118,7 @@ describe('doble escaneo — el técnico de campo con su sesión', () => {
     const c = await signInAs(SC.techAEmail)
     const { error } = await c.from('incidents').update({ status: 'résolu', ...REPORT }).eq('id', id)
     expect(error?.code).toBe('23514')
+    expect(error?.message).toBe(MSG_CLOSE)
     expect(await statusOf(id)).toBe('en_cours')
   })
 
@@ -123,6 +129,7 @@ describe('doble escaneo — el técnico de campo con su sesión', () => {
     const c = await signInAs(SC.techAEmail)
     const { error } = await c.from('incidents').update({ status: 'résolu', ...REPORT }).eq('id', id)
     expect(error?.code).toBe('23514')
+    expect(error?.message).toBe(MSG_CLOSE)
   })
 
   it('técnico: en_cours → fermé con vía intervention e informe, sin escaneos → rechazado', async () => {
@@ -130,6 +137,7 @@ describe('doble escaneo — el técnico de campo con su sesión', () => {
     const c = await signInAs(SC.techAEmail)
     const { error } = await c.from('incidents').update({ status: 'fermé', ...REPORT }).eq('id', id)
     expect(error?.code).toBe('23514')
+    expect(error?.message).toBe(MSG_CLOSE)
     expect(await statusOf(id)).toBe('en_cours')
   })
 
@@ -143,6 +151,7 @@ describe('doble escaneo — el técnico de campo con su sesión', () => {
     const c = await signInAs(SC.techAEmail)
     const { error } = await c.from('incidents').update({ status: 'résolu', ...REPORT }).eq('id', id)
     expect(error?.code).toBe('23514')
+    expect(error?.message).toBe(MSG_CLOSE)
     expect(await statusOf(id)).toBe('en_cours')
   })
 
