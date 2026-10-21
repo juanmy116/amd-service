@@ -3,7 +3,7 @@ import 'server-only'
 import { createAdminClient } from './supabase/admin'
 import { getOpenLineForMachine } from './contract-machines'
 import { FIRST_SCAN_MAX_ACCURACY_M, type LatLng } from './geo'
-import { SCAN_DEDUPE_SECONDS } from './scanGate'
+import { SCAN_DEDUPE_SECONDS, closeGate, type CloseGate } from './scanGate'
 
 /**
  * Deja constancia de que alguien escaneó el QR físico de una máquina.
@@ -101,6 +101,32 @@ export async function setFirstScanLocation(
     .eq('numero_serie', numeroSerie)
     .is('lat', null)
   if (error) console.error('[setFirstScanLocation.write]', error)
+}
+
+/**
+ * Lee los escaneos de ESTE técnico en ESTA avería y aplica la regla del doble escaneo
+ * (`closeGate`). Cliente admin: la tabla `incident_scans` no es legible por el técnico, y el
+ * filtro por usuario se hace aquí a mano. Ante un error de lectura se cierra el candado
+ * (`canClose: false`): mejor no dejar cerrar que dejar cerrar sin prueba.
+ *
+ * `resolvedAt` es la fecha de la última resolución (null si nunca se resolvió); solo cuentan los
+ * escaneos posteriores, así que una avería reabierta exige volver a escanear.
+ */
+export async function getCloseGate(incidentId: string, userId: string, resolvedAt: string | null): Promise<CloseGate> {
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('incident_scans')
+    .select('scanned_at')
+    .eq('incident_id', incidentId)
+    .eq('scanned_by', userId)
+  if (error) {
+    console.error('[getCloseGate.read]', error)
+    return { canClose: false, closeUntil: null }
+  }
+  return closeGate(
+    (data ?? []).map((s) => new Date(s.scanned_at)),
+    resolvedAt ? new Date(resolvedAt) : null,
+  )
 }
 
 /** El escaneo sella la visita pendiente más antigua con fecha dentro de esta ventana. */

@@ -45,4 +45,29 @@ describe('closeGate', () => {
     expect(r.canClose).toBe(true)
     expect(r.closeUntil).toEqual(new Date(minAgo(5).getTime() + 60 * 60_000))
   })
+
+  it('último escaneo hace exactamente 60 min: todavía se puede cerrar', () => {
+    expect(closeGate([minAgo(120), minAgo(60)], null, NOW).canClose).toBe(true)
+  })
+
+  it('último escaneo hace 60 min + 1 ms: la ventana caducó', () => {
+    const last = new Date(minAgo(60).getTime() - 1)
+    expect(closeGate([minAgo(120), last], null, NOW).canClose).toBe(false)
+  })
+
+  it('dos escaneos separados por 1 s: doble disparo del lector, no cuenta como empezar + terminar', () => {
+    const a = minAgo(10)
+    expect(closeGate([a, new Date(a.getTime() + 1000)], null, NOW).canClose).toBe(false)
+  })
+
+  it('dos escaneos separados por exactamente 60 s: se puede cerrar', () => {
+    const a = minAgo(10)
+    expect(closeGate([a, new Date(a.getTime() + SCAN_DEDUPE_SECONDS * 1000)], null, NOW).canClose).toBe(true)
+  })
+
+  it('la separación se mide dentro del ciclo actual, no con escaneos anteriores a resolvedAt', () => {
+    const a = minAgo(10)
+    const pair = [a, new Date(a.getTime() + 1000)]
+    expect(closeGate([minAgo(50), ...pair], minAgo(30), NOW).canClose).toBe(false)
+  })
 })

@@ -205,4 +205,37 @@ describe('stampQrScan — averías', () => {
     expect(await statusOf(mine)).toBe('en_cours')
     expect(await scansOf(mine)).toHaveLength(1)
   })
+
+  describe('getCloseGate', () => {
+    const insertScan = async (incidentId: string, userId: string, secondsAgo: number) => {
+      const { error } = await admin.from('incident_scans')
+        .insert({ incident_id: incidentId, scanned_by: userId, scanned_at: new Date(Date.now() - secondsAgo * 1000).toISOString() })
+      if (error) throw new Error(`seed scan: ${error.message}`)
+    }
+
+    it('dos escaneos recientes → canClose true; uno → false', async () => {
+      const id = await newIncident(t.techA, 'en_cours')
+      await insertScan(id, t.techA, 600)
+      expect((await scan.getCloseGate(id, t.techA, null)).canClose).toBe(false)
+      await insertScan(id, t.techA, 60)
+      const gate = await scan.getCloseGate(id, t.techA, null)
+      expect(gate.canClose).toBe(true)
+      expect(gate.closeUntil).toBeInstanceOf(Date)
+    })
+
+    it('solo cuentan los escaneos del propio técnico', async () => {
+      const id = await newIncident(t.techA, 'en_cours')
+      await insertScan(id, t.techA, 600)
+      await insertScan(id, t.techB, 60)
+      expect((await scan.getCloseGate(id, t.techA, null)).canClose).toBe(false)
+    })
+
+    it('los escaneos anteriores a resolvedAt no cuentan', async () => {
+      const id = await newIncident(t.techA, 'en_cours')
+      await insertScan(id, t.techA, 600)
+      await insertScan(id, t.techA, 300)
+      const resolvedAt = new Date(Date.now() - 100_000).toISOString()
+      expect((await scan.getCloseGate(id, t.techA, resolvedAt)).canClose).toBe(false)
+    })
+  })
 })
