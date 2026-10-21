@@ -12,7 +12,10 @@
 > sin fusionar): empezar una avería = escanear el QR (abrir la ficha ya no la pasa a `en_cours`) y
 > cerrarla = un 2º escaneo, con 60 min para el informe; tabla `incident_scans` + trigger en la BD.
 > Cierra la parte a de la fila 7; el Atelier, los admins y los mantenimientos no cambian. **Antes de
-> publicar:** avisar a los técnicos (texto en el plan) y, tras fusionar, `supabase db push`.
+> publicar:** avisar a los técnicos (texto en el plan). Orden (la BD siempre ANTES del merge): aplicar
+> la migración `20261021100000` (tabla) y después fusionar el PR A; comprobar el PR A en prod; aplicar
+> la migración `20261021110000` (trigger) y después fusionar el PR B. Deshacer: ver
+> `docs/rollback-2026-10-21-doble-escaneo.md` (trigger primero, luego app, luego tabla).
 
 > **2026-10-19:** SAV en uso real — tres arreglos en prod (PRs #187–#189): las incidencias del QR se
 > cuelgan de la línea de contrato (salen cliente y contrato en admin y técnico; las 5 antiguas

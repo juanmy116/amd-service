@@ -1137,9 +1137,15 @@ puede escanear (etiqueta dañada, avería resuelta por teléfono) llama al burea
   y `requiresScan(profile)`; lo usan la ficha y la acción, así no pueden divergir. Las constantes
   `CLOSE_SCAN_WINDOW_MINUTES` y `SCAN_DEDUPE_SECONDS` (60 y 60) se repiten en el trigger: si cambian
   aquí, cambian allí.
-- `getCloseGate` (`scan.server.ts`) lee los escaneos para la ficha (`/tech/scan/[serie]`: aviso
-  «Scanner la machine» para empezar, «Résolu» deshabilitado hasta el 2º escaneo) y para
-  `submitInterventionAction`, que rechaza empezar y cerrar sin escaneos con mensajes en francés.
+- `getCloseGate` (`scan.server.ts`) lee los escaneos para la ficha de la avería
+  (`/tech/incidents/[id]`: aviso «Scanner la machine» para empezar, «Résolu» deshabilitado hasta el
+  2º escaneo, con el motivo —`reason`: falta el 2º escaneo y desde qué hora, o la hora venció—) y
+  para `submitInterventionAction`, que rechaza empezar y cerrar sin escaneos con mensajes en francés.
+  La ficha guarda un borrador del informe en `sessionStorage` por avería, para que salir a escanear
+  no lo pierda. `/tech/scan/[serie]` es la ficha de la máquina: no sella ni bloquea nada, solo avisa
+  («Scan non enregistré…», `?scan=echec`) si el escáner de la app no logró grabar el escaneo.
+- El escaneo empieza (`→ en_cours`) las averías del técnico en `nouveau` o `assigné`: la oficina
+  puede devolver a «Nouveau» una tarjeta ya asignada sin quitar el técnico.
 - Trigger `trg_guard_tech_scan_required` (migración `20261021110000_guard_tech_scan_required.sql`,
   `guard_tech_scan_required()`, SECURITY DEFINER): la misma regla en la BD para **sesiones de
   técnico** (`auth.role() = 'authenticated'` con perfil técnico de campo) cuando cambia `status`:
