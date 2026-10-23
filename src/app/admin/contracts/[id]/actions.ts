@@ -3,7 +3,7 @@
 import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CONTRACT_STATUSES, MAINTENANCE_FREQUENCIES, parseEnum } from '@/lib/enums'
-import { mapRpcError } from '@/lib/contract-errors'
+import { mapRpcError, STALE_LINES_MESSAGE } from '@/lib/contract-errors'
 import { redirect } from 'next/navigation'
 
 type FormState = { error: string } | null
@@ -78,6 +78,28 @@ export async function updateContractAction(
   }
 
   const admin = createAdminClient()
+
+  // Una pestaña antigua puede mandar líneas que ya se cerraron (reemplazo o cierre hecho
+  // después de abrirla): la RPC las actualizaría igual. Mejor parar y pedir recargar.
+  const existingIds = [...lines.map((l) => l.id), ...retire.map((r) => r.id)].filter(
+    (lineId): lineId is string => !!lineId
+  )
+  if (existingIds.length > 0) {
+    const { data: openLines, error: openErr } = await admin
+      .from('contract_machines')
+      .select('id')
+      .eq('contract_id', id)
+      .is('date_fin', null)
+      .in('id', existingIds)
+    if (openErr) {
+      console.error('[updateContract.openLines]', openErr)
+      return { error: 'Une erreur est survenue lors de la mise à jour du contrat.' }
+    }
+    if ((openLines ?? []).length !== new Set(existingIds).size) {
+      return { error: STALE_LINES_MESSAGE }
+    }
+  }
+
   const { error } = await admin.rpc('update_contract_with_lines', { p_contract_id: id, payload })
 
   if (error) {
