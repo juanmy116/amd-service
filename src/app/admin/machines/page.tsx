@@ -115,8 +115,8 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
             param: 'active',
             label: 'Tous les statuts',
             options: [
-              { value: 'true', label: 'Actives' },
-              { value: 'false', label: 'Inactives' },
+              { value: 'true', label: 'En service' },
+              { value: 'false', label: 'Hors service' },
             ],
           },
         ]}
@@ -169,8 +169,8 @@ export default async function MachinesPage({ searchParams }: { searchParams: Sea
                   </td>
                   <td className="px-5 py-4 text-ink-soft">{m.localisation || '—'}</td>
                   <td className="px-5 py-4">
-                    <Badge variant={m.active ? 'success' : 'neutral'}>
-                      {m.active ? 'Active' : 'Inactive'}
+                    <Badge variant={m.active ? 'success' : 'danger'}>
+                      {m.active ? 'En service' : 'Hors service'}
                     </Badge>
                   </td>
                   <td className="px-5 py-4 text-right">

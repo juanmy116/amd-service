@@ -51,12 +51,16 @@ export async function replaceMachineAction(
   }
 
   revalidatePath(`/admin/contracts/${contractId}`)
+  // También desde la ficha de la máquina (botón «Remplacer»): las dos fichas cambian.
+  revalidatePath(`/admin/machines/${encodeURIComponent(in_machine_id)}`)
+  revalidatePath('/admin/machines')
   return { success: true }
 }
 
 function mapReplaceError(msg: string): string {
   if (msg.includes('out_line_invalid'))       return 'La ligne sortante est invalide ou déjà fermée.'
   if (msg.includes('in_machine_busy'))        return 'La machine entrante est déjà utilisée dans un contrat actif.'
+  if (msg.includes('machine_hors_service'))   return 'La machine entrante est hors service.'
   if (msg.includes('closing_counter_too_low')) return 'Le relevé de clôture est inférieur au dernier relevé enregistré.'
   if (msg.includes('date_before_debut'))      return 'La date de remplacement ne peut pas être antérieure à la date de début de la ligne.'
   if (msg.includes('invalid_payload'))        return 'Données invalides.'

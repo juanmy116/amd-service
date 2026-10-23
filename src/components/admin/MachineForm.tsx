@@ -1,8 +1,8 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState } from 'react'
 import Link from 'next/link'
-import { Loader2, ArrowLeft, Trash2, AlertTriangle, Gauge, Package } from 'lucide-react'
+import { Loader2, ArrowLeft, Gauge, Package } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import QuartierSelect from '@/components/admin/QuartierSelect'
 import type { Quartier } from '@/lib/quartiers'
@@ -17,7 +17,6 @@ type MachineData = {
   type?: 'color' | 'noir_blanc' | null
   localisation?: string | null
   quartier_code?: string | null
-  active?: boolean
 }
 
 type Props = {
@@ -26,7 +25,6 @@ type Props = {
   title: string
   isEdit?: boolean
   machineId?: string
-  deleteAction?: (formData: FormData) => Promise<void>
   quartiers: Quartier[]
 }
 
@@ -36,10 +34,9 @@ const inputClass =
 const selectClass =
   'w-full px-3.5 py-2.5 rounded-lg border border-line text-ink text-sm bg-card focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent'
 
-export default function MachineForm({ action, defaultValues, title, isEdit, machineId, deleteAction, quartiers }: Props) {
+export default function MachineForm({ action, defaultValues, title, isEdit, machineId, quartiers }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
   const submitKeepingValues = useSubmitKeepingValues(formAction)
-  const [confirming, setConfirming] = useState(false)
 
   return (
     <div className="p-8 max-w-3xl">
@@ -74,43 +71,6 @@ export default function MachineForm({ action, defaultValues, title, isEdit, mach
               Historique pièces
             </Link>
           </div>
-        )}
-
-        {/* Delete */}
-        {deleteAction && machineId && (
-          confirming ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-ink-soft flex items-center gap-1.5">
-                <AlertTriangle size={14} className="text-accent" />
-                Confirmer ?
-              </span>
-              <form action={deleteAction} className="contents">
-                <input type="hidden" name="serie" value={machineId} />
-                <button
-                  type="submit"
-                  className="px-3 py-2 rounded-lg text-sm font-medium text-white bg-accent"
-                >
-                  Oui, supprimer
-                </button>
-              </form>
-              <button
-                type="button"
-                onClick={() => setConfirming(false)}
-                className="px-3 py-2 rounded-lg text-sm font-medium text-ink-soft border border-line hover:bg-neutral-soft"
-              >
-                Annuler
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirming(true)}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-accent/20 text-sm font-medium text-accent bg-card hover:bg-accent-soft transition-colors"
-            >
-              <Trash2 size={15} />
-              Supprimer
-            </button>
-          )
         )}
       </div>
 
@@ -207,20 +167,6 @@ export default function MachineForm({ action, defaultValues, title, isEdit, mach
             label="Quartier (si différent du client)"
             hint="Laisser vide si la machine est au même endroit que le client."
           />
-
-          {/* Statut */}
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1.5">Statut</label>
-            <label className="flex items-center gap-3 h-[42px] cursor-pointer">
-              <input
-                name="active"
-                type="checkbox"
-                defaultChecked={defaultValues?.active ?? true}
-                className="w-4 h-4 rounded accent-accent"
-              />
-              <span className="text-sm text-ink">Machine active</span>
-            </label>
-          </div>
         </Card>
 
         {/* Actions */}

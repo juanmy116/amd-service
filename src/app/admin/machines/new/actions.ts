@@ -34,7 +34,7 @@ export async function createMachineAction(
     type,
     localisation:  str(formData, 'localisation') || null,
     quartier_code: str(formData, 'quartier_code') || null,
-    active:      formData.get('active') === 'on',
+    active:      true, // una máquina nueva entra en servicio; la baja se hace desde su ficha
   })
 
   if (error) {
