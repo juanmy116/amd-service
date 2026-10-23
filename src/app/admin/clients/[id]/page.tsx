@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import ClientForm from '@/components/admin/ClientForm'
+import ClientMaintenance from '@/components/admin/ClientMaintenance'
 import { getQuartiers } from '@/lib/quartiers.server'
 import { updateClientAction, deleteClientAction } from './actions'
 
@@ -25,13 +26,16 @@ export default async function EditClientPage({
   const boundUpdateAction = updateClientAction.bind(null, client.id)
 
   return (
-    <ClientForm
-      action={boundUpdateAction}
-      defaultValues={client}
-      title={client.nom_client}
-      clientId={client.id}
-      quartiers={quartiers}
-      deleteAction={deleteClientAction}
-    />
+    <>
+      <ClientForm
+        action={boundUpdateAction}
+        defaultValues={client}
+        title={client.nom_client}
+        clientId={client.id}
+        quartiers={quartiers}
+        deleteAction={deleteClientAction}
+      />
+      <ClientMaintenance clientId={client.id} />
+    </>
   )
 }

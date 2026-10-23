@@ -19,7 +19,7 @@
 |---|---|---|---|
 | 1 · Retoques rápidos | 3, 5, 7 y el fallo del punto 2 | No | ✅ en prod 2026-10-23 (#197, #198, #199) |
 | 2 · Ventana emergente en contratos | 4 | No | ✅ en prod 2026-10-23 (#202, sustituye al #201) |
-| 3 · Mantenimientos en la ficha del cliente | 1 | No | ⏳ |
+| 3 · Mantenimientos en la ficha del cliente | 1 | No | 🔄 PR abierto |
 | 4 · Teléfono móvil y fijo | 9 | Sí (columna nueva) | ⏳ |
 | 5 · Las máquinas nunca se borran | 6 | Sí (estado obsolète) | ⏳ |
 | 6 · Técnicos que crean incidencias | 8 | Sí (permiso + acción) | ⏳ |
@@ -97,3 +97,9 @@
   registered». En CI no pasa (base nueva cada vez). Hoy: `supabase db reset --local` + los GRANT de
   `e2e.yml` entre pasadas. Arreglo posible: que la factura de ese spec la emita un admin propio
   `TESTINV…`, fuera del barrido de `cleanup()`.
+- **Máquinas sin visita de mantenimiento.** Las visitas solo se crean al crear el plan
+  (`maintenance/new/actions.ts`), al cerrar una visita (`close_maintenance_visit`, la siguiente) y
+  al reemplazar una máquina (`replace_contract_machine`, se trasladan). **Una máquina añadida a un
+  contrato que ya tiene plan no recibe ninguna visita** y nadie la mantendría. Desde la tanda 3 la
+  ficha del cliente lo señala («Aucune visite» / «N sans visite»); falta arreglarlo de raíz
+  (crear su primera visita al añadir la línea, cambio de BD o de `update_contract_with_lines`).
