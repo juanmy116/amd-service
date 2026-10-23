@@ -53,7 +53,8 @@ test('recorrido: admin asigna → técnico ve → scan → en_cours → segundo 
 
   // 3) Abrir la ficha de la máquina ya NO arranca la avería.
   await page.goto(`/tech/scan/${encodeURIComponent(E2E.serie)}`)
-  await expect(page.getByText(E2E.serie)).toBeVisible()
+  // En escritorio la agenda lateral también lista la serie de la avería: mirar solo la ficha.
+  await expect(page.getByRole('main').getByText(E2E.serie)).toBeVisible()
   await expect(page.getByText('Scan non enregistré')).toHaveCount(0)
   expect(await statusOf(ids.incidentId)).toBe('assigné')
 

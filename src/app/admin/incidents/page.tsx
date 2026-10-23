@@ -112,6 +112,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Se
     numero_incident: r.numero_incident,
     title: r.title,
     machine_id: r.machine_id,
+    clientName: r.clientName,
     category: r.category,
     priority: r.priority,
     status: r.status,

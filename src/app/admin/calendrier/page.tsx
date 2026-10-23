@@ -36,7 +36,7 @@ export default async function CalendrierPage() {
       .order('scheduled_date'),
     supabase
       .from('incidents')
-      .select('id, title, status, created_at')
+      .select('id, title, status, created_at, contract_machines(contracts(clients(nom_client)))')
       .not('status', 'in', '("résolu","fermé")')
       .gte('created_at', `${from}T00:00:00`)
       .order('created_at', { ascending: false }),
@@ -68,10 +68,11 @@ export default async function CalendrierPage() {
   }
 
   for (const inc of incidents ?? []) {
-    const cfg = INCIDENT_COLOR[inc.status] ?? INCIDENT_COLOR.nouveau
+    const cfg    = INCIDENT_COLOR[inc.status] ?? INCIDENT_COLOR.nouveau
+    const client = inc.contract_machines?.contracts?.clients?.nom_client
     events.push({
       id:        `inc-${inc.id}`,
-      title:     `[SAV] ${inc.title}`,
+      title:     client ? `[SAV] ${client} — ${inc.title}` : `[SAV] ${inc.title}`,
       start:     inc.created_at.split('T')[0],
       allDay:    true,
       color:     cfg.color,

@@ -41,7 +41,7 @@ export default async function TechPlanningPage() {
       .limit(30),
     supabase
       .from('incidents')
-      .select('id, title, status, priority, machine_id, created_at')
+      .select('id, title, status, priority, machine_id, created_at, contract_machines(machine_id, contracts(clients(nom_client)))')
       .eq('assigned_to', user.id)
       .not('status', 'in', '("résolu","fermé")')
       .order('created_at', { ascending: false }),
@@ -116,7 +116,14 @@ export default async function TechPlanningPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-ink truncate">{inc.title}</p>
-                <p className="font-mono text-xs text-ink-muted mt-0.5">{inc.machine_id}</p>
+                {inc.contract_machines?.contracts?.clients?.nom_client && (
+                  <p className="text-xs font-medium text-ink-soft truncate mt-0.5">
+                    {inc.contract_machines.contracts.clients.nom_client}
+                  </p>
+                )}
+                <p className="font-mono text-xs text-ink-muted mt-0.5">
+                  {inc.contract_machines?.machine_id ?? inc.machine_id}
+                </p>
                 <p className="text-xs text-ink-muted">
                   {new Date(inc.created_at).toLocaleDateString('fr-FR')}
                 </p>
