@@ -79,3 +79,16 @@
 - Hacer: flag `profiles.can_create_incidents` (precedente `is_dispatcher` / `can_bill`, protegido por el trigger de `20260610100000_secure_profiles_role.sql`), interruptor en `/admin/team`.
 - Botón «Signaler une panne» en `/tech/scan/[serie]` → acción de servidor que comprueba el flag y crea con el cliente admin, resolviendo la línea abierta como `/signaler` (`signaler/[serie]/actions.ts:103-140`); `status = 'nouveau'`, **sin asignar**, `opened_by` = técnico, línea en `incident_history`.
 - Activar para Issa y Modou Dieme.
+
+---
+
+## Detalles que salieron por el camino
+
+- **Build dependía de Google Fonts** (preview del PR #197 cayó al descargar Inter): PR #200 sirve las
+  tipografías desde `src/app/fonts` con `next/font/local`. Comprobado compilando sin internet.
+- **E2E en local: no se puede pasar la suite completa dos veces seguidas.** `facturation.spec.ts`
+  emite una factura (inmutable) con `issued_by` = `admin@e2e.test`; el teardown no puede borrar ese
+  usuario y el siguiente `global-setup` falla con «A user with this email address has already been
+  registered». En CI no pasa (base nueva cada vez). Hoy: `supabase db reset --local` + los GRANT de
+  `e2e.yml` entre pasadas. Arreglo posible: que la factura de ese spec la emita un admin propio
+  `TESTINV…`, fuera del barrido de `cleanup()`.
