@@ -19,8 +19,8 @@
 |---|---|---|---|
 | 1 · Retoques rápidos | 3, 5, 7 y el fallo del punto 2 | No | ✅ en prod 2026-10-23 (#197, #198, #199) |
 | 2 · Ventana emergente en contratos | 4 | No | ✅ en prod 2026-10-23 (#202, sustituye al #201) |
-| 3 · Mantenimientos en la ficha del cliente | 1 | No | 🔄 PR abierto |
-| 4 · Teléfono móvil y fijo | 9 | Sí (columna nueva) | 🔄 PR abierto |
+| 3 · Mantenimientos en la ficha del cliente | 1 | No | ✅ en prod 2026-10-23 (#203) |
+| 4 · Teléfono móvil y fijo | 9 | Sí (columna nueva) | ✅ en prod 2026-10-23 (#204 + migración `20261023140000`) |
 | 5 · Las máquinas nunca se borran | 6 | Sí (estado obsolète) | ⏳ |
 | 6 · Técnicos que crean incidencias | 8 | Sí (permiso + acción) | ⏳ |
 
@@ -101,8 +101,11 @@
   (`maintenance/new/actions.ts`), al cerrar una visita (`close_maintenance_visit`, la siguiente) y
   al reemplazar una máquina (`replace_contract_machine`, se trasladan). **Una máquina añadida a un
   contrato que ya tiene plan no recibe ninguna visita** y nadie la mantendría. Desde la tanda 3 la
-  ficha del cliente lo señala («Aucune visite» / «N sans visite»); falta arreglarlo de raíz
-  (crear su primera visita al añadir la línea, cambio de BD o de `update_contract_with_lines`).
+  ficha del cliente lo señala («Aucune visite» / «N sans visite»). **Arreglo de raíz:** trigger
+  `trg_schedule_first_visit_for_new_line` (`20261023160000`): la máquina recibe la próxima visita
+  pendiente del contrato (decisión del usuario: mismo viaje), o max(inicio, hoy) + 30/90 días.
+  En prod a 2026-10-23 había **0 planes activos** (28 contratos, 86 máquinas): nada afectado aún;
+  los planes los tiene que crear la oficina.
 - **Los formularios se vaciaban tras un error del servidor.** Con `<form action={…}>` + `useActionState`,
   React 19 reinicia el formulario al acabar la acción también cuando vuelve con error: se pierde lo
   escrito (p. ej. un NINEA repetido en la ficha del cliente obliga a reescribirlo todo). Arreglado en
