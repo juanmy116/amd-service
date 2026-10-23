@@ -36,7 +36,7 @@ export default async function EditContractPage({
       .select('id, machine_id, date_debut, date_fin, statut, billing_day_override, maintenance_frequency_override, notes, billing_plan_id, price_bw_override, price_color_override, fixed_fee_override, machines(numero_serie, marque, modele)')
       .eq('contract_id', id)
       .order('date_debut', { ascending: true }),
-    supabase.from('billing_plans').select('id, name, type').eq('active', true).order('name'),
+    supabase.from('billing_plans').select('id, name, type, fixed_fee, price_bw, price_color, tiers').eq('active', true).order('name'),
   ])
   // WP-5b: un fallo técnico bloquea (boundary). Selects vacíos por error de BD podrían llevar a
   // guardar el cliente/máquina/plan equivocado (ver comentario arriba) — preferible bloquear.
