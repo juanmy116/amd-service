@@ -80,7 +80,11 @@ export default async function EditContractPage({
 
   return (
     <div className="space-y-8">
+      {/* El formulario guarda las líneas en su propio estado: tras un reemplazo o un cierre,
+          router.refresh() trae líneas nuevas pero no las aplicaría. La key lo vuelve a montar
+          con las líneas abiertas actuales. */}
       <ContractForm
+        key={initialLines.map((l) => l.id).join(',')}
         action={boundUpdateAction}
         defaultValues={contract}
         initialLines={initialLines}

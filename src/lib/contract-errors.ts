@@ -9,9 +9,13 @@ const RPC_ERROR_MESSAGES: Record<string, string> = {
   no_lines:                     'Veuillez ajouter au moins une machine au contrat.',
   machine_id_immutable:         "Impossible de changer la machine d'une ligne existante. Retirez la machine et ajoutez-en une nouvelle.",
   invalid_date_fin:             'La date de fin doit être postérieure ou égale à la date de début.',
+  line_already_closed:          'Cette machine a déjà été retirée ou remplacée. Rechargez la page.',
   permission_denied:            'Permission refusée.',
   client_change_forbidden_history: "Impossible de changer le client : ce contrat a déjà des factures ou des relevés. Créez un nouveau contrat pour le nouveau client.",
 }
+
+export const STALE_LINES_MESSAGE =
+  "La liste des machines a changé depuis l'ouverture de la page (remplacement ou clôture). Rechargez la page avant d'enregistrer."
 
 export function mapRpcError(message: string | undefined, fallback: string): string {
   if (!message) return fallback
