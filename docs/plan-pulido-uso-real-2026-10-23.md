@@ -17,8 +17,8 @@
 
 | Tanda | Puntos | ¿BD? | Estado |
 |---|---|---|---|
-| 1 · Retoques rápidos | 3, 5, 7 y el fallo del punto 2 | No | ⏳ |
-| 2 · Ventana emergente en contratos | 4 | No | ⏳ |
+| 1 · Retoques rápidos | 3, 5, 7 y el fallo del punto 2 | No | ✅ en prod 2026-10-23 (#197, #198, #199) |
+| 2 · Ventana emergente en contratos | 4 | No | ✅ en prod 2026-10-23 (#202, sustituye al #201) |
 | 3 · Mantenimientos en la ficha del cliente | 1 | No | ⏳ |
 | 4 · Teléfono móvil y fijo | 9 | Sí (columna nueva) | ⏳ |
 | 5 · Las máquinas nunca se borran | 6 | Sí (estado obsolète) | ⏳ |
@@ -84,8 +84,13 @@
 
 ## Detalles que salieron por el camino
 
-- **Build dependía de Google Fonts** (preview del PR #197 cayó al descargar Inter): PR #200 sirve las
-  tipografías desde `src/app/fonts` con `next/font/local`. Comprobado compilando sin internet.
+- **Build dependía de Google Fonts** (preview del PR #197 cayó al descargar Inter): PR #200 (✅ en
+  prod) sirve las tipografías desde `src/app/fonts` con `next/font/local`. Comprobado compilando sin
+  internet.
+- **PR apilado cerrado por GitHub:** el #201 iba sobre la rama del #199; `gh pr merge 199
+  --delete-branch` borró esa rama y GitHub **cerró** el #201 en vez de reapuntarlo. Se reabrió como
+  #202. Con PRs apilados: mergear el de abajo **sin** `--delete-branch`, reapuntar el de arriba a
+  `main` (`gh pr edit N --base main`) y borrar la rama después.
 - **E2E en local: no se puede pasar la suite completa dos veces seguidas.** `facturation.spec.ts`
   emite una factura (inmutable) con `issued_by` = `admin@e2e.test`; el teardown no puede borrar ese
   usuario y el siguiente `global-setup` falla con «A user with this email address has already been
