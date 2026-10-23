@@ -15,6 +15,10 @@ test('relevé manuel : vide après succès, garde les valeurs après une erreur'
   try {
     await loginAs(page, E2E.adminEmail)
     await page.goto(`/admin/contadores/${encodeURIComponent(E2E.serie)}`)
+    // Que la página acabe de arrancar (precarga de los enlaces del menú) antes de guardar: en CI,
+    // un envío a los pocos ms de abrirla se quedó una vez «Enregistrement…» sin aplicar la
+    // respuesta (que había llegado completa). Una persona no envía tan rápido.
+    await page.waitForLoadState('networkidle')
     const main = page.getByRole('main')
     const bw = main.locator('input[name="counter_bw"]')
     const color = main.locator('input[name="counter_color"]')
