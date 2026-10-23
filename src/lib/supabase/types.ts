@@ -186,6 +186,7 @@ export type Database = {
           princity_prefix: string | null
           quartier_code: string | null
           telephone: string | null
+          telephone_fixe: string | null
           ville: string | null
         }
         Insert: {
@@ -200,6 +201,7 @@ export type Database = {
           princity_prefix?: string | null
           quartier_code?: string | null
           telephone?: string | null
+          telephone_fixe?: string | null
           ville?: string | null
         }
         Update: {
@@ -214,6 +216,7 @@ export type Database = {
           princity_prefix?: string | null
           quartier_code?: string | null
           telephone?: string | null
+          telephone_fixe?: string | null
           ville?: string | null
         }
         Relationships: [

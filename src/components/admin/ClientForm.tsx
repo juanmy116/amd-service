@@ -1,11 +1,12 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { startTransition, useActionState, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { Loader2, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import QuartierSelect from '@/components/admin/QuartierSelect'
 import type { Quartier } from '@/lib/quartiers'
+import { SENEGAL_PREFIX } from '@/lib/phone'
 
 type FormState = { error: string } | null
 
@@ -14,6 +15,7 @@ type ClientData = {
   ninea?: string | null
   email?: string | null
   telephone?: string | null
+  telephone_fixe?: string | null
   adresse?: string | null
   ville?: string | null
   quartier_code?: string | null
@@ -34,6 +36,15 @@ const inputClass =
 
 export default function ClientForm({ action, defaultValues, title, clientId, deleteAction, quartiers }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
+
+  // Con `<form action={…}>`, React 19 vacía el formulario al terminar la acción, también cuando
+  // vuelve con un error: se perdía todo lo escrito (NINEA, dirección…). Enviándolo a mano no hay
+  // ese reinicio; las validaciones `required` del navegador siguen actuando antes del submit.
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const data = new FormData(e.currentTarget)
+    startTransition(() => formAction(data))
+  }
   const [confirming, setConfirming] = useState(false)
 
   return (
@@ -90,7 +101,7 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
       </div>
 
       {/* Form */}
-      <form action={formAction}>
+      <form onSubmit={handleSubmit}>
         <Card className="p-6 space-y-5">
 
           {state?.error && (
@@ -129,34 +140,48 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
             </div>
           </div>
 
-          {/* Row 2: email + telephone */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-ink-soft mb-1.5">
-                Email <span className="text-accent">*</span>
-              </label>
-              <input
-                name="email"
-                type="email"
-                required
-                defaultValue={defaultValues?.email ?? ''}
-                placeholder="contact@societe.sn"
-                className={inputClass}
-              />
+          {/* Row 2: email */}
+          <div>
+            <label className="block text-sm font-medium text-ink-soft mb-1.5">
+              Email <span className="text-accent">*</span>
+            </label>
+            <input
+              name="email"
+              type="email"
+              required
+              defaultValue={defaultValues?.email ?? ''}
+              placeholder="contact@societe.sn"
+              className={inputClass}
+            />
+          </div>
+
+          {/* Row 2b: téléphones — au moins un des deux (vérifié côté serveur) */}
+          <div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-ink-soft mb-1.5">Téléphone mobile</label>
+                <input
+                  name="telephone"
+                  type="tel"
+                  defaultValue={defaultValues?.telephone ?? SENEGAL_PREFIX}
+                  placeholder="+221 77 000 00 00"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-ink-soft mb-1.5">Téléphone fixe</label>
+                <input
+                  name="telephone_fixe"
+                  type="tel"
+                  defaultValue={defaultValues?.telephone_fixe ?? SENEGAL_PREFIX}
+                  placeholder="+221 33 000 00 00"
+                  className={inputClass}
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-ink-soft mb-1.5">
-                Téléphone <span className="text-accent">*</span>
-              </label>
-              <input
-                name="telephone"
-                type="tel"
-                required
-                defaultValue={defaultValues?.telephone ?? ''}
-                placeholder="+221 33 000 00 00"
-                className={inputClass}
-              />
-            </div>
+            <p className="mt-1.5 text-xs text-ink-muted">
+              Au moins un des deux numéros est obligatoire<span className="text-accent"> *</span>
+            </p>
           </div>
 
           {/* Row 3: adresse */}
