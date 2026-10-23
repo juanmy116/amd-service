@@ -2,25 +2,15 @@
 
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, ArrowLeft, Trash2, AlertTriangle, Plus, X } from 'lucide-react'
+import { Loader2, ArrowLeft, Trash2, AlertTriangle, Plus, X, Pencil } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import MachineCombobox from '@/components/admin/MachineCombobox'
-import { TIERED_TYPES, formatNumber, formatTiers, type BillingPlan } from '@/lib/billing'
+import ContractLineDialog, {
+  emptyLine, type BillingPlanOption, type LineInput, type MachineOption,
+} from '@/components/admin/ContractLineDialog'
+
+export type { BillingPlanOption }
 
 type FormState = { error: string } | null
-
-export type BillingPlanOption = Pick<BillingPlan, 'id' | 'name' | 'type' | 'fixed_fee' | 'price_bw' | 'price_color' | 'tiers'>
-
-/** Precio que se aplica de verdad: el de la línea si se ha escrito, si no el del plan. */
-function AppliedPrice({ override, planValue, unit }: { override: number | null; planValue: number | null; unit: string }) {
-  return (
-    <p className="text-[11px] text-ink-muted mt-1">
-      {override !== null
-        ? <>Appliqué : <span className="font-medium text-ink-soft">{formatNumber(override)} {unit}</span> (plan : {formatNumber(planValue)})</>
-        : <>Du plan : <span className="font-medium text-ink-soft">{formatNumber(planValue)} {unit}</span></>}
-    </p>
-  )
-}
 
 type ContractData = {
   numero_contrat?: string
@@ -31,19 +21,6 @@ type ContractData = {
   billing_day?: number | null
   // Valor inicial del <select>; en BD es text (CHECK mensuel/trimestriel).
   maintenance_frequency?: string | null
-}
-
-type LineInput = {
-  id?: string                                               // present for existing lines
-  machine_id: string
-  date_debut: string
-  billing_day_override: number | null
-  maintenance_frequency_override: 'mensuel' | 'trimestriel' | null
-  notes: string | null
-  billing_plan_id: string | null
-  price_bw_override: number | null
-  price_color_override: number | null
-  fixed_fee_override: number | null
 }
 
 type RetiredLine = {
@@ -61,7 +38,6 @@ type RetiredLine = {
 }
 
 type ClientOption = { id: number; nom_client: string; princity_company_id?: string | null }
-type MachineOption = { numero_serie: string; marque: string; modele: string }
 
 type Props = {
   action: (prev: FormState, data: FormData) => Promise<FormState>
@@ -85,23 +61,6 @@ const selectClass =
 const inputSmClass =
   'w-full px-3 py-2 rounded-lg border border-line text-ink text-sm placeholder-ink-muted bg-card focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent'
 
-const selectSmClass =
-  'w-full px-3 py-2 rounded-lg border border-line text-ink text-sm bg-card focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent'
-
-function emptyLine(): LineInput {
-  return {
-    machine_id: '',
-    date_debut: new Date().toISOString().slice(0, 10),
-    billing_day_override: null,
-    maintenance_frequency_override: null,
-    notes: null,
-    billing_plan_id: null,
-    price_bw_override: null,
-    price_color_override: null,
-    fixed_fee_override: null,
-  }
-}
-
 export default function ContractForm({
   action, defaultValues, initialLines, clients, availableMachines, billingPlans, title, isEdit, contractId, deleteAction,
 }: Props) {
@@ -112,9 +71,13 @@ export default function ContractForm({
     null
   )
   const [confirming, setConfirming] = useState(false)
-  const [lines, setLines] = useState<LineInput[]>(initialLines ?? [emptyLine()])
+  const [lines, setLines] = useState<LineInput[]>(initialLines ?? [])
   const [retired, setRetired] = useState<RetiredLine[]>([])
-  const [submitted, setSubmitted] = useState(false)
+  // Ventana de máquina: `index` null = máquina nueva. `line` y `key` se conservan al cerrar
+  // (fundido de salida) y cambian en cada apertura.
+  const [dialog, setDialog] = useState<{ open: boolean; index: number | null; line: LineInput; key: number }>(
+    { open: false, index: null, line: emptyLine(), key: 0 }
+  )
   const [selectedClientId, setSelectedClientId] = useState<number | null>(defaultValues?.client_id ?? null)
 
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null
@@ -123,8 +86,22 @@ export default function ContractForm({
 
   const today = new Date().toISOString().slice(0, 10)
 
-  function addLine() {
-    setLines((prev) => [...prev, emptyLine()])
+  function openNewLine() {
+    setDialog((d) => ({ open: true, index: null, line: emptyLine(), key: d.key + 1 }))
+  }
+
+  function openEditLine(idx: number) {
+    setDialog((d) => ({ open: true, index: idx, line: lines[idx], key: d.key + 1 }))
+  }
+
+  function closeDialog() {
+    setDialog((d) => ({ ...d, open: false }))
+  }
+
+  function saveLine(line: LineInput) {
+    const idx = dialog.index
+    setLines((prev) => idx === null ? [...prev, line] : prev.map((l, i) => i === idx ? line : l))
+    closeDialog()
   }
 
   // Retirar una línea. Si es existente (tiene id) se mueve a "retired" con date_fin
@@ -149,10 +126,6 @@ export default function ContractForm({
       }
       return prev.filter((_, i) => i !== idx)
     })
-  }
-
-  function updateLine<K extends keyof LineInput>(idx: number, key: K, value: LineInput[K]) {
-    setLines((prev) => prev.map((l, i) => i === idx ? { ...l, [key]: value } : l))
   }
 
   function updateRetiredDate(id: string, date_fin: string) {
@@ -180,8 +153,13 @@ export default function ContractForm({
     })
   }
 
-  // Machine IDs already used in other lines (to avoid duplicates)
-  const usedMachineIds = new Set(lines.map((l) => l.machine_id).filter(Boolean))
+  // Máquinas ya usadas en OTRAS líneas (la que se edita sigue disponible para sí misma)
+  const usedMachineIds = new Set(
+    lines.filter((_, i) => i !== dialog.index).map((l) => l.machine_id).filter(Boolean)
+  )
+  const selectableMachines = availableMachines.filter((m) => !usedMachineIds.has(m.numero_serie))
+  const machineBySerie = new Map(availableMachines.map((m) => [m.numero_serie, m]))
+  const planById = new Map(billingPlans.map((p) => [p.id, p]))
 
   return (
     <div className="p-8 max-w-3xl">
@@ -244,7 +222,7 @@ export default function ContractForm({
       )}
 
       {/* Form */}
-      <form action={formAction} onSubmit={() => setSubmitted(true)}>
+      <form action={formAction}>
         {/* Hidden field: serialised lines */}
         <input type="hidden" name="lines" value={JSON.stringify(lines)} />
         <input type="hidden" name="retire" value={JSON.stringify(retired)} />
@@ -392,225 +370,71 @@ export default function ContractForm({
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-ink-soft uppercase tracking-wide">
               Machines du contrat
+              {lines.length > 0 && <span className="ml-2 font-normal normal-case text-ink-muted">({lines.length})</span>}
             </h2>
             <button
               type="button"
-              onClick={addLine}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line text-sm font-medium text-ink-soft hover:bg-neutral-soft transition-colors"
+              onClick={openNewLine}
+              disabled={selectableMachines.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line text-sm font-medium text-ink-soft hover:bg-neutral-soft transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
             >
               <Plus size={14} />
               Ajouter une machine
             </button>
           </div>
 
-          {availableMachines.length === 0 && lines.length === 0 && (
+          {lines.length === 0 && (
             <p className="text-sm text-ink-muted">
-              Aucune machine disponible (toutes sont déjà assignées à un contrat actif).
+              {availableMachines.length === 0
+                ? 'Aucune machine disponible (toutes sont déjà assignées à un contrat actif).'
+                : 'Aucune machine pour l\'instant. Cliquez sur « Ajouter une machine ».'}
             </p>
           )}
 
-          <div className="space-y-4">
-            {lines.map((line, idx) => {
-              // This line's machine is always available to itself even if "used"
-              const selectableMachines = availableMachines.filter(
-                (m) => !usedMachineIds.has(m.numero_serie) || m.numero_serie === line.machine_id
-              )
-
-              return (
-                <div
-                  key={idx}
-                  className="p-4 rounded-lg border border-line bg-neutral-soft space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
-                      Machine {idx + 1}
-                    </span>
+          {lines.length > 0 && (
+            <ul className="divide-y divide-line rounded-lg border border-line">
+              {lines.map((line, idx) => {
+                const machine = machineBySerie.get(line.machine_id)
+                const plan = line.billing_plan_id ? planById.get(line.billing_plan_id) : undefined
+                const hasOverride = line.fixed_fee_override !== null || line.price_bw_override !== null
+                  || line.price_color_override !== null || line.billing_day_override !== null
+                  || line.maintenance_frequency_override !== null
+                return (
+                  <li key={line.id ?? `new-${idx}`} className="flex items-center gap-4 px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-ink truncate">
+                        <span className="font-mono font-medium">{line.machine_id}</span>
+                        {machine && <span className="text-ink-soft"> · {machine.marque} {machine.modele}</span>}
+                        {!line.id && <span className="ml-2 text-[11px] font-medium text-accent">Nouvelle</span>}
+                      </p>
+                      <p className="text-xs text-ink-muted truncate mt-0.5">
+                        {plan ? plan.name : 'Sans plan'}
+                        {hasOverride && ' · conditions particulières'}
+                        {' · depuis le '}{new Date(`${line.date_debut}T00:00:00`).toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openEditLine(idx)}
+                      className="flex items-center gap-1 text-xs font-medium text-ink-soft hover:text-ink transition-colors"
+                    >
+                      <Pencil size={12} />
+                      Modifier
+                    </button>
                     {lines.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeLine(idx)}
-                        className="flex items-center gap-1 text-xs text-accent hover:text-accent/80 transition-colors"
+                        className="flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
                       >
                         <X size={13} />
                         Retirer
                       </button>
                     )}
-                  </div>
-
-                  {/* Machine selector + date_debut */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-ink-muted mb-1">
-                        Numéro de série <span className="text-accent">*</span>
-                      </label>
-                      {line.id ? (
-                        <div className="px-3 py-2 rounded-lg border border-line bg-neutral-soft text-sm text-ink-soft font-mono">
-                          {line.machine_id}
-                        </div>
-                      ) : (
-                        <MachineCombobox
-                          options={selectableMachines}
-                          value={line.machine_id}
-                          onChange={(id) => updateLine(idx, 'machine_id', id)}
-                          invalid={submitted && !line.machine_id}
-                        />
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-ink-muted mb-1">
-                        Date de début <span className="text-accent">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={line.date_debut}
-                        onChange={(e) => updateLine(idx, 'date_debut', e.target.value)}
-                        required
-                        className={inputSmClass}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Overrides */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-ink-muted mb-1">
-                        Jour facturation (override)
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={31}
-                        value={line.billing_day_override ?? ''}
-                        onChange={(e) => {
-                          const v = e.target.value === '' ? null : Number(e.target.value)
-                          updateLine(idx, 'billing_day_override', v)
-                        }}
-                        placeholder="1–31"
-                        className={inputSmClass}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-ink-muted mb-1">
-                        Fréquence maintenance (override)
-                      </label>
-                      <select
-                        value={line.maintenance_frequency_override ?? ''}
-                        onChange={(e) => {
-                          const v = e.target.value as 'mensuel' | 'trimestriel' | ''
-                          updateLine(idx, 'maintenance_frequency_override', v === '' ? null : v)
-                        }}
-                        className={selectSmClass}
-                      >
-                        <option value="">— (défaut contrat)</option>
-                        <option value="mensuel">Mensuel</option>
-                        <option value="trimestriel">Trimestriel</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Facturation: plan + overrides (filtrados por tipo de plan) */}
-                  <div className="pt-3 border-t border-line-subtle space-y-3">
-                    <div>
-                      <label className="block text-xs font-medium text-ink-muted mb-1">
-                        Plan de facturation
-                      </label>
-                      <select
-                        value={line.billing_plan_id ?? ''}
-                        onChange={(e) => updateLine(idx, 'billing_plan_id', e.target.value || null)}
-                        className={selectSmClass}
-                      >
-                        <option value="">Sans plan</option>
-                        {billingPlans.map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {(() => {
-                      const plan = billingPlans.find((p) => p.id === line.billing_plan_id)
-                      if (!plan) return null
-                      const showFixed = plan.type !== 'per_copy'
-                      const showFlat  = plan.type === 'per_copy' || plan.type === 'hybrid'
-                      return (
-                        <div className="grid grid-cols-3 gap-3">
-                          {showFixed && (
-                            <div>
-                              <label className="block text-xs font-medium text-ink-muted mb-1">Forfait (override)</label>
-                              <input
-                                type="number" min={0} step="1"
-                                value={line.fixed_fee_override ?? ''}
-                                onChange={(e) => updateLine(idx, 'fixed_fee_override', e.target.value === '' ? null : Number(e.target.value))}
-                                placeholder={formatNumber(plan.fixed_fee)}
-                                className={inputSmClass}
-                              />
-                              <AppliedPrice override={line.fixed_fee_override} planValue={plan.fixed_fee} unit="FCFA" />
-                            </div>
-                          )}
-                          {showFlat && (
-                            <>
-                              <div>
-                                <label className="block text-xs font-medium text-ink-muted mb-1">Prix B&N (override)</label>
-                                <input
-                                  type="number" min={0} step="0.000001"
-                                  value={line.price_bw_override ?? ''}
-                                  onChange={(e) => updateLine(idx, 'price_bw_override', e.target.value === '' ? null : Number(e.target.value))}
-                                  placeholder={formatNumber(plan.price_bw)}
-                                  className={inputSmClass}
-                                />
-                                <AppliedPrice override={line.price_bw_override} planValue={plan.price_bw} unit="FCFA/copie" />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-ink-muted mb-1">Prix couleur (override)</label>
-                                <input
-                                  type="number" min={0} step="0.000001"
-                                  value={line.price_color_override ?? ''}
-                                  onChange={(e) => updateLine(idx, 'price_color_override', e.target.value === '' ? null : Number(e.target.value))}
-                                  placeholder={formatNumber(plan.price_color)}
-                                  className={inputSmClass}
-                                />
-                                <AppliedPrice override={line.price_color_override} planValue={plan.price_color} unit="FCFA/copie" />
-                              </div>
-                            </>
-                          )}
-                          {TIERED_TYPES.includes(plan.type) && (
-                            <div className={showFixed ? 'col-span-2' : 'col-span-3'}>
-                              <p className="block text-xs font-medium text-ink-muted mb-1">Tranches du plan</p>
-                              <ul className="space-y-0.5">
-                                {formatTiers(plan.tiers).map((tierLine) => (
-                                  <li key={tierLine} className="text-[11px] text-ink-soft">{tierLine}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })()}
-                  </div>
-
-                  {/* Notes */}
-                  <div>
-                    <label className="block text-xs font-medium text-ink-muted mb-1">Notes</label>
-                    <input
-                      type="text"
-                      value={line.notes ?? ''}
-                      onChange={(e) => updateLine(idx, 'notes', e.target.value || null)}
-                      placeholder="Consignes particulières pour cette machine…"
-                      className={inputSmClass}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {lines.length === 0 && availableMachines.length > 0 && (
-            <button
-              type="button"
-              onClick={addLine}
-              className="mt-3 text-sm text-ink-soft hover:text-ink transition-colors"
-            >
-              + Ajouter une première machine
-            </button>
+                  </li>
+                )
+              })}
+            </ul>
           )}
 
           {retired.length > 0 && (
@@ -643,6 +467,16 @@ export default function ContractForm({
             </div>
           )}
         </Card>
+
+        <ContractLineDialog
+          open={dialog.open}
+          line={dialog.line}
+          editorKey={dialog.key}
+          selectableMachines={selectableMachines}
+          billingPlans={billingPlans}
+          onSave={saveLine}
+          onClose={closeDialog}
+        />
 
         {/* Actions */}
         <div className="flex items-center justify-end gap-3 mt-6">
