@@ -5,6 +5,7 @@ import {
   BILLING_TYPE_LABEL, validateTiers, TIERED_TYPES,
   type BillingPlan, type BillingTier, type BillingType,
 } from '@/lib/billing'
+import { useSubmitKeepingValues } from '@/lib/useSubmitKeepingValues'
 
 type FormState = { error: string } | null
 
@@ -20,6 +21,7 @@ const inputClass =
 
 export default function BillingPlanForm({ action, defaultValues, submitLabel = 'Enregistrer' }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
+  const submitKeepingValues = useSubmitKeepingValues(formAction)
   const [type, setType] = useState<BillingType>(defaultValues?.type ?? 'per_copy')
   const [tiers, setTiers] = useState<BillingTier[]>(
     defaultValues?.tiers ?? [
@@ -48,7 +50,7 @@ export default function BillingPlanForm({ action, defaultValues, submitLabel = '
   }
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form onSubmit={submitKeepingValues} className="space-y-5">
       {state?.error && (
         <div className="px-4 py-3 rounded-lg bg-accent-soft border border-accent/20 text-sm text-accent">
           {state.error}

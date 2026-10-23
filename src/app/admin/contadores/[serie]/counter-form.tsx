@@ -1,9 +1,10 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { saveCounterAction, CounterFormState } from './actions'
 import { ChevronDown } from 'lucide-react'
 import { MONTHS_FR_LONG } from '../constants'
+import { useSubmitKeepingValues } from '@/lib/useSubmitKeepingValues'
 
 const now = new Date()
 const CURRENT_YEAR  = now.getFullYear()
@@ -14,10 +15,19 @@ interface Props { machineId: string }
 
 export default function CounterForm({ machineId }: Props) {
   const [state, action, pending] = useActionState<CounterFormState, FormData>(saveCounterAction, null)
+  const submitKeepingValues = useSubmitKeepingValues(action)
   const [isReplacement, setIsReplacement] = useState(false)
+  // El formulario sigue en la página tras guardar: vaciarlo solo si salió bien, listo para el
+  // siguiente relevé. Con error se conserva lo escrito.
+  const formRef = useRef<HTMLFormElement>(null)
+  useEffect(() => {
+    if (!state?.success) return
+    formRef.current?.reset()
+    setIsReplacement(false)
+  }, [state])
 
   return (
-    <form action={action} className="space-y-4">
+    <form ref={formRef} onSubmit={submitKeepingValues} className="space-y-4">
       <input type="hidden" name="machine_id" value={machineId} />
 
       {/* Période */}

@@ -2,6 +2,7 @@
 import { useActionState, useState } from 'react'
 import { confirmPendingAction, rejectPendingAction } from './actions'
 import { labelFor, DUPLICATE_CODES } from './validation-labels'
+import { useSubmitKeepingValues } from '@/lib/useSubmitKeepingValues'
 
 type Row = {
   id: string; image_url: string | null; light: 'green' | 'amber' | 'red'
@@ -41,6 +42,8 @@ export default function PendingList({ rows, machines }: { rows: Row[]; machines:
 function Detail({ row, machines }: { row: Row; machines: Machine[] }) {
   const [confirmState, confirmAction, confirmPending] = useActionState(confirmPendingAction, null)
   const [rejectState, rejectAction, rejectPending] = useActionState(rejectPendingAction, null)
+  const submitConfirm = useSubmitKeepingValues(confirmAction)
+  const submitReject = useSubmitKeepingValues(rejectAction)
   const d = row.extracted_data
   return (
     <div className="p-5 space-y-4">
@@ -68,7 +71,7 @@ function Detail({ row, machines }: { row: Row; machines: Machine[] }) {
           ))}
         </div>
       )}
-      <form action={confirmAction} className="space-y-3">
+      <form onSubmit={submitConfirm} className="space-y-3">
         <input type="hidden" name="id" value={row.id} />
         {!row.matched_machine_id && (
           <div>
@@ -93,7 +96,7 @@ function Detail({ row, machines }: { row: Row; machines: Machine[] }) {
           {confirmPending ? 'Import…' : 'Confirmer et importer'}
         </button>
       </form>
-      <form action={rejectAction} className="space-y-2 border-t border-line pt-3">
+      <form onSubmit={submitReject} className="space-y-2 border-t border-line pt-3">
         <input type="hidden" name="id" value={row.id} />
         <input name="reason" placeholder="Motif du rejet" className={inputCls} />
         {rejectState && 'error' in rejectState && <p className="text-xs text-accent">{rejectState.error}</p>}

@@ -6,6 +6,7 @@ import { Loader2, ArrowLeft, Trash2, AlertTriangle, Gauge, Package } from 'lucid
 import { Card } from '@/components/ui/Card'
 import QuartierSelect from '@/components/admin/QuartierSelect'
 import type { Quartier } from '@/lib/quartiers'
+import { useSubmitKeepingValues } from '@/lib/useSubmitKeepingValues'
 
 type FormState = { error: string } | null
 
@@ -37,6 +38,7 @@ const selectClass =
 
 export default function MachineForm({ action, defaultValues, title, isEdit, machineId, deleteAction, quartiers }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
+  const submitKeepingValues = useSubmitKeepingValues(formAction)
   const [confirming, setConfirming] = useState(false)
 
   return (
@@ -113,7 +115,7 @@ export default function MachineForm({ action, defaultValues, title, isEdit, mach
       </div>
 
       {/* Form */}
-      <form action={formAction}>
+      <form onSubmit={submitKeepingValues}>
         <Card className="p-6 space-y-5">
 
           {state?.error && (

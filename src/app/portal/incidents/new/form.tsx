@@ -6,6 +6,7 @@ import { Loader2, ArrowLeft, QrCode, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import IncidentPhotoUpload from '@/components/IncidentPhotoUpload'
 import { prepareIncidentPhotoUploadAction } from './actions'
+import { useSubmitKeepingValues } from '@/lib/useSubmitKeepingValues'
 
 type FormState = { error: string } | null
 type ContractOption = { id: string; label: string }
@@ -35,6 +36,7 @@ const selectClass = 'w-full px-3.5 py-2.5 rounded-lg border border-line text-ink
 
 export default function NewIncidentForm({ action, contracts, preselectedContractId, machineNotFound }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
+  const submitKeepingValues = useSubmitKeepingValues(formAction)
 
   return (
     <div className="max-w-2xl">
@@ -63,7 +65,7 @@ export default function NewIncidentForm({ action, contracts, preselectedContract
         </div>
       )}
 
-      <form action={formAction}>
+      <form onSubmit={submitKeepingValues}>
         <Card className="p-6 space-y-5">
 
           {state?.error && (

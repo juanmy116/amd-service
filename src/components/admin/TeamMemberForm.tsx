@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import { useSubmitKeepingValues } from '@/lib/useSubmitKeepingValues'
 
 type FormState = { error: string } | null
 
@@ -30,6 +31,7 @@ export default function TeamMemberForm({
   action, defaultValues, title, isEdit, email, memberId, deleteAction,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
+  const submitKeepingValues = useSubmitKeepingValues(formAction)
   const [confirming, setConfirming] = useState(false)
 
   return (
@@ -81,7 +83,7 @@ export default function TeamMemberForm({
         )}
       </div>
 
-      <form action={formAction}>
+      <form onSubmit={submitKeepingValues}>
         <Card className="p-6 space-y-5">
 
           {state?.error && (
