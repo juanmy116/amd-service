@@ -21,7 +21,7 @@
 | 2 · Ventana emergente en contratos | 4 | No | ✅ en prod 2026-10-23 (#202, sustituye al #201) |
 | 3 · Mantenimientos en la ficha del cliente | 1 | No | ✅ en prod 2026-10-23 (#203) |
 | 4 · Teléfono móvil y fijo | 9 | Sí (columna nueva) | ✅ en prod 2026-10-23 (#204 + migración `20261023140000`) |
-| 5 · Las máquinas nunca se borran | 6 | Sí (estado obsolète) | ⏳ |
+| 5 · Las máquinas nunca se borran | 6 | Sí (estado obsolète) | 🔄 PR abierto |
 | 6 · Técnicos que crean incidencias | 8 | Sí (permiso + acción) | ⏳ |
 
 ---
@@ -73,6 +73,14 @@
 - Añadir estado «Hors service (obsolète)» (hoy solo `machines.active`), **cualquier admin**; prohibido si la máquina tiene línea abierta; excluida de los selectores; visible en el historial.
 - Botón «Remplacer» en la ficha de la máquina reutilizando `ReplaceMachineModal` + `replaceMachineAction` (cargar su línea abierta y los candidatos como en `contracts/[id]/page.tsx:73-75`; revalidar también la ruta de la máquina).
 - Valorar quitar el `DELETE` de la política RLS admin sobre `machines` para que no se pueda borrar ni por otra vía.
+- **Hecho (2026-10-23):** sin DELETE para `authenticated`, «hors service» = `active = false` con
+  fecha/motivo/autor, reglas en BD (no con contrato abierto; una hors service no entra en contratos),
+  tarjeta «Contrat et statut» con «Remplacer» en la ficha. Migración `20261023180000`, inversa en
+  `docs/rollback-2026-10-23-hors-service.md`. En prod: 58 de 144 máquinas nunca habían estado en
+  contrato (borrables hasta hoy).
+- **Pendiente, sin decidir:** el «Supprimer» del **cliente** (`clients/[id]/actions.ts`) sigue
+  borrando de verdad un cliente sin historial (y su error se ignora). El usuario pidió esto para las
+  máquinas; preguntarle si aplica igual a los clientes.
 
 ## Tanda 6 — Punto 8 · Técnicos que crean incidencias (BD + permisos)
 - Hoy no existe: sin política INSERT de técnicos en `incidents`; `/tech/scan/[serie]` sin botón.

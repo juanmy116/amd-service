@@ -1286,6 +1286,9 @@ export type Database = {
       machines: {
         Row: {
           active: boolean
+          hors_service_at: string | null
+          hors_service_by: string | null
+          hors_service_reason: string | null
           lat: number | null
           lng: number | null
           localisation: string | null
@@ -1303,6 +1306,9 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          hors_service_at?: string | null
+          hors_service_by?: string | null
+          hors_service_reason?: string | null
           lat?: number | null
           lng?: number | null
           localisation?: string | null
@@ -1320,6 +1326,9 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          hors_service_at?: string | null
+          hors_service_by?: string | null
+          hors_service_reason?: string | null
           lat?: number | null
           lng?: number | null
           localisation?: string | null
