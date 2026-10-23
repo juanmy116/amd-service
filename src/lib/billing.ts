@@ -302,6 +302,26 @@ export function formatPrice(amount: number): string {
   )
 }
 
+/**
+ * Cifra con separador de miles a la francesa («25 000», «7,5»). Para mostrar precios de tarifa,
+ * que por copia pueden llevar decimales; los importes facturados usan `formatPrice` (FCFA entero).
+ */
+export function formatNumber(value: number | string | null | undefined): string {
+  const n = num(value)
+  if (n === null || Number.isNaN(n)) return '—'
+  return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 6 }).format(n)
+}
+
+/** Una línea legible por tramo; el último (ilimitado) se describe a partir del umbral anterior. */
+export function formatTiers(tiers: BillingTier[] | null): string[] {
+  return (tiers ?? []).map((tier, i, all) => {
+    const prices = `B&N ${formatNumber(tier.price_bw)} · Couleur ${formatNumber(tier.price_color)} FCFA`
+    if (tier.up_to !== null) return `Jusqu'à ${formatNumber(tier.up_to)} copies : ${prices}`
+    const prev = i > 0 ? all[i - 1].up_to : null
+    return prev !== null ? `Au-delà de ${formatNumber(prev)} copies : ${prices}` : `Toutes les copies : ${prices}`
+  })
+}
+
 export const BILLING_TYPE_LABEL: Record<BillingType, string> = {
   per_copy:      'Coût par copie',
   hybrid:        'Forfait + copie',

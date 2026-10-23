@@ -1,7 +1,7 @@
 import { requireBilling } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
-import { BILLING_TYPE_LABEL, type BillingPlan } from '@/lib/billing'
+import { BILLING_TYPE_LABEL, TIERED_TYPES, formatNumber, formatTiers, type BillingPlan } from '@/lib/billing'
 import { toggleBillingPlanAction } from './[id]/actions'
 import { Card } from '@/components/ui/Card'
 
@@ -30,11 +30,17 @@ export default async function BillingPlansPage() {
               <p className="text-sm font-semibold text-ink">{plan.name}</p>
               <p className="text-xs text-ink-muted mt-0.5">{BILLING_TYPE_LABEL[plan.type]}</p>
               <p className="text-xs text-ink-soft mt-1">
-                {plan.type === 'per_copy'      && `B&N: ${Number(plan.price_bw)} · Couleur: ${Number(plan.price_color)} FCFA/copie`}
-                {plan.type === 'hybrid'        && `Forfait: ${Number(plan.fixed_fee)} FCFA · B&N: ${Number(plan.price_bw)} · Couleur: ${Number(plan.price_color)}`}
-                {plan.type === 'hybrid_tiered' && `Forfait: ${Number(plan.fixed_fee)} FCFA · ${plan.tiers?.length ?? 0} tranches (par tranche)`}
-                {plan.type === 'tiered_total'  && `Forfait: ${Number(plan.fixed_fee)} FCFA · ${plan.tiers?.length ?? 0} tranches (au volume)`}
+                {plan.type === 'per_copy'      && `B&N : ${formatNumber(plan.price_bw)} · Couleur : ${formatNumber(plan.price_color)} FCFA/copie`}
+                {plan.type === 'hybrid'        && `Forfait : ${formatNumber(plan.fixed_fee)} FCFA · B&N : ${formatNumber(plan.price_bw)} · Couleur : ${formatNumber(plan.price_color)} FCFA/copie`}
+                {TIERED_TYPES.includes(plan.type) && `Forfait : ${formatNumber(plan.fixed_fee)} FCFA`}
               </p>
+              {TIERED_TYPES.includes(plan.type) && (
+                <ul className="mt-1 space-y-0.5">
+                  {formatTiers(plan.tiers).map((line) => (
+                    <li key={line} className="text-xs text-ink-muted">{line}</li>
+                  ))}
+                </ul>
+              )}
             </div>
             <div className="flex items-center gap-3 shrink-0">
               {!plan.active && <span className="text-xs font-medium text-ink-muted bg-neutral-soft rounded-full px-2 py-0.5">Inactif</span>}

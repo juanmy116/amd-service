@@ -5,11 +5,22 @@ import Link from 'next/link'
 import { Loader2, ArrowLeft, Trash2, AlertTriangle, Plus, X } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import MachineCombobox from '@/components/admin/MachineCombobox'
-import type { BillingType } from '@/lib/billing'
+import { TIERED_TYPES, formatNumber, formatTiers, type BillingPlan } from '@/lib/billing'
 
 type FormState = { error: string } | null
 
-export type BillingPlanOption = { id: string; name: string; type: BillingType }
+export type BillingPlanOption = Pick<BillingPlan, 'id' | 'name' | 'type' | 'fixed_fee' | 'price_bw' | 'price_color' | 'tiers'>
+
+/** Precio que se aplica de verdad: el de la línea si se ha escrito, si no el del plan. */
+function AppliedPrice({ override, planValue, unit }: { override: number | null; planValue: number | null; unit: string }) {
+  return (
+    <p className="text-[11px] text-ink-muted mt-1">
+      {override !== null
+        ? <>Appliqué : <span className="font-medium text-ink-soft">{formatNumber(override)} {unit}</span> (plan : {formatNumber(planValue)})</>
+        : <>Du plan : <span className="font-medium text-ink-soft">{formatNumber(planValue)} {unit}</span></>}
+    </p>
+  )
+}
 
 type ContractData = {
   numero_contrat?: string
@@ -529,9 +540,10 @@ export default function ContractForm({
                                 type="number" min={0} step="1"
                                 value={line.fixed_fee_override ?? ''}
                                 onChange={(e) => updateLine(idx, 'fixed_fee_override', e.target.value === '' ? null : Number(e.target.value))}
-                                placeholder="Du plan"
+                                placeholder={formatNumber(plan.fixed_fee)}
                                 className={inputSmClass}
                               />
+                              <AppliedPrice override={line.fixed_fee_override} planValue={plan.fixed_fee} unit="FCFA" />
                             </div>
                           )}
                           {showFlat && (
@@ -542,9 +554,10 @@ export default function ContractForm({
                                   type="number" min={0} step="0.000001"
                                   value={line.price_bw_override ?? ''}
                                   onChange={(e) => updateLine(idx, 'price_bw_override', e.target.value === '' ? null : Number(e.target.value))}
-                                  placeholder="Du plan"
+                                  placeholder={formatNumber(plan.price_bw)}
                                   className={inputSmClass}
                                 />
+                                <AppliedPrice override={line.price_bw_override} planValue={plan.price_bw} unit="FCFA/copie" />
                               </div>
                               <div>
                                 <label className="block text-xs font-medium text-ink-muted mb-1">Prix couleur (override)</label>
@@ -552,11 +565,22 @@ export default function ContractForm({
                                   type="number" min={0} step="0.000001"
                                   value={line.price_color_override ?? ''}
                                   onChange={(e) => updateLine(idx, 'price_color_override', e.target.value === '' ? null : Number(e.target.value))}
-                                  placeholder="Du plan"
+                                  placeholder={formatNumber(plan.price_color)}
                                   className={inputSmClass}
                                 />
+                                <AppliedPrice override={line.price_color_override} planValue={plan.price_color} unit="FCFA/copie" />
                               </div>
                             </>
+                          )}
+                          {TIERED_TYPES.includes(plan.type) && (
+                            <div className={showFixed ? 'col-span-2' : 'col-span-3'}>
+                              <p className="block text-xs font-medium text-ink-muted mb-1">Tranches du plan</p>
+                              <ul className="space-y-0.5">
+                                {formatTiers(plan.tiers).map((tierLine) => (
+                                  <li key={tierLine} className="text-[11px] text-ink-soft">{tierLine}</li>
+                                ))}
+                              </ul>
+                            </div>
                           )}
                         </div>
                       )

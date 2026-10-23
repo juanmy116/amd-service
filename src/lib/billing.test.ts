@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   validateTiers, pickVersionAsOf, resolveEffectiveTariffAsOf,
-  roundFcfa, calculateMonthlyAmount,
+  roundFcfa, calculateMonthlyAmount, formatNumber, formatTiers,
   type TariffVersion, type OverrideVersion, type EffectiveTariff,
 } from '@/lib/billing'
 
@@ -304,5 +304,46 @@ describe('calculateMonthlyAmount — tiered_total (volumen total, tarifa AMD)', 
     expect(r.amount_bw).toBe(0)
     expect(r.amount_color).toBe(0)
     expect(r.amount_total).toBe(25000)
+  })
+})
+
+// Separador de miles a la francesa (Intl usa un espacio fino U+202F): se normaliza a espacio
+// normal para que el test lea como lo ve el usuario.
+const plain = (s: string) => s.replace(/\u202f|\u00a0/g, ' ')
+
+describe('formatNumber', () => {
+  it('pone separador de miles', () => {
+    expect(plain(formatNumber(25000))).toBe('25 000')
+    expect(plain(formatNumber(1250000))).toBe('1 250 000')
+  })
+  it('conserva los decimales de un precio por copia', () => {
+    expect(formatNumber(7.5)).toBe('7,5')
+    expect(formatNumber('12.250000')).toBe('12,25')
+  })
+  it('acepta el string que devuelve supabase-js para numeric', () => {
+    expect(plain(formatNumber('25000.000000'))).toBe('25 000')
+  })
+  it('sin valor devuelve un guion', () => {
+    expect(formatNumber(null)).toBe('—')
+    expect(formatNumber(undefined)).toBe('—')
+    expect(formatNumber('')).toBe('—')
+  })
+})
+
+describe('formatTiers', () => {
+  it('describe cada tramo con su umbral y el último como «au-delà»', () => {
+    expect(formatTiers([
+      { up_to: 5000, price_bw: 10, price_color: 40 },
+      { up_to: 20000, price_bw: 8, price_color: 35 },
+      { up_to: null, price_bw: 6.5, price_color: 30 },
+    ]).map(plain)).toEqual([
+      "Jusqu'à 5 000 copies : B&N 10 · Couleur 40 FCFA",
+      "Jusqu'à 20 000 copies : B&N 8 · Couleur 35 FCFA",
+      'Au-delà de 20 000 copies : B&N 6,5 · Couleur 30 FCFA',
+    ])
+  })
+  it('sin tramos devuelve lista vacía', () => {
+    expect(formatTiers(null)).toEqual([])
+    expect(formatTiers([])).toEqual([])
   })
 })

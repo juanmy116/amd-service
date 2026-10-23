@@ -10,7 +10,7 @@ export default async function NewContractPage() {
     supabase.from('clients').select('id, nom_client, princity_company_id').eq('active', true).order('nom_client'),
     supabase.from('machines').select('numero_serie, marque, modele').eq('active', true).order('marque').order('modele'),
     supabase.from('contract_machines').select('machine_id').is('date_fin', null),
-    supabase.from('billing_plans').select('id, name, type').eq('active', true).order('name'),
+    supabase.from('billing_plans').select('id, name, type, fixed_fee, price_bw, price_color, tiers').eq('active', true).order('name'),
   ])
 
   const openMachineIds = new Set((openLines ?? []).map((l) => l.machine_id))
