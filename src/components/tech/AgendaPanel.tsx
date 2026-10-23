@@ -48,7 +48,7 @@ export default async function TechAgendaPanel() {
       .limit(20),
     supabase
       .from('incidents')
-      .select('id, title, status, machine_id')
+      .select('id, title, status, machine_id, contract_machines(machine_id, contracts(clients(nom_client)))')
       .eq('assigned_to', user.id)
       .not('status', 'in', '("résolu","fermé")')
       .order('created_at', { ascending: false })
@@ -145,7 +145,14 @@ export default async function TechAgendaPanel() {
                   <AlertTriangle size={12} className="mt-0.5 shrink-0 text-ink-muted/40" />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-ink-soft truncate leading-tight">{inc.title}</p>
-                    <p className="font-mono text-[10px] text-ink-muted">{inc.machine_id}</p>
+                    {inc.contract_machines?.contracts?.clients?.nom_client && (
+                      <p className="text-[11px] text-ink-muted truncate">
+                        {inc.contract_machines.contracts.clients.nom_client}
+                      </p>
+                    )}
+                    <p className="font-mono text-[10px] text-ink-muted">
+                      {inc.contract_machines?.machine_id ?? inc.machine_id}
+                    </p>
                   </div>
                   <Badge variant={STATUS_BADGE[inc.status] ?? 'neutral'}>
                     {STATUS_LABEL[inc.status] ?? inc.status}

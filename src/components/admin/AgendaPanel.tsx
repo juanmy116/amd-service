@@ -66,7 +66,7 @@ export default async function AdminAgendaPanel() {
       .limit(20),
     supabase
       .from('incidents')
-      .select('id, title, status, priority')
+      .select('id, title, status, priority, machine_id, contract_machines(machine_id, contracts(clients(nom_client)))')
       .not('status', 'in', '("résolu","fermé")')
       .order('created_at', { ascending: false })
       .limit(8),
@@ -182,9 +182,16 @@ export default async function AdminAgendaPanel() {
                     size={12}
                     className={`mt-0.5 shrink-0 ${PRIORITY_ICON_COLOR[inc.priority] ?? 'text-gray-300'}`}
                   />
-                  <p className="min-w-0 flex-1 text-xs font-medium text-gray-800 truncate leading-tight">
-                    {inc.title}
-                  </p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-gray-800 truncate leading-tight">
+                      {inc.title}
+                    </p>
+                    <p className="text-[11px] text-gray-400 truncate">
+                      {inc.contract_machines?.contracts?.clients?.nom_client
+                        ?? inc.contract_machines?.machine_id
+                        ?? inc.machine_id}
+                    </p>
+                  </div>
                   <span className={`shrink-0 inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_BADGE[inc.status] ?? 'bg-gray-100 text-gray-500'}`}>
                     {STATUS_LABEL[inc.status] ?? inc.status}
                   </span>

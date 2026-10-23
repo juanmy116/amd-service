@@ -26,6 +26,7 @@ export type KanbanIncident = {
   numero_incident: string
   title: string
   machine_id: string | null
+  clientName: string | null
   category: string
   priority: string
   status: string
@@ -89,6 +90,9 @@ function IncidentCard({
       <p className="text-sm font-medium text-ink leading-snug mb-2 line-clamp-2">
         {incident.title}
       </p>
+      {incident.clientName && (
+        <p className="text-xs font-medium text-ink-soft truncate">{incident.clientName}</p>
+      )}
       <p className="font-mono text-xs text-ink-muted mb-2">{incident.machine_id}</p>
       <p className="text-xs mb-3">
         {incident.technicianName
