@@ -20,7 +20,7 @@
 | 1 · Retoques rápidos | 3, 5, 7 y el fallo del punto 2 | No | ✅ en prod 2026-10-23 (#197, #198, #199) |
 | 2 · Ventana emergente en contratos | 4 | No | ✅ en prod 2026-10-23 (#202, sustituye al #201) |
 | 3 · Mantenimientos en la ficha del cliente | 1 | No | 🔄 PR abierto |
-| 4 · Teléfono móvil y fijo | 9 | Sí (columna nueva) | ⏳ |
+| 4 · Teléfono móvil y fijo | 9 | Sí (columna nueva) | 🔄 PR abierto |
 | 5 · Las máquinas nunca se borran | 6 | Sí (estado obsolète) | ⏳ |
 | 6 · Técnicos que crean incidencias | 8 | Sí (permiso + acción) | ⏳ |
 
@@ -103,3 +103,12 @@
   contrato que ya tiene plan no recibe ninguna visita** y nadie la mantendría. Desde la tanda 3 la
   ficha del cliente lo señala («Aucune visite» / «N sans visite»); falta arreglarlo de raíz
   (crear su primera visita al añadir la línea, cambio de BD o de `update_contract_with_lines`).
+- **Los formularios se vaciaban tras un error del servidor.** Con `<form action={…}>` + `useActionState`,
+  React 19 reinicia el formulario al acabar la acción también cuando vuelve con error: se pierde lo
+  escrito (p. ej. un NINEA repetido en la ficha del cliente obliga a reescribirlo todo). Arreglado en
+  `ClientForm` (tanda 4: `onSubmit` + `startTransition`, mismo patrón que `intervention-form.tsx`).
+  **Quedan con el mismo patrón:** `IncidentForm`, `BillingPlanForm`, `NewMaintenancePlanForm`,
+  `TeamMemberForm`, `MachineForm`, `ContractForm` (los campos del contrato; las máquinas van en
+  estado y no se pierden), `portal/incidents/new/form.tsx`, `contadores/[serie]/counter-form.tsx`,
+  `contadores/pendientes/PendingList.tsx`. Revisar cada uno (algunos quizá no devuelvan errores
+  tras rellenar mucho) y aplicar el mismo arreglo en un PR aparte.
