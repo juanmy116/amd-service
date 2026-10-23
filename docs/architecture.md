@@ -1,7 +1,7 @@
 # AMD Service — Arquitectura del Proyecto SAV
 
 > Documento de referencia técnica. Actualizar cada vez que se haga un cambio estructural.
-> Última actualización: 2026-10-23 — **«Mot de passe oublié» configurado y probado en prod** (§Seguridad → Recuperación de contraseña: Site URL y plantilla en el panel de Supabase; sin cambios de código ni de BD). Anterior 2026-10-21 — **doble escaneo obligatorio para los técnicos** (§Verrou de résolution → «El QR: doble escaneo para el técnico», §3, tabla `incident_scans`): para empezar una avería hay que escanear el QR de la máquina y para cerrarla hay que escanear una segunda vez (después, 60 min para escribir el informe); abrir la ficha ya no cambia nada. Nueva tabla `incident_scans` y trigger `trg_guard_tech_scan_required` (migraciones `20261021100000` y `20261021110000`, reversión en `docs/rollback-2026-10-21-doble-escaneo.md`). Anterior 2026-10-19 — **incidencias QR colgadas de la línea de contrato** (§6b, PR #187: si la máquina tiene línea abierta se guarda `contract_machine_id`, si no `machine_id`), **cuadro «Incidents récents» de `/admin` arreglado** (#188) y **cierre tras encuesta ya enviada o respondida** (§7-bis, `closeAfterSurvey`, #189). Sin cambios de esquema; dos correcciones de datos en prod (5 incidencias QR reasignadas, SAV-2026-0004 cerrada). Anterior 2026-10-12 — **«Mot de passe oublié»** (§Seguridad → Recuperación de contraseña): páginas `/mot-de-passe-oublie` y `/nouveau-mot-de-passe`, plantilla de correo propia con `token_hash` (`supabase/templates/recovery.html`, se pega a mano en el panel de Supabase). Sin cambios de BD. Anterior 2026-10-06 — **auditoría de estilo `/apple-design` de `/admin`** (§Sistema de Diseño, PRs #174–#176): ventanas con fundido vía `src/components/ui/dialogTransitions.ts`, `Button` con reacción al pulsar, Kanban (admin y TV) sin tarjeta fantasma, Agenda deslizante; y **E2E de nuevo en verde** (§Testing, PR #177: `loginAs` vacía el cupo del limitador del usuario de prueba). Sin cambios de BD. Anterior 2026-09-25 — **el limitador de intentos vuelve, ahora en Supabase** (§Seguridad): tabla `rate_limit_hits` + RPC `check_rate_limit` solo para `service_role` + cron `rate-limit-purge`; Upstash retirado (PR #159). Y **franja roja en el panel `/admin` si deja de funcionar** (§7 Dashboard, PR #161). Anterior 2026-09-17 — **la encuesta CSAT por fin llega a alguien** (§7-bis): se envía al email del formulario del QR, el envío queda trazado y las opiniones se leen en `/admin/avis`, en la ficha de la avería y en una franja del tablero. Ese mismo día: **el kiosko del taller queda CERRADO: montado, sonando y verificado en la TV** (§11; PR #139 docs, tras #137 audio/insistencia). Sigue abierto: **los 3 crons de Princity no importan nada** (§5). Anterior 2026-09-15: rótulo `SERVICE TECHNIQUE` en la etiqueta QR (PR #134, §6). Histórico 2026-09-11/15: kiosko del taller (§11, §11-bis, §11-ter, PRs #125–#131), permiso `can_bill` (#123) y candado de facturación (#122) — ya documentados en sus secciones.
+> Última actualización: 2026-10-23 (tarde) — **pulido tras la 1ª semana de uso real** (PRs #196–#207, plan en `docs/plan-pulido-uso-real-2026-10-23.md`): las **máquinas no se borran** y se ponen «hors service» (tabla `machines`, migración `20261023180000`), **teléfono móvil y fijo** del cliente (tabla `clients`, `20261023140000`), **primera visita automática** para una máquina que entra en un contrato con plan (§Flujo de Mantenimiento, `20261023160000`), sección Maintenance en la ficha del cliente, ventana para las máquinas del contrato, precios de tarifa visibles, formularios que no se vacían tras un error (`src/lib/useSubmitKeepingValues.ts`) y tipografías servidas desde el proyecto (§Stack). Anterior 2026-10-23 — **«Mot de passe oublié» configurado y probado en prod** (§Seguridad → Recuperación de contraseña: Site URL y plantilla en el panel de Supabase; sin cambios de código ni de BD). Anterior 2026-10-21 — **doble escaneo obligatorio para los técnicos** (§Verrou de résolution → «El QR: doble escaneo para el técnico», §3, tabla `incident_scans`): para empezar una avería hay que escanear el QR de la máquina y para cerrarla hay que escanear una segunda vez (después, 60 min para escribir el informe); abrir la ficha ya no cambia nada. Nueva tabla `incident_scans` y trigger `trg_guard_tech_scan_required` (migraciones `20261021100000` y `20261021110000`, reversión en `docs/rollback-2026-10-21-doble-escaneo.md`). Anterior 2026-10-19 — **incidencias QR colgadas de la línea de contrato** (§6b, PR #187: si la máquina tiene línea abierta se guarda `contract_machine_id`, si no `machine_id`), **cuadro «Incidents récents» de `/admin` arreglado** (#188) y **cierre tras encuesta ya enviada o respondida** (§7-bis, `closeAfterSurvey`, #189). Sin cambios de esquema; dos correcciones de datos en prod (5 incidencias QR reasignadas, SAV-2026-0004 cerrada). Anterior 2026-10-12 — **«Mot de passe oublié»** (§Seguridad → Recuperación de contraseña): páginas `/mot-de-passe-oublie` y `/nouveau-mot-de-passe`, plantilla de correo propia con `token_hash` (`supabase/templates/recovery.html`, se pega a mano en el panel de Supabase). Sin cambios de BD. Anterior 2026-10-06 — **auditoría de estilo `/apple-design` de `/admin`** (§Sistema de Diseño, PRs #174–#176): ventanas con fundido vía `src/components/ui/dialogTransitions.ts`, `Button` con reacción al pulsar, Kanban (admin y TV) sin tarjeta fantasma, Agenda deslizante; y **E2E de nuevo en verde** (§Testing, PR #177: `loginAs` vacía el cupo del limitador del usuario de prueba). Sin cambios de BD. Anterior 2026-09-25 — **el limitador de intentos vuelve, ahora en Supabase** (§Seguridad): tabla `rate_limit_hits` + RPC `check_rate_limit` solo para `service_role` + cron `rate-limit-purge`; Upstash retirado (PR #159). Y **franja roja en el panel `/admin` si deja de funcionar** (§7 Dashboard, PR #161). Anterior 2026-09-17 — **la encuesta CSAT por fin llega a alguien** (§7-bis): se envía al email del formulario del QR, el envío queda trazado y las opiniones se leen en `/admin/avis`, en la ficha de la avería y en una franja del tablero. Ese mismo día: **el kiosko del taller queda CERRADO: montado, sonando y verificado en la TV** (§11; PR #139 docs, tras #137 audio/insistencia). Sigue abierto: **los 3 crons de Princity no importan nada** (§5). Anterior 2026-09-15: rótulo `SERVICE TECHNIQUE` en la etiqueta QR (PR #134, §6). Histórico 2026-09-11/15: kiosko del taller (§11, §11-bis, §11-ter, PRs #125–#131), permiso `can_bill` (#123) y candado de facturación (#122) — ya documentados en sus secciones.
 >
 > Anterior: 2026-06-25 — **foto adjunta a la incidencia** (el cliente adjunta una foto opcional al abrir la incidencia desde el portal **o desde el formulario público del QR `/signaler`**; la ven técnico, admin y cliente; bucket `incident-photos`, migración `20260625100000`). Histórico 2026-06-15: **tests RLS de cobertura completa** (88 tests de aislamiento por rol sobre todas las tablas sensibles, PR #93), **migración `middleware` → `proxy`** (convención Next.js 16, PR #94) y `main` protegida en GitHub (required check `typecheck · test · build`). Config de prod cerrada: `COMMERCIAL_EMAIL`, `NEXT_PUBLIC_APP_URL`. Histórico previo (2026-06-11): 3 capas de tests montadas (unit + aislamiento RLS + E2E Playwright, ver §Testing), endurecimiento RLS de `maintenance_visits` + `auth_rls_initplan`, borrado/terminación atómicos de contrato (`delete_contract`/`terminate_contract`), cabos de auditoría cerrados y reconstrucción limpia de la BD arreglada (P0-1). PRs #74–#85.
 
@@ -35,7 +35,11 @@ Sistema de gestión de incidencias (SAV) para AMD Service, empresa de alquiler y
 - Gestión de clientes, máquinas y contratos
 - **Listado de máquinas** (`/admin/machines`): se alimenta de la vista `v_machine_park` (parque derivado) para mostrar el **cliente actual** de cada máquina (línea de contrato abierta, `date_fin IS NULL`) o «—» si está en stock. Filtros: búsqueda (nº serie/marca/modelo), **cliente** (`?client=<id>` → `.eq('client_id', …)`), tipo y estado activo. El nombre del cliente se resuelve en memoria con la lista de `clients` que ya alimenta el desplegable.
 - **Formulario de contratos** (`/admin/contracts/new` + `/admin/contracts/[id]`): selector de máquinas buscable en tiempo real (`MachineCombobox` con `@headlessui/react`) — filtra por marca, modelo o serial. Al seleccionar cliente muestra su ID Princity y el sufijo sugerido para el número de contrato (ej. `-007` para ID Princity `7`). Fix: edición de contrato con cliente inactivo siempre incluye ese cliente en la lista para no sobreescribir el `client_id`.
-- Gestión y asignación de incidencias (Kanban drag & drop)
+- **Ficha del cliente** (`/admin/clients/[id]`, 2026-10-23): formulario + sección **Maintenance** (`ClientMaintenance.tsx`, lógica en `src/lib/maintenanceSummary.ts`) — por máquina en contrato: frecuencia, próxima visita, última hecha y técnico; arriba lo que pide acción («En retard» por estado o fecha pasada, «Aucune visite», «Pas de plan de maintenance»).
+- **Máquinas del contrato en una ventana** (2026-10-23): en el formulario de contrato cada máquina es una fila corta (serie · modelo, plan, «depuis le…») con «Modifier» / «Retirer»; «Ajouter une machine» y «Modifier» abren `ContractLineDialog`. La ventana solo cambia el estado local; todo se guarda junto con «Enregistrer» por la misma RPC. Cada casilla de precio muestra el del plan («Du plan : 25 000 FCFA») o el aplicado, y las tarifas por tramos enseñan sus tramos (`formatNumber`/`formatTiers` en `src/lib/billing.ts`).
+- **Ficha de la máquina** (`/admin/machines/[serie]`, 2026-10-23): sin «Supprimer»; tarjeta «Contrat et statut» (`MachineStatusCard.tsx`): en contrato → contrato + **Remplacer** (misma `ReplaceMachineModal` que el contrato); en stock → **Mettre hors service** con motivo; hors service → fecha, motivo, autor y **Remettre en service**. Ver tabla `machines`.
+- **Formularios que no se vacían** (2026-10-23): con `<form action>` + `useActionState`, React 19 reinicia el formulario también cuando la acción vuelve con error. Los 10 formularios con ese patrón envían con `useSubmitKeepingValues` (`onSubmit` + `startTransition`); el de contadores (se queda en la página) se vacía a mano solo al guardar bien.
+- Gestión y asignación de incidencias (Kanban drag & drop) — el cliente sale en las tarjetas del Kanban, la agenda, el calendario y el Planning del técnico (2026-10-23)
 - Generación de QR por máquina (etiqueta imprimible con logo, datos y código QR)
 - Módulo de contadores de copias agrupado por cliente
 - **Opiniones de clientes** (`/admin/avis`): respuestas a las encuestas de satisfacción, con nota, comentario, quién la dejó y enlace a la avería; filtro «★ ≤ 2». Entrada «Avis clients» en el grupo **Service** de la sidebar (ver §7-bis)
@@ -1244,6 +1248,14 @@ Técnico va a la instalación
     → Redirige a /tech/scan/[serie]
 ```
 
+> **Máquina que entra en un contrato con plan (2026-10-23, `20261023160000`):** el trigger
+> `trg_schedule_first_visit_for_new_line` (AFTER INSERT en `contract_machines`) le crea su primera
+> visita — la **próxima visita pendiente del contrato** (mismo viaje; solo si es ≥ hoy y ≥ inicio de
+> la línea) o, si no hay, max(inicio, hoy) + 30/90 días. No actúa en reemplazos (ya trasladan las
+> visitas), líneas cerradas ni contratos sin plan. Antes esa máquina se quedaba sin ninguna visita.
+> En prod, a 2026-10-23, **no hay ningún plan activo** (los tiene que crear la oficina). Inversa:
+> `docs/rollback-2026-10-23-primera-visita.md`; tests `tests/rls/first-visit-new-line.test.ts`.
+
 > **Prueba de presencia física:** el formulario solo es accesible via `/tech/scan/[serie]/maintenance/[visitId]` (requiere escanear el QR físico de la máquina). `qr_verified = true` es implícito y no falsificable sin acceso físico al equipo.
 
 ---
@@ -1385,13 +1397,19 @@ Empresas clientes de AMD.
 | `nom_client` | text | unique |
 | `ninea` | text | unique, nullable |
 | `email` | text | nullable |
-| `telephone` | text | nullable |
+| `telephone` | text | nullable — **móvil** (era el único teléfono; no se renombró, 2026-10-23) |
+| `telephone_fixe` | text | nullable — fijo (migración `20261023140000`; los fijos ya guardados, prefijo 33, pasaron aquí) |
 | `adresse` | text | nullable |
 | `ville` | text | nullable |
 | `active` | boolean | default: true |
 | `princity_company_id` | text | **UNIQUE**, nullable — `prefix` del contrato Princity |
 | `princity_prefix` | text | nullable — copia legacy del mismo valor |
 | `princity_id` | bigint | unique, nullable — id numérico legacy (CSV antiguo) |
+
+> **Teléfonos (2026-10-23):** la ficha trae `+221 ` escrito en las dos casillas y exige **al menos
+> uno** (regla de la app, no CHECK: hay clientes importados sin teléfono — 51 de 70 en prod).
+> `normalizeClientPhone` (`src/lib/phone.ts`) trata un `+221` solo como vacío. Inversa:
+> `docs/rollback-2026-10-23-telefonos-cliente.md`.
 
 ---
 
@@ -1405,11 +1423,23 @@ Una fila por máquina física. El número de serie es la clave de todo el sistem
 | `modele` | text | |
 | `type` | enum | color / noir_blanc |
 | `localisation` | text | nullable |
-| `active` | boolean | default: true |
+| `active` | boolean | default: true — **en service / hors service**: sin ella la máquina no se ofrece en contratos ni se escanea |
+| `hors_service_at` / `hors_service_reason` / `hors_service_by` | timestamptz / text / uuid | rastro de la baja (2026-10-23); `hors_service_by` sin FK a propósito (ya hay una FK a `profiles`, `location_set_by`: una segunda daría PGRST201) |
 | `princity_device_id` | text | **UNIQUE**, nullable — id Princity formato `<prefix>-<index>` (ej. `"63-0"`) |
 | `princity_pending` | boolean | default: true — true mientras la máquina no tiene contrato manual creado |
 
 > El QR de cada máquina codifica: `https://amd-service.vercel.app/tech/scan/[numero_serie]`
+
+> **Las máquinas no se borran nunca (2026-10-23, migración `20261023180000`).** Pasan de cliente en
+> cliente y su historial se conserva; solo se dan de baja por obsolescencia (cualquier admin):
+> - Sin `DELETE` para `authenticated`: `admin_all_machines` se partió en `admin_select/insert/update_machines`
+>   (service_role conserva el DELETE: tests, mantenimiento).
+> - `trg_guard_machine_hors_service` (BEFORE UPDATE OF active): no deja `active = false` con una línea
+>   abierta (`machine_in_contract`), apunta `hors_service_at`; volver a `true` limpia fecha, motivo y autor.
+> - `trg_guard_line_machine_in_service` (BEFORE INSERT en `contract_machines`): una máquina hors
+>   service no entra en ningún contrato (`machine_hors_service`) — formulario, stock y reemplazo.
+> - Retirar una máquina de un cliente = cerrar su línea (contrato, reemplazo o rescisión): vuelve a stock.
+> Inversa: `docs/rollback-2026-10-23-hors-service.md`. Tests: `tests/rls/machines-hors-service.test.ts`.
 
 ---
 
@@ -1978,7 +2008,7 @@ Rediseño visual de la app interna iniciado en sesión 15 — **presentación pu
 - Texto: `ink`, `ink-soft`, `ink-muted`
 - Acento de marca: `accent` (`#BF0D0D`), `accent-dark`, `accent-soft`
 - Estados: `success`/`success-soft`, `warning`/`warning-soft`, `info`/`info-soft`, `violet`/`violet-soft`, `neutral-soft`
-- Radios/sombras/tipografía: `radius-card`, `shadow-card`, `shadow-raised`, `font-display` (Poppins), `font-sans` (Inter)
+- Radios/sombras/tipografía: `radius-card`, `shadow-card`, `shadow-raised`, `font-display` (Poppins), `font-sans` (Inter). Desde 2026-10-23 (PR #200) las tipografías se sirven con `next/font/local` desde `src/app/fonts/` (fontsource, OFL): con `next/font/google` cada build las descargaba y un fallo de red de Google tumbaba el build.
 
 **Componentes UI compartidos** — `src/components/ui/` (sin barrel, imports directos):
 `Card`, `PanelHeader`, `Badge` (variantes solid/danger/success/warning/info/violet/neutral), `Button` (+ `buttonClasses`, se hunde al pulsar: `active:scale-[0.97]`, anulado con `motion-reduce`), `Avatar`, `Stars`. (El dashboard usa su propio `KpiCard` local en `DashboardKpiStrip`.) `dialogTransitions.ts` exporta `DIALOG_BACKDROP_TRANSITION` y `DIALOG_PANEL_TRANSITION` — fundido + escala 95 % (entrada 200 ms `ease-out`, salida 150 ms `ease-in`) para `DialogBackdrop`/`DialogPanel` de Headless UI con `transition`; las usan `ResolutionDialog` (solo variante admin — la del kiosko no se anima), `ReplaceMachineModal` y `TerminateContractModal`.

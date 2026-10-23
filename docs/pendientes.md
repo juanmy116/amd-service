@@ -8,8 +8,14 @@
 
 ## 📍 Por dónde seguir (al 2026-10-23)
 
-> **2026-10-23 (tarde):** tras una semana de uso real, 9 detalles a pulir → **fila 16**, plan por
-> tandas en `docs/plan-pulido-uso-real-2026-10-23.md` (con las decisiones del usuario).
+> **2026-10-23 (cierre):** tras una semana de uso real, 9 detalles a pulir → **fila 16**, plan por
+> tandas en `docs/plan-pulido-uso-real-2026-10-23.md` (con las decisiones del usuario). **Tandas 1–5
+> en prod** (PRs #196–#207, 3 migraciones aplicadas: teléfonos, primera visita automática, hors
+> service) + dos arreglos que salieron por el camino (máquinas sin visita de mantenimiento,
+> formularios que se vaciaban tras un error). **Siguiente:** tanda 6 (técnicos crean incidencias) y
+> preguntar al usuario si el «Supprimer» del cliente desaparece también. Tareas de oficina, no de
+> código: **crear los planes de mantenimiento** (hoy 0 activos en prod) y completar el teléfono de
+> los 51 de 70 clientes que no tienen.
 
 > **2026-10-23:** «Mot de passe oublié» **funcionando en prod** — configurado el panel de Supabase
 > (Site URL, que seguía en `http://localhost:3000`, y la plantilla en francés) y probado con una
@@ -65,7 +71,7 @@
 | 💡 **13** | **Ideas rescatables de la plantilla shadcnstore** (`silicondeck/shadcn-dashboard-landing-template`, MIT) | No duele: es para más adelante, detrás de las filas 0, 1 y 11. **Solo como inspiración, rehaciéndolo con nuestras piezas** (`Card`, `Badge`, `Button`…): copiar su código metería Radix al lado de Headless UI, dos librerías para lo mismo. Con valor real: **(a)** página «Mon compte» para cambiar la contraseña (los usuarios `juansav`/`josesav`/`amarsav` la tienen pendiente de cambiar); hacerla junto a la fila 11; **(b)** listados con ordenar por columna, paginar y elegir columnas, para cuando estén cargados los 1.200+ equipos (antes, comprobar si los listados ya paginan). Detalles menores: página «En maintenance», tarjetas KPI con tendencia («+12 % vs mois dernier») para `DashboardCharts`, menú lateral de `/admin` plegable a iconos. Descartado: mail, chat, tareas, calendario (maquetas sin datos; ya hay Kanban y FullCalendar), landing, precios, «billing» de SaaS y el personalizador de temas. |
 | 🔎 **14** | **Comprobar con la próxima incidencia real del QR** (tras #187) | En su ficha de `/admin` y en el listado deben salir el cliente y el contrato, y el cuadro «Incidents récents» del inicio debe mostrarla. No se ha podido probar en prod sin crear una avería de verdad (no hay aún «máquina de prueba», `docs/cambios-en-produccion.md` §1). De paso: el email de contacto de SAV-2026-0003 (WOORADVICE) tiene una errata (`wooradvicesebegal.com`); si hay que escribirle, usar el de SAV-2026-0006. |
 | 🧹 **15** | **Doble escaneo: cinco detalles menores de la revisión** (PRs #191/#192) | Ninguno impide trabajar; salieron en la revisión final del 2026-10-21. **(a)** El borrador del informe (`sessionStorage`, ficha `/tech/incidents/[id]`) se borra al pulsar enviar: si la red se corta justo entonces o la sesión ha caducado, se pierde — borrarlo solo tras guardar con éxito. **(b)** El borrador no va ligado al técnico ni se limpia al cerrar sesión: en un móvil compartido uno vería el informe sin enviar del otro, y un borrador viejo pisa lo guardado en la BD al abrir la ficha — clave por usuario + limpiar al salir + no restaurarlo si la avería ya está resuelta. **(c)** La pista «scannez à nouveau à partir de HH:MM» puede mostrar una hora ya pasada (y sin fecha) — si ya pasó, decir solo «scannez à nouveau». **(d)** Si falla la BD al guardar un escaneo dentro de `stampQrScan`, el técnico no se entera (solo los fallos de red o tiempo muestran «Scan non enregistré») — que `stampQrScan` diga si escribió la fila. **(e)** `?scan=echec` se queda en la URL y el aviso vuelve a salir al recargar. |
-| 🛠️ **16** | **Pulido tras la 1ª semana de uso real** (9 puntos) | Detalles vistos usando la app: precios de tarifa invisibles, sin separador de miles, cliente ausente en tarjetas, formulario de contratos enorme, «Supprimer» que borra máquinas de verdad, técnicos sin poder abrir incidencias, un solo teléfono por cliente, mantenimientos fuera de la ficha del cliente, y un fallo tras reemplazar una máquina. Plan en 6 tandas: `docs/plan-pulido-uso-real-2026-10-23.md`. |
+| 🛠️ **16** | **Pulido tras la 1ª semana de uso real** (9 puntos) | **Tandas 1–5 en prod** (2026-10-23, PRs #196–#207): precios de tarifa visibles y con separador de miles, cliente en las tarjetas, contrato tras reemplazo, ventana para las máquinas del contrato, sección Maintenance en la ficha del cliente, teléfono móvil + fijo, máquinas que nunca se borran («Remplacer» / «Hors service»). **Queda:** tanda 6 (técnicos crean incidencias: permiso por persona, Issa y Modou Dieme, entra `nouveau` sin asignar) y decidir el «Supprimer» del cliente. Plan y decisiones: `docs/plan-pulido-uso-real-2026-10-23.md`. |
 
 **Cerrado el 2026-10-09 (seguridad, todo en prod y comprobado):** E2E en local solo contra un
 Supabase local (#179). F2 — un técnico ya no puede cambiar la máquina, la asignación ni el número
