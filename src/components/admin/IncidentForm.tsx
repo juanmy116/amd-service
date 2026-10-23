@@ -6,6 +6,7 @@ import { Loader2, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { RESOLUTION_REASON_LABELS, MIN_NOTE_LENGTH, requiresOfficeResolution } from '@/lib/resolution'
 import { RESOLUTION_REASONS } from '@/lib/enums'
+import { useSubmitKeepingValues } from '@/lib/useSubmitKeepingValues'
 
 type FormState = { error: string } | null
 
@@ -83,6 +84,7 @@ export default function IncidentForm({
   isEdit, incidentId, deleteAction, contextInfo,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
+  const submitKeepingValues = useSubmitKeepingValues(formAction)
   const [confirming, setConfirming] = useState(false)
 
   // Cascade state for contract → machine selection
@@ -159,7 +161,7 @@ export default function IncidentForm({
         )}
       </div>
 
-      <form action={formAction}>
+      <form onSubmit={submitKeepingValues}>
         <Card className="p-6 space-y-5">
 
           {state?.error && (

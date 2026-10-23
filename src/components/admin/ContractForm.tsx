@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card'
 import ContractLineDialog, {
   emptyLine, type BillingPlanOption, type LineInput, type MachineOption,
 } from '@/components/admin/ContractLineDialog'
+import { useSubmitKeepingValues } from '@/lib/useSubmitKeepingValues'
 
 export type { BillingPlanOption }
 
@@ -65,6 +66,7 @@ export default function ContractForm({
   action, defaultValues, initialLines, clients, availableMachines, billingPlans, title, isEdit, contractId, deleteAction,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
+  const submitKeepingValues = useSubmitKeepingValues(formAction)
   const noopDelete = async (_prev: FormState, _fd: FormData): Promise<FormState> => null
   const [deleteState, deleteFormAction, deletePending] = useActionState(
     deleteAction ?? noopDelete,
@@ -222,7 +224,7 @@ export default function ContractForm({
       )}
 
       {/* Form */}
-      <form action={formAction}>
+      <form onSubmit={submitKeepingValues}>
         {/* Hidden field: serialised lines */}
         <input type="hidden" name="lines" value={JSON.stringify(lines)} />
         <input type="hidden" name="retire" value={JSON.stringify(retired)} />

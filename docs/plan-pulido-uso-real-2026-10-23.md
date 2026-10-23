@@ -110,8 +110,8 @@
   React 19 reinicia el formulario al acabar la acción también cuando vuelve con error: se pierde lo
   escrito (p. ej. un NINEA repetido en la ficha del cliente obliga a reescribirlo todo). Arreglado en
   `ClientForm` (tanda 4: `onSubmit` + `startTransition`, mismo patrón que `intervention-form.tsx`).
-  **Quedan con el mismo patrón:** `IncidentForm`, `BillingPlanForm`, `NewMaintenancePlanForm`,
-  `TeamMemberForm`, `MachineForm`, `ContractForm` (los campos del contrato; las máquinas van en
-  estado y no se pierden), `portal/incidents/new/form.tsx`, `contadores/[serie]/counter-form.tsx`,
-  `contadores/pendientes/PendingList.tsx`. Revisar cada uno (algunos quizá no devuelvan errores
-  tras rellenar mucho) y aplicar el mismo arreglo en un PR aparte.
+  **Los demás, arreglados después** con la pieza compartida `src/lib/useSubmitKeepingValues.ts`:
+  `IncidentForm`, `BillingPlanForm`, `NewMaintenancePlanForm`, `TeamMemberForm`, `MachineForm`,
+  `ContractForm`, `portal/incidents/new/form.tsx`, `contadores/pendientes/PendingList.tsx` y
+  `contadores/[serie]/counter-form.tsx` (este se queda en la página: se vacía solo al guardar bien).
+  E2E `form-keeps-values.spec.ts` (falla sin el arreglo).

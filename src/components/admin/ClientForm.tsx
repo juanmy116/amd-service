@@ -1,12 +1,13 @@
 'use client'
 
-import { startTransition, useActionState, useState, type FormEvent } from 'react'
+import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import QuartierSelect from '@/components/admin/QuartierSelect'
 import type { Quartier } from '@/lib/quartiers'
 import { SENEGAL_PREFIX } from '@/lib/phone'
+import { useSubmitKeepingValues } from '@/lib/useSubmitKeepingValues'
 
 type FormState = { error: string } | null
 
@@ -37,14 +38,7 @@ const inputClass =
 export default function ClientForm({ action, defaultValues, title, clientId, deleteAction, quartiers }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
 
-  // Con `<form action={…}>`, React 19 vacía el formulario al terminar la acción, también cuando
-  // vuelve con un error: se perdía todo lo escrito (NINEA, dirección…). Enviándolo a mano no hay
-  // ese reinicio; las validaciones `required` del navegador siguen actuando antes del submit.
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const data = new FormData(e.currentTarget)
-    startTransition(() => formAction(data))
-  }
+  const submitKeepingValues = useSubmitKeepingValues(formAction)
   const [confirming, setConfirming] = useState(false)
 
   return (
@@ -101,7 +95,7 @@ export default function ClientForm({ action, defaultValues, title, clientId, del
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={submitKeepingValues}>
         <Card className="p-6 space-y-5">
 
           {state?.error && (

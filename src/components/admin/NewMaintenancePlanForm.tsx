@@ -4,6 +4,7 @@ import { useActionState } from 'react'
 import Link from 'next/link'
 import { Loader2, ArrowLeft } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import { useSubmitKeepingValues } from '@/lib/useSubmitKeepingValues'
 
 type FormState = { error: string } | null
 
@@ -28,6 +29,7 @@ const selectClass =
 
 export default function NewMaintenancePlanForm({ action, contracts }: Props) {
   const [state, formAction, pending] = useActionState(action, null)
+  const submitKeepingValues = useSubmitKeepingValues(formAction)
 
   return (
     <div className="p-8 max-w-2xl">
@@ -44,7 +46,7 @@ export default function NewMaintenancePlanForm({ action, contracts }: Props) {
         </h1>
       </div>
 
-      <form action={formAction} className="space-y-6">
+      <form onSubmit={submitKeepingValues} className="space-y-6">
 
         {state?.error && (
           <div className="px-4 py-3 rounded-lg bg-accent-soft border border-accent/20 text-sm text-accent">
