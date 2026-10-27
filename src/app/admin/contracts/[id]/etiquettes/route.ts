@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import sharp from 'sharp'
 import { requireAdmin } from '@/lib/auth'
 import { getActiveLinesForContract } from '@/lib/contract-machines'
 import { appBaseUrl } from '@/lib/app-url'
@@ -9,13 +8,14 @@ import { buildLabelsPdf, type MachineLabel } from '@/lib/labels-pdf'
 
 export const runtime = 'nodejs'
 
-// Logo AMD blanco para la cabecera roja. El asset es SVG (pdf-lib solo embebe
-// PNG/JPG), así que lo rasterizamos con sharp. Si falla, buildLabelsPdf dibuja
-// un respaldo de texto.
+// Logo AMD blanco para la cabecera roja. pdf-lib solo embebe PNG/JPG, así que se
+// usa un PNG ya rasterizado del SVG (600 px de ancho, versionado en public/). No
+// se rasteriza aquí con sharp: su librería nativa no viaja a la función de Vercel
+// y el fallo al cargarla tumbaba la ruta entera (500, 2026-10-27). Si el PNG no
+// se puede leer, buildLabelsPdf dibuja un respaldo de texto.
 async function loadLogo(): Promise<Uint8Array | null> {
   try {
-    const svg = await readFile(path.join(process.cwd(), 'public', 'images', 'logos', 'logo-amd-blanco.svg'))
-    return await sharp(svg, { density: 300 }).resize({ width: 600 }).png().toBuffer()
+    return await readFile(path.join(process.cwd(), 'public', 'images', 'logos', 'logo-amd-blanco.png'))
   } catch (e) {
     console.error('[etiquettes logo]', e)
     return null
