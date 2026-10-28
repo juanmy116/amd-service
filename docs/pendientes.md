@@ -6,7 +6,15 @@
 
 ---
 
-## 📍 Por dónde seguir (al 2026-10-23)
+## 📍 Por dónde seguir (al 2026-10-27)
+
+> **2026-10-27:** contrato **AXA `064-007`** creado en prod con 18 máquinas, cotejadas con la lista
+> del cliente (`AXA ASSURANCE 2026-09.xlsx`): modelos Ricoh corregidos, ubicaciones nuevas, 6 altas y
+> 2 retiradas a stock (W493K302507, CL9W000316). Solo datos; deshacer en
+> `../backups/2026-10-27-antes-axa-064-007/deshacer.sql`. **Al encender la facturación:** cargar la
+> tarifa de AXA (pedírsela al usuario) y leer los contadores de las 18 como punto de partida. Y las
+> **etiquetas QR en PDF** daban 500 en todos los contratos (`sharp` sin su librería nativa en Vercel):
+> arreglado y probado en prod (PR #209). El resto de la tabla sigue igual.
 
 > **2026-10-23 (cierre):** tras una semana de uso real, 9 detalles a pulir → **fila 16**, plan por
 > tandas en `docs/plan-pulido-uso-real-2026-10-23.md` (con las decisiones del usuario). **Tandas 1–5
