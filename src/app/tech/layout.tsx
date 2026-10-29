@@ -1,10 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { QrCode } from 'lucide-react'
 import type { Metadata, Viewport } from 'next'
 import { MANIFEST_PATH } from '@/lib/pwa/manifest'
 import { ServiceWorkerRegister } from '@/components/tech/ServiceWorkerRegister'
+import ScanFab from './scan-fab'
 import TechNav from './tech-nav'
 import TechDesktopSidebar from './tech-desktop-sidebar'
 import TechAgendaPanel from '@/components/tech/AgendaPanel'
@@ -50,15 +49,7 @@ export default async function TechLayout({ children }: { children: React.ReactNo
       <div className="hidden xl:block">
         <TechAgendaPanel />
       </div>
-      <div className="lg:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 flex justify-center px-4 z-40 pointer-events-none">
-        <Link
-          href="/tech/scan"
-          className="pointer-events-auto flex items-center gap-2 px-6 py-3.5 rounded-full text-white text-sm font-semibold bg-accent shadow-raised"
-        >
-          <QrCode size={20} />
-          Scanner une machine
-        </Link>
-      </div>
+      <ScanFab />
       <div className="lg:hidden">
         <TechNav />
       </div>

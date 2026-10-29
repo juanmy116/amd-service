@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { CLOSE_SCAN_WINDOW_MINUTES, SCAN_DEDUPE_SECONDS, closeGate, requiresScan } from './scanGate'
+import {
+  CLOSE_SCAN_WINDOW_MINUTES, SCAN_DEDUPE_SECONDS, closeGate, requiresScan,
+  sameMachine, interventionStarted, closeAction, scanDestination, CLOCK_SKEW_MARGIN_SECONDS,
+} from './scanGate'
 
 const NOW = new Date('2026-10-21T12:00:00Z')
 const minAgo = (m: number) => new Date(NOW.getTime() - m * 60_000)
@@ -127,5 +130,103 @@ describe('requiresScan', () => {
   })
   it('el admin queda excluido', () => {
     expect(requiresScan({ role: 'admin', is_dispatcher: false })).toBe(false)
+  })
+})
+
+describe('sameMachine', () => {
+  it('ignora mayúsculas y espacios', () => {
+    expect(sameMachine('ab-12 ', 'AB-12')).toBe(true)
+  })
+  it('series distintas no coinciden', () => {
+    expect(sameMachine('AB-12', 'AB-13')).toBe(false)
+  })
+  it('sin serie esperada no coincide', () => {
+    expect(sameMachine('AB-12', null)).toBe(false)
+  })
+  it('vacío contra vacío no coincide', () => {
+    expect(sameMachine('', '')).toBe(false)
+  })
+})
+
+describe('interventionStarted', () => {
+  const at = new Date('2026-10-21T11:00:00Z')
+  it('en curso con escaneo: empezada', () => {
+    expect(interventionStarted('en_cours', at)).toBe(true)
+  })
+  it('en curso sin escaneo (la oficina la puso): no empezada', () => {
+    expect(interventionStarted('en_cours', null)).toBe(false)
+  })
+  it('asignada con escaneo de antes de asignarla: no empezada', () => {
+    expect(interventionStarted('assigné', at)).toBe(false)
+  })
+  it('nueva con escaneo: no empezada', () => {
+    expect(interventionStarted('nouveau', at)).toBe(false)
+  })
+  it('resuelta cuenta como empezada aunque no haya escaneo', () => {
+    expect(interventionStarted('résolu', null)).toBe(true)
+  })
+  it('cerrada (fermé) cuenta como empezada aunque closeGate no vea escaneos', () => {
+    expect(interventionStarted('fermé', null)).toBe(true)
+  })
+})
+
+describe('closeAction', () => {
+  it('2º escaneo vigente: confirmar hasta último + 60 min', () => {
+    const last = minAgo(10)
+    expect(closeAction(closeGate([minAgo(30), last], null, NOW), NOW)).toEqual({
+      kind: 'confirm', until: new Date(last.getTime() + 60 * 60_000),
+    })
+  })
+  it('margen por desfase de reloj: 3 s', () => {
+    expect(CLOCK_SKEW_MARGIN_SECONDS).toBe(3)
+  })
+  it('un escaneo hace 20 s: esperar hasta escaneo + 60 s + margen', () => {
+    const scan = new Date(NOW.getTime() - 20_000)
+    expect(closeAction(closeGate([scan], null, NOW), NOW)).toEqual({
+      kind: 'wait', from: new Date(scan.getTime() + 63_000),
+    })
+  })
+  it('1 s después de nextScanAfter: todavía esperar (dentro del margen)', () => {
+    const scan = new Date(NOW.getTime() - 61_000)
+    expect(closeAction(closeGate([scan], null, NOW), NOW)).toEqual({
+      kind: 'wait', from: new Date(scan.getTime() + 63_000),
+    })
+  })
+  it('pasado el margen: escanear', () => {
+    const scan = new Date(NOW.getTime() - 63_000)
+    expect(closeAction(closeGate([scan], null, NOW), NOW)).toEqual({ kind: 'scan' })
+  })
+  it('canClose de la carga pero la hora de cierre ya pasó (ficha abierta): escanear', () => {
+    const gate = closeGate([minAgo(30), minAgo(5)], null, NOW)
+    expect(gate.canClose).toBe(true)
+    expect(closeAction(gate, new Date(gate.closeUntil!.getTime() + 1000))).toEqual({ kind: 'scan' })
+  })
+  it('un escaneo hace 5 min: escanear', () => {
+    expect(closeAction(closeGate([minAgo(5)], null, NOW), NOW)).toEqual({ kind: 'scan' })
+  })
+  it('ventana vencida: escanear', () => {
+    expect(closeAction(closeGate([minAgo(120), minAgo(61)], null, NOW), NOW)).toEqual({ kind: 'scan' })
+  })
+  it('sin escaneos: escanear', () => {
+    expect(closeAction(closeGate([], null, NOW), NOW)).toEqual({ kind: 'scan' })
+  })
+})
+
+describe('scanDestination', () => {
+  const base = { serie: 'A B', recorded: false, myIncidentIds: ['x'], visitDue: false }
+  it('escaneo no grabado: pantalla del escáner con aviso de fallo', () => {
+    expect(scanDestination(base)).toBe('/tech/scan/A%20B?scan=echec')
+  })
+  it('grabado y una sola avería mía: directo a su ficha', () => {
+    expect(scanDestination({ ...base, recorded: true })).toBe('/tech/incidents/x?scan=1')
+  })
+  it('varias averías mías: pantalla del escáner', () => {
+    expect(scanDestination({ ...base, recorded: true, myIncidentIds: ['x', 'y'] })).toBe('/tech/scan/A%20B')
+  })
+  it('una avería pero visita pendiente: pantalla del escáner', () => {
+    expect(scanDestination({ ...base, recorded: true, visitDue: true })).toBe('/tech/scan/A%20B')
+  })
+  it('ninguna avería mía: pantalla del escáner', () => {
+    expect(scanDestination({ ...base, recorded: true, myIncidentIds: [] })).toBe('/tech/scan/A%20B')
   })
 })

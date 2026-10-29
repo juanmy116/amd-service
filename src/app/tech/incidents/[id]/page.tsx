@@ -11,10 +11,14 @@ import { getCloseGate } from '@/lib/scan.server'
 
 export default async function TechIncidentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { id } = await params
+  // `?scan=1`: llega del escáner (botón flotante) con el escaneo ya grabado.
+  const scanNotice = (await searchParams).scan === '1'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -42,7 +46,7 @@ export default async function TechIncidentPage({
   let contractInfo: {
     numero_contrat: string | null
     clients: { nom_client: string; adresse: string | null; ville: string | null; quartier_code: string | null } | null
-    machines: { marque: string; modele: string; localisation: string | null; lat: number | null; lng: number | null; quartier_code: string | null } | null
+    machines: { marque: string; modele: string; localisation: string | null; numero_serie: string; lat: number | null; lng: number | null; quartier_code: string | null } | null
   } | null = null
 
   // Destination pour le bouton « Itinéraire » (`itineraryDestination`). Pour une incidence
@@ -98,11 +102,13 @@ export default async function TechIncidentPage({
   const machineName = machine ? `${machine.marque} ${machine.modele}` : (incident.machine_id ?? '')
   const machineLocation = machine?.localisation ?? null
   const contractNumber = contractInfo?.numero_contrat ?? null
+  // Serie de la máquina en la BD (la de la línea o, sin línea, `machine_id`): para fijar su
+  // ubicación tras el escaneo de inicio desde la ficha.
+  const machineSerie = machine?.numero_serie ?? incident.machine_id ?? null
 
-  // Doble escaneo: solo el técnico de campo lo cumple (Atelier y admin quedan fuera). La ficha
-  // lo refleja para que el técnico sepa qué falta, pero quien manda es la acción del servidor.
+  // Doble escaneo: solo el técnico de campo lo cumple (Atelier y admin quedan fuera) y ve la
+  // ficha en 3 pasos. La ficha refleja qué falta, pero quien manda es la acción del servidor.
   const mustScan = requiresScan(profile)
-  const needsStart = mustScan && ['nouveau', 'assigné'].includes(incident.status)
   const gate: CloseGate = mustScan
     ? await getCloseGate(incident.id, user.id, incident.resolved_at)
     : { canClose: true, closeUntil: null, reason: null, firstScanAt: null, nextScanAfter: null }
@@ -121,7 +127,9 @@ export default async function TechIncidentPage({
       destCoords={destCoords}
       destText={destText}
       checkedParts={checkedParts}
-      needsStart={needsStart}
+      mustScan={mustScan}
+      machineSerie={machineSerie}
+      scanNotice={scanNotice}
       closeGate={{
         canClose: gate.canClose,
         closeUntil: gate.closeUntil?.toISOString() ?? null,

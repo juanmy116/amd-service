@@ -28,16 +28,23 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   // En local (sin CI) Playwright arranca la app él mismo. En CI la arranca el workflow.
+  // Build + start, igual que en CI, y no `npm run dev`: en dev la suite recorre muchas rutas, el
+  // servidor las compila y descarta sobre la marcha, y cuando una página pide un componente que el
+  // chunk recién servido ya no trae, el runtime de Fast Refresh hace `location.reload()` antes de
+  // hidratar, a veces en bucle. Todo lo que solo existe tras hidratar (el borrador del informe,
+  // los botones de la ficha) fallaba al azar; en build no pasa.
   webServer: process.env.CI
     ? undefined
     : {
-        command: 'npm run dev',
+        command: 'npm run build && npm run start',
         url: 'http://localhost:3000',
-        // Nunca reutilizar un `npm run dev` ya abierto: lleva el .env.local, que es producción.
+        // Nunca reutilizar un servidor ya abierto: lleva el .env.local, que es producción.
         reuseExistingServer: false,
-        timeout: 120_000,
+        // El build va primero (1–3 min en el Mac).
+        timeout: 300_000,
         // En Next, process.env gana a .env.local: la app arranca contra el mismo Supabase local
-        // que los tests, y sin Matrix para no avisar al canal real de mantenimiento.
+        // que los tests, y sin Matrix para no avisar al canal real de mantenimiento. Vale para el
+        // build y para el start: las NEXT_PUBLIC_* se graban en el bundle al construir.
         env: {
           NEXT_PUBLIC_SUPABASE_URL: SUPABASE_URL,
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ANON_KEY,

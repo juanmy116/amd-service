@@ -37,12 +37,16 @@ import { SCAN_DEDUPE_SECONDS, closeGate, type CloseGate } from './scanGate'
  *
  * Devuelve `needsLocation`: la máquina está instalada en un cliente (línea abierta) y aún no
  * tiene ubicación, así que la posición del escaneo le serviría (ver `setFirstScanLocation`). El
- * escáner de la app solo espera al GPS en ese caso.
+ * escáner de la app solo espera al GPS en ese caso. Devuelve también `myIncidentIds` (averías
+ * abiertas asignadas a quien escanea) y `visitDue` (hay visita que toca): con eso el escáner
+ * decide adónde ir (`scanDestination`) sin una consulta más.
  *
  * Nunca bloquea nada: un fallo aquí se registra y se sigue. Cada paso es independiente: que
  * falle uno no impide los demás.
  */
-export async function stampQrScan(numeroSerie: string, userId: string): Promise<{ needsLocation: boolean }> {
+export type ScanStamp = { needsLocation: boolean; myIncidentIds: string[]; visitDue: boolean }
+
+export async function stampQrScan(numeroSerie: string, userId: string): Promise<ScanStamp> {
   const admin = createAdminClient()
 
   // El escaneo de la etiqueta de un equipo dado de baja no prueba nada (la propia página de
@@ -52,13 +56,13 @@ export async function stampQrScan(numeroSerie: string, userId: string): Promise<
     .select('active, lat')
     .eq('numero_serie', numeroSerie)
     .maybeSingle()
-  if (!machine?.active) return { needsLocation: false }
+  if (!machine?.active) return { needsLocation: false, myIncidentIds: [], visitDue: false }
 
   const openLine = await getOpenLineForMachine(admin, numeroSerie)
 
-  await stampIncidents(admin, numeroSerie, openLine?.id ?? null, userId)
-  if (openLine) await stampMaintenanceVisit(admin, openLine.id, userId)
-  return { needsLocation: openLine !== null && machine.lat === null }
+  const myIncidentIds = await stampIncidents(admin, numeroSerie, openLine?.id ?? null, userId)
+  const visitDue = openLine ? await stampMaintenanceVisit(admin, openLine.id, userId) : false
+  return { needsLocation: openLine !== null && machine.lat === null, myIncidentIds, visitDue }
 }
 
 /**
@@ -136,7 +140,14 @@ export const VISIT_STAMP_WINDOW_DAYS = 14
 
 type Admin = ReturnType<typeof createAdminClient>
 
-async function stampIncidents(admin: Admin, numeroSerie: string, openLineId: string | null, userId: string) {
+// Devuelve los ids de las averías abiertas asignadas a quien escanea (ya leídas aquí, sin
+// consulta nueva): el escáner los usa para llevarle directo a su avería.
+async function stampIncidents(
+  admin: Admin,
+  numeroSerie: string,
+  openLineId: string | null,
+  userId: string,
+): Promise<string[]> {
   const filterExpr = openLineId
     ? `contract_machine_id.eq.${openLineId},machine_id.eq.${numeroSerie}`
     : `machine_id.eq.${numeroSerie}`
@@ -148,7 +159,7 @@ async function stampIncidents(admin: Admin, numeroSerie: string, openLineId: str
     .in('status', ['nouveau', 'assigné', 'en_cours'])
   if (readError) {
     console.error('[stampQrScan.read]', readError)
-    return
+    return []
   }
 
   // Se tratan las averías del que escanea y también las que aún no tienen técnico: es
@@ -156,7 +167,8 @@ async function stampIncidents(admin: Admin, numeroSerie: string, openLineId: str
   // esté abierta desde el formulario público del QR). Guardar QUIÉN escaneó permite que la
   // lectura del semáforo exija que fuese quien la resolvió.
   const mine = (rows ?? []).filter((r) => r.assigned_to === null || r.assigned_to === userId)
-  if (mine.length === 0) return
+  if (mine.length === 0) return []
+  const assignedIds = mine.filter((r) => r.assigned_to === userId).map((r) => r.id)
 
   const toStamp = mine.filter((r) => !(r.qr_verified && r.qr_scanned_by === userId)).map((r) => r.id)
   if (toStamp.length > 0) {
@@ -176,7 +188,7 @@ async function stampIncidents(admin: Admin, numeroSerie: string, openLineId: str
   // hecho entre la lectura y aquí (p. ej. la oficina la puso en en_cours o la cerró). El
   // historial se escribe solo de las filas que de verdad cambiaron, con el estado leído.
   const toStart = mine.filter((r) => r.assigned_to === userId && (r.status === 'nouveau' || r.status === 'assigné'))
-  if (toStart.length === 0) return
+  if (toStart.length === 0) return assignedIds
   const oldStatus = new Map(toStart.map((r) => [r.id, r.status]))
   const { data: started, error: startError } = await admin
     .from('incidents')
@@ -186,9 +198,9 @@ async function stampIncidents(admin: Admin, numeroSerie: string, openLineId: str
     .select('id')
   if (startError) {
     console.error('[stampQrScan.start]', startError)
-    return
+    return assignedIds
   }
-  if (!started || started.length === 0) return
+  if (!started || started.length === 0) return assignedIds
   const { error: historyError } = await admin.from('incident_history').insert(
     started.map((i) => ({
       incident_id: i.id,
@@ -199,6 +211,7 @@ async function stampIncidents(admin: Admin, numeroSerie: string, openLineId: str
     })),
   )
   if (historyError) console.error('[stampQrScan.start.history]', historyError)
+  return assignedIds
 }
 
 // Una fila por avería y escaneo. Se compara con el ÚLTIMO escaneo de ese usuario en esa avería
@@ -231,7 +244,8 @@ async function recordScans(admin: Admin, incidentIds: string[], userId: string) 
 // Mismo criterio que las averías (del que escanea o sin técnico), pero UNA visita: la que toca
 // (la pendiente más antigua dentro de la ventana). Las visitas no guardan quién escaneó:
 // `qr_verified` a secas, como mostraba ya la oficina.
-async function stampMaintenanceVisit(admin: Admin, openLineId: string, userId: string) {
+// Devuelve true si hay visita que toca (aunque ya estuviera `qr_verified`).
+async function stampMaintenanceVisit(admin: Admin, openLineId: string, userId: string): Promise<boolean> {
   const cutoff = new Date(Date.now() + VISIT_STAMP_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10)
   const { data: due, error: readError } = await admin
     .from('maintenance_visits')
@@ -245,13 +259,15 @@ async function stampMaintenanceVisit(admin: Admin, openLineId: string, userId: s
     .maybeSingle()
   if (readError) {
     console.error('[stampQrScan.visits.read]', readError)
-    return
+    return false
   }
-  if (!due || due.qr_verified) return
+  if (!due) return false
+  if (due.qr_verified) return true
 
   const { error } = await admin
     .from('maintenance_visits')
     .update({ qr_verified: true })
     .eq('id', due.id)
   if (error) console.error('[stampQrScan.visits]', error)
+  return true
 }

@@ -96,3 +96,76 @@ export function closeGate(scans: Date[], resolvedAt: Date | null, now: Date = ne
 export function requiresScan(profile: { role: string; is_dispatcher: boolean | null }): boolean {
   return profile.role === 'technician' && profile.is_dispatcher !== true
 }
+
+/** Texto cuando el QR escaneado no es el de la máquina de la intervención (se rechaza antes de grabar). */
+export const WRONG_MACHINE_ERROR = 'Ce QR n\'est pas celui de la machine de cette intervention.'
+
+/**
+ * ¿El QR escaneado es el de la máquina esperada? Se ignoran mayúsculas y espacios que mete el lector;
+ * una serie vacía o ausente nunca coincide, para que un QR en blanco no valga como pase.
+ */
+export function sameMachine(scanned: string, expected: string | null): boolean {
+  const a = scanned.trim().toUpperCase()
+  const b = (expected ?? '').trim().toUpperCase()
+  return a !== '' && b !== '' && a === b
+}
+
+/**
+ * ¿Está la intervención empezada? `résolu` y `fermé` siempre (ya pasó por ahí; `fermé` es el final
+ * normal, tras la encuesta o al cerrarla la oficina, y sus escaneos son anteriores a `resolved_at`,
+ * así que `closeGate` no los ve). En los demás estados hace falta un escaneo Y que la avería haya
+ * salido de `nouveau`/`assigné`: un escaneo anterior a la asignación no es «empezar», y una avería
+ * puesta `en_cours` por la oficina sin escaneo tampoco.
+ */
+export function interventionStarted(status: string, firstScanAt: Date | null): boolean {
+  return ['résolu', 'fermé'].includes(status) || (!['nouveau', 'assigné'].includes(status) && firstScanAt !== null)
+}
+
+/**
+ * Margen que se suma a la espera de la ficha: la cuenta atrás corre con el reloj del móvil contra
+ * una hora de la BD, y un móvil adelantado unos segundos escanearía aún dentro de los
+ * SCAN_DEDUPE_SECONDS del servidor (el escaneo se descartaría como rebote).
+ */
+export const CLOCK_SKEW_MARGIN_SECONDS = 3
+
+/**
+ * Qué debe hacer el técnico para cerrar, derivado de `closeGate` para que la ficha no recalcule:
+ * - `confirm`: el 2º escaneo ya está hecho y vigente; se cierra sin escanear;
+ * - `wait`: escanear ahora sería un rebote (se descartaría); esperar hasta `from`
+ *   (`nextScanAfter` + CLOCK_SKEW_MARGIN_SECONDS);
+ * - `scan`: escanear ahora cierra (también si la ventana del `confirm` ya pasó con la ficha abierta).
+ */
+export type CloseAction =
+  | { kind: 'confirm'; until: Date }
+  | { kind: 'scan' }
+  | { kind: 'wait'; from: Date }
+
+export function closeAction(gate: CloseGate, now: Date = new Date()): CloseAction {
+  // `canClose` se calculó al cargar la ficha: si la hora de cierre ya pasó, ofrecer confirmar
+  // acabaría en rechazo del servidor.
+  if (gate.canClose && gate.closeUntil && gate.closeUntil.getTime() > now.getTime()) {
+    return { kind: 'confirm', until: gate.closeUntil }
+  }
+  if (gate.nextScanAfter) {
+    const from = new Date(gate.nextScanAfter.getTime() + CLOCK_SKEW_MARGIN_SECONDS * 1000)
+    if (from.getTime() > now.getTime()) return { kind: 'wait', from }
+  }
+  return { kind: 'scan' }
+}
+
+/**
+ * Adonde llevar al técnico tras escanear un QR. Directo a la ficha solo si el escaneo quedó grabado
+ * y no hay ambigüedad (una sola avería suya y ninguna visita pendiente); si no grabó, de vuelta al
+ * escáner con aviso de fallo; en los demás casos, a la pantalla del escáner para que elija.
+ */
+export function scanDestination(r: {
+  serie: string
+  recorded: boolean
+  myIncidentIds: string[]
+  visitDue: boolean
+}): string {
+  const scanner = `/tech/scan/${encodeURIComponent(r.serie)}`
+  if (!r.recorded) return `${scanner}?scan=echec`
+  if (r.myIncidentIds.length === 1 && !r.visitDue) return `/tech/incidents/${r.myIncidentIds[0]}?scan=1`
+  return scanner
+}

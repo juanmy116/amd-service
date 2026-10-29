@@ -1,8 +1,9 @@
 'use client'
 
-import { startTransition, useActionState, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { startTransition, useActionState, useEffect, useRef, useState, useTransition, type FormEvent, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, MapPin, Building2, FileText, ScanLine } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, Loader2, MapPin, Building2, FileText } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import type { BadgeVariant } from '@/components/ui/Badge'
@@ -10,7 +11,13 @@ import { PARTS } from '@/lib/parts'
 import { appendPosition, getPositionOnce } from '@/lib/pwa/geolocation'
 import type { LatLng } from '@/lib/geo'
 import ItineraryButton from '@/components/tech/ItineraryButton'
-import { CLOSE_SCAN_ERROR, type CloseBlockReason } from '@/lib/scanGate'
+import ScanSheet from '@/components/tech/ScanSheet'
+import {
+  CLOSE_SCAN_ERROR, closeAction, interventionStarted, type CloseAction, type CloseBlockReason, type CloseGate,
+} from '@/lib/scanGate'
+import { recordMachineLocationAction } from '@/app/tech/scan/actions'
+import { startInterventionScanAction } from './actions'
+import { CloseStep, ErrorBox, LockedStep, PRIMARY_BUTTON, SECONDARY_BUTTON, StartStep, StepSection } from './scan-steps'
 
 type FormState = { error: string } | null
 
@@ -20,17 +27,18 @@ const STATUS_OPTIONS = [
 ]
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
-  nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success',
+  nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success', fermé: 'neutral',
 }
 const STATUS_LABEL: Record<string, string> = {
-  nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu',
+  nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu', fermé: 'Fermé',
 }
 
-// Borrador del informe por avería, en sessionStorage. Si «Résolu» está bloqueado, el único camino
-// es «Scanner la machine», que sale de la ficha; al volver, la página se recarga de la BD y lo
-// tecleado se perdería. Se guarda en cada cambio y se borra al enviar (si el envío falla, se
-// vuelve a guardar). El almacenamiento puede lanzar o venir vacío (modo privado, datos
-// borrados): todo va en try/catch y sin borrador la ficha funciona igual.
+// Borrador del informe por avería, en sessionStorage. Los escaneos ya se hacen sobre la propia
+// ficha, pero el técnico puede salir de ella sin guardar (atrás, el botón flotante del escáner en
+// otra pantalla); al volver, la página se recarga de la BD y lo tecleado se perdería. Se guarda en
+// cada cambio y se borra al enviar (si el envío falla, se vuelve a guardar). El almacenamiento
+// puede lanzar o venir vacío (modo privado, datos borrados): todo va en try/catch y sin borrador
+// la ficha funciona igual.
 type Draft = { rapport: string; autres_pieces: string }
 const draftKey = (incidentId: string) => `amd:tech-intervention-draft:${incidentId}`
 
@@ -56,7 +64,9 @@ function clearDraft(incidentId: string) {
   try { sessionStorage.removeItem(draftKey(incidentId)) } catch { /* noop */ }
 }
 
-const hhmm = (d: Date) => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+const START_OFFLINE_ERROR = 'Scan non enregistré — vérifiez la connexion et scannez à nouveau.'
+
+const toDate = (iso: string | null) => (iso ? new Date(iso) : null)
 
 type Props = {
   incident: {
@@ -75,8 +85,12 @@ type Props = {
   checkedParts: Map<number, number>
   /** Galería de fotos del cliente (Server Component pasado como slot). */
   photos?: ReactNode
-  /** Avería sin empezar (`nouveau`/`assigné`) de un técnico de campo: hay que escanear el QR antes. */
-  needsStart: boolean
+  /** Técnico de campo (`requiresScan`): ficha en 3 pasos (Démarrer → Rapport → Clôturer). */
+  mustScan: boolean
+  /** Serie de la máquina en la BD: para fijar su ubicación tras el escaneo de inicio. */
+  machineSerie: string | null
+  /** Llega del botón flotante del escáner (`?scan=1`): el escaneo ya quedó grabado. */
+  scanNotice: boolean
   /** Doble escaneo (ver `CloseGate`): las fechas viajan como ISO porque un Date no cruza al cliente. */
   closeGate: {
     canClose: boolean
@@ -89,14 +103,16 @@ type Props = {
 
 export default function InterventionForm({
   incident, boundAction, clientName, machineName, machineLocation, contractNumber,
-  destCoords, destText, checkedParts, photos, needsStart, closeGate,
+  destCoords, destText, checkedParts, photos, mustScan, machineSerie, scanNotice, closeGate,
 }: Props) {
   const [state, formAction, pending] = useActionState(boundAction, null)
+  const router = useRouter()
+  const formRef = useRef<HTMLFormElement>(null)
 
   // Al RESOLVER se adjunta la posición del técnico (la oficina ve si estaba en el sitio). Se pide
-  // aquí y no en segundo plano; `getPositionOnce` nunca lanza ni espera más de ~4,5 s con el
-  // permiso ya dado (hasta 30 s si el navegador aún tiene que preguntarlo), y sin
-  // permiso o sin GPS se envía igual (queda «sans position»). Solo en la transición a `résolu`,
+  // aquí (en el modo 3 pasos, dentro de `close()`) y no en segundo plano; `getPositionOnce` nunca
+  // lanza ni espera más de ~4,5 s con el permiso ya dado (hasta 30 s si el navegador aún tiene que
+  // preguntarlo), y sin permiso o sin GPS se envía igual (queda «sans position»). Solo en la transición a `résolu`,
   // que es cuando el servidor la guarda. La captura va FUERA de la acción: dentro, los cambios
   // de estado son de transición y «Localisation…» no se pintaría hasta el final.
   const [locating, setLocating] = useState(false)
@@ -114,15 +130,22 @@ export default function InterventionForm({
     startTransition(() => formAction(data))
   }
 
-  // El informe solo es obligatorio para resolver, así que el formulario necesita saber
-  // qué opción está marcada. Misma preselección que antes: una avería recién asignada
-  // arranca en «en cours», y una `nouveau` sin marcar nada.
+  // Modo radios (Atelier/admin). El informe solo es obligatorio para resolver, así que el
+  // formulario necesita saber qué opción está marcada. Misma preselección que antes: una avería
+  // recién asignada arranca en «en cours», y una `nouveau` sin marcar nada. En el modo 3 pasos
+  // el informe se exige para cerrar y el envío normal guarda la avería tal como está.
   const [status, setStatus] = useState(
     incident.status === 'résolu' ? 'résolu'
       : incident.status === 'en_cours' || incident.status === 'assigné' ? 'en_cours'
       : ''
   )
-  const resolving = status === 'résolu'
+  // Modo 3 pasos: `résolu` y `fermé` ya están cerradas (`fermé` es el final normal: tras la
+  // encuesta o al cerrarla la oficina). `résolu` aún deja corregir el informe; `fermé` solo se
+  // consulta: el servidor rechazaría guardarla (`START_SCAN_ERROR` o «Statut invalide.»).
+  const closed = ['résolu', 'fermé'].includes(incident.status)
+  const readOnly = mustScan && incident.status === 'fermé'
+  const resolving = mustScan ? incident.status === 'résolu' : status === 'résolu'
+  const reportRequired = (mustScan && !readOnly) || resolving
 
   // Controlado a propósito: si el servidor rechaza el cierre (ventana de 1 h vencida), el
   // informe tecleado no debe perderse; un campo no controlado puede vaciarse al completarse
@@ -132,12 +155,14 @@ export default function InterventionForm({
 
   // Borrador: se restaura al montar (no en el estado inicial: el servidor no ve sessionStorage y
   // la hidratación no casaría).
+  // En una avería `fermé` se enseña lo guardado en la BD, nunca un borrador que ya no se enviará.
   useEffect(() => {
+    if (readOnly) return
     const draft = readDraft(incident.id)
     if (!draft) return
     setRapport(draft.rapport)
     setAutresPieces(draft.autres_pieces)
-  }, [incident.id])
+  }, [incident.id, readOnly])
 
   function updateDraft(next: Partial<Draft>) {
     writeDraft(incident.id, { rapport, autres_pieces: autresPieces, ...next })
@@ -150,36 +175,182 @@ export default function InterventionForm({
   }, [state]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // El servidor rechazó el cierre por el escaneo (p. ej. la ventana de 1 h venció con la ficha
-  // abierta): la ficha no se recarga, así que el candado de la carga ya no vale. Se trata como
-  // bloqueado para ofrecer el botón de escanear y no mostrar una hora de cierre ya pasada.
-  const closeRejected = state?.error === CLOSE_SCAN_ERROR
+  // abierta): la ficha no se recarga, así que el candado de la carga ya no vale. Se pide escanear
+  // de nuevo en vez de mostrar una hora de cierre ya pasada. Queda fijado hasta recargar: un error
+  // posterior (p. ej. otra máquina en el nuevo escaneo) no debe devolver el `confirm` caducado.
+  const [closeRejected, setCloseRejected] = useState(false)
+  if (state?.error === CLOSE_SCAN_ERROR && !closeRejected) setCloseRejected(true)
 
-  // Una avería ya resuelta conserva su opción marcada aunque el ciclo de escaneo esté gastado.
-  const resolveLocked = (!closeGate.canClose || closeRejected) && incident.status !== 'résolu'
-  // Un radio deshabilitado no viaja en el formulario: si «Résolu» queda bloqueado estando
-  // marcado, se vuelve a «En cours» para que el siguiente envío (guardar el informe) sea válido.
-  if (resolveLocked && status === 'résolu') setStatus('en_cours')
-  const closeUntilLabel = closeGate.closeUntil ? hhmm(new Date(closeGate.closeUntil)) : null
-
-  // Qué le falta al técnico para cerrar. Con el cierre recién rechazado el motivo de la carga ya
-  // no es fiable: se queda el texto genérico. La hora «à partir de» se redondea al minuto
-  // siguiente: escanear dentro del minuto mostrado podría caer aún en el margen de rebote.
-  let closeHint = 'Scannez à nouveau le QR de la machine pour clôturer (valable 1 heure).'
-  if (!closeRejected && (closeGate.reason === 'one_scan' || closeGate.reason === 'too_close')
-      && closeGate.firstScanAt && closeGate.nextScanAfter) {
-    const next = new Date(Math.ceil(new Date(closeGate.nextScanAfter).getTime() / 60_000) * 60_000)
-    closeHint = `1er scan enregistré à ${hhmm(new Date(closeGate.firstScanAt))} — scannez à nouveau la machine à partir de ${hhmm(next)}.`
-  } else if (!closeRejected && closeGate.reason === 'expired') {
-    closeHint = 'Le dernier scan date de plus d\'1 heure — scannez à nouveau la machine.'
+  // ── Modo 3 pasos ────────────────────────────────────────────────────────────────────────────
+  const gate: CloseGate = {
+    canClose: closeGate.canClose,
+    closeUntil: toDate(closeGate.closeUntil),
+    reason: closeGate.reason,
+    firstScanAt: toDate(closeGate.firstScanAt),
+    nextScanAfter: toDate(closeGate.nextScanAfter),
   }
-  const scanButton = (
-    <Link
-      href="/tech/scan"
-      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold text-white bg-accent"
-    >
-      <ScanLine size={16} />
-      Scanner la machine
-    </Link>
+  const started = interventionStarted(incident.status, gate.firstScanAt)
+
+  // `now` avanza cada segundo solo mientras hay que esperar (escanear ya sería un rebote): al llegar
+  // a `from` la acción pasa sola a `scan`, sin recargar. Al entrar en la espera se pone en hora en
+  // el acto: tras el escaneo de inicio (`router.refresh()`) `now` es el del montaje de la ficha.
+  const [now, setNow] = useState(() => new Date())
+  const action: CloseAction = closeRejected ? { kind: 'scan' } : closeAction(gate, now)
+  const waitFrom = action.kind === 'wait' ? action.from.getTime() : null
+  useEffect(() => {
+    if (waitFrom === null) return
+    setNow(new Date())
+    const timer = setInterval(() => {
+      const n = new Date()
+      setNow(n)
+      if (n.getTime() >= waitFrom) clearInterval(timer)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [waitFrom])
+
+  // Hoja de escaneo a pantalla completa sobre la ficha (sin navegar: lo tecleado sigue ahí).
+  const [sheet, setSheet] = useState<null | 'start' | 'close'>(null)
+  const [sheetBusy, setSheetBusy] = useState(false)
+  // Recarga tras el escaneo de inicio: la hoja (con «QR détecté — enregistrement…») sigue abierta
+  // hasta que llega la ficha nueva, para no enseñar «Scanner pour démarrer» mientras tanto.
+  const [, startRefresh] = useTransition()
+  const [startError, setStartError] = useState<string | null>(null)
+  // El envío en curso es el cierre (para el spinner); el de «guardar» lo pone a false.
+  const [closing, setClosing] = useState(false)
+
+  function openSheet(kind: 'start' | 'close') {
+    setStartError(null)
+    setSheetBusy(false)
+    setSheet(kind)
+  }
+
+  // Escaneo de inicio: el servidor comprueba que es la máquina de la avería y sella. Si la máquina
+  // aún no tiene ubicación, se manda la posición (siempre fresca: puede fijarla para siempre);
+  // un fallo ahí no deshace el inicio, que ya quedó grabado.
+  async function handleStartDecode(serie: string) {
+    setSheetBusy(true)
+    let res: Awaited<ReturnType<typeof startInterventionScanAction>>
+    try {
+      res = await startInterventionScanAction(incident.id, serie)
+    } catch (err) {
+      console.error('[intervention] escaneo de inicio fallido', err)
+      setStartError(START_OFFLINE_ERROR)
+      setSheet(null)
+      return
+    }
+    if ('error' in res) {
+      setStartError(res.error)
+      setSheet(null)
+      return
+    }
+    if (res.needsLocation && machineSerie) {
+      try {
+        const position = await getPositionOnce(3000, 0)
+        if (position) await recordMachineLocationAction(machineSerie, position)
+      } catch (err) {
+        console.error('[intervention] ubicación de la máquina', err)
+      }
+    }
+    // Dentro de la transición, cerrar la hoja se pinta a la vez que la ficha recargada.
+    startRefresh(() => {
+      setSheet(null)
+      router.refresh()
+    })
+  }
+
+  // Cerrar: con el QR recién escaneado (`scanSerie`, el servidor lo comprueba y sella antes del
+  // candado) o con el 2º escaneo ya hecho y vigente. Lleva lo escrito en el paso 2.
+  async function close(scanSerie?: string) {
+    const form = formRef.current
+    if (!form || locating || pending) return
+    const data = new FormData(form)
+    data.set('status', 'résolu')
+    if (scanSerie) data.set('scan_serie', scanSerie)
+    setClosing(true)
+    setLocating(true)
+    appendPosition(data, await getPositionOnce(4000))
+    setLocating(false)
+    clearDraft(incident.id)
+    setSheet(null)
+    startTransition(() => formAction(data))
+  }
+
+  // Campos de la intervención, iguales en los dos modos (en el de 3 pasos son el paso 2).
+  const fields = (
+    <>
+      {/* Rapport */}
+      <Card className="p-4">
+        <p className="text-sm font-semibold text-ink-soft mb-1">
+          Rapport d&apos;intervention
+          {reportRequired && <span className="text-accent"> *</span>}
+        </p>
+        {!readOnly && (
+          <p className="text-xs text-ink-muted mb-3">
+            {!reportRequired ? 'Décrivez ce que vous avez fait sur la machine.'
+              : mustScan ? 'Obligatoire pour clôturer : sans rapport, personne ne saura ce qui a été fait.'
+              : 'Obligatoire pour résoudre : sans rapport, personne ne saura ce qui a été fait.'}
+          </p>
+        )}
+        <textarea
+          name="rapport"
+          rows={4}
+          required={resolving}
+          value={rapport}
+          onChange={(e) => { setRapport(e.target.value); updateDraft({ rapport: e.target.value }) }}
+          placeholder="Décrivez les actions effectuées, l'état de la machine, les pièces changées..."
+          className="w-full px-3 py-2.5 rounded-xl border border-line text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
+        />
+      </Card>
+
+      {/* Pièces remplacées */}
+      <Card className="p-4">
+        <p className="text-sm font-semibold text-ink-soft mb-3">Pièces remplacées</p>
+        <div className="grid grid-cols-2 gap-2">
+          {PARTS.map((p) => (
+            <label key={p.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-line cursor-pointer">
+              <input
+                type="checkbox"
+                name={`part_${p.id}`}
+                defaultChecked={checkedParts.has(p.id)}
+                className="w-4 h-4 rounded accent-red-600 shrink-0"
+              />
+              <span className="text-sm text-ink-soft flex-1 min-w-0 truncate">{p.name}</span>
+              <input
+                type="number"
+                name={`qty_${p.id}`}
+                min={1}
+                defaultValue={checkedParts.get(p.id) ?? 1}
+                aria-label={`Quantité ${p.name}`}
+                onClick={(e) => e.stopPropagation()}
+                className="w-12 px-1.5 py-1 rounded-lg border border-line text-sm text-center text-ink shrink-0 focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </label>
+          ))}
+        </div>
+        <div className="mt-3">
+          <input
+            name="autres_pieces"
+            type="text"
+            value={autresPieces}
+            onChange={(e) => { setAutresPieces(e.target.value); updateDraft({ autres_pieces: e.target.value }) }}
+            placeholder="Autres pièces (libre)"
+            className="w-full px-3 py-2.5 rounded-xl border border-line text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+          />
+        </div>
+      </Card>
+
+      {/* Commentaire */}
+      <Card className="p-4">
+        <p className="text-sm font-semibold text-ink-soft mb-1">Commentaire</p>
+        <p className="text-xs text-ink-muted mb-3">Ajouté à l&apos;historique si le statut change</p>
+        <input
+          name="comment"
+          type="text"
+          placeholder="Ex : Pièce commandée, retour prévu demain"
+          className="w-full px-3 py-2.5 rounded-xl border border-line text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+        />
+      </Card>
+    </>
   )
 
   return (
@@ -205,6 +376,12 @@ export default function InterventionForm({
         </div>
         <ItineraryButton coords={destCoords} text={destText} />
       </div>
+
+      {scanNotice && (
+        <div role="status" className="px-4 py-3 rounded-xl bg-success-soft border border-success/20 text-sm text-success">
+          Scan enregistré.
+        </div>
+      )}
 
       {/* Infos machine */}
       <Card className="p-4 space-y-3">
@@ -240,131 +417,97 @@ export default function InterventionForm({
       {/* Photo signalée par le client */}
       {photos}
 
-      {needsStart ? (
-        <Card className="p-4 space-y-3">
-          <p className="text-sm text-ink-soft">
-            Scannez le QR de la machine pour démarrer l&apos;intervention.
-          </p>
-          {scanButton}
-        </Card>
+      {mustScan ? (
+        <>
+          <StartStep
+            started={started}
+            firstScanAt={gate.firstScanAt}
+            error={startError}
+            onScan={() => openSheet('start')}
+          />
+
+          {started ? (
+            // Envío normal (R1): guarda el informe sin cerrar, con el estado de la avería en el campo
+            // oculto y sin posición. Cerrar pasa siempre por `close()`.
+            <form ref={formRef} action={formAction} onSubmit={() => { clearDraft(incident.id); setClosing(false) }} className="space-y-5">
+              <input type="hidden" name="status" value={closed ? 'résolu' : 'en_cours'} />
+
+              <StepSection title="2. Réparer et écrire le rapport">
+                {readOnly ? (
+                  // Solo lectura: los campos se ven tal cual pero desactivados, y sin botón de guardar.
+                  <fieldset disabled className="space-y-3 min-w-0">{fields}</fieldset>
+                ) : (
+                  <>
+                    {fields}
+                    <button type="submit" disabled={pending || locating} className={SECONDARY_BUTTON}>
+                      {pending && !closing && <Loader2 size={16} className="animate-spin" />}
+                      {closed ? 'Enregistrer le rapport' : 'Enregistrer sans clôturer'}
+                    </button>
+                    {!closed && (
+                      <p className="text-xs text-ink-muted text-center">L&apos;intervention reste en cours, le rapport est gardé.</p>
+                    )}
+                  </>
+                )}
+              </StepSection>
+
+              <CloseStep
+                closed={closed}
+                action={action}
+                now={now}
+                hasRapport={rapport.trim() !== ''}
+                error={state?.error ?? null}
+                busy={pending || locating}
+                spinning={closing && (pending || locating)}
+                locating={locating}
+                onScan={() => openSheet('close')}
+                onConfirm={() => void close()}
+              />
+            </form>
+          ) : (
+            <>
+              <LockedStep title="2. Réparer et écrire le rapport" />
+              <LockedStep title="3. Clôturer" />
+            </>
+          )}
+
+          {sheet && (
+            <ScanSheet
+              title={sheet === 'start' ? 'Scan de démarrage' : 'Scan de clôture'}
+              overlay={sheetBusy ? (sheet === 'start' ? 'QR détecté — enregistrement…' : 'QR détecté — clôture…') : null}
+              onDecode={sheet === 'start'
+                ? (serie) => void handleStartDecode(serie)
+                : (serie) => { setSheetBusy(true); void close(serie) }}
+              onCancel={() => setSheet(null)}
+            />
+          )}
+        </>
       ) : (
       <form action={formAction} onSubmit={handleSubmit} className="space-y-5">
-        {state?.error && (
-          <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
-            {state.error}
-          </div>
-        )}
+        {state?.error && <ErrorBox>{state.error}</ErrorBox>}
 
         {/* Statut */}
         <Card className="p-4">
           <p className="text-sm font-semibold text-ink-soft mb-3">Statut de l&apos;intervention</p>
           <div className="space-y-2">
-            {STATUS_OPTIONS.map((o) => {
-              const locked = o.value === 'résolu' && resolveLocked
-              return (
-              <label key={o.value} className={`flex items-center gap-3 p-3 rounded-xl border border-line ${locked ? 'opacity-60' : 'cursor-pointer'}`}>
+            {STATUS_OPTIONS.map((o) => (
+              <label key={o.value} className="flex items-center gap-3 p-3 rounded-xl border border-line cursor-pointer">
                 <input
                   type="radio"
                   name="status"
                   value={o.value}
                   checked={status === o.value}
-                  disabled={locked}
                   onChange={() => setStatus(o.value)}
                   className="accent-red-600"
                 />
                 <span className="text-sm text-ink-soft">{o.label}</span>
               </label>
-              )
-            })}
-          </div>
-          {resolveLocked && (
-            <div className="mt-3 space-y-3">
-              {/* Tras un rechazo, el error de arriba ya dice lo mismo que el texto genérico. */}
-              {!closeRejected && <p className="text-sm text-ink-soft">{closeHint}</p>}
-              {scanButton}
-            </div>
-          )}
-          {!resolveLocked && closeUntilLabel && incident.status !== 'résolu' && (
-            <p className="mt-3 text-xs text-ink-muted">Clôture possible jusqu&apos;à {closeUntilLabel}</p>
-          )}
-        </Card>
-
-        {/* Rapport */}
-        <Card className="p-4">
-          <p className="text-sm font-semibold text-ink-soft mb-1">
-            Rapport d&apos;intervention
-            {resolving && <span className="text-accent"> *</span>}
-          </p>
-          <p className="text-xs text-ink-muted mb-3">
-            {resolving
-              ? 'Obligatoire pour résoudre : sans rapport, personne ne saura ce qui a été fait.'
-              : 'Décrivez ce que vous avez fait sur la machine.'}
-          </p>
-          <textarea
-            name="rapport"
-            rows={4}
-            required={resolving}
-            value={rapport}
-            onChange={(e) => { setRapport(e.target.value); updateDraft({ rapport: e.target.value }) }}
-            placeholder="Décrivez les actions effectuées, l'état de la machine, les pièces changées..."
-            className="w-full px-3 py-2.5 rounded-xl border border-line text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
-          />
-        </Card>
-
-        {/* Pièces remplacées */}
-        <Card className="p-4">
-          <p className="text-sm font-semibold text-ink-soft mb-3">Pièces remplacées</p>
-          <div className="grid grid-cols-2 gap-2">
-            {PARTS.map((p) => (
-              <label key={p.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-line cursor-pointer">
-                <input
-                  type="checkbox"
-                  name={`part_${p.id}`}
-                  defaultChecked={checkedParts.has(p.id)}
-                  className="w-4 h-4 rounded accent-red-600 shrink-0"
-                />
-                <span className="text-sm text-ink-soft flex-1 min-w-0 truncate">{p.name}</span>
-                <input
-                  type="number"
-                  name={`qty_${p.id}`}
-                  min={1}
-                  defaultValue={checkedParts.get(p.id) ?? 1}
-                  aria-label={`Quantité ${p.name}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-12 px-1.5 py-1 rounded-lg border border-line text-sm text-center text-ink shrink-0 focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-              </label>
             ))}
           </div>
-          <div className="mt-3">
-            <input
-              name="autres_pieces"
-              type="text"
-              value={autresPieces}
-              onChange={(e) => { setAutresPieces(e.target.value); updateDraft({ autres_pieces: e.target.value }) }}
-              placeholder="Autres pièces (libre)"
-              className="w-full px-3 py-2.5 rounded-xl border border-line text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-            />
-          </div>
         </Card>
 
-        {/* Commentaire */}
-        <Card className="p-4">
-          <p className="text-sm font-semibold text-ink-soft mb-1">Commentaire</p>
-          <p className="text-xs text-ink-muted mb-3">Ajouté à l&apos;historique si le statut change</p>
-          <input
-            name="comment"
-            type="text"
-            placeholder="Ex : Pièce commandée, retour prévu demain"
-            className="w-full px-3 py-2.5 rounded-xl border border-line text-sm text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-          />
-        </Card>
+        {fields}
 
-        <button
-          type="submit"
-          disabled={pending || locating}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-semibold text-white bg-accent disabled:opacity-60 transition-opacity"
-        >
+        <button type="submit" disabled={pending || locating} className={PRIMARY_BUTTON}>
           {(pending || locating) && <Loader2 size={16} className="animate-spin" />}
           {locating ? 'Localisation…' : <>Enregistrer l&apos;intervention</>}
         </button>
