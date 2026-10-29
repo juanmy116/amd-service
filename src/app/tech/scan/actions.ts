@@ -1,15 +1,15 @@
 'use server'
 
 import { requireTechnician } from '@/lib/auth'
-import { setFirstScanLocation, stampQrScan } from '@/lib/scan.server'
+import { setFirstScanLocation, stampQrScan, type ScanStamp } from '@/lib/scan.server'
 import { toPosition } from '@/lib/geo'
 
 // Sello «el técnico tuvo la máquina delante» cuando escanea con la cámara DE LA APP. Es tan
 // creíble como `/m/[serie]`: en ambos casos el serie sale de leer la etiqueta física.
 // Devuelve `needsLocation` (máquina instalada y sin ubicación): solo entonces el escáner espera
-// al GPS y manda la posición con `recordMachineLocationAction`. Nunca bloquea (stampQrScan
-// registra y sigue).
-export async function recordQrScanAction(numeroSerie: string): Promise<{ needsLocation: boolean }> {
+// al GPS y manda la posición con `recordMachineLocationAction`; y las averías propias / visita
+// pendiente, para elegir destino. Nunca bloquea (stampQrScan registra y sigue).
+export async function recordQrScanAction(numeroSerie: string): Promise<ScanStamp> {
   const { user } = await requireTechnician()
   return stampQrScan(numeroSerie, user.id)
 }
