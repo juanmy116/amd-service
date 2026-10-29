@@ -11,7 +11,7 @@
 > **2026-10-29:** la **ficha de avería del técnico de campo va en 3 pasos** (1. Démarrer → 2. Rapport →
 > 3. Clôturer): se escanea el QR desde una hoja a pantalla completa sobre la propia ficha, ya no hay
 > radios «En cours / Résolu» y el botón flotante del escáner se oculta en esa ficha. Sin cambios de BD.
-> Pendiente probar en el iPhone tras publicar (lista en `docs/superpowers/plans/2026-10-29-pasos-escaneo-tecnicos.md`, §«Prueba en el iPhone tras publicar»).
+> **En prod** desde el 2026-10-29 (~16:47 GMT, PR #211, merge `147880d`). Pendiente probar en el iPhone (lista en `docs/superpowers/plans/2026-10-29-pasos-escaneo-tecnicos.md`, §«Prueba en el iPhone tras publicar»).
 > Cabos sueltos que dejó la revisión, todos menores:
 > - El escaneo de inicio no tiene tiempo máximo en el cliente (si la red se cuelga, la hoja espera).
 > - El mensaje de «sin conexión» está duplicado entre la ficha de avería y la ficha de máquina.
