@@ -15,7 +15,7 @@ import {
 } from '@dnd-kit/core'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
 import ResolutionDialog from '@/components/admin/ResolutionDialog'
-import ArchivedToast from './ArchivedToast'
+import KioskToast, { archivedMessage } from './KioskToast'
 import { requiresOfficeResolution, OFFICE_RESOLUTION_STATUS, type OfficeResolution } from '@/lib/resolution'
 import { assignIncidentAction } from '@/app/atelier/actions'
 import AssignPanel from './AssignPanel'
@@ -155,7 +155,7 @@ export default function AtelierKanban({
   const [resolutionError, setResolutionError] = useState<string | null>(null)
   const [resolutionTarget, setResolutionTarget] = useState<string>('résolu')
   // Acuse de recibo: la tarjeta archivada desaparece del tablero, así que hay que decir que
-  // ha funcionado (ver ArchivedToast).
+  // ha funcionado (ver KioskToast).
   const [archived, setArchived] = useState<{ numero: string | null; at: number }>({ numero: null, at: 0 })
 
   const [optimistic, updateOptimistic] = useOptimistic(
@@ -285,7 +285,7 @@ export default function AtelierKanban({
         onConfirm={confirmResolution}
       />
 
-      <ArchivedToast numero={archived.numero} at={archived.at} />
+      <KioskToast message={archivedMessage(archived.numero)} at={archived.at} />
     </>
   )
 }

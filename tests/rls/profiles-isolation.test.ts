@@ -4,7 +4,7 @@ import { seedTenants, SC, type Tenants } from './scenario'
 
 // Aislamiento RLS de PROFILES y CLIENT_PROFILES.
 //   profiles: cada usuario ve solo su perfil; el admin ve todos. Un usuario NO
-//     puede escalar privilegios cambiándose role/is_dispatcher (doble defensa:
+//     puede escalar privilegios cambiándose role/is_dispatcher/can_create_incidents (doble defensa:
 //     GRANT por columna + trigger tg_profiles_protect_privileged).
 //   client_profiles: cada cliente ve solo su propio vínculo.
 
@@ -64,6 +64,13 @@ describe('RLS profiles — escalada de privilegios bloqueada', () => {
     await c.from('profiles').update({ is_dispatcher: true }).eq('id', t.techA)
     const { data } = await admin.from('profiles').select('is_dispatcher').eq('id', t.techA).single()
     expect(data?.is_dispatcher).toBe(false)
+  })
+
+  it('el técnico A NO puede darse el permiso de crear averías (can_create_incidents)', async () => {
+    const c = await signInAs(SC.techAEmail)
+    await c.from('profiles').update({ can_create_incidents: true }).eq('id', t.techA)
+    const { data } = await admin.from('profiles').select('can_create_incidents').eq('id', t.techA).single()
+    expect(data?.can_create_incidents).toBe(false)
   })
 
   it('el cliente A SÍ puede actualizar su propio full_name (columna no sensible)', async () => {

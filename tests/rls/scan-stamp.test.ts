@@ -93,10 +93,10 @@ describe('primer escaneo — ubicación de la máquina', () => {
   })
 
   it('máquina instalada y sin ubicación ⇒ needsLocation y el primer escaneo la fija', async () => {
-    expect(await scan.stampQrScan(SC.snA, t.techA)).toEqual({ needsLocation: true })
+    expect(await scan.stampQrScan(SC.snA, t.techA)).toMatchObject({ needsLocation: true })
     await scan.setFirstScanLocation(SC.snA, t.techA, GOOD)
     expect(await location(SC.snA)).toEqual({ lat: 14.6928, lng: -17.4467, location_source: 'first_scan', location_set_by: t.techA })
-    expect(await scan.stampQrScan(SC.snA, t.techA)).toEqual({ needsLocation: false })
+    expect(await scan.stampQrScan(SC.snA, t.techA)).toMatchObject({ needsLocation: false })
   })
 
   it('no pisa una ubicación ya puesta', async () => {
@@ -113,7 +113,7 @@ describe('primer escaneo — ubicación de la máquina', () => {
   it('máquina en el almacén (sin línea abierta) ⇒ ni needsLocation ni ubicación', async () => {
     const serie = 'TEST-GEO-STOCK'
     expect((await admin.from('machines').insert({ numero_serie: serie, marque: 'TESTGEO', modele: 'G1' })).error).toBeNull()
-    expect(await scan.stampQrScan(serie, t.techA)).toEqual({ needsLocation: false })
+    expect(await scan.stampQrScan(serie, t.techA)).toMatchObject({ needsLocation: false })
     await scan.setFirstScanLocation(serie, t.techA, GOOD)
     expect(await location(serie)).toMatchObject({ lat: null, location_source: null })
   })

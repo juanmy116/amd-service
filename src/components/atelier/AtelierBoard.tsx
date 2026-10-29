@@ -10,7 +10,7 @@ import MaintenanceDetail from './MaintenanceDetail'
 import PanneAlert from './PanneAlert'
 import UnattendedBanner from './UnattendedBanner'
 import ResolutionDialog from '@/components/admin/ResolutionDialog'
-import ArchivedToast from './ArchivedToast'
+import KioskToast, { archivedMessage } from './KioskToast'
 import { filterByQuartier, findNewIncidents, unattendedIncidents, waitingLabel, type BoardIncident, type BoardMaintenance } from '@/lib/atelier/board'
 import { assignIncidentAction, assignMaintenanceVisitAction, setIncidentStatusAction } from '@/app/atelier/actions'
 import type { MapViewId } from '@/lib/atelier/mapView'
@@ -28,6 +28,8 @@ type Props = {
   /** Instante del servidor. Se usa como valor inicial del reloj para que el primer pintado
    *  del navegador diga lo mismo que el HTML que llegó (si no, React avisa de desajuste). */
   serverNow: string
+  /** Cuenta que mira la pantalla: lo que crea ella misma no hace sonar la campana. */
+  viewerId: string
 }
 
 /** Cada cuánto se recarga el tablero cuando nadie lo está usando. */
@@ -41,7 +43,7 @@ type Selection =
   | null
 
 export default function AtelierBoard({
-  incidents, maintenances, quartiers, technicians, today, serverNow,
+  incidents, maintenances, quartiers, technicians, today, serverNow, viewerId,
 }: Props) {
   const router = useRouter()
   const [quartierFilter, setQuartierFilter] = useState<QuartierSelection | null>(null)
@@ -56,7 +58,7 @@ export default function AtelierBoard({
   const [resolving, setResolving] = useState<BoardIncident | null>(null)
   const [resolutionError, setResolutionError] = useState<string | null>(null)
   // La avería archivada sale del tablero (solo muestra las vivas): hay que confirmar que se
-  // ha hecho, o parecerá que el botón no hizo nada (ver ArchivedToast).
+  // ha hecho, o parecerá que el botón no hizo nada (ver KioskToast).
   const [archived, setArchived] = useState<{ numero: string | null; at: number }>({ numero: null, at: 0 })
   const [now, setNow] = useState(() => new Date(serverNow))
 
@@ -86,12 +88,12 @@ export default function AtelierBoard({
 
   // Averías nuevas desde el último refresco → campana + cartel (ver NewIncidentAlert).
   useEffect(() => {
-    const nuevas = findNewIncidents(incidents, knownIds.current)
+    const nuevas = findNewIncidents(incidents, knownIds.current, viewerId)
     knownIds.current = new Set(incidents.map((i) => i.id))
     if (nuevas.length === 0) return
     // `at` fuerza un cambio de estado aunque entren dos veces seguidas el mismo número de avisos.
     setAlert({ count: nuevas.length, numero: nuevas[nuevas.length - 1]!.numeroIncident, at: Date.now() })
-  }, [incidents])
+  }, [incidents, viewerId])
 
   // El reloj de las tarjetas («il y a 40 min») se refresca cada minuto sin tocar el servidor.
   useEffect(() => {
@@ -233,7 +235,7 @@ export default function AtelierBoard({
         }}
       />
 
-      <ArchivedToast numero={archived.numero} at={archived.at} />
+      <KioskToast message={archivedMessage(archived.numero)} at={archived.at} />
     </>
   )
 }

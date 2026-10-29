@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { INCIDENT_CATEGORIES, INCIDENT_PRIORITIES, parseEnum } from '@/lib/enums'
+import { PORTAL_INCIDENT_CATEGORIES, INCIDENT_PRIORITIES, parseEnum } from '@/lib/enums'
 import { createIncidentPhotoUploadUrl, incidentPhotoExists, type PrepareUploadResult } from '@/lib/incidentPhotoUpload'
 import { isIncidentPhotoPathFor } from '@/lib/incidentPhotos'
 import { redirect } from 'next/navigation'
@@ -37,7 +37,7 @@ export async function createPortalIncidentAction(
   if (!title) return { error: 'Le titre est obligatoire.' }
   if (!contract_machine_id) return { error: 'Veuillez sélectionner une machine.' }
 
-  const category = parseEnum(formData.get('category'), INCIDENT_CATEGORIES)
+  const category = parseEnum(formData.get('category'), PORTAL_INCIDENT_CATEGORIES)
   const priority = parseEnum(formData.get('priority'), INCIDENT_PRIORITIES)
   if (!category) return { error: 'Catégorie invalide.' }
   if (!priority) return { error: 'Priorité invalide.' }

@@ -31,6 +31,7 @@ const inc = (over: Partial<BoardIncident>): BoardIncident => ({
   technicianId: null,
   technicianName: null,
   photoUrl: null,
+  openedBy: null,
   ...over,
 })
 
@@ -211,23 +212,30 @@ describe('LIVE_STATUSES', () => {
 })
 
 describe('findNewIncidents', () => {
+  const KIOSK = 'kiosk-uid'
   const a = inc({ id: 'a' })
   const b = inc({ id: 'b' })
 
   it('en la primera carga no hay nada nuevo: el kiosko no debe sonar al encenderse', () => {
-    expect(findNewIncidents([a, b], null)).toEqual([])
+    expect(findNewIncidents([a, b], null, KIOSK)).toEqual([])
   })
 
   it('detecta la que no estaba en el refresco anterior', () => {
-    expect(findNewIncidents([a, b], new Set(['a'])).map((i) => i.id)).toEqual(['b'])
+    expect(findNewIncidents([a, b], new Set(['a']), KIOSK).map((i) => i.id)).toEqual(['b'])
   })
 
   it('sin novedades devuelve lista vacía', () => {
-    expect(findNewIncidents([a, b], new Set(['a', 'b']))).toEqual([])
+    expect(findNewIncidents([a, b], new Set(['a', 'b']), KIOSK)).toEqual([])
   })
 
   it('que desaparezca una (resuelta) no cuenta como novedad', () => {
-    expect(findNewIncidents([a], new Set(['a', 'b']))).toEqual([])
+    expect(findNewIncidents([a], new Set(['a', 'b']), KIOSK)).toEqual([])
+  })
+
+  it('la que crea el propio kiosko (burbuja «+») no suena; la de otro sí', () => {
+    const delKiosko = inc({ id: 'k', openedBy: KIOSK })
+    const delTecnico = inc({ id: 't', openedBy: 'tech-uid' })
+    expect(findNewIncidents([a, delKiosko, delTecnico], new Set(['a']), KIOSK).map((i) => i.id)).toEqual(['t'])
   })
 })
 

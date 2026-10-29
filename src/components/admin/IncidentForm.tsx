@@ -52,10 +52,11 @@ type Props = {
 }
 
 const CATEGORY_OPTIONS = [
-  { value: 'panne',       label: 'Panne' },
-  { value: 'maintenance', label: 'Maintenance' },
-  { value: 'consommable', label: 'Consommable' },
-  { value: 'autre',       label: 'Autre' },
+  { value: 'panne',        label: 'Panne' },
+  { value: 'maintenance',  label: 'Maintenance' },
+  { value: 'consommable',  label: 'Consommable' },
+  { value: 'recuperation', label: 'Récupération' },
+  { value: 'autre',        label: 'Autre' },
 ]
 
 const PRIORITY_OPTIONS = [

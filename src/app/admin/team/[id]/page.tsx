@@ -14,7 +14,7 @@ export default async function EditTeamMemberPage({
   const supabaseAdmin = createAdminClient()
 
   const [{ data: profile }, { data: { user } }] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, phone, role').eq('id', id).single(),
+    supabase.from('profiles').select('id, full_name, phone, role, can_create_incidents').eq('id', id).single(),
     supabaseAdmin.auth.admin.getUserById(id),
   ])
 

@@ -20,11 +20,14 @@ export async function updateMemberAction(
   const role = parseEnum(formData.get('role'), STAFF_ROLES)
   if (!role) return { error: 'Rôle invalide.' }
 
+  // Solo tiene sentido para un técnico: un admin ya crea averías desde /admin.
+  const can_create_incidents = role === 'technician' && formData.get('can_create_incidents') === 'on'
+
   const supabaseAdmin = createAdminClient()
 
   const { error } = await supabaseAdmin
     .from('profiles')
-    .update({ full_name, phone, role })
+    .update({ full_name, phone, role, can_create_incidents })
     .eq('id', id)
 
   if (error) {

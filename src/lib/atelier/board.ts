@@ -28,6 +28,8 @@ export type BoardIncident = {
   technicianId: string | null
   technicianName: string | null
   photoUrl: string | null
+  /** Quién la abrió (null: QR público, Princity). Con él, la TV no suena por lo que crea ella misma. */
+  openedBy: string | null
 }
 
 export type BoardMaintenance = {
@@ -208,11 +210,15 @@ export function unattendedIncidents(incidents: BoardIncident[]): BoardIncident[]
  *
  * `known === null` significa «primera carga»: ahí no hay nada nuevo que anunciar, o el
  * kiosko sonaría al encenderse y cada vez que alguien abriera la pantalla.
+ *
+ * Lo que abrió la propia cuenta que mira la pantalla (`viewerId`, la burbuja «+» del kiosko)
+ * tampoco se anuncia: quien la acaba de crear ya lo sabe.
  */
 export function findNewIncidents(
   incidents: BoardIncident[],
-  known: Set<string> | null
+  known: Set<string> | null,
+  viewerId: string,
 ): BoardIncident[] {
   if (known === null) return []
-  return incidents.filter((i) => !known.has(i.id))
+  return incidents.filter((i) => !known.has(i.id) && i.openedBy !== viewerId)
 }
