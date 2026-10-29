@@ -10,8 +10,8 @@ import { sendCsatForIncident } from '@/lib/csat.server'
 import { PARTS } from '@/lib/parts'
 import { computePresence } from '@/lib/presence.server'
 import { readPosition } from '@/lib/geo'
-import { getCloseGate } from '@/lib/scan.server'
-import { CLOSE_SCAN_ERROR, START_SCAN_ERROR, requiresScan } from '@/lib/scanGate'
+import { getCloseGate, stampQrScan } from '@/lib/scan.server'
+import { CLOSE_SCAN_ERROR, START_SCAN_ERROR, WRONG_MACHINE_ERROR, requiresScan, sameMachine } from '@/lib/scanGate'
 import { archivedResolutionNote, buildResolution, clearResolution, historyComment, reopens } from '@/lib/resolution'
 
 type FormState = { error: string } | null
@@ -35,6 +35,36 @@ async function incidentSerie(
     if (data?.machine_id) return data.machine_id
   }
   return incident.machine_id
+}
+
+/**
+ * Empezar la intervención escaneando desde la ficha: el técnico escanea el QR de la máquina con
+ * la cámara de la propia página. Tiene la misma credibilidad que `recordQrScanAction` (el serie
+ * sale de leer la etiqueta), pero aquí además debe ser la máquina de ESTA avería: si no, no se
+ * sella nada. Se sella con el serie de la BD (no con el texto escaneado) para que coincida
+ * exactamente con `machines.numero_serie` aunque cambien las mayúsculas.
+ */
+export async function startInterventionScanAction(
+  incidentId: string,
+  rawSerie: string,
+): Promise<{ error: string } | { needsLocation: boolean }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: incident } = await supabase
+    .from('incidents')
+    .select('assigned_to, contract_machine_id, machine_id')
+    .eq('id', incidentId)
+    .single()
+  if (!incident) return { error: 'Incident introuvable.' }
+  if (incident.assigned_to !== user.id) return { error: 'Non autorisé.' }
+
+  const serie = await incidentSerie(supabase, incident)
+  if (!serie || !sameMachine(rawSerie, serie)) return { error: WRONG_MACHINE_ERROR }
+
+  const stamp = await stampQrScan(serie, user.id)
+  return { needsLocation: stamp.needsLocation }
 }
 
 export async function submitInterventionAction(
@@ -62,6 +92,18 @@ export async function submitInterventionAction(
   // abierta hace rato manda el estado de entonces, y con él se decidían el historial, el
   // `resolved_at` y el envío de la encuesta.
   const old_status = incident.status
+
+  // Cierre escaneando desde la ficha: si llega `scan_serie`, el QR debe ser el de la máquina de
+  // esta avería (se rechaza ANTES de escribir nada) y se sella aquí, para que la comprobación del
+  // doble escaneo de abajo ya vea este escaneo. El serie se calcula una sola vez por petición y se
+  // reutiliza en `computePresence`; sin `scan_serie` se calcula donde hacía falta (al resolver).
+  let serie: string | null | undefined
+  const scanSerie = formData.get('scan_serie')
+  if (typeof scanSerie === 'string' && scanSerie.trim() && new_status === 'résolu') {
+    serie = await incidentSerie(supabase, incident)
+    if (!serie || !sameMachine(scanSerie, serie)) return { error: WRONG_MACHINE_ERROR }
+    await stampQrScan(serie, user.id)
+  }
 
   // Doble escaneo: el técnico de campo empieza escaneando el QR de la máquina y solo puede
   // cerrar si ha escaneado otra vez (ventana de 1 h). Se rechaza ANTES de escribir nada (ni
@@ -163,7 +205,7 @@ export async function submitInterventionAction(
   if (new_status === 'résolu' && old_status !== 'résolu') {
     const presence = await computePresence({
       entityType: 'incident', entityId: id, techId: user.id,
-      numeroSerie: await incidentSerie(supabase, incident), position: readPosition(formData),
+      numeroSerie: serie !== undefined ? serie : await incidentSerie(supabase, incident), position: readPosition(formData),
     })
     const { error: presenceError } = await createAdminClient()
       .from('field_presence')
