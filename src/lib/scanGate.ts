@@ -111,19 +111,29 @@ export function sameMachine(scanned: string, expected: string | null): boolean {
 }
 
 /**
- * ¿Está la intervención empezada? `résolu` siempre (ya pasó por ahí). En los demás estados hace falta
- * un escaneo Y que la avería haya salido de `nouveau`/`assigné`: un escaneo anterior a la asignación
- * no es «empezar», y una avería puesta `en_cours` por la oficina sin escaneo tampoco.
+ * ¿Está la intervención empezada? `résolu` y `fermé` siempre (ya pasó por ahí; `fermé` es el final
+ * normal, tras la encuesta o al cerrarla la oficina, y sus escaneos son anteriores a `resolved_at`,
+ * así que `closeGate` no los ve). En los demás estados hace falta un escaneo Y que la avería haya
+ * salido de `nouveau`/`assigné`: un escaneo anterior a la asignación no es «empezar», y una avería
+ * puesta `en_cours` por la oficina sin escaneo tampoco.
  */
 export function interventionStarted(status: string, firstScanAt: Date | null): boolean {
-  return status === 'résolu' || (!['nouveau', 'assigné'].includes(status) && firstScanAt !== null)
+  return ['résolu', 'fermé'].includes(status) || (!['nouveau', 'assigné'].includes(status) && firstScanAt !== null)
 }
+
+/**
+ * Margen que se suma a la espera de la ficha: la cuenta atrás corre con el reloj del móvil contra
+ * una hora de la BD, y un móvil adelantado unos segundos escanearía aún dentro de los
+ * SCAN_DEDUPE_SECONDS del servidor (el escaneo se descartaría como rebote).
+ */
+export const CLOCK_SKEW_MARGIN_SECONDS = 3
 
 /**
  * Qué debe hacer el técnico para cerrar, derivado de `closeGate` para que la ficha no recalcule:
  * - `confirm`: el 2º escaneo ya está hecho y vigente; se cierra sin escanear;
- * - `wait`: escanear ahora sería un rebote (se descartaría); esperar hasta `from`;
- * - `scan`: escanear ahora cierra.
+ * - `wait`: escanear ahora sería un rebote (se descartaría); esperar hasta `from`
+ *   (`nextScanAfter` + CLOCK_SKEW_MARGIN_SECONDS);
+ * - `scan`: escanear ahora cierra (también si la ventana del `confirm` ya pasó con la ficha abierta).
  */
 export type CloseAction =
   | { kind: 'confirm'; until: Date }
@@ -131,9 +141,14 @@ export type CloseAction =
   | { kind: 'wait'; from: Date }
 
 export function closeAction(gate: CloseGate, now: Date = new Date()): CloseAction {
-  if (gate.canClose && gate.closeUntil) return { kind: 'confirm', until: gate.closeUntil }
-  if (gate.nextScanAfter && gate.nextScanAfter.getTime() > now.getTime()) {
-    return { kind: 'wait', from: gate.nextScanAfter }
+  // `canClose` se calculó al cargar la ficha: si la hora de cierre ya pasó, ofrecer confirmar
+  // acabaría en rechazo del servidor.
+  if (gate.canClose && gate.closeUntil && gate.closeUntil.getTime() > now.getTime()) {
+    return { kind: 'confirm', until: gate.closeUntil }
+  }
+  if (gate.nextScanAfter) {
+    const from = new Date(gate.nextScanAfter.getTime() + CLOCK_SKEW_MARGIN_SECONDS * 1000)
+    if (from.getTime() > now.getTime()) return { kind: 'wait', from }
   }
   return { kind: 'scan' }
 }

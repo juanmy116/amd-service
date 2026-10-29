@@ -165,4 +165,16 @@ test('cierre con la ventana vencida: error, escanear de nuevo y el informe tecle
   await expect.poll(() => page.evaluate(
     (id) => Object.keys(sessionStorage).filter((k) => k.includes(id)).length, ids.incidentId,
   )).toBe(0)
+
+  // La encuesta (o la oficina) la pasa a `fermé`, el final normal: la ficha la da por cerrada,
+  // enseña el informe sin dejar editarlo y no pide escanear para empezar.
+  const { error: e3 } = await admin.from('incidents')
+    .update({ status: 'fermé', closed_at: new Date().toISOString() }).eq('id', ids.incidentId)
+  if (e3) throw new Error(`cerrar incidente: ${e3.message}`)
+  await page.goto(`/tech/incidents/${ids.incidentId}`)
+  await expect(page.getByText('Intervention clôturée.')).toBeVisible()
+  await expect(page.locator('textarea[name="rapport"]')).toHaveValue(texto)
+  await expect(page.locator('textarea[name="rapport"]')).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Scanner pour démarrer' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Enregistrer/ })).toHaveCount(0)
 })

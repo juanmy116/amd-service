@@ -1,6 +1,6 @@
 'use client'
 
-import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { startTransition, useActionState, useEffect, useRef, useState, useTransition, type FormEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2, MapPin, Building2, FileText } from 'lucide-react'
@@ -27,10 +27,10 @@ const STATUS_OPTIONS = [
 ]
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
-  nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success',
+  nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success', fermé: 'neutral',
 }
 const STATUS_LABEL: Record<string, string> = {
-  nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu',
+  nouveau: 'Nouveau', assigné: 'Assigné', en_cours: 'En cours', résolu: 'Résolu', fermé: 'Fermé',
 }
 
 // Borrador del informe por avería, en sessionStorage. Los escaneos ya se hacen sobre la propia
@@ -139,8 +139,13 @@ export default function InterventionForm({
       : incident.status === 'en_cours' || incident.status === 'assigné' ? 'en_cours'
       : ''
   )
+  // Modo 3 pasos: `résolu` y `fermé` ya están cerradas (`fermé` es el final normal: tras la
+  // encuesta o al cerrarla la oficina). `résolu` aún deja corregir el informe; `fermé` solo se
+  // consulta: el servidor rechazaría guardarla (`START_SCAN_ERROR` o «Statut invalide.»).
+  const closed = ['résolu', 'fermé'].includes(incident.status)
+  const readOnly = mustScan && incident.status === 'fermé'
   const resolving = mustScan ? incident.status === 'résolu' : status === 'résolu'
-  const reportRequired = mustScan || resolving
+  const reportRequired = (mustScan && !readOnly) || resolving
 
   // Controlado a propósito: si el servidor rechaza el cierre (ventana de 1 h vencida), el
   // informe tecleado no debe perderse; un campo no controlado puede vaciarse al completarse
@@ -150,12 +155,14 @@ export default function InterventionForm({
 
   // Borrador: se restaura al montar (no en el estado inicial: el servidor no ve sessionStorage y
   // la hidratación no casaría).
+  // En una avería `fermé` se enseña lo guardado en la BD, nunca un borrador que ya no se enviará.
   useEffect(() => {
+    if (readOnly) return
     const draft = readDraft(incident.id)
     if (!draft) return
     setRapport(draft.rapport)
     setAutresPieces(draft.autres_pieces)
-  }, [incident.id])
+  }, [incident.id, readOnly])
 
   function updateDraft(next: Partial<Draft>) {
     writeDraft(incident.id, { rapport, autres_pieces: autresPieces, ...next })
@@ -169,8 +176,10 @@ export default function InterventionForm({
 
   // El servidor rechazó el cierre por el escaneo (p. ej. la ventana de 1 h venció con la ficha
   // abierta): la ficha no se recarga, así que el candado de la carga ya no vale. Se pide escanear
-  // de nuevo en vez de mostrar una hora de cierre ya pasada.
-  const closeRejected = state?.error === CLOSE_SCAN_ERROR
+  // de nuevo en vez de mostrar una hora de cierre ya pasada. Queda fijado hasta recargar: un error
+  // posterior (p. ej. otra máquina en el nuevo escaneo) no debe devolver el `confirm` caducado.
+  const [closeRejected, setCloseRejected] = useState(false)
+  if (state?.error === CLOSE_SCAN_ERROR && !closeRejected) setCloseRejected(true)
 
   // ── Modo 3 pasos ────────────────────────────────────────────────────────────────────────────
   const gate: CloseGate = {
@@ -202,6 +211,9 @@ export default function InterventionForm({
   // Hoja de escaneo a pantalla completa sobre la ficha (sin navegar: lo tecleado sigue ahí).
   const [sheet, setSheet] = useState<null | 'start' | 'close'>(null)
   const [sheetBusy, setSheetBusy] = useState(false)
+  // Recarga tras el escaneo de inicio: la hoja (con «QR détecté — enregistrement…») sigue abierta
+  // hasta que llega la ficha nueva, para no enseñar «Scanner pour démarrer» mientras tanto.
+  const [, startRefresh] = useTransition()
   const [startError, setStartError] = useState<string | null>(null)
   // El envío en curso es el cierre (para el spinner); el de «guardar» lo pone a false.
   const [closing, setClosing] = useState(false)
@@ -239,8 +251,11 @@ export default function InterventionForm({
         console.error('[intervention] ubicación de la máquina', err)
       }
     }
-    setSheet(null)
-    router.refresh()
+    // Dentro de la transición, cerrar la hoja se pinta a la vez que la ficha recargada.
+    startRefresh(() => {
+      setSheet(null)
+      router.refresh()
+    })
   }
 
   // Cerrar: con el QR recién escaneado (`scanSerie`, el servidor lo comprueba y sella antes del
@@ -269,11 +284,13 @@ export default function InterventionForm({
           Rapport d&apos;intervention
           {reportRequired && <span className="text-accent"> *</span>}
         </p>
-        <p className="text-xs text-ink-muted mb-3">
-          {reportRequired
-            ? 'Obligatoire pour résoudre : sans rapport, personne ne saura ce qui a été fait.'
-            : 'Décrivez ce que vous avez fait sur la machine.'}
-        </p>
+        {!readOnly && (
+          <p className="text-xs text-ink-muted mb-3">
+            {!reportRequired ? 'Décrivez ce que vous avez fait sur la machine.'
+              : mustScan ? 'Obligatoire pour clôturer : sans rapport, personne ne saura ce qui a été fait.'
+              : 'Obligatoire pour résoudre : sans rapport, personne ne saura ce qui a été fait.'}
+          </p>
+        )}
         <textarea
           name="rapport"
           rows={4}
@@ -413,21 +430,28 @@ export default function InterventionForm({
             // Envío normal (R1): guarda el informe sin cerrar, con el estado de la avería en el campo
             // oculto y sin posición. Cerrar pasa siempre por `close()`.
             <form ref={formRef} action={formAction} onSubmit={() => { clearDraft(incident.id); setClosing(false) }} className="space-y-5">
-              <input type="hidden" name="status" value={incident.status === 'résolu' ? 'résolu' : 'en_cours'} />
+              <input type="hidden" name="status" value={closed ? 'résolu' : 'en_cours'} />
 
               <StepSection title="2. Réparer et écrire le rapport">
-                {fields}
-                <button type="submit" disabled={pending || locating} className={SECONDARY_BUTTON}>
-                  {pending && !closing && <Loader2 size={16} className="animate-spin" />}
-                  {incident.status === 'résolu' ? 'Enregistrer le rapport' : 'Enregistrer sans clôturer'}
-                </button>
-                {incident.status !== 'résolu' && (
-                  <p className="text-xs text-ink-muted text-center">L&apos;intervention reste en cours, le rapport est gardé.</p>
+                {readOnly ? (
+                  // Solo lectura: los campos se ven tal cual pero desactivados, y sin botón de guardar.
+                  <fieldset disabled className="space-y-3 min-w-0">{fields}</fieldset>
+                ) : (
+                  <>
+                    {fields}
+                    <button type="submit" disabled={pending || locating} className={SECONDARY_BUTTON}>
+                      {pending && !closing && <Loader2 size={16} className="animate-spin" />}
+                      {closed ? 'Enregistrer le rapport' : 'Enregistrer sans clôturer'}
+                    </button>
+                    {!closed && (
+                      <p className="text-xs text-ink-muted text-center">L&apos;intervention reste en cours, le rapport est gardé.</p>
+                    )}
+                  </>
                 )}
               </StepSection>
 
               <CloseStep
-                closed={incident.status === 'résolu'}
+                closed={closed}
                 action={action}
                 now={now}
                 hasRapport={rapport.trim() !== ''}

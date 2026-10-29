@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   CLOSE_SCAN_WINDOW_MINUTES, SCAN_DEDUPE_SECONDS, closeGate, requiresScan,
-  sameMachine, interventionStarted, closeAction, scanDestination,
+  sameMachine, interventionStarted, closeAction, scanDestination, CLOCK_SKEW_MARGIN_SECONDS,
 } from './scanGate'
 
 const NOW = new Date('2026-10-21T12:00:00Z')
@@ -165,6 +165,9 @@ describe('interventionStarted', () => {
   it('resuelta cuenta como empezada aunque no haya escaneo', () => {
     expect(interventionStarted('résolu', null)).toBe(true)
   })
+  it('cerrada (fermé) cuenta como empezada aunque closeGate no vea escaneos', () => {
+    expect(interventionStarted('fermé', null)).toBe(true)
+  })
 })
 
 describe('closeAction', () => {
@@ -174,11 +177,29 @@ describe('closeAction', () => {
       kind: 'confirm', until: new Date(last.getTime() + 60 * 60_000),
     })
   })
-  it('un escaneo hace 20 s: esperar hasta escaneo + 60 s', () => {
+  it('margen por desfase de reloj: 3 s', () => {
+    expect(CLOCK_SKEW_MARGIN_SECONDS).toBe(3)
+  })
+  it('un escaneo hace 20 s: esperar hasta escaneo + 60 s + margen', () => {
     const scan = new Date(NOW.getTime() - 20_000)
     expect(closeAction(closeGate([scan], null, NOW), NOW)).toEqual({
-      kind: 'wait', from: new Date(scan.getTime() + 60_000),
+      kind: 'wait', from: new Date(scan.getTime() + 63_000),
     })
+  })
+  it('1 s después de nextScanAfter: todavía esperar (dentro del margen)', () => {
+    const scan = new Date(NOW.getTime() - 61_000)
+    expect(closeAction(closeGate([scan], null, NOW), NOW)).toEqual({
+      kind: 'wait', from: new Date(scan.getTime() + 63_000),
+    })
+  })
+  it('pasado el margen: escanear', () => {
+    const scan = new Date(NOW.getTime() - 63_000)
+    expect(closeAction(closeGate([scan], null, NOW), NOW)).toEqual({ kind: 'scan' })
+  })
+  it('canClose de la carga pero la hora de cierre ya pasó (ficha abierta): escanear', () => {
+    const gate = closeGate([minAgo(30), minAgo(5)], null, NOW)
+    expect(gate.canClose).toBe(true)
+    expect(closeAction(gate, new Date(gate.closeUntil!.getTime() + 1000))).toEqual({ kind: 'scan' })
   })
   it('un escaneo hace 5 min: escanear', () => {
     expect(closeAction(closeGate([minAgo(5)], null, NOW), NOW)).toEqual({ kind: 'scan' })

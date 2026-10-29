@@ -87,7 +87,7 @@ export function StartStep({ started, firstScanAt, error, onScan }: {
 }
 
 export function CloseStep({ closed, action, now, hasRapport, error, busy, spinning, locating, onScan, onConfirm }: {
-  /** Avería ya `résolu`: no queda nada que cerrar. */
+  /** Avería ya `résolu` o `fermé`: no queda nada que cerrar. */
   closed: boolean
   action: CloseAction
   now: Date
