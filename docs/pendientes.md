@@ -11,11 +11,9 @@
 > **2026-10-29:** la **ficha de avería del técnico de campo va en 3 pasos** (1. Démarrer → 2. Rapport →
 > 3. Clôturer): se escanea el QR desde una hoja a pantalla completa sobre la propia ficha, ya no hay
 > radios «En cours / Résolu» y el botón flotante del escáner se oculta en esa ficha. Sin cambios de BD.
-> Pendiente probar en el iPhone tras publicar (lista en `.superpowers/sdd/2026-10-29-pasos-escaneo-tecnicos/task-5-brief.md`).
+> Pendiente probar en el iPhone tras publicar (lista en `docs/superpowers/plans/2026-10-29-pasos-escaneo-tecnicos.md`, §«Prueba en el iPhone tras publicar»).
 > Cabos sueltos que dejó la revisión, todos menores:
-> - Margen de unos segundos al final de la cuenta atrás: el reloj del móvil puede ir desfasado respecto a los 60 s del servidor.
 > - El escaneo de inicio no tiene tiempo máximo en el cliente (si la red se cuelga, la hoja espera).
-> - El texto «Obligatoire pour résoudre» del informe no encaja del todo en el modo 3 pasos (allí se exige para cerrar).
 > - El mensaje de «sin conexión» está duplicado entre la ficha de avería y la ficha de máquina.
 
 > **2026-10-27:** contrato **AXA `064-007`** creado en prod con 18 máquinas, cotejadas con la lista

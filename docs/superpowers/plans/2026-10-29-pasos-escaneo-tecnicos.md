@@ -240,6 +240,7 @@ Con la cuenta y la máquina de prueba, tarde-noche:
 4. `Scanner pour clôturer` → escanear → avería resuelta, vuelta a `/tech`.
 5. Botón flotante desde `/tech` sobre una máquina con una avería propia → abre esa avería con `Scan enregistré.`
 6. Atelier: su formulario sigue igual.
+7. Desde la lista de averías, abrir una cerrada (`fermé`) → paso 3 `Intervention clôturée.`, el informe visible (sin poder editarlo) y sin pedir escanear.
 
 ## Mensaje para los técnicos (WhatsApp, tras publicar)
 
