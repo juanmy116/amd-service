@@ -15,6 +15,11 @@
 > Cabos sueltos que dejó la revisión, todos menores:
 > - El escaneo de inicio no tiene tiempo máximo en el cliente (si la red se cuelga, la hoja espera).
 > - El mensaje de «sin conexión» está duplicado entre la ficha de avería y la ficha de máquina.
+> - **E2E en local, solo valen una vez:** `facturation.spec` emite una factura como `admin@e2e.test`
+>   y las facturas no se pueden borrar (`invoices_issued_by_fkey`), así que la limpieza no puede
+>   quitar ese usuario y la siguiente ejecución falla al crearlo («already registered»). Hoy hay que
+>   hacer `supabase db reset` (local) entre ejecuciones; el CI no lo nota porque arranca de cero.
+>   Arreglo: que `global-setup` reutilice el usuario si ya existe, o que el cleanup no dependa de borrarlo.
 
 > **2026-10-27:** contrato **AXA `064-007`** creado en prod con 18 máquinas, cotejadas con la lista
 > del cliente (`AXA ASSURANCE 2026-09.xlsx`): modelos Ricoh corregidos, ubicaciones nuevas, 6 altas y
