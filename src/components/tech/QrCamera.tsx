@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { BrowserMultiFormatReader } from '@zxing/browser'
+import { BrowserMultiFormatReader, type IScannerControls } from '@zxing/browser'
 import { Camera, AlertCircle } from 'lucide-react'
 import { extractSerie } from '@/lib/qr'
 
@@ -14,27 +14,37 @@ export default function QrCamera({ onDecode, overlay }: { onDecode: (serie: stri
   const onDecodeRef = useRef(onDecode)
   const [error, setError] = useState<string | null>(null)
 
-  // Siempre el callback último, sin reiniciar la cámara si el padre se re-renderiza.
-  useEffect(() => { onDecodeRef.current = onDecode }, [onDecode])
+  // Siempre el callback último, sin reiniciar la cámara si el padre se re-renderiza. Se asigna
+  // en el render (no en un efecto) para que nunca haya una lectura con el callback viejo.
+  onDecodeRef.current = onDecode
 
   useEffect(() => {
     const reader = new BrowserMultiFormatReader()
+    // Si la hoja se cierra antes de que el navegador conceda la cámara, el stream llega cuando
+    // el cleanup ya pasó y `releaseAllStreams` no lo conoce: se para en cuanto llega los controles.
+    let cancelled = false
+    let controls: IScannerControls | null = null
 
     reader.decodeFromVideoDevice(undefined, videoRef.current!, (result) => {
-      if (result && !scannedRef.current) {
-        scannedRef.current = true
+      if (cancelled || !result || scannedRef.current) return
+      scannedRef.current = true
 
-        // Detener la cámara ANTES de seguir: libera el stream y evita que la
-        // transición de cliente quede en blanco.
-        try { BrowserMultiFormatReader.releaseAllStreams() } catch { /* noop */ }
+      // Detener lectura y cámara ANTES de seguir: libera el stream, corta el bucle de
+      // decodificación y evita que la transición de cliente quede en blanco.
+      try { controls?.stop() } catch { /* noop */ }
+      try { BrowserMultiFormatReader.releaseAllStreams() } catch { /* noop */ }
 
-        onDecodeRef.current(extractSerie(result.getText()))
-      }
+      onDecodeRef.current(extractSerie(result.getText()))
+    }).then((c) => {
+      if (cancelled) c.stop()
+      else controls = c
     }).catch(() => {
-      setError('Impossible d\'accéder à la caméra. Vérifiez les permissions.')
+      if (!cancelled) setError('Impossible d\'accéder à la caméra. Vérifiez les permissions.')
     })
 
     return () => {
+      cancelled = true
+      try { controls?.stop() } catch { /* noop */ }
       BrowserMultiFormatReader.releaseAllStreams()
     }
   }, [])
