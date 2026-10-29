@@ -21,7 +21,7 @@ export default function ScanSheet({ title, overlay, onDecode, onCancel }: {
       <button
         type="button"
         onClick={onCancel}
-        className="mt-4 w-full max-w-lg mx-auto py-3 rounded-full border border-gray-300 text-sm font-semibold"
+        className="mt-4 w-full max-w-lg mx-auto py-3 rounded-full border border-gray-300 text-sm font-semibold text-ink"
       >
         Annuler
       </button>
