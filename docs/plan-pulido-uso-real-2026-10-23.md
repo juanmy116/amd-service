@@ -83,7 +83,7 @@
   máquinas; preguntarle si aplica igual a los clientes.
 
 ## Tanda 6 — Punto 8 · Técnicos que crean incidencias (BD + permisos)
-> **2026-10-29: hecha en el PR #213** (sin publicar), ampliada al kiosko (burbuja «+» para pannes y
+> **En prod el 2026-10-30** (PR #213, merge `4ff6f69`), ampliada al kiosko (burbuja «+» para pannes y
 > recogidas). Plan: `docs/superpowers/plans/2026-10-29-tecnicos-atelier-crean-averias.md`.
 - Hoy no existe: sin política INSERT de técnicos en `incidents`; `/tech/scan/[serie]` sin botón.
 - Hacer: flag `profiles.can_create_incidents` (precedente `is_dispatcher` / `can_bill`, protegido por el trigger de `20260610100000_secure_profiles_role.sql`), interruptor en `/admin/team`.
