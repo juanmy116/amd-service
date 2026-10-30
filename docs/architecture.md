@@ -1062,7 +1062,8 @@ Kiosko (admin o is_dispatcher) → burbuja «+» → ventana Panne | Récupérat
   regla XOR que el QR (línea abierta ⇒ `contract_machine_id`; almacén ⇒ `machine_id`) y una línea de
   `incident_history`. Lo puro (títulos, motivos, validación) en `src/lib/staffIncident.ts`.
 - **Recogida** = avería con categoría `recuperation`: exige contrato, motivo en el título («Récupération
-  (Fin de contrat) — …»). Sigue el flujo normal (asignación, push, doble escaneo, informe). **No** saca
+  (Fin de contrat) — …»). Sigue el flujo normal (asignación, push, doble escaneo, informe), salvo la
+  **encuesta**: `sendCsatForIncident` la archiva sin mandarla (no se pide puntuar una recogida). **No** saca
   la máquina del contrato: eso sigue siendo «Remplacer» / «Hors service».
 - El técnico no ve la avería que declara hasta que se la asignen (RLS normal de técnicos).
 - El portal del cliente no ofrece `recuperation` (`PORTAL_INCIDENT_CATEGORIES`).

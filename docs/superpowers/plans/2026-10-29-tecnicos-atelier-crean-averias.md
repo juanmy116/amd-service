@@ -27,7 +27,8 @@ ampliación al Atelier que pidió el usuario el 2026-10-29.
 - El técnico solo declara **pannes** (no recogidas).
 - **La campana no suena** por lo que crea el propio kiosko (pedido por el usuario el 2026-10-29); sí por lo
   que declaran los técnicos.
-- La avería creada así no tiene email de contacto → no sale encuesta CSAT (igual que las de `/admin`).
+- Encuesta CSAT: una **panne** creada así la recibe en el email del portal del cliente si lo tiene (igual que
+  las de `/admin`). Una **recogida nunca**: al resolverse se archiva sin encuesta (revisión del PR #213).
 
 ## Base de datos (tipo B — una migración, compatible con la app publicada)
 

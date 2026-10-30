@@ -114,20 +114,33 @@ export async function listAtelierMachinesAction(): Promise<AtelierMachineOption[
   if (!actor) return { error: 'Non autorisé' }
 
   const admin = createAdminClient()
-  const { data: park, error } = await admin
-    .from('v_machine_park')
-    .select('numero_serie, marque, modele, client_id, open_line_id')
-    .eq('active', true)
-    .order('numero_serie')
-  if (error) return { error: 'Impossible de charger les machines.' }
 
-  const clientIds = [...new Set((park ?? []).map((m) => m.client_id).filter((id): id is number => id !== null))]
-  const { data: clients } = clientIds.length > 0
-    ? await admin.from('clients').select('id, nom_client').in('id', clientIds)
-    : { data: [] }
-  const clientName = new Map((clients ?? []).map((c) => [c.id, c.nom_client]))
+  // PostgREST corta cada respuesta en 1000 filas (`max_rows`): se pide por páginas para que,
+  // con el parque completo cargado, las últimas series no desaparezcan del buscador sin avisar.
+  const PAGE = 1000
+  const park: { numero_serie: string | null; marque: string | null; modele: string | null; client_id: number | null; open_line_id: string | null }[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await admin
+      .from('v_machine_park')
+      .select('numero_serie, marque, modele, client_id, open_line_id')
+      .eq('active', true)
+      .order('numero_serie')
+      .range(from, from + PAGE - 1)
+    if (error) return { error: 'Impossible de charger les machines.' }
+    park.push(...(data ?? []))
+    if (!data || data.length < PAGE) break
+  }
 
-  return (park ?? [])
+  // Todos los clientes y no `.in(ids)`: con cientos de ids la URL de la consulta se haría enorme.
+  const clientName = new Map<number, string>()
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await admin.from('clients').select('id, nom_client').order('id').range(from, from + PAGE - 1)
+    if (error) return { error: 'Impossible de charger les machines.' }
+    for (const c of data ?? []) clientName.set(c.id, c.nom_client)
+    if (!data || data.length < PAGE) break
+  }
+
+  return park
     .filter((m): m is typeof m & { numero_serie: string } => m.numero_serie !== null)
     .map((m) => ({
       serie:      m.numero_serie,

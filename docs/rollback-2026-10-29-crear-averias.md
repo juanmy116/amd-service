@@ -5,7 +5,7 @@
 
 | Qué | Migración |
 |---|---|
-| Valor `recuperation` en el enum `incident_category`; columna `profiles.can_create_incidents`; el trigger `tg_profiles_protect_privileged` protege también esa columna | `20261029100000_staff_create_incidents.sql` |
+| Valor `recuperation` en el enum `incident_category`; columna `profiles.can_create_incidents`; el trigger `tg_profiles_protect_privileged` protege también esa columna y `can_bill` | `20261029100000_staff_create_incidents.sql` |
 
 ## Orden para deshacerlo
 

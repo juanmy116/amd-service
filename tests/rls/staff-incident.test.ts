@@ -6,7 +6,8 @@ import { seedTenants, SC, type Tenants } from './scenario'
 // `src/lib/staffIncident.server.ts`) contra la BD local real:
 // - máquina en contrato ⇒ se cuelga de la línea abierta; en el almacén ⇒ solo `machine_id`;
 // - la recogida exige contrato y entra con la categoría `recuperation`;
-// - con técnico entra `assigné`, sin él `nouveau`; siempre con su línea de historial.
+// - con técnico entra `assigné`, sin él `nouveau`; siempre con su línea de historial;
+// - una recogida resuelta se archiva sin encuesta (`sendCsatForIncident`).
 //
 // `createAdminClient()` lee NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY: se apuntan AQUÍ al
 // Supabase local antes de importar el módulo, para que nunca pueda tocar otra base.
@@ -15,6 +16,7 @@ const admin = adminClient()
 const STOCK = 'TEST-STAFF-STOCK'
 let t: Tenants
 let staff: typeof import('@/lib/staffIncident.server')
+let csat: typeof import('@/lib/csat.server')
 const created: string[] = []
 
 const base = {
@@ -32,6 +34,7 @@ beforeAll(async () => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = URL
   process.env.SUPABASE_SECRET_KEY = SERVICE_KEY
   staff = await import('@/lib/staffIncident.server')
+  csat = await import('@/lib/csat.server')
   await cleanup(admin)
   t = await seedTenants(admin)
   const { error } = await admin.from('machines').insert({ numero_serie: STOCK, marque: 'TESTSTAFF', modele: 'S1' })
@@ -95,6 +98,22 @@ describe('createStaffIncident', () => {
   it('recogida de una máquina del almacén ⇒ error, nada creado', async () => {
     const r = await create({ ...base, serie: STOCK, kind: 'recuperation', reason: 'atelier', openedBy: t.adminUid })
     expect(r).toEqual({ error: "Cette machine n'est dans aucun contrat : rien à récupérer." })
+  })
+
+  it('recogida resuelta por el técnico ⇒ archivada, sin encuesta al cliente', async () => {
+    const r = await create({ ...base, serie: SC.snB, kind: 'recuperation', reason: 'fin_contrat', openedBy: t.adminUid })
+    if (!('id' in r)) throw new Error(r.error)
+    const { error } = await admin.from('incidents').update({
+      status: 'résolu', resolved_via: 'intervention',
+      rapport_intervention: 'Machine récupérée.', resolution_note: 'Machine récupérée.',
+    }).eq('id', r.id)
+    expect(error).toBeNull()
+
+    await csat.sendCsatForIncident(r.id)
+
+    expect((await read(r.id))?.status).toBe('fermé')
+    const { data: survey } = await admin.from('csat_responses').select('id').eq('incident_id', r.id)
+    expect(survey).toEqual([])
   })
 
   it('máquina dada de baja ⇒ error', async () => {

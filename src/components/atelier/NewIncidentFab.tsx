@@ -60,11 +60,16 @@ export default function NewIncidentFab({ technicians }: { technicians: Technicia
     setTechnicianId('')
     setError(null)
     setOpen(true)
-    if (machines) return
+    // Se pide en cada apertura: la TV pasa días sin recargarse y los contratos cambian.
+    setMachines(null)
     setLoadError(null)
-    const result = await listAtelierMachinesAction()
-    if ('error' in result) setLoadError(result.error)
-    else setMachines(result)
+    try {
+      const result = await listAtelierMachinesAction()
+      if ('error' in result) setLoadError(result.error)
+      else setMachines(result)
+    } catch {
+      setLoadError('Impossible de charger les machines. Vérifiez la connexion.')
+    }
   }
 
   function chooseKind(next: StaffIncidentKind) {
@@ -97,15 +102,23 @@ export default function NewIncidentFab({ technicians }: { technicians: Technicia
     if (missing || !selected) return
     setBusy(true)
     setError(null)
-    const result = await createAtelierIncidentAction({
-      serie: selected.serie,
-      kind,
-      reason,
-      description,
-      urgent,
-      technicianId: technicianId || null,
-    })
-    setBusy(false)
+    // Sin red (o con una versión nueva publicada) la acción lanza: sin el try, `busy` se quedaba
+    // en true y la ventana, sin Annuler ni Créer, tapaba la TV hasta recargarla.
+    let result: Awaited<ReturnType<typeof createAtelierIncidentAction>>
+    try {
+      result = await createAtelierIncidentAction({
+        serie: selected.serie,
+        kind,
+        reason,
+        description,
+        urgent,
+        technicianId: technicianId || null,
+      })
+    } catch {
+      result = { error: 'Connexion perdue — réessayez.' }
+    } finally {
+      setBusy(false)
+    }
     if ('error' in result) {
       setError(result.error)
       return
