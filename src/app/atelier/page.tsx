@@ -1,5 +1,6 @@
 import { requireDispatcher } from '@/lib/auth'
 import AtelierHeader from '@/components/atelier/AtelierHeader'
+import NewIncidentFab from '@/components/atelier/NewIncidentFab'
 import AtelierBoard from '@/components/atelier/AtelierBoard'
 import { getBoardData } from './data'
 
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic'
  * La vista kanban (arrastrar y soltar) vive en `/atelier/kanban`.
  */
 export default async function AtelierPage() {
-  await requireDispatcher()
+  const { user } = await requireDispatcher()
 
   const now = new Date()
   const { incidents, maintenances, quartiers, technicians, kpis } = await getBoardData(now)
@@ -25,7 +26,9 @@ export default async function AtelierPage() {
         technicians={technicians}
         today={now.toISOString().slice(0, 10)}
         serverNow={now.toISOString()}
+        viewerId={user.id}
       />
+      <NewIncidentFab technicians={technicians} />
     </div>
   )
 }

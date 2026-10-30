@@ -1,5 +1,6 @@
 import { requireDispatcher } from '@/lib/auth'
 import AtelierHeader from '@/components/atelier/AtelierHeader'
+import NewIncidentFab from '@/components/atelier/NewIncidentFab'
 import AtelierKanban from '@/components/atelier/AtelierKanban'
 import AtelierMaintenanceWeek from '@/components/atelier/AtelierMaintenanceWeek'
 import AutoRefresh from '@/components/atelier/AutoRefresh'
@@ -36,6 +37,7 @@ export default async function AtelierKanbanPage() {
           <AtelierMaintenanceWeek visits={visits} weekDates={weekDates} technicians={technicians} />
         </div>
       </section>
+      <NewIncidentFab technicians={technicians} />
     </div>
   )
 }

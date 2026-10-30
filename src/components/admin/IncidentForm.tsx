@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Loader2, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { RESOLUTION_REASON_LABELS, MIN_NOTE_LENGTH, requiresOfficeResolution } from '@/lib/resolution'
-import { RESOLUTION_REASONS } from '@/lib/enums'
+import { INCIDENT_CATEGORIES, INCIDENT_CATEGORY_LABEL, RESOLUTION_REASONS } from '@/lib/enums'
 import { useSubmitKeepingValues } from '@/lib/useSubmitKeepingValues'
 
 type FormState = { error: string } | null
@@ -51,12 +51,7 @@ type Props = {
   contextInfo?: ContextInfo
 }
 
-const CATEGORY_OPTIONS = [
-  { value: 'panne',       label: 'Panne' },
-  { value: 'maintenance', label: 'Maintenance' },
-  { value: 'consommable', label: 'Consommable' },
-  { value: 'autre',       label: 'Autre' },
-]
+const CATEGORY_OPTIONS = INCIDENT_CATEGORIES.map((value) => ({ value, label: INCIDENT_CATEGORY_LABEL[value] }))
 
 const PRIORITY_OPTIONS = [
   { value: 'basse',   label: 'Basse' },

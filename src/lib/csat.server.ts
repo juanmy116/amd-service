@@ -88,11 +88,18 @@ export async function sendCsatForIncident(incidentId: string): Promise<void> {
 
   const { data: incident } = await admin
     .from('incidents')
-    .select('id, title, numero_incident, contact_name, contact_email, machine_id, contract_machine_id, resolved_via')
+    .select('id, title, numero_incident, contact_name, contact_email, machine_id, contract_machine_id, resolved_via, category')
     .eq('id', incidentId)
     .single()
 
   if (!incident) return
+
+  // Una recogida no es una reparación: preguntarle al cliente «¿qué tal la intervención?» cuando
+  // se le lleva la máquina (fin de contrato incluido) no tiene sentido. Se archiva sin encuesta.
+  if (incident.category === 'recuperation') {
+    await closeAfterSurvey(admin, incidentId, "Fermé automatiquement — récupération, pas d'enquête")
+    return
+  }
 
   // Verrou de résolution: la encuesta pregunta por la INTERVENCIÓN, no por el cierre. Mandarla
   // tras una resolución de oficina —una falsa alerta de Princity, un duplicado, algo resuelto

@@ -18,6 +18,7 @@ import {
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import { updateIncidentStatusAction } from '@/app/admin/incidents/kanban-actions'
+import { INCIDENT_CATEGORY_LABEL } from '@/lib/enums'
 import ResolutionDialog from './ResolutionDialog'
 import { requiresOfficeResolution, OFFICE_RESOLUTION_STATUS, type OfficeResolution } from '@/lib/resolution'
 
@@ -46,9 +47,6 @@ const PRIORITY: Record<string, { label: string; variant: BadgeVariant }> = {
   normale: { label: 'Normale', variant: 'info'    },
   haute:   { label: 'Haute',   variant: 'warning' },
   urgente: { label: 'Urgente', variant: 'danger'  },
-}
-const CATEGORY_LABEL: Record<string, string> = {
-  panne: 'Panne', maintenance: 'Maintenance', consommable: 'Consommable', autre: 'Autre',
 }
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
@@ -105,7 +103,7 @@ function IncidentCard({
             ? <Badge variant={priority.variant}>{priority.label}</Badge>
             : <span className="text-xs text-ink-muted">{incident.priority}</span>}
           <span className="text-xs text-ink-muted truncate">
-            {CATEGORY_LABEL[incident.category] ?? incident.category}
+            {INCIDENT_CATEGORY_LABEL[incident.category] ?? incident.category}
           </span>
         </div>
         {!isOverlay && (

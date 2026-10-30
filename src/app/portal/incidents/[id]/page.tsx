@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
 import IncidentPhotos from '@/components/IncidentPhotos'
+import { INCIDENT_CATEGORY_LABEL } from '@/lib/enums'
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
   nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success', fermé: 'neutral',
@@ -44,6 +45,7 @@ export default async function PortalIncidentDetailPage({
     .select('*')
     .eq('id', id)
     .or('source.is.null,source.neq.public')
+    .neq('category', 'recuperation')   // las recogidas son internas de AMD (decisión 2026-10-30)
     .single()
 
   if (!incident) notFound()
@@ -125,7 +127,7 @@ export default async function PortalIncidentDetailPage({
         <div className="grid grid-cols-3 gap-4 pt-2 border-t border-line-subtle">
           <div>
             <p className="text-xs font-medium text-ink-muted mb-1">Catégorie</p>
-            <p className="text-sm text-ink-soft capitalize">{incident.category}</p>
+            <p className="text-sm text-ink-soft">{INCIDENT_CATEGORY_LABEL[incident.category] ?? incident.category}</p>
           </div>
           <div>
             <p className="text-xs font-medium text-ink-muted mb-1">Priorité</p>

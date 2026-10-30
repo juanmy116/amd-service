@@ -12,6 +12,7 @@ type MemberData = {
   full_name?: string | null
   phone?: string | null
   role?: string
+  can_create_incidents?: boolean
 }
 
 type Props = {
@@ -33,6 +34,7 @@ export default function TeamMemberForm({
   const [state, formAction, pending] = useActionState(action, null)
   const submitKeepingValues = useSubmitKeepingValues(formAction)
   const [confirming, setConfirming] = useState(false)
+  const [role, setRole] = useState(defaultValues?.role ?? 'technician')
 
   return (
     <div className="p-8 max-w-2xl">
@@ -144,13 +146,32 @@ export default function TeamMemberForm({
             <label className="block text-sm font-medium text-ink-soft mb-1.5">Rôle</label>
             <select
               name="role"
-              defaultValue={defaultValues?.role ?? 'technician'}
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
               className={selectClass}
             >
               <option value="technician">Technicien</option>
               <option value="admin">Administrateur</option>
             </select>
           </div>
+
+          {/* Permiso por persona (tanda 6): el técnico declara averías desde la ficha de máquina */}
+          {isEdit && role === 'technician' && (
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                name="can_create_incidents"
+                type="checkbox"
+                defaultChecked={defaultValues?.can_create_incidents ?? false}
+                className="mt-0.5 w-4 h-4 accent-[#BF0D0D]"
+              />
+              <span>
+                <span className="block text-sm font-medium text-ink">Peut signaler des pannes</span>
+                <span className="block text-xs text-ink-muted mt-0.5">
+                  Depuis la fiche machine de l&apos;application. La panne arrive au bureau sans technicien assigné.
+                </span>
+              </span>
+            </label>
+          )}
 
           {/* Mot de passe temporaire (create only) */}
           {!isEdit && (

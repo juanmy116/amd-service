@@ -1,4 +1,10 @@
-export const INCIDENT_CATEGORIES = ['panne', 'maintenance', 'consommable', 'autre'] as const
+export const INCIDENT_CATEGORIES = ['panne', 'maintenance', 'consommable', 'autre', 'recuperation'] as const
+// El cliente no pide recogidas: las crea la oficina o el taller (tanda 6, 2026-10-29).
+export const PORTAL_INCIDENT_CATEGORIES = ['panne', 'maintenance', 'consommable', 'autre'] as const
+export const INCIDENT_CATEGORY_LABEL: Record<string, string> = {
+  panne: 'Panne', maintenance: 'Maintenance', consommable: 'Consommable', autre: 'Autre',
+  recuperation: 'Récupération',
+}
 export const INCIDENT_PRIORITIES = ['basse', 'normale', 'haute', 'urgente'] as const
 export const INCIDENT_STATUSES   = ['nouveau', 'assigné', 'en_cours', 'résolu', 'fermé'] as const
 export const RESOLVED_VIA        = ['intervention', 'bureau'] as const

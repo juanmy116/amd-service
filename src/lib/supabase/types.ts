@@ -1840,6 +1840,7 @@ export type Database = {
       profiles: {
         Row: {
           can_bill: boolean
+          can_create_incidents: boolean
           created_at: string
           full_name: string | null
           id: string
@@ -1849,6 +1850,7 @@ export type Database = {
         }
         Insert: {
           can_bill?: boolean
+          can_create_incidents?: boolean
           created_at?: string
           full_name?: string | null
           id: string
@@ -1858,6 +1860,7 @@ export type Database = {
         }
         Update: {
           can_bill?: boolean
+          can_create_incidents?: boolean
           created_at?: string
           full_name?: string | null
           id?: string
@@ -2229,7 +2232,12 @@ export type Database = {
       alert_type: "panne" | "toner_bas" | "autre"
       contract_machine_status: "actif" | "suspendu" | "terminé"
       contract_status: "actif" | "suspendu" | "terminé"
-      incident_category: "panne" | "maintenance" | "consommable" | "autre"
+      incident_category:
+        | "panne"
+        | "maintenance"
+        | "consommable"
+        | "autre"
+        | "recuperation"
       incident_priority: "basse" | "normale" | "haute" | "urgente"
       incident_status: "nouveau" | "assigné" | "en_cours" | "résolu" | "fermé"
       machine_type: "color" | "noir_blanc"
@@ -2367,7 +2375,13 @@ export const Constants = {
       alert_type: ["panne", "toner_bas", "autre"],
       contract_machine_status: ["actif", "suspendu", "terminé"],
       contract_status: ["actif", "suspendu", "terminé"],
-      incident_category: ["panne", "maintenance", "consommable", "autre"],
+      incident_category: [
+        "panne",
+        "maintenance",
+        "consommable",
+        "autre",
+        "recuperation",
+      ],
       incident_priority: ["basse", "normale", "haute", "urgente"],
       incident_status: ["nouveau", "assigné", "en_cours", "résolu", "fermé"],
       machine_type: ["color", "noir_blanc"],

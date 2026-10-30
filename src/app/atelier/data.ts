@@ -80,7 +80,7 @@ export async function getBoardData(now = new Date()): Promise<BoardData> {
       .from('incidents')
       .select(`
         id, numero_incident, title, description, status, priority, created_at, resolved_at,
-        assigned_to, contact_phone, machine_id,
+        assigned_to, opened_by, contact_phone, machine_id,
         contract_machines (
           machines ( marque, modele, numero_serie, quartier_code ),
           contracts ( clients ( nom_client, quartier_code ) )
@@ -181,6 +181,7 @@ export async function getBoardData(now = new Date()): Promise<BoardData> {
       technicianId: i.assigned_to,
       technicianName: i.profiles?.full_name ?? null,
       photoUrl: photoUrlById.get(i.id) ?? null,
+      openedBy: i.opened_by,
     }
   })
 

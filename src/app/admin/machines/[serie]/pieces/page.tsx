@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card'
 import { PanelHeader } from '@/components/ui/PanelHeader'
 import { Badge } from '@/components/ui/Badge'
 import type { BadgeVariant } from '@/components/ui/Badge'
+import { INCIDENT_CATEGORY_LABEL } from '@/lib/enums'
 
 type HistoryRow = {
   source: string | null
@@ -17,10 +18,6 @@ type HistoryRow = {
   changed_at: string | null
   category: string | null
   technician_name: string | null
-}
-
-const CATEGORY_LABEL: Record<string, string> = {
-  panne: 'Panne', maintenance: 'Maintenance', consommable: 'Consommable', autre: 'Autre',
 }
 
 export default async function MachinePartsHistoryPage({
@@ -114,7 +111,7 @@ export default async function MachinePartsHistoryPage({
               const isIncident = r.source === 'incident'
               const originVariant: BadgeVariant = isIncident ? 'warning' : 'info'
               const originLabel = isIncident
-                ? (CATEGORY_LABEL[r.category ?? ''] ?? 'Incident')
+                ? (INCIDENT_CATEGORY_LABEL[r.category ?? ''] ?? 'Incident')
                 : 'Maintenance'
               const dateStr = r.changed_at
                 ? new Date(r.changed_at).toLocaleDateString('fr-FR')

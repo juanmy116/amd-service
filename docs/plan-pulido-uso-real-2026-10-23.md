@@ -83,6 +83,8 @@
   máquinas; preguntarle si aplica igual a los clientes.
 
 ## Tanda 6 — Punto 8 · Técnicos que crean incidencias (BD + permisos)
+> **2026-10-29: hecha en el PR #213** (sin publicar), ampliada al kiosko (burbuja «+» para pannes y
+> recogidas). Plan: `docs/superpowers/plans/2026-10-29-tecnicos-atelier-crean-averias.md`.
 - Hoy no existe: sin política INSERT de técnicos en `incidents`; `/tech/scan/[serie]` sin botón.
 - Hacer: flag `profiles.can_create_incidents` (precedente `is_dispatcher` / `can_bill`, protegido por el trigger de `20260610100000_secure_profiles_role.sql`), interruptor en `/admin/team`.
 - Botón «Signaler une panne» en `/tech/scan/[serie]` → acción de servidor que comprueba el flag y crea con el cliente admin, resolviendo la línea abierta como `/signaler` (`signaler/[serie]/actions.ts:103-140`); `status = 'nouveau'`, **sin asignar**, `opened_by` = técnico, línea en `incident_history`.

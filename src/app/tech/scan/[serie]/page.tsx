@@ -8,6 +8,7 @@ import type { BadgeVariant } from '@/components/ui/Badge'
 import { getOpenLineForMachine } from '@/lib/contract-machines'
 import { itineraryDestination } from '@/lib/geo.server'
 import ItineraryButton from '@/components/tech/ItineraryButton'
+import ReportPanne from './report-panne'
 
 const STATUS_BADGE: Record<string, BadgeVariant> = {
   nouveau: 'info', assigné: 'violet', en_cours: 'warning', résolu: 'success',
@@ -42,7 +43,7 @@ export default async function MachineScanPage({
   const numero_serie = decodeURIComponent(serie)
 
   // Admin o técnico; cualquier otro rol sale (requireTechnician redirige).
-  const { supabase } = await requireTechnician()
+  const { supabase, user, profile } = await requireTechnician()
 
   // Ficha de SOLO LECTURA: cualquier técnico puede ver cualquier máquina activa (decisión
   // 2026-09-23: en campo se topa con máquinas que no son suyas). Por eso máquina, línea,
@@ -51,11 +52,12 @@ export default async function MachineScanPage({
   // createAdminClient() bypassa RLS — server-only, nunca llamar desde un Client Component.
   const admin = createAdminClient()
 
-  const { data: machine } = await admin
-    .from('machines')
-    .select('*')
-    .eq('numero_serie', numero_serie)
-    .maybeSingle()
+  const [{ data: machine }, { data: permission }] = await Promise.all([
+    admin.from('machines').select('*').eq('numero_serie', numero_serie).maybeSingle(),
+    admin.from('profiles').select('can_create_incidents').eq('id', user.id).single(),
+  ])
+  // «Signaler une panne»: permiso por técnico (tanda 6). La acción lo vuelve a comprobar.
+  const canReportPanne = profile.role === 'technician' && permission?.can_create_incidents === true
 
   if (!machine || !machine.active) {
     return (
@@ -220,6 +222,11 @@ export default async function MachineScanPage({
       {/* Incidents actifs */}
       <div>
         <p className="text-sm font-semibold text-ink mb-3">Incidents actifs</p>
+        {canReportPanne && (
+          <div className="mb-3">
+            <ReportPanne serie={numero_serie} />
+          </div>
+        )}
         {(!incidents || incidents.length === 0) ? (
           <Card className="p-6 text-center">
             <p className="text-sm text-ink-muted">Aucun incident actif sur cette machine</p>
