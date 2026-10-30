@@ -1066,7 +1066,7 @@ Kiosko (admin o is_dispatcher) → burbuja «+» → ventana Panne | Récupérat
   **encuesta**: `sendCsatForIncident` la archiva sin mandarla (no se pide puntuar una recogida). **No** saca
   la máquina del contrato: eso sigue siendo «Remplacer» / «Hors service».
 - El técnico no ve la avería que declara hasta que se la asignen (RLS normal de técnicos).
-- El portal del cliente no ofrece `recuperation` (`PORTAL_INCIDENT_CATEGORIES`).
+- El portal del cliente **ni ofrece ni muestra** `recuperation` (`PORTAL_INCIDENT_CATEGORIES` en el alta; `.neq('category', 'recuperation')` en inicio, lista y ficha, como ya se hacía con `source = 'public'`). Decisión del usuario 2026-10-30: las recogidas son internas de AMD.
 - Tests: `tests/rls/staff-incident.test.ts`, `tests/rls/profiles-isolation.test.ts`, `src/lib/staffIncident.test.ts`.
 
 ### Creada vía QR público (sin autenticación) — PR #19

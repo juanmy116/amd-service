@@ -74,6 +74,7 @@ export default async function PortalIncidentsPage() {
         .select('id, numero_incident, title, status, priority, category, created_at, machine_id')
         .or(orParts.join(','))
         .or('source.is.null,source.neq.public')
+        .neq('category', 'recuperation')   // las recogidas son internas de AMD (decisión 2026-10-30)
         .order('created_at', { ascending: false })
       incidents = data
     }

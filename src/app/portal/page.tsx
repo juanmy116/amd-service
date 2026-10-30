@@ -48,6 +48,7 @@ export default async function PortalPage() {
     .from('incidents')
     .select('id, title, status, priority, created_at')
     .in('contract_machine_id', allLines.length > 0 ? allLines.map(l => l.id) : [''])
+    .neq('category', 'recuperation')   // las recogidas son internas de AMD (decisión 2026-10-30)
     .order('created_at', { ascending: false })
     .limit(5)
 

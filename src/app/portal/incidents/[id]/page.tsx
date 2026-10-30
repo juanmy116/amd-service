@@ -45,6 +45,7 @@ export default async function PortalIncidentDetailPage({
     .select('*')
     .eq('id', id)
     .or('source.is.null,source.neq.public')
+    .neq('category', 'recuperation')   // las recogidas son internas de AMD (decisión 2026-10-30)
     .single()
 
   if (!incident) notFound()

@@ -25,6 +25,7 @@ ampliación al Atelier que pidió el usuario el 2026-10-29.
 - La máquina se busca en la ventana por número de serie, modelo o cliente (todas las máquinas activas).
   Recogida: solo máquinas **en contrato** (una de almacén no se recoge). Panne: cualquiera activa.
 - El técnico solo declara **pannes** (no recogidas).
+- **Las recogidas no se ven en el portal del cliente** (decisión del usuario, 2026-10-30).
 - **La campana no suena** por lo que crea el propio kiosko (pedido por el usuario el 2026-10-29); sí por lo
   que declaran los técnicos.
 - Encuesta CSAT: una **panne** creada así la recibe en el email del portal del cliente si lo tiene (igual que
