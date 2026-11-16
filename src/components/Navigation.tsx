@@ -4,20 +4,35 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { NAVIGATION } from '@/lib/constants';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Menu, X } from 'lucide-react';
+
+const MOBILE_MENU_ID = 'menu-principal';
 
 export default function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen]);
+
   return (
-    <nav className="sticky top-0 z-50 border-b" style={{ backgroundColor: '#0B1120', borderColor: '#1E2D45' }}>
+    <nav
+      aria-label="Navigation principale"
+      className="focus-on-dark sticky top-0 z-50 border-b"
+      style={{ backgroundColor: '#0B1120', borderColor: '#1E2D45' }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
 
           {/* Logo */}
-          <Link href="/" className="flex items-center cursor-pointer" onClick={() => setIsOpen(false)}>
+          <Link href="/" className="flex shrink-0 items-center cursor-pointer" onClick={() => setIsOpen(false)}>
             <Image
               src="/images/logos/logo-amd.png"
               alt="AMD Service"
@@ -28,19 +43,21 @@ export default function Navigation() {
             />
           </Link>
 
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-1">
+          {/* Desktop Nav — a partir de xl: por debajo, los 7 enlaces y los dos botones no caben
+              en una línea (el logo se encogía a 0 y «Nous contacter» se salía de la pantalla). */}
+          <div className="hidden xl:flex items-center gap-1">
             {NAVIGATION.map((item) => {
               const active = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="px-4 py-2 text-sm font-medium transition-colors duration-150 cursor-pointer"
-                  style={{
-                    color: active ? '#BF0D0D' : '#FFFFFF',
-                    borderBottom: active ? '2px solid #BF0D0D' : '2px solid transparent',
-                  }}
+                  aria-current={active ? 'page' : undefined}
+                  className={`px-4 py-2 text-sm whitespace-nowrap border-b-2 transition-colors duration-150 cursor-pointer ${
+                    active
+                      ? 'font-semibold text-white border-[#BF0D0D]'
+                      : 'font-medium text-white/70 border-transparent hover:text-white'
+                  }`}
                 >
                   {item.label}
                 </Link>
@@ -49,19 +66,16 @@ export default function Navigation() {
           </div>
 
           {/* CTA group */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden xl:flex items-center gap-3">
             <Link
               href="/login"
-              className="px-4 py-2 text-sm font-medium border transition-colors duration-150 cursor-pointer"
-              style={{ color: '#FFFFFF', borderColor: '#1E2D45', backgroundColor: 'transparent' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = '#BF0D0D')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = '#1E2D45')}
+              className="px-4 py-2 text-sm font-medium whitespace-nowrap text-white border border-[#1E2D45] hover:border-[#BF0D0D] transition-colors duration-150 cursor-pointer"
             >
               Connexion
             </Link>
             <Link
               href="/contact"
-              className="inline-flex items-center gap-2 px-5 py-2 text-white text-sm font-semibold transition-opacity duration-150 hover:opacity-80 cursor-pointer"
+              className="inline-flex items-center gap-2 px-5 py-2 text-white text-sm font-semibold whitespace-nowrap transition-opacity duration-150 hover:opacity-80 cursor-pointer"
               style={{ backgroundColor: '#BF0D0D' }}
             >
               Nous contacter
@@ -71,9 +85,10 @@ export default function Navigation() {
           {/* Mobile Toggle */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 transition-colors cursor-pointer"
-            style={{ color: '#94A3B8' }}
+            className="xl:hidden flex h-11 w-11 items-center justify-center text-white/70 hover:text-white transition-colors duration-150 cursor-pointer"
             aria-label={isOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+            aria-expanded={isOpen}
+            aria-controls={MOBILE_MENU_ID}
           >
             {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -81,7 +96,7 @@ export default function Navigation() {
 
         {/* Mobile Menu */}
         {isOpen && (
-          <div className="md:hidden border-t pb-4 pt-2" style={{ borderColor: '#1E2D45' }}>
+          <div id={MOBILE_MENU_ID} className="xl:hidden border-t pb-4 pt-2" style={{ borderColor: '#1E2D45' }}>
             <div className="flex flex-col">
               {NAVIGATION.map((item) => {
                 const active = pathname === item.href;
@@ -90,11 +105,10 @@ export default function Navigation() {
                     key={item.href}
                     href={item.href}
                     onClick={() => setIsOpen(false)}
-                    className="px-4 py-3 text-sm font-medium transition-colors cursor-pointer"
-                    style={{
-                      color: active ? '#BF0D0D' : '#FFFFFF',
-                      backgroundColor: active ? '#172033' : 'transparent',
-                    }}
+                    aria-current={active ? 'page' : undefined}
+                    className={`px-4 py-3 text-sm transition-colors duration-150 cursor-pointer ${
+                      active ? 'font-semibold text-white bg-[#172033]' : 'font-medium text-white/70 hover:text-white'
+                    }`}
                   >
                     {item.label}
                   </Link>

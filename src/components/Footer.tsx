@@ -7,7 +7,7 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer style={{ backgroundColor: '#0B1120', borderTop: '1px solid #1E2D45' }}>
+    <footer className="focus-on-dark" style={{ backgroundColor: '#0B1120', borderTop: '1px solid #1E2D45' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-8">
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
@@ -36,7 +36,7 @@ export default function Footer() {
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="text-sm font-medium text-slate-500 hover:text-slate-100 transition-colors duration-150 cursor-pointer"
+                    className="text-sm font-medium text-slate-400 hover:text-slate-100 transition-colors duration-150 cursor-pointer"
                   >
                     {item.label}
                   </Link>
@@ -53,7 +53,7 @@ export default function Footer() {
                 <li key={item}>
                   <Link
                     href="/services"
-                    className="text-sm font-medium text-slate-500 hover:text-slate-100 transition-colors duration-150 cursor-pointer"
+                    className="text-sm font-medium text-slate-400 hover:text-slate-100 transition-colors duration-150 cursor-pointer"
                   >
                     {item}
                   </Link>
@@ -68,7 +68,7 @@ export default function Footer() {
             <ul className="space-y-4">
               <li className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#BF0D0D' }} />
-                <span className="text-sm font-medium text-slate-400">{FOOTER.address_fr}, Sénégal</span>
+                <span className="text-sm font-medium text-slate-400">{FOOTER.address_fr}</span>
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 flex-shrink-0" style={{ color: '#BF0D0D' }} />
@@ -94,7 +94,7 @@ export default function Footer() {
 
         {/* Bottom */}
         <div className="pt-8 flex flex-col md:flex-row justify-between items-center gap-4" style={{ borderTop: '1px solid #1E2D45' }}>
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-slate-400">
             © {currentYear} AMD Service. Tous droits réservés.
           </p>
           <div className="flex gap-6">
@@ -102,7 +102,7 @@ export default function Footer() {
               <a
                 key={item}
                 href="#"
-                className="text-xs text-slate-600 hover:text-slate-400 transition-colors duration-150 cursor-pointer"
+                className="text-xs text-slate-400 hover:text-slate-100 transition-colors duration-150 cursor-pointer"
               >
                 {item}
               </a>

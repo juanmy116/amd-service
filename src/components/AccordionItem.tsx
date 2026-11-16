@@ -23,7 +23,7 @@ export default function AccordionItem({ q, a }: { q: string; a: string }) {
           className="w-4 h-4 flex-shrink-0 transition-transform duration-200"
           style={{
             transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-            color: open ? '#BF0D0D' : '#9CA3AF',
+            color: open ? '#BF0D0D' : '#6B7280',
           }}
         />
       </button>
@@ -31,6 +31,7 @@ export default function AccordionItem({ q, a }: { q: string; a: string }) {
         id={panelId}
         role="region"
         aria-labelledby={buttonId}
+        inert={!open}
         style={{
           display: 'grid',
           gridTemplateRows: open ? '1fr' : '0fr',

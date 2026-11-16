@@ -45,12 +45,12 @@ export default function WhyPage() {
     <div style={{ backgroundColor: '#FFFFFF' }}>
 
       {/* Hero — RED */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-px" style={{ backgroundColor: 'rgba(255,255,255,0.22)' }}>
           <div className="p-8 md:p-12 lg:col-span-3" style={{ backgroundColor: '#BF0D0D' }}>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Pourquoi AMD Service</span>
+              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>Pourquoi AMD Service</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
               De la gestion chaotique au contrôle total
@@ -77,7 +77,7 @@ export default function WhyPage() {
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Le problème</span>
           </div>
           <h2 className="text-2xl font-bold mb-2" style={{ color: '#111827' }}>Les problèmes que vous connaissez</h2>
-          <p className="mb-10" style={{ color: '#6B7280' }}>La gestion de l&apos;impression en interne génère des coûts cachés et des frustrations quotidiennes.</p>
+          <p className="mb-10" style={{ color: '#4B5563' }}>La gestion de l&apos;impression en interne génère des coûts cachés et des frustrations quotidiennes.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ backgroundColor: '#E5E7EB' }}>
             {PROBLEMS.map(({ icon: Icon, title, description }) => (
               <div key={title} className="p-6" style={{ backgroundColor: '#FFFFFF' }}>
@@ -149,20 +149,48 @@ export default function WhyPage() {
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>Comparatif</span>
           </div>
           <h2 className="text-2xl font-bold mb-2" style={{ color: '#111827' }}>Achat direct vs AMD Service</h2>
-          <p className="mb-10" style={{ color: '#6B7280' }}>Comparez objectivement avant de décider.</p>
-          <div className="border overflow-hidden" style={{ borderColor: '#E5E7EB' }}>
+          <p className="mb-10" style={{ color: '#4B5563' }}>Comparez objectivement avant de décider.</p>
+          {/* Móvil: un bloque por criterio. La tabla de 3 columnas no cabe en 390 px y la
+              columna «AMD Service» quedaba cortada. */}
+          <ul className="sm:hidden border" style={{ borderColor: '#E5E7EB' }}>
+            {COMPARISON.map((row, i) => (
+              <li
+                key={row.criteria}
+                className="p-4"
+                style={{ backgroundColor: i % 2 === 0 ? '#FFFFFF' : '#F9FAFB', borderTop: i === 0 ? 'none' : '1px solid #E5E7EB' }}
+              >
+                <p className="mb-3 text-sm font-semibold" style={{ color: '#111827' }}>{row.criteria}</p>
+                <dl className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <dt className="mb-1 text-xs" style={{ color: '#6B7280' }}>Achat direct</dt>
+                    <dd style={{ color: '#4B5563' }}>{row.achat}</dd>
+                  </div>
+                  <div>
+                    <dt className="mb-1 text-xs font-semibold" style={{ color: '#BF0D0D' }}>AMD Service</dt>
+                    <dd className="flex items-start gap-1.5 font-semibold" style={{ color: '#BF0D0D' }}>
+                      <CheckCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                      {row.amd}
+                    </dd>
+                  </div>
+                </dl>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden sm:block border" style={{ borderColor: '#E5E7EB' }}>
             <table className="w-full text-sm">
+              <caption className="sr-only">Comparatif entre l&apos;achat direct et AMD Service</caption>
               <thead>
                 <tr style={{ backgroundColor: '#BF0D0D' }}>
-                  <th className="px-6 py-4 text-left font-semibold text-white">Critère</th>
-                  <th className="px-6 py-4 text-center font-semibold text-white">Achat direct</th>
-                  <th className="px-6 py-4 text-center font-semibold text-white">AMD Service</th>
+                  <th scope="col" className="px-6 py-4 text-left font-semibold text-white">Critère</th>
+                  <th scope="col" className="px-6 py-4 text-center font-semibold text-white">Achat direct</th>
+                  <th scope="col" className="px-6 py-4 text-center font-semibold text-white">AMD Service</th>
                 </tr>
               </thead>
               <tbody>
                 {COMPARISON.map((row, i) => (
                   <tr key={row.criteria} style={{ backgroundColor: i % 2 === 0 ? '#FFFFFF' : '#F9FAFB', borderTop: '1px solid #E5E7EB' }}>
-                    <td className="px-6 py-4 font-medium" style={{ color: '#111827' }}>{row.criteria}</td>
+                    <th scope="row" className="px-6 py-4 text-left font-medium" style={{ color: '#111827' }}>{row.criteria}</th>
                     <td className="px-6 py-4 text-center" style={{ color: '#6B7280' }}>{row.achat}</td>
                     <td className="px-6 py-4 text-center">
                       <span className="inline-flex items-center gap-1.5 font-semibold" style={{ color: '#BF0D0D' }}>
@@ -179,11 +207,11 @@ export default function WhyPage() {
       </section>
 
       {/* CTA — RED */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 mb-6">
             <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Prochaine étape</span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>Prochaine étape</span>
           </div>
           <h2 className="text-3xl font-bold text-white mb-4">Prêt à reprendre le contrôle ?</h2>
           <p className="text-lg mb-8" style={{ color: 'rgba(255,255,255,0.85)' }}>Demandez un audit gratuit de votre parc d&apos;impression, sans engagement.</p>

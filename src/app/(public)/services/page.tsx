@@ -51,6 +51,12 @@ const SERVICE_GROUPS = [
   },
 ];
 
+// Tantas columnas como servicios tiene el grupo, para que no quede ninguna casilla vacía.
+const GROUP_COLUMNS: Record<number, string> = {
+  1: '',
+  3: 'md:grid-cols-3',
+};
+
 function ServiceTile({ serviceId }: { serviceId: string }) {
   const serviceIndex = SERVICES.findIndex((service) => service.id === serviceId);
   const service = SERVICES[serviceIndex];
@@ -66,7 +72,7 @@ function ServiceTile({ serviceId }: { serviceId: string }) {
         >
           <Icon className="h-5 w-5" style={{ color: '#BF0D0D' }} />
         </div>
-        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#9CA3AF' }}>
+        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6B7280' }}>
           {String(serviceIndex + 1).padStart(2, '0')}
         </span>
       </div>
@@ -93,12 +99,12 @@ function ServiceTile({ serviceId }: { serviceId: string }) {
 export default function ServicesPage() {
   return (
     <div style={{ backgroundColor: '#FFFFFF' }}>
-      <section className="px-4 py-16 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark px-4 py-16 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-px lg:grid-cols-5" style={{ backgroundColor: 'rgba(255,255,255,0.22)' }}>
           <div className="p-8 md:p-12 lg:col-span-3" style={{ backgroundColor: '#BF0D0D' }}>
             <div className="mb-5 flex items-center gap-2">
               <div className="h-4 w-1 bg-white" style={{ opacity: 0.7 }} />
-              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>
+              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>
                 Nos services
               </span>
             </div>
@@ -139,7 +145,8 @@ export default function ServicesPage() {
 
       <section className="border-b px-4 py-16 sm:px-6 lg:px-8" style={{ backgroundColor: '#F5F5F5', borderColor: '#E5E7EB' }}>
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-px lg:grid-cols-3" style={{ backgroundColor: '#E5E7EB' }}>
-          <div className="p-8 lg:col-span-1" style={{ backgroundColor: '#FFFFFF' }}>
+          {/* A todo el ancho: con la intro en una columna, los 3 pasos dejaban dos casillas vacías. */}
+          <div className="p-8 lg:col-span-3" style={{ backgroundColor: '#FFFFFF' }}>
             <div className="mb-4 flex items-center gap-2">
               <div className="h-4 w-1" style={{ backgroundColor: '#BF0D0D' }} />
               <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#BF0D0D' }}>
@@ -149,7 +156,7 @@ export default function ServicesPage() {
             <h2 className="mb-4 text-2xl font-bold" style={{ color: '#111827' }}>
               La bonne offre dépend surtout de votre usage réel
             </h2>
-            <p className="text-sm leading-relaxed" style={{ color: '#6B7280' }}>
+            <p className="max-w-3xl text-sm leading-relaxed" style={{ color: '#6B7280' }}>
               Volume mensuel, nombre de services, couleur ou monochrome, criticité des documents : notre rôle est de dimensionner le parc avant de parler machine.
             </p>
           </div>
@@ -225,7 +232,10 @@ export default function ServicesPage() {
                     {group.title}
                   </h3>
                 </div>
-                <div className="grid grid-cols-1 gap-px md:grid-cols-2 lg:col-span-3" style={{ backgroundColor: '#E5E7EB' }}>
+                <div
+                  className={`grid grid-cols-1 gap-px lg:col-span-3 ${GROUP_COLUMNS[group.serviceIds.length] ?? 'md:grid-cols-2'}`}
+                  style={{ backgroundColor: '#E5E7EB' }}
+                >
                   {group.serviceIds.map((serviceId) => (
                     <ServiceTile key={serviceId} serviceId={serviceId} />
                   ))}
@@ -243,7 +253,7 @@ export default function ServicesPage() {
               <div className="mb-1 text-4xl font-bold text-white font-display">
                 {value}
               </div>
-              <div className="text-xs uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.75)' }}>
+              <div className="text-xs uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.85)' }}>
                 {label}
               </div>
             </div>

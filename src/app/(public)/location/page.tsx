@@ -88,7 +88,7 @@ export default function LocationPage() {
     <div style={{ backgroundColor: '#FFFFFF' }}>
 
       {/* 1 — Hero — RED */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div
           className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-px"
           style={{ backgroundColor: 'rgba(255,255,255,0.22)' }}
@@ -98,7 +98,7 @@ export default function LocationPage() {
               <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
               <span
                 className="text-xs font-semibold uppercase tracking-widest text-white"
-                style={{ opacity: 0.75 }}
+                style={{ opacity: 0.85 }}
               >
                 Location d&apos;imprimantes · Dakar, Sénégal
               </span>
@@ -200,19 +200,19 @@ export default function LocationPage() {
       </section>
 
       {/* 4 — Plans — RED */}
-      <section id="plans" className="py-14 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section id="plans" className="focus-on-dark py-14 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>
+              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>
                 Nos équipements en location
               </span>
             </div>
             <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
               Choisissez votre équipement
             </h2>
-            <p className="text-base max-w-2xl" style={{ color: 'rgba(255,255,255,0.7)' }}>
+            <p className="text-base max-w-2xl" style={{ color: 'rgba(255,255,255,0.85)' }}>
               Imprimantes A4, multifonctions A3, couleur ou monochrome. Maintenance et toner inclus dans chaque formule.
             </p>
           </div>
@@ -319,11 +319,11 @@ export default function LocationPage() {
       </section>
 
       {/* 9 — CTA final — RED */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 mb-6">
             <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>
               Prochaine étape
             </span>
           </div>

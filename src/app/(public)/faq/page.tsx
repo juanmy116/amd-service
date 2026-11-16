@@ -58,12 +58,12 @@ export default function FAQPage() {
     <div style={{ backgroundColor: '#FFFFFF' }}>
 
       {/* Hero — RED */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-px" style={{ backgroundColor: 'rgba(255,255,255,0.22)' }}>
           <div className="p-8 md:p-12 lg:col-span-3" style={{ backgroundColor: '#BF0D0D' }}>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>FAQ</span>
+              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>FAQ</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Questions fréquentes</h1>
             <p className="text-lg max-w-2xl" style={{ color: 'rgba(255,255,255,0.85)' }}>
@@ -126,11 +126,11 @@ export default function FAQPage() {
       </section>
 
       {/* CTA — RED */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-3xl mx-auto">
           <div className="flex items-center gap-2 mb-6">
             <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Nous contacter</span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>Nous contacter</span>
           </div>
           <h2 className="text-2xl font-bold text-white mb-3">Vous ne trouvez pas votre réponse ?</h2>
           <p className="mb-6" style={{ color: 'rgba(255,255,255,0.85)' }}>Notre équipe répond à toutes vos questions spécifiques.</p>
