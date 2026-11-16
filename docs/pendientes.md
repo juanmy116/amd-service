@@ -6,7 +6,17 @@
 
 ---
 
-## 📍 Por dónde seguir (al 2026-10-30)
+## 📍 Por dónde seguir (al 2026-11-16)
+
+> **2026-11-16:** arranca el trabajo para **poner la web pública en `amd-service.com`**, que hoy
+> sigue sirviendo el WordPress antiguo (la nuestra solo se ve en `amd-service.vercel.app`). Auditoría
+> visual y de contenido hecha, plan en 7 tandas y decisiones del usuario en
+> `docs/plan-web-publica-2026-11-16.md` → **fila 17**. **Tanda 1** (lo roto en las páginas
+> interiores: tabla de `/why` en móvil, menú en tabletas, formulario, contraste, casillas vacías de
+> `/services`) en PR. **Siguiente:** tanda 2 (fotos propias en vez de las de banco y ocultar «Cas
+> d'usage»). Mientras tanto, **pedir a AMD** los 7 datos de la lista del plan (plazo de
+> intervención, tóner, precio publicable, WhatsApp y dirección, datos legales, foto del C3003 e
+> identificador de Google).
 
 > **2026-10-30:** **técnicos y Atelier crean averías** (tanda 6 del pulido, fila 16) **en prod** desde
 > las ~09:50 GMT (PR #213, merge `4ff6f69`, migración `20261029100000` aplicada; copia previa en
@@ -108,6 +118,7 @@
 | 🔎 **14** | **Comprobar con la próxima incidencia real del QR** (tras #187) | En su ficha de `/admin` y en el listado deben salir el cliente y el contrato, y el cuadro «Incidents récents» del inicio debe mostrarla. No se ha podido probar en prod sin crear una avería de verdad (no hay aún «máquina de prueba», `docs/cambios-en-produccion.md` §1). De paso: el email de contacto de SAV-2026-0003 (WOORADVICE) tiene una errata (`wooradvicesebegal.com`); si hay que escribirle, usar el de SAV-2026-0006. |
 | 🧹 **15** | **Doble escaneo: cinco detalles menores de la revisión** (PRs #191/#192) | Ninguno impide trabajar; salieron en la revisión final del 2026-10-21. **(a)** El borrador del informe (`sessionStorage`, ficha `/tech/incidents/[id]`) se borra al pulsar enviar: si la red se corta justo entonces o la sesión ha caducado, se pierde — borrarlo solo tras guardar con éxito. **(b)** El borrador no va ligado al técnico ni se limpia al cerrar sesión: en un móvil compartido uno vería el informe sin enviar del otro, y un borrador viejo pisa lo guardado en la BD al abrir la ficha — clave por usuario + limpiar al salir + no restaurarlo si la avería ya está resuelta. ~~**(c)** La pista «scannez à nouveau à partir de HH:MM» puede mostrar una hora ya pasada (y sin fecha) — si ya pasó, decir solo «scannez à nouveau».~~ ✅ sustituida por la cuenta atrás de la ficha en 3 pasos (2026-10-29). **(d)** Si falla la BD al guardar un escaneo dentro de `stampQrScan`, el técnico no se entera (solo los fallos de red o tiempo muestran «Scan non enregistré») — que `stampQrScan` diga si escribió la fila. **(e)** `?scan=echec` se queda en la URL y el aviso vuelve a salir al recargar — desde la ficha en 3 pasos solo afecta a la ficha de máquina (`/tech/scan/[serie]`). |
 | 🛠️ **16** | **Pulido tras la 1ª semana de uso real** (9 puntos) | **Tandas 1–5 en prod** (2026-10-23, PRs #196–#207): precios de tarifa visibles y con separador de miles, cliente en las tarjetas, contrato tras reemplazo, ventana para las máquinas del contrato, sección Maintenance en la ficha del cliente, teléfono móvil + fijo, máquinas que nunca se borran («Remplacer» / «Hors service»). **Tanda 6 en prod** (2026-10-30, PR #213, merge `4ff6f69`): técnicos con permiso por persona declaran pannes (entran `nouveau` sin asignar) y el kiosko crea pannes y **recogidas** (categoría `recuperation`) con una burbuja «+»; migración `20261029100000` aplicada, reversión en `docs/rollback-2026-10-29-crear-averias.md`. Recogidas sin encuesta y ocultas en el portal. Permiso activado a Issa Ba y Modu Dieme (2026-10-30) y «Signaler une panne» confirmado en uso (2026-11-03). **Queda:** decidir el «Supprimer» del cliente. Plan y decisiones: `docs/plan-pulido-uso-real-2026-10-23.md`. |
+| 🌐 **17** | **Web pública → `amd-service.com`** | No bloquea el SAV. La web nueva está completa (7 páginas) pero sin publicar en el dominio oficial. Auditoría del 2026-11-16: portada que puede salir en blanco, fotos de banco, textos incoherentes, sin páginas legales, sin `sitemap` ni medición. **7 tandas**; tanda 1 en PR (2026-11-16). Faltan datos de AMD para las tandas 4–6. Plan, decisiones y hallazgos: `docs/plan-web-publica-2026-11-16.md`. |
 
 **Cerrado el 2026-10-09 (seguridad, todo en prod y comprobado):** E2E en local solo contra un
 Supabase local (#179). F2 — un técnico ya no puede cambiar la máquina, la asignación ni el número

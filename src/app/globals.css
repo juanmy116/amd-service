@@ -103,12 +103,37 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 4px;
 }
 
-/* Focus ring for keyboard navigation — links, buttons, accordion */
+/* Focus ring for keyboard navigation — links, buttons, accordion.
+   Rojo sobre fondos claros; blanco dentro de `.focus-on-dark` (secciones rojas, menú y pie
+   de la web pública), donde el rojo no se distingue. `.focus-on-light` lo devuelve a rojo
+   para una tarjeta clara metida en una sección roja. */
+.focus-on-dark  { --focus-ring: #FFFFFF; }
+.focus-on-light { --focus-ring: #BF0D0D; }
+
 a:focus-visible,
 button:focus-visible,
 [role="button"]:focus-visible {
-  outline: 2px solid #BF0D0D;
+  outline: 2px solid var(--focus-ring, #BF0D0D);
   outline-offset: 2px;
+}
+
+/* Campo de formulario de la web pública. El borde va aquí y no en un estilo en línea:
+   en línea ganaba a la regla de foco y el campo activo no se distinguía. */
+.field {
+  width: 100%;
+  padding: 12px 16px;
+  background-color: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  color: #111827;
+  transition: border-color 150ms ease-out;
+}
+.field::placeholder {
+  color: #6B7280;
+}
+.field:focus-visible {
+  border-color: #BF0D0D;
+  outline: 1px solid #BF0D0D;
+  outline-offset: 0;
 }
 
 @keyframes ripple-expand {

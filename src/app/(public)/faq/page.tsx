@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'FAQ — AMD Service',
-  description: 'Toutes les réponses sur AMD Service : location d\'équipements, maintenance, coût par copie, contrats et délais d\'intervention à Dakar, Sénégal.',
+  description: 'Toutes les réponses sur AMD Service : location d\'équipements, maintenance, coût par copie, contrats et délais d\'intervention partout au Sénégal.',
 };
 import PhotoFrame from '@/components/PhotoFrame';
 import AccordionItem from '@/components/AccordionItem';
@@ -16,7 +16,7 @@ const FAQ_ITEMS = [
     category: 'Général',
     items: [
       { q: "Qu'est-ce qu'AMD Service ?", a: "AMD Service est une entreprise spécialisée dans la location, la vente et la gestion d'équipements d'impression professionnels pour les entreprises, administrations et institutions au Sénégal. Avec plus de 10 ans d'expérience, nous gérons plus de 1.200 équipements en location et 2.600+ machines sur le territoire." },
-      { q: 'Où est situé AMD Service ?', a: "AMD Service est basé à Dakar, Sénégal. Nous intervenons dans toute la région de Dakar et accompagnons des clients professionnels sur l'ensemble du territoire sénégalais." },
+      { q: 'Où est situé AMD Service ?', a: "Notre siège est à Dakar. Nous intervenons et accompagnons nos clients professionnels sur l'ensemble du territoire sénégalais." },
       { q: 'Quels types de clients accompagnez-vous ?', a: "Entreprises privées, PME, grandes entreprises, administrations publiques, institutions, ONG, organisations internationales, cliniques, hôpitaux, établissements scolaires et universitaires, cabinets professionnels." },
     ],
   },
@@ -41,7 +41,7 @@ const FAQ_ITEMS = [
     items: [
       { q: 'La maintenance est-elle incluse ?', a: "Dans les offres de location et de gestion complète, la maintenance préventive et corrective est incluse. Nos techniciens interviennent pour éviter les pannes avant qu'elles surviennent." },
       { q: "Quel est le délai d'intervention ?", a: "Pour les contrats avec SLA, nous garantissons une intervention dans un délai défini — généralement entre 4h et 24h selon la criticité. Contactez-nous pour les conditions selon votre situation." },
-      { q: 'Avez-vous des techniciens locaux à Dakar ?', a: "Oui. Notre équipe technique est basée à Dakar. Nous ne dépendons pas de prestataires extérieurs pour les interventions courantes." },
+      { q: 'Avez-vous vos propres techniciens ?', a: "Oui. Notre équipe technique intervient partout au Sénégal. Nous ne dépendons pas de prestataires extérieurs pour les interventions courantes." },
     ],
   },
   {
@@ -58,12 +58,12 @@ export default function FAQPage() {
     <div style={{ backgroundColor: '#FFFFFF' }}>
 
       {/* Hero — RED */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-px" style={{ backgroundColor: 'rgba(255,255,255,0.22)' }}>
           <div className="p-8 md:p-12 lg:col-span-3" style={{ backgroundColor: '#BF0D0D' }}>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>FAQ</span>
+              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>FAQ</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Questions fréquentes</h1>
             <p className="text-lg max-w-2xl" style={{ color: 'rgba(255,255,255,0.85)' }}>
@@ -126,11 +126,11 @@ export default function FAQPage() {
       </section>
 
       {/* CTA — RED */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-3xl mx-auto">
           <div className="flex items-center gap-2 mb-6">
             <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Nous contacter</span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>Nous contacter</span>
           </div>
           <h2 className="text-2xl font-bold text-white mb-3">Vous ne trouvez pas votre réponse ?</h2>
           <p className="mb-6" style={{ color: 'rgba(255,255,255,0.85)' }}>Notre équipe répond à toutes vos questions spécifiques.</p>

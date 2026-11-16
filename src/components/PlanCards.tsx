@@ -70,7 +70,7 @@ export default function PlanCards() {
       {PLANS.map((plan, i) => (
         <motion.div
           key={plan.id}
-          className={`relative flex flex-col overflow-hidden${plan.recommended ? ' md:scale-105 md:z-10' : ''}`}
+          className={`focus-on-light relative flex flex-col overflow-hidden${plan.recommended ? ' md:scale-105 md:z-10' : ''}`}
           style={{
             backgroundColor: '#FFFFFF',
             border: plan.recommended
@@ -141,13 +141,13 @@ export default function PlanCards() {
                 </span>
               ) : (
                 <>
-                  <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: '#9CA3AF' }}>
+                  <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: '#6B7280' }}>
                     Dès
                   </p>
                   <span className="text-3xl font-bold font-display" style={{ color: '#111827' }}>
                     {plan.price}
                   </span>
-                  <span className="text-xs font-medium ml-2" style={{ color: '#9CA3AF' }}>
+                  <span className="text-xs font-medium ml-2" style={{ color: '#6B7280' }}>
                     /mois
                   </span>
                 </>

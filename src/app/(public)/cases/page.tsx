@@ -70,11 +70,11 @@ export default function CasesPage() {
     <div style={{ backgroundColor: '#FFFFFF' }}>
 
       {/* Hero — RED */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Cas d&apos;usage</span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>Cas d&apos;usage</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Des résultats concrets</h1>
           <p className="text-lg max-w-3xl" style={{ color: 'rgba(255,255,255,0.85)' }}>
@@ -93,7 +93,7 @@ export default function CasesPage() {
               <div className="flex flex-col items-center justify-center p-10 border-b lg:border-b-0 lg:border-r text-center" style={{ borderColor: '#E5E7EB' }}>
                 <c.Icon className="w-6 h-6 mb-4" style={{ color: '#BF0D0D' }} />
                 <div className="text-4xl font-bold mb-1 font-display" style={{ color: '#111827' }}>{c.metric}</div>
-                <div className="text-xs uppercase tracking-widest mb-3" style={{ color: '#9CA3AF' }}>{c.metricLabel}</div>
+                <div className="text-xs uppercase tracking-widest mb-3" style={{ color: '#6B7280' }}>{c.metricLabel}</div>
                 <div className="text-xs font-semibold px-2 py-1 text-white" style={{ backgroundColor: '#BF0D0D' }}>{c.sector}</div>
               </div>
 
@@ -109,16 +109,16 @@ export default function CasesPage() {
                 <h2 className="text-xl font-bold mb-6" style={{ color: '#111827' }}>{c.title}</h2>
                 <div className="grid md:grid-cols-2 gap-8 mb-8">
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#9CA3AF' }}>Le problème</div>
+                    <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#6B7280' }}>Le problème</div>
                     <p className="text-sm leading-relaxed" style={{ color: '#6B7280' }}>{c.problem}</p>
                   </div>
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#9CA3AF' }}>La solution</div>
+                    <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#6B7280' }}>La solution</div>
                     <p className="text-sm leading-relaxed" style={{ color: '#6B7280' }}>{c.solution}</p>
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#9CA3AF' }}>Résultats</div>
+                  <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#6B7280' }}>Résultats</div>
                   <div className="grid grid-cols-2 gap-2">
                     {c.results.map((r) => (
                       <div key={r} className="flex items-start gap-2 text-sm" style={{ color: '#374151' }}>
@@ -136,11 +136,11 @@ export default function CasesPage() {
       </section>
 
       {/* CTA — RED */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 mb-6">
             <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Votre diagnostic</span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>Votre diagnostic</span>
           </div>
           <h2 className="text-3xl font-bold text-white mb-4">Quelle économie pour votre entreprise ?</h2>
           <p className="text-lg mb-8" style={{ color: 'rgba(255,255,255,0.85)' }}>

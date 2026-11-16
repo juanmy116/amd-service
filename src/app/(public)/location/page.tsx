@@ -17,19 +17,21 @@ import {
 } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: "Location d'imprimante & photocopieur à Dakar — AMD Service",
+  title: "Location d'imprimante & photocopieur à Dakar et au Sénégal — AMD Service",
   description:
-    "Louez une imprimante ou photocopieur professionnelle à Dakar sans investissement initial. Coût par copie transparent, maintenance incluse, toner livré automatiquement. AMD Service, +10 ans au Sénégal.",
+    "Louez une imprimante ou un photocopieur professionnel à Dakar et partout au Sénégal, sans investissement initial. Coût par copie transparent, maintenance incluse, toner livré automatiquement. AMD Service, +10 ans au Sénégal.",
   keywords: [
     "location imprimante Dakar",
     "location photocopieur Dakar",
     "coût par copie Sénégal",
     "louer imprimante entreprise Dakar",
     "location multifonction Dakar",
+    "location imprimante Sénégal",
+    "location photocopieur Sénégal",
     "impression gérée Sénégal",
   ],
   openGraph: {
-    title: "Location d'imprimante & photocopieur à Dakar — AMD Service",
+    title: "Location d'imprimante & photocopieur à Dakar et au Sénégal — AMD Service",
     description:
       "Zéro investissement initial. Maintenance, toner et support inclus. Payez uniquement vos copies.",
     locale: 'fr_SN',
@@ -88,7 +90,7 @@ export default function LocationPage() {
     <div style={{ backgroundColor: '#FFFFFF' }}>
 
       {/* 1 — Hero — RED */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div
           className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-px"
           style={{ backgroundColor: 'rgba(255,255,255,0.22)' }}
@@ -98,13 +100,13 @@ export default function LocationPage() {
               <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
               <span
                 className="text-xs font-semibold uppercase tracking-widest text-white"
-                style={{ opacity: 0.75 }}
+                style={{ opacity: 0.85 }}
               >
-                Location d&apos;imprimantes · Dakar, Sénégal
+                Location d&apos;imprimantes · Dakar et tout le Sénégal
               </span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-5 leading-tight">
-              Location d&apos;imprimante et photocopieur à Dakar
+              Location d&apos;imprimante et photocopieur à Dakar et partout au Sénégal
             </h1>
             <p className="text-lg max-w-2xl mb-8 leading-relaxed" style={{ color: 'rgba(255,255,255,0.85)' }}>
               Accédez à des équipements professionnels récents sans investissement initial.
@@ -146,7 +148,7 @@ export default function LocationPage() {
               'Zéro investissement initial',
               'Coût par copie transparent',
               'Maintenance & toner inclus',
-              'Techniciens basés à Dakar',
+              'Intervention partout au Sénégal',
             ].map((item) => (
               <div key={item} className="flex items-center gap-2 text-sm text-white/80">
                 <div className="w-1 h-4 flex-shrink-0 bg-white/50" />
@@ -200,19 +202,19 @@ export default function LocationPage() {
       </section>
 
       {/* 4 — Plans — RED */}
-      <section id="plans" className="py-14 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section id="plans" className="focus-on-dark py-14 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>
+              <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>
                 Nos équipements en location
               </span>
             </div>
             <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
               Choisissez votre équipement
             </h2>
-            <p className="text-base max-w-2xl" style={{ color: 'rgba(255,255,255,0.7)' }}>
+            <p className="text-base max-w-2xl" style={{ color: 'rgba(255,255,255,0.85)' }}>
               Imprimantes A4, multifonctions A3, couleur ou monochrome. Maintenance et toner inclus dans chaque formule.
             </p>
           </div>
@@ -319,16 +321,16 @@ export default function LocationPage() {
       </section>
 
       {/* 9 — CTA final — RED */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark py-20 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 mb-6">
             <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>
               Prochaine étape
             </span>
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Prêt à louer votre imprimante à Dakar ?
+            Prêt à louer votre imprimante au Sénégal ?
           </h2>
           <p className="text-lg mb-8" style={{ color: 'rgba(255,255,255,0.85)' }}>
             Obtenez un audit gratuit de votre parc et un devis personnalisé sous 24h. Sans engagement.

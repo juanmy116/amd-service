@@ -235,13 +235,16 @@ Los bordes de separación son siempre `1px solid #E5E7EB`. En grids de tarjetas 
 ### Inputs / Formularios
 
 - Fondo `#F9FAFB`, borde `#E5E7EB`, texto `#111827`, placeholder `#9CA3AF`.
-- Focus: borde AMD Crimson. Sin glow.
+- Focus: borde AMD Crimson (clase `.field` de `globals.css`). Sin glow.
+- Cada campo lleva su nombre visible encima; el placeholder no hace de etiqueta.
 - `border-radius: 0`.
 
 ### Navigation
 
 - Sticky, fondo `#0B1120` (excepción intencional: el nav mantiene fondo oscuro para contraste con el body claro).
-- Links: texto blanco. Activo: texto AMD Crimson + borde inferior 2px crimson.
+- Links: blanco al 70 %, blanco pleno al pasar el ratón. Activo: blanco en negrita + borde inferior 2px crimson (el rojo como texto sobre el navy no llega a contraste AA).
+- Versión de escritorio a partir de `xl` (1280 px); por debajo, menú desplegable.
+- Foco de teclado: blanco dentro de `.focus-on-dark` (secciones rojas, menú y pie), rojo en el resto.
 - Botón CTA: AMD Crimson.
 
 ### Footer

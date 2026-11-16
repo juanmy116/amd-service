@@ -7,7 +7,7 @@ import { MapPin, Phone, Mail, Clock, CheckCircle } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Contact — AMD Service',
-  description: 'Contactez AMD Service pour un diagnostic gratuit de votre parc d\'impression. Réponse garantie sous 24h. Basés à Dakar, Sénégal.',
+  description: 'Contactez AMD Service pour un diagnostic gratuit de votre parc d\'impression. Réponse garantie sous 24h. Intervention partout au Sénégal.',
 };
 
 export default function ContactPage() {
@@ -15,11 +15,11 @@ export default function ContactPage() {
     <div style={{ backgroundColor: '#FFFFFF' }}>
 
       {/* Hero — RED */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
+      <section className="focus-on-dark py-16 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#BF0D0D' }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
-            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>Contact</span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.85 }}>Contact</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Parlons de votre projet</h1>
           <p className="text-lg max-w-2xl" style={{ color: 'rgba(255,255,255,0.85)' }}>
@@ -56,7 +56,7 @@ export default function ContactPage() {
                 <div className="text-xs font-semibold uppercase tracking-widest mb-5" style={{ color: '#BF0D0D' }}>Informations</div>
                 <div className="space-y-5">
                   {[
-                    { icon: MapPin, label: 'Localisation', value: `${FOOTER.address_fr}, Sénégal` },
+                    { icon: MapPin, label: 'Localisation', value: FOOTER.address_fr },
                     { icon: Phone, label: 'Téléphone', value: FOOTER.phone, href: `tel:${FOOTER.phone}` },
                     { icon: Mail, label: 'Email', value: FOOTER.email, href: `mailto:${FOOTER.email}` },
                     { icon: Clock, label: 'Délai de réponse', value: 'Moins de 24 heures' },
@@ -64,7 +64,7 @@ export default function ContactPage() {
                     <div key={label} className="flex items-start gap-3">
                       <Icon className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#BF0D0D' }} />
                       <div>
-                        <div className="text-xs uppercase tracking-widest mb-0.5" style={{ color: '#9CA3AF' }}>{label}</div>
+                        <div className="text-xs uppercase tracking-widest mb-0.5" style={{ color: '#6B7280' }}>{label}</div>
                         {href
                           ? <a href={href} className="text-sm font-medium transition-opacity hover:opacity-70 cursor-pointer" style={{ color: '#111827' }}>{value}</a>
                           : <p className="text-sm font-medium" style={{ color: '#111827' }}>{value}</p>
@@ -97,7 +97,7 @@ export default function ContactPage() {
               <div className="p-6" style={{ backgroundColor: '#FFFFFF' }}>
                 <div className="text-xs font-semibold uppercase tracking-widest mb-5" style={{ color: '#BF0D0D' }}>Nos garanties</div>
                 <ul className="space-y-3">
-                  {['Audit gratuit sans engagement', 'Devis sous 24h', 'Aucun frais caché', 'Intervention locale Dakar'].map((g) => (
+                  {['Audit gratuit sans engagement', 'Devis sous 24h', 'Aucun frais caché', 'Intervention partout au Sénégal'].map((g) => (
                     <li key={g} className="flex items-center gap-2.5 text-sm" style={{ color: '#374151' }}>
                       <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#BF0D0D' }} />
                       {g}
