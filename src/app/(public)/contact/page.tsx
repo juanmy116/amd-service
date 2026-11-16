@@ -7,7 +7,7 @@ import { MapPin, Phone, Mail, Clock, CheckCircle } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Contact — AMD Service',
-  description: 'Contactez AMD Service pour un diagnostic gratuit de votre parc d\'impression. Réponse garantie sous 24h. Basés à Dakar, Sénégal.',
+  description: 'Contactez AMD Service pour un diagnostic gratuit de votre parc d\'impression. Réponse garantie sous 24h. Intervention partout au Sénégal.',
 };
 
 export default function ContactPage() {
@@ -97,7 +97,7 @@ export default function ContactPage() {
               <div className="p-6" style={{ backgroundColor: '#FFFFFF' }}>
                 <div className="text-xs font-semibold uppercase tracking-widest mb-5" style={{ color: '#BF0D0D' }}>Nos garanties</div>
                 <ul className="space-y-3">
-                  {['Audit gratuit sans engagement', 'Devis sous 24h', 'Aucun frais caché', 'Intervention locale Dakar'].map((g) => (
+                  {['Audit gratuit sans engagement', 'Devis sous 24h', 'Aucun frais caché', 'Intervention partout au Sénégal'].map((g) => (
                     <li key={g} className="flex items-center gap-2.5 text-sm" style={{ color: '#374151' }}>
                       <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#BF0D0D' }} />
                       {g}

@@ -14,7 +14,7 @@ const SUPPORT_ITEMS = [
   {
     Icon: Clock,
     title: 'Intervention sous délai garanti',
-    desc: 'Nos techniciens sont basés à Dakar. Aucun sous-traitant — une équipe propre qui intervient en temps record pour ne pas interrompre votre activité.',
+    desc: 'Nos techniciens interviennent partout au Sénégal. Aucun sous-traitant — une équipe propre qui intervient en temps record pour ne pas interrompre votre activité.',
   },
   {
     Icon: Wrench,
@@ -57,7 +57,7 @@ export default function Home() {
               <div className="flex items-center gap-2 mb-6">
                 <div className="w-1 h-4 bg-white" style={{ opacity: 0.7 }} />
                 <span className="text-xs font-semibold uppercase tracking-widest text-white" style={{ opacity: 0.75 }}>
-                  +10 ans d&apos;expertise · Dakar, Sénégal
+                  +10 ans d&apos;expertise · Partout au Sénégal
                 </span>
               </div>
               <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6 text-white">
@@ -94,7 +94,7 @@ export default function Home() {
       <section className="border-b" style={{ backgroundColor: '#111827', borderColor: '#1E2D45' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="flex flex-wrap justify-center gap-8">
-            {['Zéro investissement initial', 'Maintenance incluse', 'Coût par copie transparent', 'Support local Dakar'].map((item) => (
+            {['Zéro investissement initial', 'Maintenance incluse', 'Coût par copie transparent', 'Support partout au Sénégal'].map((item) => (
               <div key={item} className="flex items-center gap-2 text-sm text-white/80">
                 <div className="w-1 h-4 flex-shrink-0 bg-white/50" />
                 {item}
@@ -116,7 +116,7 @@ export default function Home() {
               La confiance commence par un parc lisible
             </h2>
             <p className="text-sm leading-relaxed mb-6" style={{ color: '#6B7280' }}>
-              Chaque contrat AMD Service est construit autour d&apos;un seul objectif : que votre parc ne s&apos;arrête jamais. Équipements récents, toner livré avant rupture, technicien disponible à Dakar — tout est inclus dès le premier jour.
+              Chaque contrat AMD Service est construit autour d&apos;un seul objectif : que votre parc ne s&apos;arrête jamais. Équipements récents, toner livré avant rupture, technicien disponible partout au Sénégal — tout est inclus dès le premier jour.
             </p>
             <Link
               href="/services"
@@ -188,7 +188,7 @@ export default function Home() {
               Un support qui ne vous laisse jamais tomber
             </h2>
             <p className="text-base max-w-2xl" style={{ color: '#6B7280' }}>
-              Nos techniciens basés à Dakar prennent en charge l&apos;intégralité de vos équipements, de l&apos;installation au suivi quotidien.
+              Partout au Sénégal, nos techniciens prennent en charge l&apos;intégralité de vos équipements, de l&apos;installation au suivi quotidien.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px" style={{ backgroundColor: '#E5E7EB' }}>

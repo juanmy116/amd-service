@@ -24,7 +24,7 @@ export default function Footer() {
               />
             </Link>
             <p className="text-sm leading-relaxed text-slate-400">
-              Location, vente et gestion d&apos;équipements d&apos;impression professionnels à Dakar, Sénégal.
+              Location, vente et gestion d&apos;équipements d&apos;impression professionnels, partout au Sénégal.
             </p>
           </div>
 

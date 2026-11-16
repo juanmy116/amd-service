@@ -3,7 +3,7 @@
 export const SITE = {
   name: 'AMD Service',
   description:
-    'Location, vente et gestion d\'équipements d\'impression professionnels à Dakar, Sénégal',
+    'Location, vente et gestion d\'équipements d\'impression professionnels, partout au Sénégal',
   url: 'https://amd-service.com',
   ogImage: 'https://amd-service.com/og.png',
   locale: 'fr_SN',
@@ -50,7 +50,7 @@ export const BENEFITS = [
   },
   {
     title_fr: 'Support local',
-    description_fr: 'Intervention rapide et assistance technique disponible à Dakar.',
+    description_fr: 'Intervention rapide et assistance technique partout au Sénégal.',
   },
 ];
 

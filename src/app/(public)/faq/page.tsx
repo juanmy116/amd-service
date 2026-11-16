@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'FAQ — AMD Service',
-  description: 'Toutes les réponses sur AMD Service : location d\'équipements, maintenance, coût par copie, contrats et délais d\'intervention à Dakar, Sénégal.',
+  description: 'Toutes les réponses sur AMD Service : location d\'équipements, maintenance, coût par copie, contrats et délais d\'intervention partout au Sénégal.',
 };
 import PhotoFrame from '@/components/PhotoFrame';
 import AccordionItem from '@/components/AccordionItem';
@@ -16,7 +16,7 @@ const FAQ_ITEMS = [
     category: 'Général',
     items: [
       { q: "Qu'est-ce qu'AMD Service ?", a: "AMD Service est une entreprise spécialisée dans la location, la vente et la gestion d'équipements d'impression professionnels pour les entreprises, administrations et institutions au Sénégal. Avec plus de 10 ans d'expérience, nous gérons plus de 1.200 équipements en location et 2.600+ machines sur le territoire." },
-      { q: 'Où est situé AMD Service ?', a: "AMD Service est basé à Dakar, Sénégal. Nous intervenons dans toute la région de Dakar et accompagnons des clients professionnels sur l'ensemble du territoire sénégalais." },
+      { q: 'Où est situé AMD Service ?', a: "Notre siège est à Dakar. Nous intervenons et accompagnons nos clients professionnels sur l'ensemble du territoire sénégalais." },
       { q: 'Quels types de clients accompagnez-vous ?', a: "Entreprises privées, PME, grandes entreprises, administrations publiques, institutions, ONG, organisations internationales, cliniques, hôpitaux, établissements scolaires et universitaires, cabinets professionnels." },
     ],
   },
@@ -41,7 +41,7 @@ const FAQ_ITEMS = [
     items: [
       { q: 'La maintenance est-elle incluse ?', a: "Dans les offres de location et de gestion complète, la maintenance préventive et corrective est incluse. Nos techniciens interviennent pour éviter les pannes avant qu'elles surviennent." },
       { q: "Quel est le délai d'intervention ?", a: "Pour les contrats avec SLA, nous garantissons une intervention dans un délai défini — généralement entre 4h et 24h selon la criticité. Contactez-nous pour les conditions selon votre situation." },
-      { q: 'Avez-vous des techniciens locaux à Dakar ?', a: "Oui. Notre équipe technique est basée à Dakar. Nous ne dépendons pas de prestataires extérieurs pour les interventions courantes." },
+      { q: 'Avez-vous vos propres techniciens ?', a: "Oui. Notre équipe technique intervient partout au Sénégal. Nous ne dépendons pas de prestataires extérieurs pour les interventions courantes." },
     ],
   },
   {

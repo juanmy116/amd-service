@@ -146,7 +146,7 @@ export default function LocationPage() {
               'Zéro investissement initial',
               'Coût par copie transparent',
               'Maintenance & toner inclus',
-              'Techniciens basés à Dakar',
+              'Intervention partout au Sénégal',
             ].map((item) => (
               <div key={item} className="flex items-center gap-2 text-sm text-white/80">
                 <div className="w-1 h-4 flex-shrink-0 bg-white/50" />

@@ -27,7 +27,7 @@ const SOLUTIONS = [
   { icon: Printer, title: 'Équipements professionnels récents', description: 'Accédez à des imprimantes et multifonctions de dernière génération sans immobiliser votre capital.' },
   { icon: LayoutDashboard, title: 'Tableau de bord de consommation', description: 'Suivez votre volume d\'impression, identifiez les postes coûteux et prenez des décisions éclairées.' },
   { icon: Headphones, title: 'Un interlocuteur unique', description: 'Une équipe dédiée gère tout pour vous : équipements, maintenance, toner, support.' },
-  { icon: Users, title: 'Expertise locale Dakar', description: 'Techniciens basés à Dakar, intervention rapide, connaissance du contexte sénégalais.' },
+  { icon: Users, title: 'Expertise locale, partout au Sénégal', description: 'Nos propres techniciens, intervention rapide dans tout le pays, connaissance du contexte sénégalais.' },
 ];
 
 const COMPARISON = [

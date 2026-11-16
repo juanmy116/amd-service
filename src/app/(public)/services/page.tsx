@@ -17,7 +17,7 @@ import {
 export const metadata: Metadata = {
   title: 'Services techniques — Vente, Maintenance & Gestion de parc — AMD Service',
   description:
-    'Vente d\'équipements, maintenance préventive et corrective, gestion de parc et fourniture de consommables à Dakar, Sénégal. AMD Service, +10 ans d\'expertise.',
+    'Vente d\'équipements, maintenance préventive et corrective, gestion de parc et fourniture de consommables partout au Sénégal. AMD Service, +10 ans d\'expertise.',
 };
 
 const SERVICE_ICONS = [Printer, ShoppingCart, BarChart3, Wrench, Package, CreditCard];
