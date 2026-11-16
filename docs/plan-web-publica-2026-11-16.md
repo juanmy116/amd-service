@@ -18,7 +18,7 @@ pule el diseño de una sección cuyo texto o foto va a cambiar.
 | Cabecera de la portada | Se mantiene el **vídeo, con velo oscuro** detrás del texto e imagen fija mientras carga |
 | Fotos | Usar **las fotos propias de AMD que ya hay** (`public/images/Photos/`); donde ninguna encaje, sin foto |
 | «Cas d'usage» | **Ocultarla** (fuera del menú) hasta tener casos y cifras reales |
-| Cobertura | **El servicio y los contratos son para todo Senegal, no solo Dakar.** Ningún texto debe limitar el servicio técnico a Dakar; Dakar queda solo como sede y dirección. Hecho el 2026-11-16 en todas las páginas salvo `/location` (título, H1 y palabras clave pensados para buscar «Dakar»: pendiente de decisión) y `/cases` (se oculta) |
+| Cobertura | **El servicio y los contratos son para todo Senegal, no solo Dakar.** Ningún texto debe limitar el servicio técnico a Dakar; Dakar queda solo como sede y dirección. Hecho el 2026-11-16 en todas las páginas incluida `/location`, que por decisión del usuario dice «à Dakar et partout au Sénégal» para no perder la búsqueda por «Dakar»; `/cases` no se toca (se oculta) |
 
 ---
 
